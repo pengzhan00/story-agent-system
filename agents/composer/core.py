@@ -17,6 +17,7 @@ def compose_theme(
     character_name: str = "",
     mood: str = "epic",
     project_id: int = 0,
+    model: str = DEFAULT_MODEL,
 ) -> dict:
     """
     Create a theme music concept — either for the project overall or a character.
@@ -59,7 +60,7 @@ Output JSON (no markdown):
     result = generate_json(
         prompt=prompt,
         system=COMPOSER_SYSTEM,
-        model=DEFAULT_MODEL,
+        model=model,
         temperature=0.8,
         project_id=project_id,
         agent_type="composer",
@@ -88,6 +89,7 @@ def compose_bgm(
     scene_mood: str,
     characters_present: list,
     project_id: int = 0,
+    model: str = DEFAULT_MODEL,
 ) -> dict:
     """
     Create a BGM concept for a specific scene.
@@ -123,7 +125,7 @@ Output JSON (no markdown):
     result = generate_json(
         prompt=prompt,
         system=COMPOSER_SYSTEM,
-        model=DEFAULT_MODEL,
+        model=model,
         temperature=0.7,
         project_id=project_id,
         agent_type="composer",
@@ -154,13 +156,15 @@ def run_action(action: str, input_data: dict, project_id: int = 0, task_id: int 
         tone = input_data.get("tone", "")
         character_name = input_data.get("character_name", "")
         mood = input_data.get("mood", "epic")
-        result = compose_theme(project_name, genre, tone, character_name, mood, project_id)
+        model = input_data.get("model", DEFAULT_MODEL)
+        result = compose_theme(project_name, genre, tone, character_name, mood, project_id, model)
         return {"result": result}
     elif action == "bgm":
         scene_description = input_data.get("scene_description", "")
         scene_mood = input_data.get("scene_mood", "")
         characters_present = input_data.get("characters_present", [])
-        result = compose_bgm(scene_description, scene_mood, characters_present, project_id)
+        model = input_data.get("model", DEFAULT_MODEL)
+        result = compose_bgm(scene_description, scene_mood, characters_present, project_id, model)
         return {"result": result}
     else:
         return {"error": f"Unknown action: {action}"}

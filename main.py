@@ -5,7 +5,8 @@
 支持一键全流程：创意→剧本→角色→场景→美术→音乐→音效→渲染→导出
 
 Usage:
-  python main.py               # 启动 Gradio Web UI (默认)
+  python main.py               # 启动故事创作 Gradio Web UI (7860)
+  python main.py --render      # 启动独立渲染服务 (7861)
   python main.py --cli         # 命令行模式
   python main.py --demo        # 演示模式
   python main.py --check       # 环境检查
@@ -49,16 +50,6 @@ def check_environment() -> dict:
             results["ollama"] = "❌ 异常"
     except:
         results["ollama"] = "❌ 离线 (请运行 ollama serve)"
-
-    # ComfyUI
-    try:
-        r = req.get("http://127.0.0.1:8188/queue", timeout=5)
-        if r.status_code == 200:
-            results["comfyui"] = "✅ 在线"
-        else:
-            results["comfyui"] = "⚠️ 返回异常"
-    except:
-        results["comfyui"] = "❌ 离线 (请启动 ComfyUI)"
 
     # Database
     db_path = os.path.expanduser("~/myworkspace/projects/story-agent-system/story_agents.db")
@@ -144,6 +135,21 @@ def main():
         for k, v in env.items():
             icon = "✅" if v.startswith("✅") else ("⚠️" if v.startswith("⚠️") else "❌")
             print(f"  {icon} {k}: {v[1:].strip()}")
+        return
+
+    if "--render" in sys.argv:
+        init_db()
+        print("🎬 启动独立渲染服务 (端口 7861)...")
+        from ui.render_app import build_render_ui
+        app = build_render_ui()
+        print("  🌐 http://127.0.0.1:7861")
+        print("  💡 按 Ctrl+C 退出\n")
+        app.launch(
+            server_name="127.0.0.1",
+            server_port=7861,
+            share=False,
+            show_error=True,
+        )
         return
 
     # 默认：启动 Web UI

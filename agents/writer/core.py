@@ -15,6 +15,7 @@ def generate_storyline(
     tone: str = "热血",
     acts: int = 3,
     project_id: int = 0,
+    model: str = DEFAULT_MODEL,
 ) -> dict:
     """
     Generate a full storyline with acts and scene breakdown.
@@ -73,7 +74,7 @@ Output as JSON (no markdown):
     result = generate_json(
         prompt=prompt,
         system=SCREENWRITER_SYSTEM,
-        model=DEFAULT_MODEL,
+        model=model,
         temperature=0.8,
         max_tokens=8192,
         project_id=project_id,
@@ -105,6 +106,7 @@ def expand_scene(
     act_number: int,
     scene_number: int,
     project_id: int = 0,
+    model: str = CREATIVE_MODEL,
 ) -> dict:
     """
     Take an existing scene outline and expand it into full script
@@ -165,7 +167,7 @@ Output as JSON (no markdown):
     result = generate_json(
         prompt=prompt,
         system=SCREENWRITER_SYSTEM,
-        model=CREATIVE_MODEL,
+        model=model,
         temperature=0.8,
         max_tokens=8192,
         project_id=project_id,
@@ -192,13 +194,15 @@ def run_action(action: str, input_data: dict, project_id: int = 0, task_id: int 
         genre = input_data.get("genre", "玄幻")
         tone = input_data.get("tone", "热血")
         acts = input_data.get("acts", 3)
-        result = generate_storyline(premise, genre, tone, acts, project_id)
+        model = input_data.get("model", DEFAULT_MODEL)
+        result = generate_storyline(premise, genre, tone, acts, project_id, model)
         return {"result": result}
     elif action == "expand_scene":
         script_id = input_data.get("script_id", 0)
         act_number = input_data.get("act_number", 1)
         scene_number = input_data.get("scene_number", 1)
-        result = expand_scene(script_id, act_number, scene_number, project_id)
+        model = input_data.get("model", CREATIVE_MODEL)
+        result = expand_scene(script_id, act_number, scene_number, project_id, model)
         return {"result": result}
     else:
         return {"error": f"Unknown action: {action}"}

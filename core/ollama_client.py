@@ -14,6 +14,17 @@ DEFAULT_MODEL = "gemma4:latest"       # Light, fast, good Chinese
 CREATIVE_MODEL = "gemma4:latest"      # For story generation
 DETAIL_MODEL = "deepseek-r1:70b"      # For detailed reasoning (when needed)
 
+STAGE_MODEL_DEFAULTS = {
+    "director": DEFAULT_MODEL,
+    "writer": CREATIVE_MODEL,
+    "character": CREATIVE_MODEL,
+    "scene": CREATIVE_MODEL,
+    "art": DETAIL_MODEL,
+    "music": DEFAULT_MODEL,
+    "sound": DEFAULT_MODEL,
+    "review": DETAIL_MODEL,
+}
+
 # Available models cache
 _available_models: list[str] = []
 
@@ -55,6 +66,20 @@ def _pick_model(preferred: str) -> str:
         if fallback in models:
             return fallback
     return models[0]
+
+
+def resolve_model_profile(selection: str | dict | None = None) -> dict[str, str]:
+    """Resolve a UI/model selection into per-stage concrete models."""
+    if isinstance(selection, dict):
+        merged = dict(STAGE_MODEL_DEFAULTS)
+        merged.update({k: v for k, v in selection.items() if v})
+    else:
+        base = selection or DEFAULT_MODEL
+        merged = {stage: base for stage in STAGE_MODEL_DEFAULTS}
+        merged["art"] = selection or DETAIL_MODEL
+        merged["review"] = selection or DETAIL_MODEL
+
+    return {stage: _pick_model(model_name) for stage, model_name in merged.items()}
 
 
 def generate(

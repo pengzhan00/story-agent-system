@@ -11,14 +11,15 @@ from datetime import datetime, timezone
 
 from .models import (
     Project, Script, Character, SceneAsset,
-    MusicTheme, SoundEffect, PromptTemplate, GenerationLog
+    MusicTheme, SoundEffect, PromptTemplate, GenerationLog,
+    Episode, Shot, RenderJob
 )
 
 T = TypeVar("T")
 _lock = threading.Lock()
 
 DB_PATH = os.path.expanduser(
-    "~/myworkspace/projects/story-agent-system/story_agents.db"
+    "~/myworkspace/projects/story-agent-system/data/story_agents.db"
 )
 
 _table_map = {
@@ -30,6 +31,9 @@ _table_map = {
     SoundEffect: "sound_effects",
     PromptTemplate: "prompt_templates",
     GenerationLog: "generation_logs",
+    Episode: "episodes",
+    Shot: "shots",
+    RenderJob: "render_jobs",
 }
 
 # JSON fields per table (auto-serialized/deserialized)
@@ -38,6 +42,7 @@ _json_fields = {
     "characters": ["relationships", "ip_ref_images"],
     "scenes": ["ref_images"],
     "prompt_templates": ["variables"],
+    "shots": ["characters", "dialogue", "render_payload"],
 }
 
 # ───────── Single connection (thread-safe) ─────────
@@ -61,9 +66,17 @@ def _execute(sql: str, params: tuple = ()):
     """Execute with automatic commit and lock."""
     with _lock:
         c = _get_conn()
-        cur = c.execute(sql, params)
-        c.commit()
-        return cur
+        try:
+            cur = c.execute(sql, params)
+            c.commit()
+            return cur
+        except Exception as e:
+            # 调试：打印 SQL 和参数类型
+            param_types = [(i, type(v).__name__, str(v)[:80]) for i, v in enumerate(params)]
+            print(f"[DB ERROR] {e}", flush=True)
+            print(f"[DB SQL] {sql[:200]}", flush=True)
+            print(f"[DB PARAMS] {param_types}", flush=True)
+            raise
 
 
 def _fetchone(sql: str, params: tuple = ()):
@@ -193,6 +206,56 @@ def init_db():
                 created_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS episodes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                number INTEGER NOT NULL DEFAULT 1,
+                title TEXT NOT NULL DEFAULT '',
+                summary TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'draft',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS shots (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                episode_id INTEGER NOT NULL DEFAULT 0 REFERENCES episodes(id) ON DELETE CASCADE,
+                script_id INTEGER NOT NULL DEFAULT 0 REFERENCES scripts(id) ON DELETE CASCADE,
+                act_number INTEGER NOT NULL DEFAULT 1,
+                scene_number INTEGER NOT NULL DEFAULT 1,
+                shot_number INTEGER NOT NULL DEFAULT 1,
+                location TEXT NOT NULL DEFAULT '',
+                shot_type TEXT NOT NULL DEFAULT '中景',
+                mood TEXT NOT NULL DEFAULT '',
+                time_of_day TEXT NOT NULL DEFAULT '白天',
+                weather TEXT NOT NULL DEFAULT '晴',
+                characters TEXT NOT NULL DEFAULT '[]',
+                narration TEXT NOT NULL DEFAULT '',
+                dialogue TEXT NOT NULL DEFAULT '[]',
+                camera_notes TEXT NOT NULL DEFAULT '',
+                visual_prompt TEXT NOT NULL DEFAULT '',
+                render_payload TEXT NOT NULL DEFAULT '{}',
+                status TEXT NOT NULL DEFAULT 'draft',
+                locked INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS render_jobs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                shot_id INTEGER NOT NULL DEFAULT 0 REFERENCES shots(id) ON DELETE CASCADE,
+                status TEXT NOT NULL DEFAULT 'queued',
+                model_name TEXT NOT NULL DEFAULT '',
+                workflow_name TEXT NOT NULL DEFAULT '',
+                prompt_id TEXT NOT NULL DEFAULT '',
+                output_path TEXT NOT NULL DEFAULT '',
+                error TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
             CREATE INDEX IF NOT EXISTS idx_scripts_project ON scripts(project_id);
             CREATE INDEX IF NOT EXISTS idx_chars_project ON characters(project_id);
             CREATE INDEX IF NOT EXISTS idx_scenes_project ON scenes(project_id);
@@ -200,6 +263,11 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_sfx_project ON sound_effects(project_id);
             CREATE INDEX IF NOT EXISTS idx_logs_project ON generation_logs(project_id);
             CREATE INDEX IF NOT EXISTS idx_logs_agent ON generation_logs(agent_type);
+            CREATE INDEX IF NOT EXISTS idx_episodes_project ON episodes(project_id);
+            CREATE INDEX IF NOT EXISTS idx_shots_project ON shots(project_id);
+            CREATE INDEX IF NOT EXISTS idx_shots_episode ON shots(episode_id);
+            CREATE INDEX IF NOT EXISTS idx_render_jobs_project ON render_jobs(project_id);
+            CREATE INDEX IF NOT EXISTS idx_render_jobs_shot ON render_jobs(shot_id);
 
             CREATE TABLE IF NOT EXISTS task_queue (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -242,14 +310,24 @@ def _row2model(row: sqlite3.Row, cls: Type[T], table: str) -> T:
 
 
 def _ensure_json(d: dict, table: str) -> dict:
-    """Deep copy and ensure JSON fields are serialized."""
+    """Deep copy and ensure JSON fields are serialized.
+    Auto-serializes any list/dict value not just known JSON fields.
+    """
     result = dict(d)
+    # First pass: handle known JSON fields (explicit list in _json_fields)
     for field in _json_fields.get(table, []):
         val = result.get(field)
         if val is not None and not isinstance(val, str):
             result[field] = json.dumps(val, ensure_ascii=False)
         elif val is None:
             result.pop(field, None)
+    # Second pass: catch any other non-string, non-number values
+    # (e.g. agent returns list for tags, instruments, etc.)
+    for field, val in list(result.items()):
+        if val is None:
+            result.pop(field, None)
+        elif isinstance(val, (list, dict)):
+            result[field] = json.dumps(val, ensure_ascii=False)
     # Remove id for INSERT
     if result.get("id") is None:
         result.pop("id", None)
@@ -280,7 +358,10 @@ def _insert(table: str, data: dict) -> int:
 
 def _update(table: str, rid: int, data: dict):
     data = _ensure_json(data, table)
-    data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    col_info = _get_conn().execute(f"PRAGMA table_info({table})").fetchall()
+    col_names = [r[1] for r in col_info]
+    if "updated_at" in col_names:
+        data["updated_at"] = datetime.now(timezone.utc).isoformat()
     sets = ", ".join(f"{k}=?" for k in data)
     _execute(f"UPDATE {table} SET {sets} WHERE id=?", list(data.values()) + [rid])
 
@@ -391,6 +472,12 @@ def delete_sfx(sid: int):
 def list_sfx(project_id: int) -> List[SoundEffect]:
     return _list("sound_effects", SoundEffect, "project_id=?", (project_id,))
 
+def update_music(mid: int, data: dict):
+    _update("music_themes", mid, data)
+
+def update_sfx(sid: int, data: dict):
+    _update("sound_effects", sid, data)
+
 # --- Prompt Templates ---
 def create_prompt(data: dict) -> int:
     return _insert("prompt_templates", data)
@@ -432,6 +519,73 @@ def add_prompt_log(project_id: int, agent_type: str, action_type: str,
         "tokens_out": 0,
         "duration_ms": 0,
     })
+
+
+# --- Episodes ---
+def create_episode(data: dict) -> int:
+    return _insert("episodes", data)
+
+def update_episode(eid: int, data: dict):
+    _update("episodes", eid, data)
+
+def get_episode(eid: int) -> Optional[Episode]:
+    return _get("episodes", Episode, eid)
+
+def list_episodes(project_id: int) -> List[Episode]:
+    return _list("episodes", Episode, "project_id=?", (project_id,))
+
+
+# --- Shots ---
+def create_shot(data: dict) -> int:
+    return _insert("shots", data)
+
+def update_shot(sid: int, data: dict):
+    _update("shots", sid, data)
+
+def get_shot(sid: int) -> Optional[Shot]:
+    return _get("shots", Shot, sid)
+
+def list_shots(project_id: int = 0, episode_id: int = 0, status: str = "") -> List[Shot]:
+    where = []
+    params = []
+    if project_id:
+        where.append("project_id=?")
+        params.append(project_id)
+    if episode_id:
+        where.append("episode_id=?")
+        params.append(episode_id)
+    if status:
+        where.append("status=?")
+        params.append(status)
+    clause = " AND ".join(where) if where else ""
+    q = "SELECT * FROM shots"
+    if clause:
+        q += f" WHERE {clause}"
+    q += " ORDER BY act_number ASC, scene_number ASC, shot_number ASC, id ASC"
+    return [_row2model(r, Shot, "shots") for r in _fetchall(q, tuple(params))]
+
+def delete_shots_by_project(project_id: int):
+    _execute("DELETE FROM shots WHERE project_id=?", (project_id,))
+
+
+# --- Render Jobs ---
+def create_render_job(data: dict) -> int:
+    return _insert("render_jobs", data)
+
+def update_render_job(rid: int, data: dict):
+    _update("render_jobs", rid, data)
+
+def list_render_jobs(project_id: int = 0, shot_id: int = 0) -> List[RenderJob]:
+    where = []
+    params = []
+    if project_id:
+        where.append("project_id=?")
+        params.append(project_id)
+    if shot_id:
+        where.append("shot_id=?")
+        params.append(shot_id)
+    clause = " AND ".join(where) if where else ""
+    return _list("render_jobs", RenderJob, clause, tuple(params))
 
 
 # ══════════════════════════════════════════════

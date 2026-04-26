@@ -22,7 +22,7 @@ Available specialist agents:
 Always respond with a structured plan in JSON format."""
 
 
-def analyze_request(request: str, project_id: int = 0) -> dict:
+def analyze_request(request: str, project_id: int = 0, model: str = DEFAULT_MODEL) -> dict:
     """Analyze a user request and return a production plan."""
     prompt = f"""Analyze this creative request and produce a production plan as JSON:
 
@@ -48,7 +48,7 @@ Output format (JSON, no markdown):
     return generate_json(
         prompt=prompt,
         system=DIRECTOR_SYSTEM,
-        model=DEFAULT_MODEL,
+        model=model,
         temperature=0.3,
         project_id=project_id,
         agent_type="director",

@@ -15,7 +15,7 @@ import sys
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from pipelines.animate_pipeline import submit_workflow, wait_for_completion
+from pipelines.animate_pipeline import submit_workflow, wait_for_completion, build_scene_prompt
 from pipelines.output_manager import (
     ensure_project_dirs, register_scene, load_timeline, save_timeline
 )
@@ -77,34 +77,25 @@ class BatchRenderer:
         return str(latest)
 
     def build_prompt_from_scene(self, scene: dict) -> str:
-        """从场景数据构建 ComfyUI prompt"""
-        location = scene.get("location", "未知场景")
-        mood = scene.get("mood", "平静")
-        weather = scene.get("weather", "晴")
-        time_of_day = scene.get("time_of_day", "白天")
-        narration = scene.get("narration", "")
-        characters = scene.get("characters", [])
-
-        # 从演员描述构建 prompt
-        char_desc = ", ".join(characters) if characters else "一位角色"
-
-        # 主 prompt
-        prompt = (
-            f"anime style, {location}, {weather} weather, {time_of_day}, "
-            f"{mood} atmosphere, {char_desc}, {narration}, "
-            f"cinematic lighting, detailed background, story illustration style, "
-            f"high quality, 2D anime art style"
-        )
-        return prompt
+        """从统一 render_payload 构建 ComfyUI prompt"""
+        return build_scene_prompt(scene)
 
     def render_scene(self, scene: dict, scene_id: str = "") -> Optional[str]:
         """渲染单个场景"""
         import requests as req
+        from core.database import create_render_job, update_render_job, update_shot
 
         if not scene_id:
             scene_id = scene.get("location", f"scene_{int(time.time())}")
+        shot_id = scene.get("shot_id", 0)
 
         prompt_text = self.build_prompt_from_scene(scene)
+        render_job_id = create_render_job({
+            "project_id": self.project_id,
+            "shot_id": shot_id,
+            "status": "running",
+            "workflow_name": "animatediff_workflow",
+        }) if self.project_id and shot_id else 0
 
         # 构建 ComfyUI 工作流
         from pipelines.animate_pipeline import WORKFLOW_FILE
@@ -132,16 +123,24 @@ class BatchRenderer:
         # 提交
         prompt_id = submit_workflow(workflow)
         if not prompt_id:
+            if render_job_id:
+                update_render_job(render_job_id, {"status": "failed", "error": "提交失败"})
             return None
+        if render_job_id:
+            update_render_job(render_job_id, {"prompt_id": prompt_id})
 
         # 等待完成
         outputs = wait_for_completion(prompt_id, timeout=300)
         if not outputs:
+            if render_job_id:
+                update_render_job(render_job_id, {"status": "failed", "error": "渲染超时"})
             return None
 
         # 找生成的视频
         video_path = self.get_latest_video()
         if not video_path:
+            if render_job_id:
+                update_render_job(render_job_id, {"status": "failed", "error": "未找到输出视频"})
             return None
 
         # 复制到项目输出目录
@@ -149,6 +148,18 @@ class BatchRenderer:
         import shutil
         shutil.copy2(video_path, dest)
         self.results.append(str(dest))
+        if render_job_id:
+            update_render_job(render_job_id, {"status": "completed", "output_path": str(dest)})
+        if shot_id:
+            update_shot(shot_id, {"status": "rendered"})
+        register_scene(
+            self.project_name,
+            scene_id=scene_id,
+            video_file=str(dest),
+            duration_sec=2.0,
+            episode=scene.get("episode_number", 1),
+            prompt=prompt_text,
+        )
 
         return str(dest)
 
@@ -165,8 +176,10 @@ class BatchRenderer:
 
         for idx, scene in enumerate(scenes):
             pct = idx / max(len(scenes), 1)
-            self._progress(f"渲染 {idx+1}/{len(scenes)}: {scene.get('location','')}", pct)
-            self.render_scene(scene, scene_id=f"scene_{idx+1:03d}")
+            shot_label = scene.get("location", scene.get("scene_asset", {}).get("name", ""))
+            self._progress(f"渲染 {idx+1}/{len(scenes)}: {shot_label}", pct)
+            scene_id = scene.get("scene_id") or f"scene_{idx+1:03d}"
+            self.render_scene(scene, scene_id=scene_id)
 
         return self.results
 

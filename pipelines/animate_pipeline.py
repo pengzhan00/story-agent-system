@@ -81,42 +81,59 @@ def wait_for_completion(prompt_id: str, timeout: int = 300) -> dict | None:
 
 
 def build_scene_prompt(scene: dict) -> str:
-    """从场景信息构建生成 prompt"""
+    """从统一 render_payload 构建生成 prompt"""
     parts = []
-    
-    # 场景名称和描述
-    name = scene.get("name", scene.get("scene_name", ""))
-    description = scene.get("description", "")
-    setting = scene.get("setting", "")
-    time_info = scene.get("time", "")
+
+    scene_asset = scene.get("scene_asset", {}) or {}
+    character_refs = scene.get("characters", []) or []
+    dialogue = scene.get("dialogue_snippets", []) or []
+
+    location = scene.get("location", scene_asset.get("name", ""))
+    if location:
+        parts.append(location)
+    if scene_asset.get("description"):
+        parts.append(scene_asset["description"])
+    if scene_asset.get("lighting"):
+        parts.append(scene_asset["lighting"])
+    if scene_asset.get("color_palette"):
+        parts.append(f"palette {scene_asset['color_palette']}")
+    if scene_asset.get("atmosphere"):
+        parts.append(scene_asset["atmosphere"])
+
+    time_of_day = scene.get("time_of_day", "")
     weather = scene.get("weather", "")
-    
-    if description:
-        parts.append(description)
-    if setting:
-        parts.append(setting)
-    if time_info:
-        parts.append(time_info)
-    if weather:
-        parts.append(weather)
-    
     mood = scene.get("mood", "")
-    if mood:
-        parts.append(mood)
-    
-    # 角色信息
-    characters = scene.get("characters", "")
-    if characters:
-        parts.append(characters)
-    
-    # 动作/镜头
-    camera = scene.get("camera", "")
-    if camera:
-        parts.append(camera)
-    
-    # 风格标签
-    parts.append("anime style, soft colors, detailed background, high quality")
-    
+    camera_angle = scene.get("camera_angle", "")
+    narration = scene.get("narration", "")
+    style_guide = scene.get("style_guide", "")
+
+    for item in [time_of_day, weather, mood, camera_angle, narration, style_guide]:
+        if item:
+            parts.append(item)
+
+    for char in character_refs:
+        if isinstance(char, dict):
+            char_part = ", ".join(
+                p for p in [char.get("name", ""), char.get("appearance", "")] if p
+            )
+            if char_part:
+                parts.append(char_part)
+        elif char:
+            parts.append(str(char))
+
+    if dialogue:
+        sample_lines = []
+        for line in dialogue[:2]:
+            if isinstance(line, dict):
+                speaker = line.get("character", "")
+                text = line.get("line", "")
+                emotion = line.get("emotion", "")
+                sample_lines.append(" ".join(p for p in [speaker, text, emotion] if p))
+        if sample_lines:
+            parts.append("dialogue beat: " + " | ".join(sample_lines))
+
+    parts.append("anime storyboard frame, cinematic composition, detailed background, consistent character design, high quality")
+
     return ", ".join(p for p in parts if p)
 
 

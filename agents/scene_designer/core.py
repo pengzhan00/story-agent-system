@@ -13,6 +13,7 @@ def design_scene(
     scene_name: str,
     story_context: str,
     project_id: int = 0,
+    model: str = DEFAULT_MODEL,
 ) -> dict:
     """
     Design a complete scene environment asset.
@@ -49,7 +50,7 @@ Output JSON (no markdown):
     result = generate_json(
         prompt=prompt,
         system=SCENE_SYSTEM,
-        model=DEFAULT_MODEL,
+        model=model,
         temperature=0.7,
         max_tokens=4096,
         project_id=project_id,
@@ -83,7 +84,8 @@ def run_action(action: str, input_data: dict, project_id: int = 0, task_id: int 
     if action == "design":
         scene_name = input_data.get("scene_name", "")
         story_context = input_data.get("story_context", "")
-        result = design_scene(scene_name, story_context, project_id)
+        model = input_data.get("model", DEFAULT_MODEL)
+        result = design_scene(scene_name, story_context, project_id, model)
         return {"result": result}
     else:
         return {"error": f"Unknown action: {action}"}

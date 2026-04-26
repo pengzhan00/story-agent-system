@@ -216,3 +216,63 @@ class GenerationLog:
     tokens_out: int = 0
     duration_ms: int = 0
     created_at: str = field(default_factory=_now)
+
+
+# ────────────────────────────────
+#  Production pipeline entities
+# ────────────────────────────────
+
+@dataclass
+class Episode:
+    """Production episode / chapter container."""
+    id: Optional[int] = None
+    project_id: int = 0
+    number: int = 1
+    title: str = ""
+    summary: str = ""
+    status: str = "draft"           # draft | planned | rendering | reviewed | exported
+    created_at: str = field(default_factory=_now)
+    updated_at: str = field(default_factory=_now)
+
+
+@dataclass
+class Shot:
+    """Atomic production shot used by storyboard and rendering."""
+    id: Optional[int] = None
+    project_id: int = 0
+    episode_id: int = 0
+    script_id: int = 0
+    act_number: int = 1
+    scene_number: int = 1
+    shot_number: int = 1
+    location: str = ""
+    shot_type: str = "中景"
+    mood: str = ""
+    time_of_day: str = "白天"
+    weather: str = "晴"
+    characters: str = "[]"          # JSON list
+    narration: str = ""
+    dialogue: str = "[]"            # JSON list
+    camera_notes: str = ""
+    visual_prompt: str = ""
+    render_payload: str = "{}"      # JSON dict
+    status: str = "draft"           # draft | ready | rendering | rendered | approved | rejected
+    locked: int = 0
+    created_at: str = field(default_factory=_now)
+    updated_at: str = field(default_factory=_now)
+
+
+@dataclass
+class RenderJob:
+    """Track individual render attempts for a shot."""
+    id: Optional[int] = None
+    project_id: int = 0
+    shot_id: int = 0
+    status: str = "queued"          # queued | running | completed | failed
+    model_name: str = ""
+    workflow_name: str = ""
+    prompt_id: str = ""
+    output_path: str = ""
+    error: str = ""
+    created_at: str = field(default_factory=_now)
+    updated_at: str = field(default_factory=_now)

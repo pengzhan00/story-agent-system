@@ -14,6 +14,7 @@ def design_character(
     role: str,
     story_context: str,
     project_id: int = 0,
+    model: str = DEFAULT_MODEL,
 ) -> dict:
     """
     Design a complete character based on name and role within the story context.
@@ -57,7 +58,7 @@ Output JSON (no markdown):
     result = generate_json(
         prompt=prompt,
         system=CHARACTER_SYSTEM,
-        model=DEFAULT_MODEL,
+        model=model,
         temperature=0.7,
         max_tokens=4096,
         project_id=project_id,
@@ -96,7 +97,8 @@ def run_action(action: str, input_data: dict, project_id: int = 0, task_id: int 
         name = input_data.get("name", "")
         role = input_data.get("role", "")
         story_context = input_data.get("story_context", "")
-        result = design_character(name, role, story_context, project_id)
+        model = input_data.get("model", DEFAULT_MODEL)
+        result = design_character(name, role, story_context, project_id, model)
         return {"result": result}
     else:
         return {"error": f"Unknown action: {action}"}

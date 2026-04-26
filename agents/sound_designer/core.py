@@ -17,6 +17,7 @@ def design_soundscape(
     time_of_day: str,
     actions: list,
     project_id: int = 0,
+    model: str = DEFAULT_MODEL,
 ) -> dict:
     """
     Design a complete soundscape for a scene — ambient + action sounds.
@@ -77,7 +78,7 @@ Output JSON (no markdown):
     result = generate_json(
         prompt=prompt,
         system=SOUND_SYSTEM,
-        model=DEFAULT_MODEL,
+        model=model,
         temperature=0.6,
         project_id=project_id,
         agent_type="sound_designer",
@@ -130,7 +131,8 @@ def run_action(action: str, input_data: dict, project_id: int = 0, task_id: int 
         weather = input_data.get("weather", "")
         time_of_day = input_data.get("time_of_day", "")
         actions = input_data.get("actions", [])
-        result = design_soundscape(scene_description, location, weather, time_of_day, actions, project_id)
+        model = input_data.get("model", DEFAULT_MODEL)
+        result = design_soundscape(scene_description, location, weather, time_of_day, actions, project_id, model)
         return {"result": result}
     else:
         return {"error": f"Unknown action: {action}"}
