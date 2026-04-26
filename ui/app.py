@@ -519,9 +519,10 @@ def build_ui():
             fn=full_pipeline_flow,
             inputs=[premise, project_name, genre, tone, acts, model],
             outputs=gen_outputs,
+            concurrency_limit=2,
         )
 
-        # 清空
+        # 清空（绕过 queue，防止被生成器堵住）
         clear_btn.click(
             fn=lambda: (
                 "### 📋 管线日志\n等待启动...", None,
@@ -530,40 +531,47 @@ def build_ui():
             ),
             inputs=[],
             outputs=gen_outputs,
+            queue=False,
         )
 
-        # Phase 2: 渲染导出
+        # Phase 2: 渲染导出（生成器，需要 queue 流式输出）
         render_btn.click(
             fn=render_export_flow,
             inputs=[project_id_state, project_name],
             outputs=[render_log, render_results, project_id_state],
+            concurrency_limit=2,
         )
 
-        # 保存
+        # 保存（绕过 queue）
         save_script_btn.click(
             fn=save_script_text,
             inputs=[project_id_state, script_edit],
             outputs=[script_status],
+            queue=False,
         )
         save_char_btn.click(
             fn=save_chars_text,
             inputs=[project_id_state, char_edit],
             outputs=[char_status],
+            queue=False,
         )
         save_scene_btn.click(
             fn=save_scenes_text,
             inputs=[project_id_state, scene_edit],
             outputs=[scene_status],
+            queue=False,
         )
         save_music_btn.click(
             fn=save_music_text,
             inputs=[project_id_state, music_edit],
             outputs=[music_status],
+            queue=False,
         )
         save_sfx_btn.click(
             fn=save_sfx_text,
             inputs=[project_id_state, sfx_edit],
             outputs=[sfx_status],
+            queue=False,
         )
 
     return app

@@ -48,7 +48,7 @@ def submit_workflow(workflow: dict) -> str | None:
     return None
 
 
-def wait_for_completion(prompt_id: str, timeout: int = 300) -> dict | None:
+def wait_for_completion(prompt_id: str, timeout: int = 1800) -> dict | None:
     """等待 ComfyUI 工作流完成，返回 outputs dict"""
     import requests
     start = time.time()

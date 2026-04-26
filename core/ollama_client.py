@@ -27,19 +27,23 @@ STAGE_MODEL_DEFAULTS = {
 
 # Available models cache
 _available_models: list[str] = []
+_last_refresh_failed: bool = False
 
 
 def refresh_models() -> list[str]:
     """Fetch available models from Ollama."""
-    global _available_models
+    global _available_models, _last_refresh_failed
     try:
         resp = requests.get(f"{OLLAMA_BASE}/api/tags", timeout=5)
         if resp.status_code == 200:
             models = [m["name"] for m in resp.json().get("models", [])]
             _available_models = models
+            _last_refresh_failed = False
             return models
     except requests.RequestException:
         pass
+    # On failure, set flag so list_models() won't retry
+    _last_refresh_failed = True
     return _available_models
 
 

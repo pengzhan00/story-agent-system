@@ -20,6 +20,7 @@ from pipelines.output_manager import (
     ensure_project_dirs, register_scene, load_timeline, save_timeline
 )
 
+RENDER_TIMEOUT = 1800  # 30分钟超时
 COMFYUI_URL = "http://127.0.0.1:8188"
 OUTPUT_DIR = PROJECT_ROOT / "output"
 COMFYUI_OUTPUT_DIR = Path(os.path.expanduser("~/Documents/ComfyUI/output"))
@@ -67,7 +68,7 @@ class BatchRenderer:
         return False
 
     def get_latest_video(self, prefix: str = "story_anim") -> Optional[str]:
-        """从 ComfyUI output 目录找到最新的视频文件"""
+        """从 ComfyUI output 目录找到最新的视频文件（向后兼容）"""
         if not COMFYUI_OUTPUT_DIR.exists():
             return None
         videos = list(COMFYUI_OUTPUT_DIR.glob(f"{prefix}*.mp4"))
@@ -80,8 +81,29 @@ class BatchRenderer:
         """从统一 render_payload 构建 ComfyUI prompt"""
         return build_scene_prompt(scene)
 
-    def render_scene(self, scene: dict, scene_id: str = "") -> Optional[str]:
-        """渲染单个场景"""
+    def _find_video_from_outputs(self, outputs: dict) -> Optional[str]:
+        """从 ComfyUI history outputs 中解析真实视频文件路径（不像 glob 那样靠猜）"""
+        from pipelines.animate_pipeline import get_video_output
+        files = get_video_output(outputs)
+        if not files:
+            self._progress(f"  ComfyUI history 无视频记录", 0)
+            return None
+        vf = files[0]
+        filename = vf["filename"]
+        subfolder = vf.get("subfolder", "")
+        file_type = vf.get("type", "output")
+        if subfolder:
+            video_path = COMFYUI_OUTPUT_DIR / subfolder / filename
+        else:
+            video_path = COMFYUI_OUTPUT_DIR / filename
+        if video_path.exists():
+            return str(video_path)
+        self._progress(f"  文件 {video_path} 不存在（可能被清理）", 0)
+        return None
+
+    def render_scene(self, scene: dict, scene_id: str = "",
+                     timeout: int = RENDER_TIMEOUT) -> Optional[str]:
+        """渲染单个场景，等待完成后通过 history 精确匹配输出文件"""
         import requests as req
         from core.database import create_render_job, update_render_job, update_shot
 
@@ -130,14 +152,15 @@ class BatchRenderer:
             update_render_job(render_job_id, {"prompt_id": prompt_id})
 
         # 等待完成
-        outputs = wait_for_completion(prompt_id, timeout=300)
+        self._progress(f"  等待渲染（超时 {timeout}s）...", 0)
+        outputs = wait_for_completion(prompt_id, timeout=timeout)
         if not outputs:
             if render_job_id:
                 update_render_job(render_job_id, {"status": "failed", "error": "渲染超时"})
             return None
 
-        # 找生成的视频
-        video_path = self.get_latest_video()
+        # 找生成的视频（从 history 精确匹配，不用 glob）
+        video_path = self._find_video_from_outputs(outputs)
         if not video_path:
             if render_job_id:
                 update_render_job(render_job_id, {"status": "failed", "error": "未找到输出视频"})
@@ -163,8 +186,8 @@ class BatchRenderer:
 
         return str(dest)
 
-    def render_multi_scene(self, scenes: list[dict]) -> list[str]:
-        """批量渲染多个场景"""
+    def render_multi_scene(self, scenes: list[dict], start_index: int = 0) -> list[str]:
+        """批量渲染多个场景，支持从指定索引继续"""
         self.results = []
         from core.database import add_prompt_log
 
@@ -174,12 +197,17 @@ class BatchRenderer:
                               "ComfyUI 不可用", "ComfyUI not reachable")
             return []
 
-        for idx, scene in enumerate(scenes):
-            pct = idx / max(len(scenes), 1)
+        total = len(scenes)
+        if start_index > 0:
+            self._progress(f"🔄 从第 {start_index+1}/{total} 个场景继续", start_index / max(total, 1))
+
+        for idx in range(start_index, total):
+            scene = scenes[idx]
+            pct = idx / max(total, 1)
             shot_label = scene.get("location", scene.get("scene_asset", {}).get("name", ""))
-            self._progress(f"渲染 {idx+1}/{len(scenes)}: {shot_label}", pct)
+            self._progress(f"🎬 渲染 {idx+1}/{total}: {shot_label}（超时 30min，当前任务从 {start_index+1} 开始）", pct)
             scene_id = scene.get("scene_id") or f"scene_{idx+1:03d}"
-            self.render_scene(scene, scene_id=scene_id)
+            self.render_scene(scene, scene_id=scene_id, timeout=RENDER_TIMEOUT)
 
         return self.results
 

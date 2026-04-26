@@ -493,6 +493,7 @@ def run_pipeline_generator(
 def run_render_export_generator(
     project_id: int,
     project_name: str,
+    start_index: int = 0,
 ) -> Generator[tuple[float, str, dict], None, dict]:
     """Phase 2：从 DB 读取内容，执行渲染+导出。
     yield (progress, log_markdown, partial_result)
@@ -546,8 +547,7 @@ def run_render_export_generator(
         # ── 4. 批量渲染 ──────────────────────────
         if render_scenes:
             renderer = BatchRenderer(project_name, project_id=project_id)
-            # 模拟进度（渲染时再细分）
-            render_results = renderer.render_multi_scene(render_scenes)
+            render_results = renderer.render_multi_scene(render_scenes, start_index=start_index)
             if render_results:
                 result["render"] = render_results
                 yield emit(0.80, f"✅ 渲染完成: {len(render_results)}/{len(render_scenes)}")

@@ -24,6 +24,9 @@ logs/
 *.log
 nohup.out
 
+# ── AI Agent 缓存 ──
+.claude/
+
 # ── 配置文件 ──
 .env
 *.local
