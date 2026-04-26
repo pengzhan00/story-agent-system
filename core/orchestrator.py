@@ -191,6 +191,351 @@ def _create_shot_plan(project_id: int, script_id: int, acts_list: list, result: 
     return created
 
 
+# ─── 独立阶段 Generator（每个阶段可单独运行）─────────
+
+def run_stage_story(
+    project_id: int,
+    premise: str,
+    project_name: str = "",
+    genre: str = "玄幻",
+    tone: str = "热血",
+    acts: int = 3,
+    model: str = DEFAULT_MODEL,
+) -> Generator[tuple[float, str, dict], None, dict]:
+    """阶段1: 导演分析 + 创建项目 + 生成剧本。已有剧本则跳过。"""
+    log_entries: list[str] = []
+    result: dict = {"project_id": project_id, "script_id": 0, "acts_list": []}
+
+    def emit(pct, msg):
+        ts = time.strftime("%H:%M:%S")
+        log_entries.append(f"[{ts}] {msg}")
+        yield pct, _format_log(log_entries), result
+
+    try:
+        from core.ollama_client import refresh_models
+        refresh_models()
+
+        from agents.director.core import analyze_request
+        yield from emit(0.05, "🎬 导演分析创作构想...")
+        analysis = analyze_request(premise, model=model)
+        if not project_name:
+            project_name = analysis.get("project_name", "未命名项目")
+        genre = genre or analysis.get("genre", "玄幻")
+        tone = tone or analysis.get("tone", "热血")
+        yield from emit(0.15, f"✅ 分析完成 → {project_name} ({genre}/{tone})")
+
+        if project_id:
+            proj = get_project(project_id)
+            if proj:
+                yield from emit(0.18, f"📁 使用已有项目: {proj.name} (ID:{project_id})")
+                project_name = proj.name
+            else:
+                project_id = 0
+        if not project_id:
+            project_id = create_project({
+                "name": project_name,
+                "description": f"{premise[:200]}...",
+                "genre": genre,
+                "status": "active",
+            })
+            result["project_id"] = project_id
+            yield from emit(0.20, f"📁 项目已创建: {project_name} (ID:{project_id})")
+        result["project_id"] = project_id
+
+        existing = list_scripts(project_id)
+        if existing:
+            result["script_id"] = existing[0].id
+            try:
+                result["acts_list"] = json.loads(existing[0].acts or "[]")
+            except Exception:
+                result["acts_list"] = []
+            yield from emit(1.0, f"✅ 已有剧本「{existing[0].title}」，跳过生成")
+            return result
+
+        from agents.writer.core import generate_storyline
+        yield from emit(0.30, "✍️ 编剧生成剧本大纲...")
+        script_data = generate_storyline(
+            premise=premise, genre=genre, tone=tone,
+            acts=acts, project_id=project_id, model=model,
+        )
+        if script_data and "title" in script_data:
+            result["script_id"] = script_data.get("id", 0)
+            result["acts_list"] = script_data.get("acts", [])
+            yield from emit(1.0, f"✅ 剧本完成: {script_data['title']} ({len(result['acts_list'])} 幕)")
+        else:
+            yield from emit(1.0, "⚠️ 剧本生成失败，可重试")
+    except Exception as e:
+        import traceback
+        yield from emit(0.0, f"❌ 剧本阶段出错: {e}\n{traceback.format_exc()[:400]}")
+    return result
+
+
+def run_stage_characters(
+    project_id: int,
+    model: str = DEFAULT_MODEL,
+) -> Generator[tuple[float, str, dict], None, dict]:
+    """阶段2: 从剧本提取角色名 → 设计角色。已有角色则跳过。"""
+    log_entries: list[str] = []
+    result: dict = {"project_id": project_id, "characters": []}
+
+    def emit(pct, msg):
+        ts = time.strftime("%H:%M:%S")
+        log_entries.append(f"[{ts}] {msg}")
+        yield pct, _format_log(log_entries), result
+
+    try:
+        proj = get_project(project_id)
+        if not proj:
+            yield from emit(0.0, "❌ 项目不存在"); return result
+
+        existing_chars = list_characters(project_id)
+        if existing_chars:
+            result["characters"] = [{"id": c.id, "name": c.name} for c in existing_chars]
+            yield from emit(1.0, f"✅ 已有 {len(existing_chars)} 个角色，跳过设计")
+            return result
+
+        scripts = list_scripts(project_id)
+        if not scripts:
+            yield from emit(0.0, "❌ 未找到剧本，请先运行剧本阶段"); return result
+
+        acts_list = json.loads(scripts[0].acts or "[]")
+        all_chars: set[str] = set()
+        for act in acts_list:
+            for sc in act.get("scenes", []):
+                all_chars.update(sc.get("characters", []))
+
+        story_context = (
+            f"项目：{proj.name}\n类型：{proj.genre}\n"
+            f"故事大纲：{scripts[0].synopsis or ''}[:500]"
+        )
+        from agents.character_designer.core import design_character
+        yield from emit(0.05, f"👤 设计 {len(all_chars)} 个角色...")
+        for i, name in enumerate(sorted(all_chars)[:8]):
+            role = "主角" if i == 0 else "配角"
+            data = design_character(
+                name=name, role=role,
+                story_context=story_context, project_id=project_id, model=model,
+            )
+            if data and "name" in data:
+                result["characters"].append({"id": data.get("id", 0), "name": data["name"]})
+                pct = 0.1 + 0.85 * (i + 1) / max(len(all_chars), 1)
+                yield from emit(pct, f"  → {data['name']} ({role})")
+
+        yield from emit(1.0, f"✅ 角色设计完成: {len(result['characters'])} 个")
+    except Exception as e:
+        import traceback
+        yield from emit(0.0, f"❌ 角色阶段出错: {e}\n{traceback.format_exc()[:400]}")
+    return result
+
+
+def run_stage_scenes(
+    project_id: int,
+    model: str = DEFAULT_MODEL,
+) -> Generator[tuple[float, str, dict], None, dict]:
+    """阶段3: 从剧本提取场景位置 → 设计场景资产。已有场景则跳过。"""
+    log_entries: list[str] = []
+    result: dict = {"project_id": project_id, "scenes": []}
+
+    def emit(pct, msg):
+        ts = time.strftime("%H:%M:%S")
+        log_entries.append(f"[{ts}] {msg}")
+        yield pct, _format_log(log_entries), result
+
+    try:
+        proj = get_project(project_id)
+        if not proj:
+            yield from emit(0.0, "❌ 项目不存在"); return result
+
+        existing = list_scene_assets(project_id)
+        if existing:
+            result["scenes"] = [{"id": s.id, "name": s.name} for s in existing]
+            yield from emit(1.0, f"✅ 已有 {len(existing)} 个场景，跳过设计")
+            return result
+
+        scripts = list_scripts(project_id)
+        if not scripts:
+            yield from emit(0.0, "❌ 未找到剧本，请先运行剧本阶段"); return result
+
+        acts_list = json.loads(scripts[0].acts or "[]")
+        all_scenes: dict[str, dict] = {}
+        for act in acts_list:
+            for sc in act.get("scenes", []):
+                loc = sc.get("location", "")
+                if loc and loc not in all_scenes:
+                    all_scenes[loc] = sc
+
+        from agents.scene_designer.core import design_scene
+        yield from emit(0.05, f"🏞️ 设计 {len(all_scenes)} 个场景...")
+        for i, (loc, sc_data) in enumerate(all_scenes.items()):
+            data = design_scene(
+                scene_name=loc,
+                story_context=json.dumps(sc_data, ensure_ascii=False),
+                project_id=project_id, model=model,
+            )
+            if data and "name" in data:
+                result["scenes"].append({"id": data.get("id", 0), "name": data["name"]})
+                pct = 0.1 + 0.85 * (i + 1) / max(len(all_scenes), 1)
+                yield from emit(pct, f"  → {data['name']}")
+
+        yield from emit(1.0, f"✅ 场景设计完成: {len(result['scenes'])} 个")
+    except Exception as e:
+        import traceback
+        yield from emit(0.0, f"❌ 场景阶段出错: {e}\n{traceback.format_exc()[:400]}")
+    return result
+
+
+def run_stage_art_music_sfx(
+    project_id: int,
+    model: str = DEFAULT_MODEL,
+) -> Generator[tuple[float, str, dict], None, dict]:
+    """阶段4: 美术指导 + 音乐主题 + 音效。已有数据则跳过。"""
+    log_entries: list[str] = []
+    result: dict = {"project_id": project_id, "art_style": {}, "music": [], "sfx": []}
+
+    def emit(pct, msg):
+        ts = time.strftime("%H:%M:%S")
+        log_entries.append(f"[{ts}] {msg}")
+        yield pct, _format_log(log_entries), result
+
+    try:
+        proj = get_project(project_id)
+        if not proj:
+            yield from emit(0.0, "❌ 项目不存在"); return result
+
+        scripts = list_scripts(project_id)
+        acts_list = json.loads(scripts[0].acts or "[]") if scripts else []
+
+        existing_music = list_music(project_id)
+        existing_sfx = list_sfx(project_id)
+        if existing_music and existing_sfx:
+            result["music"] = [{"id": m.id, "name": m.name} for m in existing_music]
+            result["sfx"] = [{"id": s.id, "name": s.name} for s in existing_sfx]
+            yield from emit(1.0, f"✅ 已有音乐 {len(existing_music)} 首 / 音效 {len(existing_sfx)} 条，跳过")
+            return result
+
+        from agents.art_director.core import define_color_palette, design_camera_language
+        yield from emit(0.05, "🎨 美术指导定义视觉风格...")
+        palette = define_color_palette(
+            project_name=proj.name, genre=proj.genre,
+            tone="热血", project_id=project_id, model=model,
+        )
+        if palette and "name" in palette:
+            result["art_style"]["palette"] = palette
+            yield from emit(0.15, f"  → 色调: {palette.get('name')}")
+
+        moods = [sc.get("mood", "") for act in acts_list for sc in act.get("scenes", []) if sc.get("mood")]
+        if moods:
+            camera = design_camera_language(
+                genre=proj.genre, mood_sequence=moods[:5],
+                project_id=project_id, model=model,
+            )
+            if camera and "overall_style" in camera:
+                result["art_style"]["camera"] = camera
+                yield from emit(0.22, f"  → 镜头风格: {camera.get('overall_style','')[:60]}")
+
+        from agents.composer.core import compose_theme, compose_bgm
+        yield from emit(0.30, "🎵 作曲师创作音乐...")
+        theme = compose_theme(
+            project_name=proj.name, genre=proj.genre,
+            tone="热血", mood="epic", project_id=project_id, model=model,
+        )
+        if theme and "name" in theme:
+            result["music"].append({"id": theme.get("id", 0), "name": theme["name"], "type": "theme"})
+            yield from emit(0.40, f"  → 主题曲: {theme['name']}")
+
+        for act in acts_list[:1]:
+            for sc in act.get("scenes", [])[:3]:
+                bgm = compose_bgm(
+                    scene_description=sc.get("location", ""),
+                    scene_mood=sc.get("mood", "平静"),
+                    characters_present=sc.get("characters", []),
+                    project_id=project_id, model=model,
+                )
+                if bgm and "name" in bgm:
+                    result["music"].append({"id": bgm.get("id", 0), "name": bgm["name"], "type": "bgm"})
+
+        yield from emit(0.55, f"音乐完成: {len(result['music'])} 首")
+
+        from agents.sound_designer.core import design_soundscape
+        yield from emit(0.60, "🔊 音效设计师规划音效...")
+        all_scenes_desc = "; ".join(
+            f"{act_sc.get('location','')}({act_sc.get('mood','')})"
+            for act in acts_list for act_sc in act.get("scenes", [])[:4]
+        )
+        design_soundscape(
+            scene_description=f"项目「{proj.name}」({proj.genre}) {all_scenes_desc}",
+            location="多场景", weather="晴", time_of_day="全天",
+            actions=["对话", "动作", "环境"], project_id=project_id, model=model,
+        )
+        sfx_items = list_sfx(project_id)
+        result["sfx"] = [{"id": s.id, "name": s.name} for s in sfx_items]
+        yield from emit(1.0, f"✅ 美术/音乐/音效完成，音效 {len(sfx_items)} 条")
+    except Exception as e:
+        import traceback
+        yield from emit(0.0, f"❌ 美术/音乐/音效阶段出错: {e}\n{traceback.format_exc()[:400]}")
+    return result
+
+
+def run_stage_shots(
+    project_id: int,
+) -> Generator[tuple[float, str, dict], None, dict]:
+    """阶段5: 根据剧本+角色+场景生成分镜计划。每次运行都会重新生成（幂等）。"""
+    log_entries: list[str] = []
+    result: dict = {"project_id": project_id, "shots": []}
+
+    def emit(pct, msg):
+        ts = time.strftime("%H:%M:%S")
+        log_entries.append(f"[{ts}] {msg}")
+        yield pct, _format_log(log_entries), result
+
+    try:
+        proj = get_project(project_id)
+        if not proj:
+            yield from emit(0.0, "❌ 项目不存在"); return result
+
+        scripts = list_scripts(project_id)
+        if not scripts:
+            yield from emit(0.0, "❌ 未找到剧本，请先运行剧本阶段"); return result
+
+        acts_list = json.loads(scripts[0].acts or "[]")
+        art_result: dict = {}  # art_style not persisted simply, reconstruct from DB if needed
+
+        yield from emit(0.10, "🎞️ 生成分镜计划...")
+        shots = _create_shot_plan(
+            project_id=project_id,
+            script_id=scripts[0].id,
+            acts_list=acts_list,
+            result=art_result,
+        )
+        result["shots"] = shots
+        yield from emit(1.0, f"✅ 分镜规划完成: {len(shots)} 个镜头")
+    except Exception as e:
+        import traceback
+        yield from emit(0.0, f"❌ 分镜阶段出错: {e}\n{traceback.format_exc()[:400]}")
+    return result
+
+
+def _stage_status(project_id: int) -> dict:
+    """快速检查各阶段完成状态，返回 dict。"""
+    scripts = list_scripts(project_id)
+    chars = list_characters(project_id)
+    scenes = list_scene_assets(project_id)
+    music = list_music(project_id)
+    sfx = list_sfx(project_id)
+    shots = list_shots(project_id=project_id)
+    return {
+        "story":    bool(scripts),
+        "chars":    bool(chars),
+        "scenes":   bool(scenes),
+        "art_music_sfx": bool(music) and bool(sfx),
+        "shots":    bool(shots),
+        "script_title": scripts[0].title if scripts else "",
+        "n_chars":  len(chars),
+        "n_scenes": len(scenes),
+        "n_shots":  len(shots),
+    }
+
+
 # ─── 核心管线（Generator 版本，支持流式输出）──────────
 
 def run_pipeline_generator(
@@ -200,292 +545,128 @@ def run_pipeline_generator(
     tone: str = "热血",
     acts: int = 3,
     model: str = DEFAULT_MODEL,
+    model_profile: Optional[dict] = None,
     enable_render: bool = False,
+    project_id: int = 0,
 ) -> Generator[tuple[float, str, Optional[dict]], None, dict]:
     """
-    Generator 版本的一键全流程管线。
-    每次 yield (progress, log_markdown, partial_result_or_None)。
-    最终 return 完整结果 dict。
+    一键全流程管线 — 串行调用各阶段 Stage Generator。
+    model_profile: {stage: model_name} 字典，优先于 model 参数。
+    project_id: 指定已有项目则继续，未指定则新建。
     """
     log_entries: list[str] = []
     result = {
-        "project_id": 0, "script_id": 0,
-        "characters": [], "scenes": [],
-        "shots": [],
+        "project_id": project_id, "script_id": 0,
+        "characters": [], "scenes": [], "shots": [],
         "art_style": {}, "music": [], "sfx": [],
-        "render": [], "export": None,
-        "model_profile": {},
-        "error": None,
+        "render": [], "export": None, "error": None,
     }
-    pid = 0
 
-    def emit(pct: float, msg: str):
+    if model_profile is None:
+        model_profile = resolve_model_profile(model)
+
+    def emit(pct, msg):
         ts = time.strftime("%H:%M:%S")
         log_entries.append(f"[{ts}] {msg}")
         yield pct, _format_log(log_entries), result
 
+    def relay(stage_gen, pct_offset: float = 0.0, pct_scale: float = 1.0):
+        """Relay a stage generator's progress into this generator's log."""
+        try:
+            while True:
+                pct, _, partial = next(stage_gen)
+                ts = time.strftime("%H:%M:%S")
+                # absorb stage's last log line into our log
+                if partial:
+                    result.update({k: v for k, v in partial.items() if v})
+                yield pct_offset + pct * pct_scale, _format_log(log_entries), result
+        except StopIteration as e:
+            return e.value if e.value else {}
+
     try:
-        # ── 0. 探测 Ollama ──────────────────────
         from core.ollama_client import refresh_models, list_models
         refresh_models()
         models = list_models()
-        yield from emit(0.01, f"🤖 Ollama 在线: {len(models)} 个模型可用")
-        model_profile = resolve_model_profile(model)
-        result["model_profile"] = model_profile
+        yield from emit(0.01, f"🤖 Ollama: {len(models)} 个模型可用")
 
-        # ── 1. 导演分析 ─────────────────────────
-        from agents.director.core import analyze_request
-        yield from emit(0.02, "🎬 导演分析创作构想...")
-        analysis = analyze_request(premise, model=model_profile["director"])
+        # Stage 1: 剧本
+        yield from emit(0.02, "=== 阶段1: 剧本生成 ===")
+        for pct, log_md, partial in run_stage_story(
+            project_id=project_id, premise=premise, project_name=project_name,
+            genre=genre, tone=tone, acts=acts, model=model_profile.get("writer", model),
+        ):
+            result.update({k: v for k, v in partial.items() if v})
+            yield 0.02 + pct * 0.18, log_md, result
+        project_id = result.get("project_id", project_id)
+        if not project_id:
+            yield from emit(0.20, "❌ 项目创建失败，中止")
+            return result
 
-        if not project_name:
-            project_name = analysis.get("project_name", "未命名项目")
-        if not genre:
-            genre = analysis.get("genre", "玄幻")
-        if not tone:
-            tone = analysis.get("tone", "热血")
+        # Stage 2: 角色
+        yield from emit(0.21, "=== 阶段2: 角色设计 ===")
+        for pct, log_md, partial in run_stage_characters(
+            project_id=project_id, model=model_profile.get("character", model),
+        ):
+            result.update({k: v for k, v in partial.items() if v})
+            yield 0.21 + pct * 0.14, log_md, result
 
-        yield from emit(0.05, f"✅ 导演分析完成 → {project_name} ({genre}/{tone})")
+        # Stage 3: 场景
+        yield from emit(0.36, "=== 阶段3: 场景设计 ===")
+        for pct, log_md, partial in run_stage_scenes(
+            project_id=project_id, model=model_profile.get("scene", model),
+        ):
+            result.update({k: v for k, v in partial.items() if v})
+            yield 0.36 + pct * 0.14, log_md, result
 
-        # ── 2. 创建项目 ─────────────────────────
-        pid = create_project({
-            "name": project_name,
-            "description": f"{premise[:200]}...",
-            "genre": genre,
-            "status": "active",
-        })
-        result["project_id"] = pid
-        yield from emit(0.08, f"📁 项目已创建: {project_name} (ID:{pid})")
+        # Stage 4: 美术/音乐/音效
+        yield from emit(0.51, "=== 阶段4: 美术/音乐/音效 ===")
+        for pct, log_md, partial in run_stage_art_music_sfx(
+            project_id=project_id, model=model_profile.get("art", model),
+        ):
+            result.update({k: v for k, v in partial.items() if v})
+            yield 0.51 + pct * 0.14, log_md, result
 
-        # ── 3. 生成剧本 ─────────────────────────
-        from agents.writer.core import generate_storyline
-        yield from emit(0.10, "✍️ 编剧生成剧本大纲...")
-        script_data = generate_storyline(
-            premise=premise, genre=genre, tone=tone,
-            acts=acts, project_id=pid, model=model_profile["writer"],
-        )
-        if script_data and "title" in script_data:
-            result["script_id"] = script_data.get("id", 0)
-            result["script_synopsis"] = script_data.get("synopsis", "")
-            title = script_data.get("title", "")
-            synopsis = script_data.get("synopsis", "")[:60]
-            yield from emit(0.15, f"✅ 剧本完成: {title} ({synopsis}...)")
+        # Stage 5: 分镜
+        yield from emit(0.66, "=== 阶段5: 分镜规划 ===")
+        for pct, log_md, partial in run_stage_shots(project_id=project_id):
+            result.update({k: v for k, v in partial.items() if v})
+            yield 0.66 + pct * 0.08, log_md, result
 
-        acts_list = script_data.get("acts", []) if script_data else []
+        proj = get_project(project_id)
+        if proj:
+            update_project(project_id, {"status": "completed"})
+        yield from emit(0.75, "🎉 内容生成完成！")
 
-        # ── 4. 设计角色 ─────────────────────────
-        from agents.character_designer.core import design_character
-        yield from emit(0.20, "👤 角色设计师创建角色...")
-        all_chars = set()
-        for act in acts_list:
-            for sc in act.get("scenes", []):
-                for char_name in sc.get("characters", []):
-                    all_chars.add(char_name)
-        story_context = (
-            f"项目：{project_name}\\n类型：{genre}\\n基调：{tone}\\n"
-            f"故事大纲：{script_data.get('synopsis', premise)[:500]}"
-        )
-        for i, char_name in enumerate(sorted(all_chars)[:5]):
-            role = "主角" if i == 0 else "配角"
-            char_data = design_character(
-                name=char_name, role=role,
-                story_context=story_context, project_id=pid,
-                model=model_profile["character"],
-            )
-            if char_data and "name" in char_data:
-                result["characters"].append({
-                    "id": char_data.get("id", 0), "name": char_data.get("name", char_name)
-                })
-                yield from emit(0.22 + 0.02 * i,
-                                f"  → 角色: {char_data.get('name')} ({role})")
-        yield from emit(0.28, f"角色设计完成: {len(result['characters'])} 个")
-
-        # ── 5. 设计场景 ─────────────────────────
-        from agents.scene_designer.core import design_scene
-        yield from emit(0.32, "🏞️ 场景设计师构建场景...")
-        all_scenes = {}
-        for act in acts_list:
-            for sc in act.get("scenes", []):
-                loc_name = sc.get("location", "未知场景")
-                if loc_name not in all_scenes:
-                    all_scenes[loc_name] = sc
-        for idx, (loc_name, sc_data) in enumerate(all_scenes.items()):
-            scene_result = design_scene(
-                scene_name=loc_name,
-                story_context=json.dumps(sc_data, ensure_ascii=False),
-                project_id=pid,
-                model=model_profile["scene"],
-            )
-            if scene_result and "name" in scene_result:
-                result["scenes"].append({
-                    "id": scene_result.get("id", 0), "name": scene_result.get("name", loc_name)
-                })
-                yield from emit(0.33 + 0.02 * idx / max(len(all_scenes), 1),
-                                f"  → 场景: {scene_result.get('name')}")
-        yield from emit(0.38, f"场景设计完成: {len(result['scenes'])} 个")
-
-        # ── 6. 美术指导 ─────────────────────────
-        from agents.art_director.core import (
-            define_color_palette, design_camera_language,
-            review_visual_consistency,
-        )
-        yield from emit(0.42, "🎨 美术指导定义视觉风格...")
-        palette = define_color_palette(
-            project_name=project_name, genre=genre,
-            tone=tone, project_id=pid, model=model_profile["art"],
-        )
-        if palette and "name" in palette:
-            result["art_style"]["palette"] = palette
-            add_prompt_log(pid, "art_director", "color_palette",
-                           f"调色板:{project_name}",
-                           json.dumps(palette, ensure_ascii=False))
-            colors = palette.get("primary_colors", [])
-            yield from emit(0.45,
-                            f"  → 色调方案: {palette.get('name')} ({len(colors)} 种主色)")
-
-        # 镜头语言
-        moods = []
-        for act in acts_list:
-            for sc in act.get("scenes", []):
-                if sc.get("mood"):
-                    moods.append(sc["mood"])
-        if moods:
-            camera_lang = design_camera_language(
-                genre=genre, mood_sequence=moods[:5],
-                project_id=pid, model=model_profile["art"],
-            )
-            if camera_lang and "overall_style" in camera_lang:
-                result["art_style"]["camera"] = camera_lang
-                add_prompt_log(pid, "art_director", "camera_language",
-                               f"镜头语言:{genre}",
-                               json.dumps(camera_lang, ensure_ascii=False))
-                yield from emit(0.48,
-                                f"  → 镜头风格: {camera_lang.get('overall_style', '')[:60]}")
-        yield from emit(0.50, "✅ 美术指导完成")
-
-        # ── 7. 音乐 ─────────────────────────────
-        from agents.composer.core import compose_theme, compose_bgm
-        yield from emit(0.52, "🎵 作曲师创作音乐概念...")
-        theme = compose_theme(
-            project_name=project_name, genre=genre,
-            tone=tone, mood="epic", project_id=pid,
-            model=model_profile["music"],
-        )
-        if theme and "name" in theme:
-            result["music"].append({
-                "id": theme.get("id", 0), "name": theme.get("name"), "type": "theme"
-            })
-            yield from emit(0.55, f"  → 主题曲: {theme.get('name')}")
-
-        for i, act in enumerate(acts_list[:1]):
-            for sc in act.get("scenes", [])[:3]:
-                bgm = compose_bgm(
-                    scene_description=sc.get("location", "未知场景"),
-                    scene_mood=sc.get("mood", "平静"),
-                    characters_present=sc.get("characters", []),
-                    project_id=pid,
-                    model=model_profile["music"],
-                )
-                if bgm and "name" in bgm:
-                    result["music"].append({
-                        "id": bgm.get("id", 0), "name": bgm.get("name"), "type": "bgm"
-                    })
-        yield from emit(0.60, f"音乐概念完成: {len(result['music'])} 首")
-
-        # ── 8. 音效设计 ─────────────────────────
-        from agents.sound_designer.core import design_soundscape
-        yield from emit(0.63, "🔊 音效设计师规划音效...")
-        all_scene_desc = "; ".join(
-            f"{loc}({sd.get('mood','平静')})"
-            for loc, sd in list(all_scenes.items())[:5]
-        )
-        sfx_plan = design_soundscape(
-            scene_description=(
-                f"项目「{project_name}」({genre}) "
-                f"共{len(all_scenes)}个场景: {all_scene_desc}"
-            ),
-            location="多场景",
-            weather=next(iter(all_scenes.values()), {}).get("weather", "晴"),
-            time_of_day="全天",
-            actions=["对话", "动作", "环境过渡"],
-            project_id=pid,
-            model=model_profile["sound"],
-        )
-        sfx_items = list_sfx(pid)
-        result["sfx"] = [{"id": s.id, "name": s.name, "category": s.category} for s in sfx_items]
-        if sfx_items:
-            yield from emit(0.68, f"  → 音效资产: {len(sfx_items)} 条")
-        yield from emit(0.70, "✅ 音效设计完成")
-
-        # ── 8.5 分镜规划 ───────────────────────
-        result["shots"] = _create_shot_plan(
-            project_id=pid,
-            script_id=result["script_id"],
-            acts_list=acts_list,
-            result=result,
-        )
-        yield from emit(0.74, f"🎞️ 分镜规划完成: {len(result['shots'])} 个镜头")
-
-        # ── 9. 渲染（可选）────────────────────────
+        # Stage 6: 渲染（可选）
         if enable_render:
-            yield from emit(0.75, "🎬 检查 ComfyUI 状态...")
+            yield from emit(0.76, "=== 阶段6: 渲染 ===")
             comfy_online = _ensure_comfyui()
             if comfy_online:
-                yield from emit(0.78, "✅ ComfyUI 在线，开始批量渲染...")
                 from pipelines.batch_renderer import BatchRenderer
-
-                # 从剧本场景构建渲染场景数据
-                render_scenes = [json.loads(s.render_payload) for s in list_shots(project_id=pid)]
-
-                if render_scenes:
-                    renderer = BatchRenderer(project_name, project_id=pid)
-                    render_results = renderer.render_multi_scene(render_scenes)
-                    if render_results:
-                        result["render"] = render_results
-                        yield from emit(0.85,
-                                        f"✅ 渲染完成: {len(render_results)}/{len(render_scenes)} 个场景")
-                    else:
-                        yield from emit(0.83,
-                                        "⚠️ 渲染未生成视频（ComfyUI 处理中或异常）")
-                else:
-                    yield from emit(0.80, "⚠️ 没有可渲染的场景数据")
+                proj = get_project(project_id)
+                pname = proj.name if proj else "未知项目"
+                render_scenes = []
+                for shot in list_shots(project_id=project_id):
+                    payload = shot.render_payload
+                    if isinstance(payload, str):
+                        payload = json.loads(payload) if payload else {}
+                    render_scenes.append(payload)
+                renderer = BatchRenderer(pname, project_id=project_id)
+                render_results = renderer.render_multi_scene(render_scenes)
+                result["render"] = render_results
+                yield from emit(0.92, f"渲染完成: {len(render_results)}/{len(render_scenes)}")
             else:
-                yield from emit(0.78, "⚠️ ComfyUI 离线，跳过渲染")
-                result["render"] = ["跳过（ComfyUI 离线）"]
+                yield from emit(0.80, "⚠️ ComfyUI 离线，跳过渲染")
         else:
-            yield from emit(0.72, "⏭️ 渲染未启用（可勾选「启用渲染」重新运行）")
-
-        # ── 10. 导出 ────────────────────────────
-        if enable_render and result.get("render"):
-            yield from emit(0.90, "📦 合并导出视频...")
-            from pipelines.output_manager import merge_episode, export_project
-            try:
-                merged = merge_episode(project_name, episode=1, overwrite=True)
-                if merged and os.path.exists(merged):
-                    result["export"] = merged
-                    size_mb = os.path.getsize(merged) / 1024 / 1024
-                    yield from emit(0.94,
-                                    f"✅ 导出完成: {merged} ({size_mb:.1f}MB)")
-                else:
-                    yield from emit(0.93,
-                                    "⚠️ 合并失败（可能缺少渲染视频文件）")
-            except Exception as e:
-                yield from emit(0.92, f"⚠️ 导出异常: {e}")
-        else:
-            yield from emit(0.72, "⏭️ 跳过导出（需要渲染完成）")
-
-        # ── 完成 ────────────────────────────────
-        update_project(pid, {"status": "completed"})
-        yield from emit(1.0, "🎉 全流程完成！")
+            yield from emit(0.75, "⏭️ 跳过渲染（Phase 2 单独运行）")
 
     except Exception as e:
         import traceback
         tb = traceback.format_exc()[:500]
-        log_entries.append(f"[{time.strftime('%H:%M:%S')}] ❌ 管线出错: {e}")
-        log_entries.append(tb)
+        log_entries.append(f"[{time.strftime('%H:%M:%S')}] ❌ 管线出错: {e}\n{tb}")
         _pipeline_status["running"] = False
         result["error"] = str(e)
-        yield (0.0, _format_log(log_entries), result)
+        yield 0.0, _format_log(log_entries), result
 
     return result
 

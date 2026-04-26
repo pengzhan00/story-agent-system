@@ -21,19 +21,23 @@ COMFYUI_URL = "http://127.0.0.1:8188"
 OUTPUT_DIR = Path(__file__).parent.parent / "output"
 WORKFLOW_FILE = Path(__file__).parent / "animatediff_workflow.json"
 
-# SDXL 参数
-SDXL_WIDTH = 1024
-SDXL_HEIGHT = 1024
-ANIMATION_FRAMES = 16
-FRAME_RATE = 8
-SAMPLER_STEPS = 20
+# SDXL 静态图像参数 (无 AnimateDiff，仅静态帧)
+SDXL_WIDTH = 896
+SDXL_HEIGHT = 1152
+FRAME_RATE = 1          # 1fps → 1帧=1秒静态视频
+SAMPLER_STEPS = 25
 CFG_SCALE = 7.0
+
+# 默认风格 LoRA (动漫风格)
+DEFAULT_STYLE_LORA = "anime.safetensors"
+DEFAULT_STYLE_LORA_STRENGTH = 0.7
 
 # 负面提示词
 NEGATIVE_PROMPT = (
-    "blurry, low quality, distorted, deformed, ugly, bad anatomy, "
-    "watermark, text, extra limbs, fused fingers, deformed hands, "
-    "poorly drawn face, mutation, mutated, extra limbs, gross proportions"
+    "nsfw, lowres, bad anatomy, bad hands, text, error, missing fingers, "
+    "ugly, worst quality, low quality, watermark, blurry, "
+    "3d render, realistic, photorealistic, extra limbs, fused fingers, "
+    "deformed hands, poorly drawn face, mutation, gross proportions"
 )
 
 # ─── 动态节点查找 ──────────────────────────────────────
@@ -178,11 +182,12 @@ def inject_loras(workflow: dict, lora_refs: list[dict]) -> dict:
 # ─── ControlNet 管线 ──────────────────────────────────
 
 _CONTROLNET_MAP = {
-    "canny": "controlnet_canny.safetensors",
-    "depth": "controlnet_depth.safetensors",
-    "openpose": "controlnet_openpose.safetensors",
-    "lineart": "controlnet_lineart.safetensors",
-    "tile": "control_v11f1e_sd15_tile.pth",
+    "canny":        "diffusers_xl_canny_mid.safetensors",
+    "canny_anime":  "kohya_controllllite_xl_canny_anime.safetensors",
+    "depth":        "diffusers_xl_depth_mid.safetensors",
+    "depth_anime":  "kohya_controllllite_xl_depth.safetensors",
+    "openpose":     "kohya_controllllite_xl_openpose_anime_v2.safetensors",
+    "instantid":    "InstantID-ControlNet.safetensors",
 }
 
 
@@ -339,86 +344,59 @@ def build_scene_prompt(scene: dict) -> str:
 
 
 def create_animatediff_workflow(positive_prompt: str, scene_name: str, seed: int = 0) -> dict:
-    """创建 AnimateDiff 工作流 JSON (使用 ADE_LoadAnimateDiffModel + ADE_ApplyAnimateDiffModelSimple)"""
-    prefix = f"scene_{scene_name[:20].replace(' ', '_')}"
-    wf = {
+    """创建 SDXL 静态图像工作流（不依赖 AnimateDiff 动态模块）。
+    输出: 单帧 mp4 (1fps = 1秒静态画面)，使用已安装的 sd_xl_base_1.0 + VHS_VideoCombine。
+    """
+    prefix = f"story_anim_{scene_name[:20].replace(' ', '_')}"
+    return {
         "1": {
             "class_type": "CheckpointLoaderSimple",
-            "inputs": {"ckpt_name": "sd_xl_base_1.0.safetensors"}
+            "inputs": {"ckpt_name": "sd_xl_base_1.0.safetensors"},
         },
         "2": {
-            "class_type": "ADE_EmptyLatentImageLarge",
-            "inputs": {
-                "batch_size": ANIMATION_FRAMES,
-                "width": SDXL_WIDTH,
-                "height": SDXL_HEIGHT
-            }
+            "class_type": "EmptyLatentImage",
+            "inputs": {"width": SDXL_WIDTH, "height": SDXL_HEIGHT, "batch_size": 1},
         },
         "3": {
             "class_type": "CLIPTextEncode",
-            "inputs": {"clip": ["1", 1], "text": positive_prompt}
+            "inputs": {"clip": ["1", 1], "text": positive_prompt},
         },
         "4": {
             "class_type": "CLIPTextEncode",
-            "inputs": {"clip": ["1", 1], "text": NEGATIVE_PROMPT}
+            "inputs": {"clip": ["1", 1], "text": NEGATIVE_PROMPT},
         },
         "5": {
-            "class_type": "ADE_LoadAnimateDiffModel",
-            "inputs": {"model_name": "hsxl_temporal_layers.f16.safetensors"}
-        },
-        "6": {
-            "class_type": "ADE_ApplyAnimateDiffModelSimple",
-            "inputs": {"motion_model": ["5", 0]}
-        },
-        "7": {
-            "class_type": "ADE_UseEvolvedSampling",
-            "inputs": {
-                "model": ["1", 0],
-                "beta_schedule": "autoselect",
-                "m_models": ["6", 0]
-            }
-        },
-        "8": {
             "class_type": "KSampler",
             "inputs": {
-                "model": ["7", 0],
+                "model": ["1", 0],
                 "positive": ["3", 0],
                 "negative": ["4", 0],
                 "latent_image": ["2", 0],
                 "steps": SAMPLER_STEPS,
                 "cfg": CFG_SCALE,
-                "sampler_name": "euler",
-                "scheduler": "normal",
+                "sampler_name": "dpmpp_2m",
+                "scheduler": "karras",
                 "seed": seed,
-                "denoise": 1.0
-            }
+                "denoise": 1.0,
+            },
         },
-        "9": {
-            "class_type": "VAEDecodeTiled",
-            "inputs": {
-                "samples": ["8", 0],
-                "vae": ["1", 2],
-                "tile_size": 512,
-                "overlap": 64,
-                "temporal_size": 64,
-                "temporal_overlap": 8
-            }
+        "6": {
+            "class_type": "VAEDecode",
+            "inputs": {"samples": ["5", 0], "vae": ["1", 2]},
         },
-        "10": {
+        "7": {
             "class_type": "VHS_VideoCombine",
             "inputs": {
-                "images": ["9", 0],
+                "images": ["6", 0],
                 "frame_rate": FRAME_RATE,
                 "loop_count": 0,
                 "filename_prefix": prefix,
                 "format": "video/h264-mp4",
                 "pingpong": False,
-                "save_output": True
-            }
+                "save_output": True,
+            },
         },
     }
-
-    return wf
 
 
 def get_video_output(comfyui_outputs: dict) -> list[dict]:

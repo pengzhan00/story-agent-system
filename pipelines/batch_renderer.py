@@ -69,6 +69,36 @@ class BatchRenderer:
                 time.sleep(poll_interval)
         return False
 
+    def _extend_static_frame(self, video_path: str, duration_sec: float = 3.0) -> Optional[str]:
+        """用 ffmpeg 将单帧（或短帧）视频延长到指定秒数。返回临时文件路径，失败返回 None。"""
+        try:
+            result = subprocess.run(
+                ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                 "-of", "default=noprint_wrappers=1:nokey=1", video_path],
+                capture_output=True, text=True, timeout=10,
+            )
+            current_dur = float(result.stdout.strip() or "0")
+        except Exception:
+            current_dur = 0.0
+
+        if current_dur >= duration_sec - 0.1:
+            return video_path  # 已够长，不用处理
+
+        tmp = str(Path(video_path).with_suffix(".extended.mp4"))
+        try:
+            subprocess.run(
+                ["ffmpeg", "-y", "-i", video_path,
+                 "-vf", f"tpad=stop_mode=clone:stop_duration={duration_sec}",
+                 "-c:v", "libx264", "-crf", "23", "-preset", "fast",
+                 "-an", tmp],
+                capture_output=True, timeout=60,
+            )
+            if Path(tmp).exists() and Path(tmp).stat().st_size > 1000:
+                return tmp
+        except Exception:
+            pass
+        return None
+
     def get_latest_video(self, prefix: str = "story_anim") -> Optional[str]:
         """从 ComfyUI output 目录找到最新的视频文件（向后兼容）"""
         if not COMFYUI_OUTPUT_DIR.exists():
@@ -131,31 +161,25 @@ class BatchRenderer:
             "project_id": self.project_id,
             "shot_id": shot_id,
             "status": "running",
-            "workflow_name": "animatediff_workflow",
+            "workflow_name": "sdxl_static",
         }) if self.project_id and shot_id else 0
 
         # 构建 ComfyUI 工作流
-        from pipelines.animate_pipeline import WORKFLOW_FILE
+        from pipelines.animate_pipeline import (
+            WORKFLOW_FILE, inject_prompt, inject_seed, inject_loras,
+            NEGATIVE_PROMPT, DEFAULT_STYLE_LORA, DEFAULT_STYLE_LORA_STRENGTH,
+        )
         workflow = json.loads(WORKFLOW_FILE.read_text())
 
-        # 注入 prompt
-        for node_id, node in workflow.items():
-            if node.get("class_type") == "CLIPTextEncode":
-                input_key = node.get("_meta", {}).get("input_key", "text")
-                # 第一个 CLIPTextEncode 是 positive
-                if node.get("_is_positive", False) or (
-                    "positive" not in str(node_id) and
-                    workflow.get(node_id, {}).get("inputs", {}).get("text", "").startswith("positive")
-                ):
-                    # 这个判断不靠谱，更好的方法：找连接到 KSampler positive 的那个
-                    pass
+        # 动态注入 prompt + seed
+        workflow = inject_prompt(workflow, prompt_text, NEGATIVE_PROMPT)
+        workflow = inject_seed(workflow, int(time.time()) % (2**31))
 
-        # 更可靠的方案：按节点 ID 约定
-        # 我们约定节点 3 = positive prompt, 节点 4 = negative prompt
-        if "3" in workflow and workflow["3"].get("class_type") == "CLIPTextEncode":
-            workflow["3"]["inputs"]["text"] = prompt_text
-        if "8" in workflow and workflow["8"].get("class_type") == "KSampler":
-            workflow["8"]["inputs"]["seed"] = int(time.time())  # 随机种子
+        # LoRA 注入：优先用场景指定的，没有则用默认动漫风格 LoRA
+        lora_refs = scene.get("_lora_refs") or []
+        if not lora_refs:
+            lora_refs = [{"name": DEFAULT_STYLE_LORA, "strength": DEFAULT_STYLE_LORA_STRENGTH}]
+        workflow = inject_loras(workflow, lora_refs)
 
         # 提交
         prompt_id = submit_workflow(workflow)
@@ -181,10 +205,16 @@ class BatchRenderer:
                 update_render_job(render_job_id, {"status": "failed", "error": "未找到输出视频"})
             return None
 
-        # 复制到项目输出目录
+        # 复制到项目输出目录，并将静态单帧延长为3秒
         dest = self.project_dirs["scenes"] / f"{scene_id}.mp4"
         import shutil
-        shutil.copy2(video_path, dest)
+        extended = self._extend_static_frame(video_path, duration_sec=3.0)
+        shutil.copy2(extended or video_path, dest)
+        if extended and extended != video_path:
+            try:
+                os.remove(extended)
+            except Exception:
+                pass
         self.results.append(str(dest))
         if render_job_id:
             update_render_job(render_job_id, {"status": "completed", "output_path": str(dest)})

@@ -16,7 +16,11 @@ from core.database import (
     get_project, list_shots, list_episodes, list_render_jobs
 )
 from core.ollama_client import list_models, refresh_models, resolve_model_profile
-from core.orchestrator import run_pipeline_generator, run_render_export_generator
+from core.orchestrator import (
+    run_pipeline_generator, run_render_export_generator,
+    run_stage_story, run_stage_characters, run_stage_scenes,
+    run_stage_art_music_sfx, run_stage_shots, _stage_status,
+)
 from ui.edit_panel import (
     ai_edit_preview, ai_edit_execute, ai_edit_rollback,
     get_edit_history,
@@ -322,14 +326,120 @@ def save_sfx_text(pid: int, text: str) -> str:
     except Exception as e: return f"❌ 保存失败: {e}"
 
 
+# ─── 各阶段独立运行流 ────────────────────────────
+
+def _relay_stage(stage_gen, log_lines: list, result_ref: dict):
+    """把阶段 generator 的 (pct, log_md, partial) 转成 (log_md, partial, pid)。"""
+    for pct, log_md, partial in stage_gen:
+        result_ref.update({k: v for k, v in partial.items() if v})
+        log_lines.clear()
+        log_lines.extend(log_md.splitlines()[-30:])
+        yield log_md, result_ref, result_ref.get("project_id", 0)
+
+
+def _resolve_model(stage_model: str, fallback: str, global_model_var) -> str:
+    """返回阶段模型，空则回退到全局模型组件值（由调用方传入）。"""
+    return (stage_model or "").strip() or (fallback or "").strip() or "qwen2.5:7b"
+
+
+def story_stage_flow(pid, premise, pname, genre, tone, acts, stage_m, global_m, progress=gr.Progress()):
+    """步骤1: 剧本生成。"""
+    if not premise or not premise.strip():
+        yield "### ⚠️ 请输入创作构想", None, int(pid or 0); return
+    model = _resolve_model(stage_m, global_m, None)
+    result = {}
+    for pct, log_md, partial in run_stage_story(
+        project_id=int(pid or 0), premise=premise.strip(),
+        project_name=pname.strip() if pname else "",
+        genre=genre or "玄幻", tone=tone or "热血",
+        acts=int(acts or 3), model=model,
+    ):
+        result = partial
+        progress(pct)
+        yield log_md, partial, partial.get("project_id", int(pid or 0))
+
+
+def chars_stage_flow(pid, stage_m, global_m, progress=gr.Progress()):
+    """步骤2: 角色设计。"""
+    if not pid:
+        yield "### ⚠️ 请先运行步骤1生成剧本", None, 0; return
+    model = _resolve_model(stage_m, global_m, None)
+    for pct, log_md, partial in run_stage_characters(int(pid), model=model):
+        progress(pct)
+        yield log_md, partial, int(pid)
+
+
+def scenes_stage_flow(pid, stage_m, global_m, progress=gr.Progress()):
+    """步骤3: 场景设计。"""
+    if not pid:
+        yield "### ⚠️ 请先运行步骤1生成剧本", None, 0; return
+    model = _resolve_model(stage_m, global_m, None)
+    for pct, log_md, partial in run_stage_scenes(int(pid), model=model):
+        progress(pct)
+        yield log_md, partial, int(pid)
+
+
+def art_music_stage_flow(pid, stage_m, global_m, progress=gr.Progress()):
+    """步骤4: 美术/音乐/音效。"""
+    if not pid:
+        yield "### ⚠️ 请先运行步骤1生成剧本", None, 0; return
+    model = _resolve_model(stage_m, global_m, None)
+    for pct, log_md, partial in run_stage_art_music_sfx(int(pid), model=model):
+        progress(pct)
+        yield log_md, partial, int(pid)
+
+
+def shots_stage_flow(pid, progress=gr.Progress()):
+    """步骤5: 分镜规划。"""
+    if not pid:
+        yield "### ⚠️ 请先运行步骤1-3", None, 0; return
+    for pct, log_md, partial in run_stage_shots(int(pid)):
+        progress(pct)
+        yield log_md, partial, int(pid)
+
+
+def get_stage_status(pid) -> str:
+    """返回当前各阶段完成状态。"""
+    if not pid:
+        return "无项目"
+    try:
+        s = _stage_status(int(pid))
+        tick = lambda v: "✅" if v else "❌"
+        lines = [
+            f"### 📋 阶段状态 (项目 {pid})",
+            f"- 步骤1 剧本: {tick(s['story'])} {s.get('script_title','')}",
+            f"- 步骤2 角色: {tick(s['chars'])} ({s.get('n_chars',0)} 个)",
+            f"- 步骤3 场景: {tick(s['scenes'])} ({s.get('n_scenes',0)} 个)",
+            f"- 步骤4 音乐/音效: {tick(s['art_music_sfx'])}",
+            f"- 步骤5 分镜: {tick(s['shots'])} ({s.get('n_shots',0)} 个)",
+        ]
+        return "\n".join(lines)
+    except Exception as e:
+        return f"❌ 状态查询失败: {e}"
+
+
 # ─── Phase 1: 全流程生成 ────────────────────────────
 
 def full_pipeline_flow(premise, project_name, genre, tone, acts, model,
+                       story_model, char_model, scene_model, art_model,
                        progress=gr.Progress()):
     """yield (gen_log, gen_result, view_md, edit_data..., pid)"""
     if not premise or not premise.strip():
         yield ("### ⚠️ 请先输入创作构想", None, "", "", "", "", "", "", "", [], 0)
         return
+
+    # 构建 per-stage 模型配置，未填则回退到全局 model
+    base = model or "qwen2.5:7b"
+    stage_models = {
+        "director": story_model or base,
+        "writer":   story_model or base,
+        "character": char_model or base,
+        "scene":     scene_model or base,
+        "art":       art_model or base,
+        "music":     art_model or base,
+        "sound":     art_model or base,
+        "review":    base,
+    }
 
     result = None
     pid = 0
@@ -339,7 +449,8 @@ def full_pipeline_flow(premise, project_name, genre, tone, acts, model,
             project_name=project_name.strip() if project_name else "",
             genre=genre or "玄幻", tone=tone or "热血",
             acts=int(acts) if acts else 3,
-            model=model or "qwen2.5:7b",
+            model=base,
+            model_profile=stage_models,
             enable_render=False,
         ):
             progress(pct)
@@ -467,8 +578,7 @@ def build_ui():
         # ══════ Phase 1: 内容生成 ═══════════════════
         gr.Markdown("## 📝 Phase 1: 内容生成")
 
-        premise = gr.Textbox(label="创作构想", lines=6,
-            placeholder="输入故事创意...")
+        premise = gr.Textbox(label="创作构想", lines=6, placeholder="输入故事创意...")
 
         with gr.Row():
             project_name = gr.Textbox(label="项目名称", placeholder="留空自动生成", scale=1)
@@ -480,11 +590,35 @@ def build_ui():
                 value="热血", scale=1)
             acts = gr.Slider(label="幕数", minimum=1, maximum=5, value=3, step=1, scale=1)
 
+        # 全局默认模型 + 各阶段独立模型
         with gr.Row():
-            model = gr.Dropdown(label="模型", choices=models or ["qwen2.5:7b"],
+            model = gr.Dropdown(label="全局默认模型", choices=models or ["qwen2.5:7b"],
                 value=default_model, allow_custom_value=True, scale=2)
         model_profile_md = gr.Markdown(format_model_profile(default_model))
         model.change(fn=format_model_profile, inputs=[model], outputs=[model_profile_md])
+
+        with gr.Accordion("🎭 各阶段独立模型 & 分步运行", open=False):
+            gr.Markdown("各阶段留空则使用全局模型。可对已有项目单独运行某一步骤（填入项目 ID）。")
+            with gr.Row():
+                story_model = gr.Dropdown(label="📝 步骤1 剧本", choices=models or [default_model],
+                    value="", allow_custom_value=True, scale=1)
+                char_model = gr.Dropdown(label="👤 步骤2 角色", choices=models or [default_model],
+                    value="", allow_custom_value=True, scale=1)
+                scene_model = gr.Dropdown(label="🏞️ 步骤3 场景", choices=models or [default_model],
+                    value="", allow_custom_value=True, scale=1)
+                art_model = gr.Dropdown(label="🎨 步骤4 美术/音乐", choices=models or [default_model],
+                    value="", allow_custom_value=True, scale=1)
+
+            with gr.Row():
+                step1_btn = gr.Button("📝 步骤1: 剧本", scale=1)
+                step2_btn = gr.Button("👤 步骤2: 角色", scale=1)
+                step3_btn = gr.Button("🏞️ 步骤3: 场景", scale=1)
+                step4_btn = gr.Button("🎨 步骤4: 美术/音乐/音效", scale=1)
+                step5_btn = gr.Button("🎞️ 步骤5: 分镜", scale=1)
+
+            with gr.Row():
+                stage_status_btn = gr.Button("🔍 查看阶段状态", size="sm", scale=1)
+            stage_status_md = gr.Markdown("", label="阶段状态")
 
         with gr.Row():
             gen_btn = gr.Button("🔥 一键全流程生成", variant="primary", size="lg", scale=2)
@@ -613,9 +747,53 @@ def build_ui():
         ]
         gen_btn.click(
             fn=full_pipeline_flow,
-            inputs=[premise, project_name, genre, tone, acts, model],
+            inputs=[premise, project_name, genre, tone, acts, model,
+                    story_model, char_model, scene_model, art_model],
             outputs=gen_outputs,
             concurrency_limit=2,
+        )
+
+        # Phase 1: 分步运行
+        _step_outputs = [gen_log, gen_results, project_id_state]
+
+        step1_btn.click(
+            fn=story_stage_flow,
+            inputs=[project_id_state, premise, project_name, genre, tone, acts,
+                    story_model, model],
+            outputs=_step_outputs,
+            concurrency_limit=2,
+        )
+        step2_btn.click(
+            fn=chars_stage_flow,
+            inputs=[project_id_state, char_model, model],
+            outputs=_step_outputs,
+            concurrency_limit=2,
+        )
+        step3_btn.click(
+            fn=scenes_stage_flow,
+            inputs=[project_id_state, scene_model, model],
+            outputs=_step_outputs,
+            concurrency_limit=2,
+        )
+        step4_btn.click(
+            fn=art_music_stage_flow,
+            inputs=[project_id_state, art_model, model],
+            outputs=_step_outputs,
+            concurrency_limit=2,
+        )
+        step5_btn.click(
+            fn=shots_stage_flow,
+            inputs=[project_id_state],
+            outputs=_step_outputs,
+            concurrency_limit=2,
+        )
+
+        # 阶段状态查询
+        stage_status_btn.click(
+            fn=get_stage_status,
+            inputs=[project_id_state],
+            outputs=[stage_status_md],
+            queue=False,
         )
 
         # 清空（绕过 queue，防止被生成器堵住）
