@@ -407,6 +407,50 @@ def render_export_flow(pid, project_name, progress=gr.Progress()):
                result, pid)
 
 
+def resume_pipeline_flow(pid, progress=gr.Progress()):
+    """续跑管线：跳过已完成阶段/shot，只处理未完成的。yield (log, state_md)"""
+    if not pid:
+        yield "### ⚠️ 请先生成内容（需要项目 ID）", "无项目"
+        return
+
+    from core.pipeline_state import resume_pipeline, describe_state
+    log_lines = []
+    try:
+        gen = resume_pipeline(int(pid), max_retries=2)
+        while True:
+            try:
+                msg, pct = next(gen)
+                log_lines.append(msg)
+                progress(pct)
+                yield "### 🔄 续跑中...\n" + "\n".join(f"- {l}" for l in log_lines[-20:]), gr.update()
+            except StopIteration as e:
+                result = e.value
+                break
+    except Exception as e:
+        import traceback
+        yield (f"### ❌ 续跑出错\n```\n{e}\n{traceback.format_exc()[-500:]}\n```",
+               gr.update())
+        return
+
+    state_md = describe_state(int(pid))
+    done_stages = result.get("stages", {}) if result else {}
+    summary = "  ".join(
+        f"{s}: {v.get('done', 0)}" for s, v in done_stages.items()
+    )
+    yield f"### ✅ 续跑完成\n{summary}\n\n" + "\n".join(f"- {l}" for l in log_lines[-30:]), state_md
+
+
+def get_pipeline_state(pid):
+    """返回当前管线状态 Markdown。"""
+    if not pid:
+        return "无项目"
+    from core.pipeline_state import describe_state
+    try:
+        return describe_state(int(pid))
+    except Exception as e:
+        return f"❌ 获取状态失败: {e}"
+
+
 # ─── 构建 UI ─────────────────────────────────────────
 
 def build_ui():
@@ -454,10 +498,15 @@ def build_ui():
         gr.Markdown("## 🎬 Phase 2: 渲染 + 导出")
         gr.Markdown("用数据库中最新内容渲染视频。可先编辑内容再执行。")
 
-        render_btn = gr.Button("🎬 渲染导出", variant="secondary", size="lg",
-                               elem_classes="gr-button-secondary")
-        render_log = gr.Markdown("点击「渲染导出」开始...")
+        with gr.Row():
+            render_btn = gr.Button("🎬 渲染导出", variant="secondary", size="lg",
+                                   elem_classes="gr-button-secondary", scale=2)
+            resume_btn = gr.Button("🔄 继续上次", variant="primary", size="lg", scale=2)
+            pipeline_state_btn = gr.Button("📊 查看状态", size="lg", scale=1)
+
+        render_log = gr.Markdown("点击「渲染导出」开始，或点击「继续上次」从断点续跑...")
         render_results = gr.JSON(value=None, label="渲染结果")
+        pipeline_state_md = gr.Markdown("", label="管线状态")
 
         # ══════ 状态变量 ════════════════════════════
         project_id_state = gr.State(0)
@@ -587,6 +636,21 @@ def build_ui():
             inputs=[project_id_state, project_name],
             outputs=[render_log, render_results, project_id_state],
             concurrency_limit=2,
+        )
+
+        # Phase 2: 续跑
+        resume_btn.click(
+            fn=resume_pipeline_flow,
+            inputs=[project_id_state],
+            outputs=[render_log, pipeline_state_md],
+        )
+
+        # Phase 2: 查看管线状态
+        pipeline_state_btn.click(
+            fn=get_pipeline_state,
+            inputs=[project_id_state],
+            outputs=[pipeline_state_md],
+            queue=False,
         )
 
         # 保存（绕过 queue）
