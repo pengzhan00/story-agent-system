@@ -298,6 +298,37 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_tasks_status ON task_queue(status);
             CREATE INDEX IF NOT EXISTS idx_tasks_project ON task_queue(project_id);
             CREATE INDEX IF NOT EXISTS idx_tasks_agent ON task_queue(agent_type);
+
+            CREATE TABLE IF NOT EXISTS edit_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL DEFAULT 0,
+                instruction TEXT NOT NULL DEFAULT '',
+                table_name TEXT NOT NULL DEFAULT '',
+                record_id INTEGER NOT NULL DEFAULT 0,
+                field TEXT NOT NULL DEFAULT '',
+                json_path TEXT NOT NULL DEFAULT '',
+                old_value TEXT NOT NULL DEFAULT '',
+                new_value TEXT NOT NULL DEFAULT '',
+                ai_confidence REAL NOT NULL DEFAULT 1.0,
+                created_at TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_edit_log_project ON edit_log(project_id);
+            CREATE INDEX IF NOT EXISTS idx_edit_log_created ON edit_log(created_at);
+
+            CREATE TABLE IF NOT EXISTS audio_assets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                shot_id INTEGER NOT NULL DEFAULT 0,
+                asset_type TEXT NOT NULL DEFAULT 'tts',
+                file_path TEXT NOT NULL DEFAULT '',
+                duration_sec REAL NOT NULL DEFAULT 0.0,
+                metadata TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_audio_project ON audio_assets(project_id);
+            CREATE INDEX IF NOT EXISTS idx_audio_shot ON audio_assets(shot_id);
         """)
         c.commit()
 
@@ -675,4 +706,41 @@ def list_agent_logs(task_id: int = 0, limit: int = 50):
         rows = _fetchall("SELECT * FROM agent_logs WHERE task_id=? ORDER BY id DESC LIMIT ?", (task_id, limit))
     else:
         rows = _fetchall("SELECT * FROM agent_logs ORDER BY id DESC LIMIT ?", (limit,))
+    return [dict(r) for r in rows]
+
+
+# ══════════════════════════════════════════════
+#  Edit Log API
+# ══════════════════════════════════════════════
+
+def list_edit_log(project_id: int, limit: int = 50) -> list[dict]:
+    rows = _fetchall(
+        "SELECT * FROM edit_log WHERE project_id=? ORDER BY id DESC LIMIT ?",
+        (project_id, limit)
+    )
+    return [dict(r) for r in rows]
+
+
+def clear_edit_log(project_id: int):
+    _execute("DELETE FROM edit_log WHERE project_id=?", (project_id,))
+
+
+# ══════════════════════════════════════════════
+#  Audio Assets API
+# ══════════════════════════════════════════════
+
+def create_audio_asset(data: dict) -> int:
+    return _insert("audio_assets", data)
+
+def list_audio_assets(project_id: int, shot_id: int = 0) -> list[dict]:
+    if shot_id:
+        rows = _fetchall(
+            "SELECT * FROM audio_assets WHERE project_id=? AND shot_id=? ORDER BY id ASC",
+            (project_id, shot_id)
+        )
+    else:
+        rows = _fetchall(
+            "SELECT * FROM audio_assets WHERE project_id=? ORDER BY id ASC",
+            (project_id,)
+        )
     return [dict(r) for r in rows]

@@ -13,10 +13,14 @@ import gradio as gr
 from core.database import init_db, get_script, list_scripts, list_characters, list_scene_assets, list_music, list_sfx
 from core.database import (
     update_script, update_character, update_scene_asset, update_music, update_sfx,
-    get_project, list_shots, list_episodes
+    get_project, list_shots, list_episodes, list_render_jobs
 )
 from core.ollama_client import list_models, refresh_models, resolve_model_profile
 from core.orchestrator import run_pipeline_generator, run_render_export_generator
+from ui.edit_panel import (
+    ai_edit_preview, ai_edit_execute, ai_edit_rollback,
+    get_edit_history,
+)
 
 # ─── 主题 ───────────────────────────────────────────
 
@@ -505,6 +509,49 @@ def build_ui():
                     save_sfx_btn = gr.Button("💾 保存音效", elem_classes="save-btn", scale=1)
                     sfx_status = gr.Markdown("")
 
+            with gr.TabItem("🤖 AI 编辑"):
+                gr.Markdown("### AI 联动编辑\n输入自然语言指令，AI 扫描所有受影响字段并预览变更。")
+                with gr.Row():
+                    ai_edit_instruction = gr.Textbox(
+                        label="编辑指令",
+                        placeholder="例如: 把张三改名为李四，性格改为冷漠",
+                        lines=2, scale=3,
+                    )
+                    ai_scan_btn = gr.Button("🔍 AI 扫描预览", variant="primary", scale=1)
+                ai_edit_preview_md = gr.Markdown("输入指令后点击「AI 扫描预览」")
+                ai_manifest_json = gr.Textbox(
+                    label="变更清单 JSON（可手动调整后执行）",
+                    lines=8, visible=False,
+                )
+                with gr.Row():
+                    ai_exec_btn = gr.Button("✅ 确认执行变更", variant="secondary", scale=1)
+                    ai_rollback_btn = gr.Button("↩️ 回滚最近编辑", scale=1)
+                    show_manifest_btn = gr.Button("📋 显示/隐藏 JSON", scale=1)
+                ai_exec_status = gr.Markdown("")
+
+                gr.Markdown("#### 编辑历史")
+                edit_history_table = gr.Dataframe(
+                    headers=["ID", "时间", "指令", "表", "字段", "旧值", "新值", "置信度"],
+                    value=[],
+                    interactive=False,
+                    label="近 30 条编辑记录",
+                )
+                refresh_history_btn = gr.Button("🔄 刷新历史", size="sm")
+
+            with gr.TabItem("🎞️ 视频预览"):
+                gr.Markdown("### Shot 视频预览")
+                with gr.Row():
+                    shot_preview_id = gr.Number(label="Shot ID", value=0, precision=0, scale=1)
+                    load_video_btn = gr.Button("▶️ 加载视频", scale=1)
+                shot_video_player = gr.Video(label="Shot 视频", interactive=False)
+                shot_video_status = gr.Markdown("")
+
+                gr.Markdown("### 集数合成视频")
+                episode_video_path = gr.Textbox(
+                    label="集数视频路径（生成后自动填入）",
+                    interactive=False,
+                )
+
         # ══════ 事件绑定 ═════════════════════════════
 
         # Phase 1: 全流程生成
@@ -571,6 +618,68 @@ def build_ui():
             fn=save_sfx_text,
             inputs=[project_id_state, sfx_edit],
             outputs=[sfx_status],
+            queue=False,
+        )
+
+        # ── AI 编辑 ────────────────────────────────────
+        ai_scan_btn.click(
+            fn=lambda pid, instr, mdl: ai_edit_preview(int(pid) if pid else 0, instr, mdl),
+            inputs=[project_id_state, ai_edit_instruction, model],
+            outputs=[ai_edit_preview_md, ai_manifest_json],
+            concurrency_limit=2,
+        )
+        ai_exec_btn.click(
+            fn=lambda pid, mjson: ai_edit_execute(int(pid) if pid else 0, mjson),
+            inputs=[project_id_state, ai_manifest_json],
+            outputs=[ai_exec_status],
+            queue=False,
+        )
+        ai_rollback_btn.click(
+            fn=lambda pid: ai_edit_rollback(int(pid) if pid else 0, n=1),
+            inputs=[project_id_state],
+            outputs=[ai_exec_status],
+            queue=False,
+        )
+        show_manifest_btn.click(
+            fn=lambda v: gr.update(visible=not v),
+            inputs=[ai_manifest_json],
+            outputs=[ai_manifest_json],
+            queue=False,
+        )
+        refresh_history_btn.click(
+            fn=lambda pid: get_edit_history(int(pid) if pid else 0),
+            inputs=[project_id_state],
+            outputs=[edit_history_table],
+            queue=False,
+        )
+
+        # ── 视频预览 ────────────────────────────────────
+        def _load_shot_video(project_id, shot_id):
+            from pathlib import Path as _Path
+            if not project_id or not shot_id:
+                return None, "请输入 Shot ID"
+            shot_id = int(shot_id)
+            proj = get_project(int(project_id))
+            if not proj:
+                return None, "项目不存在"
+            jobs = list_render_jobs(project_id=int(project_id), shot_id=shot_id)
+            for job in jobs:
+                vp = job.get("output_path", "")
+                if job.get("status") == "completed" and vp and _Path(vp).exists():
+                    return vp, f"✅ shot {shot_id}: {_Path(vp).name}"
+            try:
+                from pipelines.output_manager import get_shot_video_path
+                vp = get_shot_video_path(proj.name, shot_id)
+                if vp:
+                    return vp, f"✅ 找到视频: {_Path(vp).name}"
+            except Exception:
+                pass
+            return None, f"❌ Shot {shot_id} 暂无视频"
+
+        load_video_btn.click(
+            fn=_load_shot_video,
+            inputs=[project_id_state, shot_preview_id],
+            outputs=[shot_video_player, shot_video_status],
             queue=False,
         )
 
