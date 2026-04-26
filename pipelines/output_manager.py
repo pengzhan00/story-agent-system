@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 Video output management: organize, merge, and export video clips.
+增强: Shot 排序（act/scene/shot_number）/ Crossfade 过渡 / 项目级合并入口
 
 Output structure:
   output/
@@ -211,6 +212,172 @@ def export_project(project_name: str, episode: int = 1,
     shutil.copy2(str(episode_file), dest)
     print(f"Exported: {dest}")
     return dest
+
+
+# ── Shot 排序合并（项目级入口）────────────────────────────
+
+def sort_shots_by_order(shots: list) -> list:
+    """按 act_number / scene_number / shot_number 排序 shot 列表。"""
+    return sorted(shots, key=lambda s: (
+        getattr(s, "act_number", 0),
+        getattr(s, "scene_number", 0),
+        getattr(s, "shot_number", 0),
+        getattr(s, "id", 0),
+    ))
+
+
+def get_shot_video_path(project_name: str, shot_id: int) -> Optional[str]:
+    """从 composed 或 scenes 目录查找 shot 视频。"""
+    proj_dir = PROJECTS_DIR / project_name
+    # 优先找已合成的（带字幕）
+    composed = proj_dir / "composed" / f"shot_{shot_id:04d}_composed.mp4"
+    if composed.exists():
+        return str(composed)
+    # 其次找原始渲染
+    scenes = proj_dir / "scenes" / f"scene_{shot_id:04d}.mp4"
+    if scenes.exists():
+        return str(scenes)
+    # glob 更宽松匹配
+    for p in (proj_dir / "composed").glob(f"shot_{shot_id:04d}*"):
+        return str(p)
+    for p in (proj_dir / "scenes").glob(f"*{shot_id}*"):
+        return str(p)
+    return None
+
+
+def merge_project(
+    project_name: str,
+    episode: int = 1,
+    output_name: str = "",
+    crossfade: float = 0.5,
+    use_db_order: bool = True,
+    project_id: int = 0,
+) -> Optional[str]:
+    """
+    项目级合并：按 shot 顺序（DB 排序）找到所有视频，crossfade 合并为一集。
+    """
+    episode_dir = PROJECTS_DIR / project_name / "episodes"
+    episode_dir.mkdir(parents=True, exist_ok=True)
+
+    if not output_name:
+        output_name = f"ep{episode:03d}_merged"
+    output_file = str(episode_dir / f"{output_name}.mp4")
+
+    # 尝试从 DB 获取有序 shot 列表
+    if use_db_order and project_id:
+        try:
+            import sys
+            sys.path.insert(0, str(BASE_DIR))
+            import core.database as db
+            shots = db.list_shots(project_id=project_id)
+            shots = sort_shots_by_order(shots)
+            video_paths = []
+            for shot in shots:
+                vp = get_shot_video_path(project_name, shot.id)
+                if vp:
+                    video_paths.append(vp)
+        except Exception as e:
+            print(f"[OutputManager] DB 排序失败，退回 timeline: {e}")
+            video_paths = _get_videos_from_timeline(project_name, episode)
+    else:
+        video_paths = _get_videos_from_timeline(project_name, episode)
+
+    if not video_paths:
+        print(f"[OutputManager] 无视频文件可合并")
+        return None
+
+    print(f"[OutputManager] 合并 {len(video_paths)} 个视频 (crossfade={crossfade}s)...")
+
+    if crossfade > 0:
+        return _crossfade_concat(video_paths, output_file, crossfade)
+    else:
+        return _simple_ffmpeg_concat(video_paths, output_file)
+
+
+def _get_videos_from_timeline(project_name: str, episode: int) -> list[str]:
+    tl = load_timeline(project_name)
+    ep_scenes = [s for s in tl["scenes"] if s.get("episode") == episode]
+    ep_scenes.sort(key=lambda s: s.get("id", ""))
+    return [s["file"] for s in ep_scenes if Path(s["file"]).exists()]
+
+
+def _simple_ffmpeg_concat(videos: list[str], output_file: str) -> Optional[str]:
+    import tempfile
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+        for v in videos:
+            escaped = str(Path(v).resolve()).replace("'", "'\\''")
+            f.write(f"file '{escaped}'\n")
+        filelist = f.name
+
+    try:
+        result = subprocess.run(
+            ["ffmpeg", "-y", "-f", "concat", "-safe", "0",
+             "-i", filelist, "-c", "copy", output_file],
+            capture_output=True, text=True, timeout=600
+        )
+        if result.returncode == 0:
+            return output_file
+        # 回退 re-encode
+        inputs_flat = []
+        for v in videos:
+            inputs_flat += ["-i", v]
+        n = len(videos)
+        filter_str = "".join(f"[{i}:v]" for i in range(n)) + f"concat=n={n}:v=1:a=0[outv]"
+        result2 = subprocess.run(
+            ["ffmpeg", "-y"] + inputs_flat + [
+                "-filter_complex", filter_str,
+                "-map", "[outv]",
+                "-c:v", "libx264", "-preset", "medium", "-pix_fmt", "yuv420p",
+                output_file
+            ],
+            capture_output=True, text=True, timeout=600
+        )
+        return output_file if result2.returncode == 0 else None
+    finally:
+        Path(filelist).unlink(missing_ok=True)
+
+
+def _crossfade_concat(videos: list[str], output_file: str, cf: float) -> Optional[str]:
+    """带 crossfade 过渡的视频拼接（逐对合并）。"""
+    import tempfile
+
+    def _duration(path):
+        try:
+            r = subprocess.run(
+                ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                 "-of", "default=noprint_wrappers=1:nokey=1", path],
+                capture_output=True, text=True, timeout=10
+            )
+            return float(r.stdout.strip())
+        except Exception:
+            return 5.0
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp = Path(tmpdir)
+        current = videos[0]
+        for i, next_v in enumerate(videos[1:], 1):
+            dur = _duration(current)
+            offset = max(dur - cf, 0)
+            out = str(tmp / f"stage_{i}.mp4")
+            result = subprocess.run(
+                ["ffmpeg", "-y",
+                 "-i", current, "-i", next_v,
+                 "-filter_complex",
+                 f"[0:v][1:v]xfade=transition=fade:duration={cf}:offset={offset}[outv]",
+                 "-map", "[outv]",
+                 "-c:v", "libx264", "-preset", "fast", "-pix_fmt", "yuv420p",
+                 out],
+                capture_output=True, text=True, timeout=300
+            )
+            if result.returncode != 0:
+                print(f"[OutputManager] crossfade 失败，回退简单拼接")
+                return _simple_ffmpeg_concat(videos, output_file)
+            current = out
+
+        import shutil
+        shutil.copy2(current, output_file)
+
+    return output_file if Path(output_file).exists() else None
 
 
 if __name__ == "__main__":

@@ -1,11 +1,13 @@
 """
 Batch Renderer — 批量场景渲染管线
-从数据库读取剧本场景 → 逐个渲染 → 收集视频 → 输出管理
+从数据库读取剧本场景 → 并行渲染队列 → 重试 → 收集视频 → 输出管理
 """
 import json
 import os
 import time
 import subprocess
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Optional, Callable
 
@@ -163,9 +165,37 @@ class BatchRenderer:
 
         return str(dest)
 
-    def render_multi_scene(self, scenes: list[dict]) -> list[str]:
-        """批量渲染多个场景"""
+    def render_scene_with_retry(
+        self,
+        scene: dict,
+        scene_id: str = "",
+        timeout: int = RENDER_TIMEOUT,
+        max_retries: int = 2,
+    ) -> Optional[str]:
+        """渲染单个场景，失败时自动重试 max_retries 次。"""
+        for attempt in range(max_retries + 1):
+            if attempt > 0:
+                self._progress(f"  🔄 重试 {attempt}/{max_retries}...", 0)
+                time.sleep(5)
+            result = self.render_scene(scene, scene_id=scene_id, timeout=timeout)
+            if result:
+                return result
+        return None
+
+    def render_multi_scene(
+        self,
+        scenes: list[dict],
+        start_index: int = 0,
+        max_workers: int = 1,
+        max_retries: int = 2,
+    ) -> list[str]:
+        """
+        批量渲染多个场景，支持从指定索引继续 + 并行 + 自动重试。
+        max_workers=1: 串行（ComfyUI 单实例推荐）
+        max_workers>1: 并行（需要多 ComfyUI 实例）
+        """
         self.results = []
+        self._results_lock = threading.Lock()
         from core.database import add_prompt_log
 
         if not self.check_comfyui():
@@ -174,12 +204,52 @@ class BatchRenderer:
                               "ComfyUI 不可用", "ComfyUI not reachable")
             return []
 
-        for idx, scene in enumerate(scenes):
-            pct = idx / max(len(scenes), 1)
-            shot_label = scene.get("location", scene.get("scene_asset", {}).get("name", ""))
-            self._progress(f"渲染 {idx+1}/{len(scenes)}: {shot_label}", pct)
-            scene_id = scene.get("scene_id") or f"scene_{idx+1:03d}"
-            self.render_scene(scene, scene_id=scene_id)
+        total = len(scenes)
+        if start_index > 0:
+            self._progress(f"🔄 从第 {start_index+1}/{total} 个场景继续",
+                           start_index / max(total, 1))
+
+        pending = [
+            (idx, scenes[idx], scenes[idx].get("scene_id") or f"scene_{idx+1:03d}")
+            for idx in range(start_index, total)
+        ]
+
+        if max_workers <= 1:
+            for idx, scene, scene_id in pending:
+                pct = idx / max(total, 1)
+                shot_label = scene.get("location", scene.get("scene_asset", {}).get("name", ""))
+                self._progress(f"🎬 渲染 {idx+1}/{total}: {shot_label}", pct)
+                result = self.render_scene_with_retry(
+                    scene, scene_id=scene_id,
+                    timeout=RENDER_TIMEOUT, max_retries=max_retries
+                )
+                if result:
+                    self.results.append(result)
+        else:
+            completed_count = [0]
+            lock = threading.Lock()
+
+            def _worker(item):
+                idx, scene, scene_id = item
+                shot_label = scene.get("location", "")
+                result = self.render_scene_with_retry(
+                    scene, scene_id=scene_id,
+                    timeout=RENDER_TIMEOUT, max_retries=max_retries
+                )
+                with lock:
+                    completed_count[0] += 1
+                    pct = completed_count[0] / max(total, 1)
+                    status = "✅" if result else "❌"
+                    self._progress(f"🎬 [{completed_count[0]}/{total}] {shot_label} {status}", pct)
+                return result
+
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = [executor.submit(_worker, item) for item in pending]
+                for future in as_completed(futures):
+                    result = future.result()
+                    if result:
+                        with self._results_lock:
+                            self.results.append(result)
 
         return self.results
 
