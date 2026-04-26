@@ -13,7 +13,7 @@ import gradio as gr
 from core.database import init_db, get_script, list_scripts, list_characters, list_scene_assets, list_music, list_sfx
 from core.database import (
     update_script, update_character, update_scene_asset, update_music, update_sfx,
-    get_project, list_shots, list_episodes, list_render_jobs
+    get_project, list_shots, list_episodes, list_render_jobs, list_projects,
 )
 from core.ollama_client import list_models, refresh_models, resolve_model_profile
 from core.model_manager import (
@@ -638,6 +638,94 @@ def cm_check_file(filename: str, model_type: str) -> str:
     return f"❌ 未找到: `{d / filename.strip()}`"
 
 
+# ─── 已有项目加载 ─────────────────────────────────────
+
+def get_project_choices() -> list[str]:
+    """返回所有项目的下拉选项，最新在前。"""
+    try:
+        projects = list_projects()
+        result = []
+        for p in sorted(projects, key=lambda x: x.id, reverse=True):
+            shots = list_shots(project_id=p.id)
+            rendered = sum(1 for s in shots if s.status == "rendered")
+            label = f"#{p.id}  {p.name}  ({rendered}/{len(shots)} 已渲染)"
+            result.append(label)
+        return result
+    except Exception:
+        return []
+
+
+def load_existing_project(proj_choice: str):
+    """加载已有项目到 UI（非流式，queue=False）。"""
+    empty = ("", None, "请先选择项目", "", "", "", "", "", "运行管线后自动展示生产指标。", [], 0)
+    if not proj_choice or not str(proj_choice).startswith("#"):
+        return empty
+    try:
+        pid = int(str(proj_choice).split()[0].lstrip("#"))
+    except Exception:
+        return empty
+    proj = get_project(pid)
+    if not proj:
+        return ("❌ 项目不存在", None, "", "", "", "", "", "", "", [], 0)
+
+    view_md = format_content_markdown(pid)
+    edit_data = load_edit_data(pid)
+    overview = format_production_overview(pid)
+    shot_rows = build_shot_table(pid)
+    return (
+        f"### 📂 已加载项目 #{pid}: {proj.name}",
+        {"project_id": pid, "name": proj.name},
+        view_md,
+        edit_data.get("script", ""),
+        edit_data.get("characters", ""),
+        edit_data.get("scenes", ""),
+        edit_data.get("music", ""),
+        edit_data.get("sfx", ""),
+        overview,
+        shot_rows,
+        pid,
+    )
+
+
+# ─── ComfyUI 启动 ─────────────────────────────────────
+
+COMFYUI_DIR = Path(os.path.expanduser("~/Documents/ComfyUI"))
+_comfyui_proc = None
+
+
+def _comfyui_status_text() -> str:
+    online = comfyui_online()
+    return "🟢 ComfyUI 在线" if online else "🔴 ComfyUI 离线"
+
+
+def launch_comfyui() -> str:
+    global _comfyui_proc
+    if comfyui_online():
+        return "✅ ComfyUI 已在运行"
+    main_py = COMFYUI_DIR / "main.py"
+    if not main_py.exists():
+        return f"❌ 未找到 {main_py}"
+    # 尝试 venv python，否则 fallback 到系统 python3
+    venv_py = COMFYUI_DIR / "venv" / "bin" / "python3"
+    python_exe = str(venv_py) if venv_py.exists() else "python3"
+    try:
+        import subprocess
+        _comfyui_proc = subprocess.Popen(
+            [python_exe, str(main_py), "--listen", "127.0.0.1", "--port", "8188"],
+            cwd=str(COMFYUI_DIR),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        import time
+        for _ in range(12):
+            time.sleep(2.5)
+            if comfyui_online():
+                return "✅ ComfyUI 启动成功（PID: %d）" % _comfyui_proc.pid
+        return "⏳ ComfyUI 正在启动，请稍后刷新状态..."
+    except Exception as e:
+        return f"❌ 启动失败: {e}"
+
+
 # ─── 构建 UI ─────────────────────────────────────────
 
 def build_ui():
@@ -650,6 +738,18 @@ def build_ui():
 
         gr.Markdown("# 🎬 漫剧故事工坊")
         gr.Markdown("**两步走**: ① 生成全部内容（可编辑） → ② 渲染导出成片")
+
+        # ══════ 已有项目选择 ═══════════════════════
+        with gr.Row():
+            proj_dropdown = gr.Dropdown(
+                label="📂 加载已有项目",
+                choices=get_project_choices(),
+                value=None,
+                allow_custom_value=False,
+                scale=4,
+            )
+            proj_refresh_btn = gr.Button("🔄", scale=1, size="sm", min_width=60)
+            proj_load_btn = gr.Button("📂 加载", variant="primary", scale=1, min_width=80)
 
         # ══════ Phase 1: 内容生成 ═══════════════════
         gr.Markdown("## 📝 Phase 1: 内容生成")
@@ -707,6 +807,12 @@ def build_ui():
         gr.Markdown("---")
         gr.Markdown("## 🎬 Phase 2: 渲染 + 导出")
         gr.Markdown("用数据库中最新内容渲染视频。可先编辑内容再执行。")
+
+        with gr.Row():
+            comfyui_status_md = gr.Markdown(_comfyui_status_text())
+            comfyui_launch_btn = gr.Button("🚀 启动 ComfyUI", scale=1, size="sm")
+            comfyui_refresh_btn = gr.Button("🔄 刷新状态", scale=1, size="sm")
+        comfyui_launch_log = gr.Markdown("", visible=False)
 
         with gr.Row():
             render_btn = gr.Button("🎬 渲染导出", variant="secondary", size="lg",
@@ -881,6 +987,45 @@ def build_ui():
                     )
 
         # ══════ 事件绑定 ═════════════════════════════
+
+        # 项目加载
+        _load_proj_outputs = [
+            gen_log, gen_results,
+            view_md,
+            script_edit, char_edit, scene_edit, music_edit, sfx_edit,
+            production_overview, shot_table,
+            project_id_state,
+        ]
+        proj_load_btn.click(
+            fn=load_existing_project,
+            inputs=[proj_dropdown],
+            outputs=_load_proj_outputs,
+            queue=False,
+        )
+        proj_refresh_btn.click(
+            fn=lambda: gr.update(choices=get_project_choices()),
+            inputs=[],
+            outputs=[proj_dropdown],
+            queue=False,
+        )
+
+        # ComfyUI 启动
+        comfyui_launch_btn.click(
+            fn=lambda: (gr.update(visible=True, value="⏳ 正在启动..."),),
+            inputs=[],
+            outputs=[comfyui_launch_log],
+            queue=False,
+        ).then(
+            fn=lambda: (gr.update(value=launch_comfyui()), _comfyui_status_text()),
+            inputs=[],
+            outputs=[comfyui_launch_log, comfyui_status_md],
+        )
+        comfyui_refresh_btn.click(
+            fn=_comfyui_status_text,
+            inputs=[],
+            outputs=[comfyui_status_md],
+            queue=False,
+        )
 
         # Phase 1: 全流程生成
         gen_outputs = [
