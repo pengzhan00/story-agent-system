@@ -167,16 +167,39 @@ class BatchRenderer:
         # 构建 ComfyUI 工作流
         from pipelines.animate_pipeline import (
             WORKFLOW_FILE, inject_prompt, inject_seed, inject_loras,
+            inject_checkpoint,
             NEGATIVE_PROMPT, DEFAULT_STYLE_LORA, DEFAULT_STYLE_LORA_STRENGTH,
         )
         workflow = json.loads(WORKFLOW_FILE.read_text())
+
+        # 渲染配置覆盖（来自 UI 模型管理选择）
+        render_cfg = scene.get("_render_config") or {}
+        if render_cfg.get("checkpoint"):
+            workflow = inject_checkpoint(workflow, render_cfg["checkpoint"])
+
+        # KSampler 参数覆盖
+        for kid in [n for n, node in workflow.items() if node.get("class_type") == "KSampler"]:
+            if render_cfg.get("steps"):
+                workflow[kid]["inputs"]["steps"] = int(render_cfg["steps"])
+            if render_cfg.get("cfg"):
+                workflow[kid]["inputs"]["cfg"] = float(render_cfg["cfg"])
+            if render_cfg.get("width") and render_cfg.get("height"):
+                # 尺寸在 EmptyLatentImage 节点
+                pass
+
+        for nid, node in workflow.items():
+            if node.get("class_type") == "EmptyLatentImage":
+                if render_cfg.get("width"):
+                    workflow[nid]["inputs"]["width"] = int(render_cfg["width"])
+                if render_cfg.get("height"):
+                    workflow[nid]["inputs"]["height"] = int(render_cfg["height"])
 
         # 动态注入 prompt + seed
         workflow = inject_prompt(workflow, prompt_text, NEGATIVE_PROMPT)
         workflow = inject_seed(workflow, int(time.time()) % (2**31))
 
-        # LoRA 注入：优先用场景指定的，没有则用默认动漫风格 LoRA
-        lora_refs = scene.get("_lora_refs") or []
+        # LoRA 注入：优先用场景指定的 → 渲染配置中的 → 默认动漫风格 LoRA
+        lora_refs = scene.get("_lora_refs") or render_cfg.get("loras") or []
         if not lora_refs:
             lora_refs = [{"name": DEFAULT_STYLE_LORA, "strength": DEFAULT_STYLE_LORA_STRENGTH}]
         workflow = inject_loras(workflow, lora_refs)

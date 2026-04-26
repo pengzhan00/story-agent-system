@@ -16,6 +16,11 @@ from core.database import (
     get_project, list_shots, list_episodes, list_render_jobs
 )
 from core.ollama_client import list_models, refresh_models, resolve_model_profile
+from core.model_manager import (
+    list_models as cm_list, search_models as cm_search,
+    comfyui_online, is_installed, get_model_dir,
+    download_model, refresh_comfyui_cache, all_installed,
+)
 from core.orchestrator import (
     run_pipeline_generator, run_render_export_generator,
     run_stage_story, run_stage_characters, run_stage_scenes,
@@ -495,7 +500,7 @@ def full_pipeline_flow(premise, project_name, genre, tone, acts, model,
 
 # ─── Phase 2: 渲染导出 ─────────────────────────────
 
-def render_export_flow(pid, project_name, progress=gr.Progress()):
+def render_export_flow(pid, project_name, render_cfg, progress=gr.Progress()):
     """yield (render_log, render_result, render_pid)"""
     if not pid:
         yield ("### ⚠️ 请先生成内容", None, 0)
@@ -507,7 +512,7 @@ def render_export_flow(pid, project_name, progress=gr.Progress()):
     result = None
     try:
         for pct, log_md, partial in run_render_export_generator(
-            project_id=pid, project_name=pname,
+            project_id=pid, project_name=pname, render_config=render_cfg or {},
         ):
             progress(pct)
             result = partial
@@ -560,6 +565,77 @@ def get_pipeline_state(pid):
         return describe_state(int(pid))
     except Exception as e:
         return f"❌ 获取状态失败: {e}"
+
+
+# ─── ComfyUI 模型管理 ────────────────────────────────
+
+MODEL_TYPE_LABELS = {
+    "checkpoint":  "Checkpoint (大模型)",
+    "lora":        "LoRA (风格/角色)",
+    "vae":         "VAE",
+    "controlnet":  "ControlNet",
+    "animatediff": "AnimateDiff 动态模块",
+    "upscale":     "Upscale 模型",
+}
+
+
+def cm_refresh_list(model_type: str, query: str = "") -> tuple[list, str]:
+    """刷新指定类型模型列表，返回 (choices, status_md)。"""
+    if not comfyui_online():
+        return [], "⚠️ ComfyUI 离线 — 无法查询已安装模型"
+    models = cm_search(query, model_type, force_refresh=True)
+    status = f"✅ ComfyUI 在线 · **{MODEL_TYPE_LABELS.get(model_type, model_type)}** — 找到 {len(models)} 个"
+    return models, status
+
+
+def cm_load_all_types() -> tuple[list, list, list, list, str]:
+    """一次性加载所有类型，返回 (checkpoints, loras, vaes, controlnets, status)。"""
+    if not comfyui_online():
+        return [], [], [], [], "⚠️ ComfyUI 离线"
+    installed = all_installed()
+    ckpts = installed.get("checkpoint", [])
+    loras = installed.get("lora", [])
+    vaes  = installed.get("vae", [])
+    cns   = installed.get("controlnet", [])
+    msg = (f"✅ 已加载: Checkpoint×{len(ckpts)} · LoRA×{len(loras)} "
+           f"· VAE×{len(vaes)} · ControlNet×{len(cns)}")
+    return ckpts, loras, vaes, cns, msg
+
+
+def cm_do_download(source: str, model_type: str, filename: str, progress=gr.Progress()):
+    """下载模型，流式输出进度。"""
+    if not source.strip():
+        yield "❌ 请输入来源 URL 或 HuggingFace 路径"; return
+    if not model_type:
+        yield "❌ 请选择模型类型"; return
+
+    dest_dir = get_model_dir(model_type)
+    yield f"⏳ 目标目录: `{dest_dir}`\n开始下载..."
+
+    log = []
+
+    def _prog(msg, pct=0.0):
+        log.append(msg)
+        progress(pct, desc=msg)
+
+    success, final_msg = download_model(
+        source=source, model_type=model_type,
+        filename=filename.strip() or "",
+        progress_fn=_prog,
+    )
+    full_log = "\n".join(log[-20:])
+    yield f"{final_msg}\n\n```\n{full_log}\n```"
+
+
+def cm_check_file(filename: str, model_type: str) -> str:
+    """检查文件是否已存在于 ComfyUI 目录。"""
+    if not filename.strip():
+        return ""
+    exists = is_installed(filename.strip(), model_type)
+    d = get_model_dir(model_type)
+    if exists:
+        return f"✅ 已存在: `{d / filename.strip()}`"
+    return f"❌ 未找到: `{d / filename.strip()}`"
 
 
 # ─── 构建 UI ─────────────────────────────────────────
@@ -644,6 +720,7 @@ def build_ui():
 
         # ══════ 状态变量 ════════════════════════════
         project_id_state = gr.State(0)
+        render_config_state = gr.State({})   # {checkpoint, loras, width, height, steps, cfg}
 
         # ══════ 查看 + 编辑区 ════════════════════════
         gr.Markdown("---")
@@ -735,6 +812,74 @@ def build_ui():
                     interactive=False,
                 )
 
+            with gr.TabItem("🗂️ 模型管理"):
+                gr.Markdown("### ComfyUI 模型管理\n查看已安装模型 / 搜索 / 下载缺失模型。")
+
+                # ── 已安装模型浏览 ──────────────────────
+                with gr.Accordion("🔍 已安装模型浏览", open=True):
+                    cm_status_md = gr.Markdown("点击「加载」查询 ComfyUI 已安装模型。")
+                    with gr.Row():
+                        cm_load_btn = gr.Button("🔄 加载全部模型", variant="primary", scale=2)
+                        cm_type_filter = gr.Dropdown(
+                            label="类型筛选",
+                            choices=list(MODEL_TYPE_LABELS.keys()),
+                            value="checkpoint", scale=1,
+                        )
+                        cm_search_input = gr.Textbox(
+                            label="搜索关键词", placeholder="输入关键词过滤...",
+                            scale=2,
+                        )
+                        cm_search_btn = gr.Button("🔍 搜索", scale=1)
+
+                    with gr.Row():
+                        cm_ckpt_list  = gr.Dropdown(label="Checkpoint", choices=[], allow_custom_value=True, scale=1)
+                        cm_lora_list  = gr.Dropdown(label="LoRA",        choices=[], allow_custom_value=True, scale=1)
+                        cm_vae_list   = gr.Dropdown(label="VAE",         choices=[], allow_custom_value=True, scale=1)
+                        cm_cn_list    = gr.Dropdown(label="ControlNet",  choices=[], allow_custom_value=True, scale=1)
+
+                    cm_search_result = gr.Dropdown(
+                        label="搜索结果（选择后可应用）", choices=[], interactive=True,
+                    )
+
+                    # LoRA 强度 + 应用配置
+                    with gr.Row():
+                        cm_lora_strength = gr.Slider(label="LoRA 强度", minimum=0.0, maximum=1.5,
+                                                      value=0.7, step=0.05, scale=2)
+                        cm_apply_btn = gr.Button("✅ 应用到渲染配置", variant="secondary", scale=1)
+                    cm_active_config_md = gr.Markdown("当前渲染配置：使用默认值")
+
+                # ── 下载缺失模型 ────────────────────────
+                with gr.Accordion("📥 下载缺失模型", open=False):
+                    gr.Markdown(
+                        "支持以下格式：\n"
+                        "- **直链 URL**: `https://huggingface.co/.../resolve/main/xxx.safetensors`\n"
+                        "- **HuggingFace 路径**: `username/repo-name/path/to/file.safetensors`\n"
+                        "- **HF 简写**: `hf:username/repo@filename.safetensors`\n\n"
+                        "下载完成后需要**重启 ComfyUI** 才能在工作流中使用。"
+                    )
+                    with gr.Row():
+                        dl_source = gr.Textbox(
+                            label="来源 URL / HuggingFace 路径",
+                            placeholder="如: stabilityai/stable-diffusion-xl-base-1.0/sd_xl_base_1.0.safetensors",
+                            scale=3,
+                        )
+                        dl_type = gr.Dropdown(
+                            label="模型类型",
+                            choices=list(MODEL_TYPE_LABELS.keys()),
+                            value="lora", scale=1,
+                        )
+                    with gr.Row():
+                        dl_filename = gr.Textbox(
+                            label="保存文件名（留空从 URL 自动提取）",
+                            placeholder="my_lora.safetensors", scale=2,
+                        )
+                        dl_check_btn = gr.Button("🔎 检查是否已存在", scale=1)
+                        dl_btn = gr.Button("⬇️ 开始下载", variant="primary", scale=1)
+                    dl_check_status = gr.Markdown("")
+                    dl_log = gr.Textbox(
+                        label="下载日志", lines=6, interactive=False,
+                    )
+
         # ══════ 事件绑定 ═════════════════════════════
 
         # Phase 1: 全流程生成
@@ -811,7 +956,7 @@ def build_ui():
         # Phase 2: 渲染导出（生成器，需要 queue 流式输出）
         render_btn.click(
             fn=render_export_flow,
-            inputs=[project_id_state, project_name],
+            inputs=[project_id_state, project_name, render_config_state],
             outputs=[render_log, render_results, project_id_state],
             concurrency_limit=2,
         )
@@ -922,6 +1067,81 @@ def build_ui():
             fn=_load_shot_video,
             inputs=[project_id_state, shot_preview_id],
             outputs=[shot_video_player, shot_video_status],
+            queue=False,
+        )
+
+        # ── 模型管理 ─────────────────────────────────────
+
+        def _load_all_models():
+            ckpts, loras, vaes, cns, msg = cm_load_all_types()
+            return (
+                gr.update(choices=ckpts, value=ckpts[0] if ckpts else ""),
+                gr.update(choices=loras, value=loras[0] if loras else ""),
+                gr.update(choices=vaes,  value=vaes[0]  if vaes  else ""),
+                gr.update(choices=cns,   value=cns[0]   if cns   else ""),
+                msg,
+            )
+
+        cm_load_btn.click(
+            fn=_load_all_models,
+            inputs=[],
+            outputs=[cm_ckpt_list, cm_lora_list, cm_vae_list, cm_cn_list, cm_status_md],
+            queue=False,
+        )
+
+        def _cm_search(query, model_type):
+            models, status = cm_refresh_list(model_type, query)
+            return gr.update(choices=models, value=None), status
+
+        cm_search_btn.click(
+            fn=_cm_search,
+            inputs=[cm_search_input, cm_type_filter],
+            outputs=[cm_search_result, cm_status_md],
+            queue=False,
+        )
+        cm_search_input.submit(
+            fn=_cm_search,
+            inputs=[cm_search_input, cm_type_filter],
+            outputs=[cm_search_result, cm_status_md],
+            queue=False,
+        )
+
+        dl_check_btn.click(
+            fn=cm_check_file,
+            inputs=[dl_filename, dl_type],
+            outputs=[dl_check_status],
+            queue=False,
+        )
+
+        dl_btn.click(
+            fn=cm_do_download,
+            inputs=[dl_source, dl_type, dl_filename],
+            outputs=[dl_log],
+        )
+
+        def _apply_render_config(ckpt, lora, lora_str, search_sel, cur_cfg: dict):
+            cfg = dict(cur_cfg or {})
+            active_ckpt = ckpt or cfg.get("checkpoint", "")
+            # search_result 优先（当搜索后选了一个）
+            active_lora = lora or cfg.get("loras", [{}])[0].get("name", "") if cfg.get("loras") else lora
+            if active_ckpt:
+                cfg["checkpoint"] = active_ckpt
+            if active_lora:
+                cfg["loras"] = [{"name": active_lora, "strength": float(lora_str or 0.7)}]
+            parts = []
+            if cfg.get("checkpoint"):
+                parts.append(f"📌 Checkpoint: `{cfg['checkpoint']}`")
+            if cfg.get("loras"):
+                lora_info = ", ".join(f"{l['name']} ({l['strength']})" for l in cfg["loras"])
+                parts.append(f"🎨 LoRA: {lora_info}")
+            display = "当前渲染配置：\n" + "\n".join(parts) if parts else "当前渲染配置：使用默认值"
+            return cfg, display
+
+        cm_apply_btn.click(
+            fn=_apply_render_config,
+            inputs=[cm_ckpt_list, cm_lora_list, cm_lora_strength,
+                    cm_search_result, render_config_state],
+            outputs=[render_config_state, cm_active_config_md],
             queue=False,
         )
 

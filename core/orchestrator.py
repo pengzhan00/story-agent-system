@@ -675,6 +675,7 @@ def run_render_export_generator(
     project_id: int,
     project_name: str,
     start_index: int = 0,
+    render_config: Optional[dict] = None,
 ) -> Generator[tuple[float, str, dict], None, dict]:
     """Phase 2：从 DB 读取内容，执行渲染+导出。
     yield (progress, log_markdown, partial_result)
@@ -722,8 +723,12 @@ def run_render_export_generator(
             payload = shot.render_payload
             if isinstance(payload, str):
                 payload = json.loads(payload) if payload else {}
+            # 注入渲染配置（checkpoint/lora 等 UI 选择）
+            if render_config:
+                payload["_render_config"] = render_config
             render_scenes.append(payload)
-        yield emit(0.30, f"🎯 准备渲染 {len(render_scenes)} 个场景")
+        cfg_info = f"  checkpoint={render_config.get('checkpoint','默认')}" if render_config else ""
+        yield emit(0.30, f"🎯 准备渲染 {len(render_scenes)} 个场景{cfg_info}")
 
         # ── 4. 批量渲染 ──────────────────────────
         if render_scenes:

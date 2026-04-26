@@ -82,6 +82,13 @@ def find_ksampler_negative_node(workflow: dict) -> Optional[str]:
     return None
 
 
+def inject_checkpoint(workflow: dict, ckpt_name: str) -> dict:
+    """替换工作流中 CheckpointLoaderSimple 的模型文件名。"""
+    for nid in find_nodes_by_type(workflow, "CheckpointLoaderSimple"):
+        workflow[nid]["inputs"]["ckpt_name"] = ckpt_name
+    return workflow
+
+
 def inject_prompt(workflow: dict, positive: str, negative: str = "") -> dict:
     """动态定位 positive/negative 节点并注入 prompt（不依赖硬编码节点 ID）。"""
     pos_id = find_ksampler_positive_node(workflow)
