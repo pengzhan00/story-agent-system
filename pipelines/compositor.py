@@ -383,31 +383,30 @@ def run_compositor_pipeline(
             bgm_path = m.file_path
             break
 
+    from core.asset_registry import get_shot_video, get_shot_tts, is_shot_composed
+
     composed_videos = []
     for i, shot in enumerate(shots):
         pct = 0.1 + 0.7 * i / max(len(shots), 1)
+
+        out_path = str(composed_dir / f"shot_{shot.id:04d}_composed.mp4")
+
+        # ── 复用检查：已合成文件存在，直接使用 ────────────────
+        if is_shot_composed(proj.name, shot.id):
+            _progress(f"  ♻️  shot {shot.id} 已合成，复用", pct)
+            composed_videos.append(out_path)
+            continue
+
         _progress(f"合成 shot {shot.id} ({i+1}/{len(shots)})", pct)
 
-        # 找渲染视频
-        render_jobs = db.list_render_jobs(project_id=project_id, shot_id=shot.id)
-        video_path = None
-        for job in render_jobs:
-            if job.get("status") == "completed" and job.get("output_path"):
-                video_path = job["output_path"]
-                break
+        # 从 asset_registry 获取视频和 TTS
+        video_path = get_shot_video(project_id, shot.id, proj.name)
         if not video_path or not Path(video_path).exists():
             _progress(f"  shot {shot.id} 无视频，跳过")
             continue
 
-        # 找 TTS
-        audio_assets = db.list_audio_assets(project_id, shot_id=shot.id)
-        tts_files = [
-            {"file": a["file_path"], "line_idx": json.loads(a.get("metadata") or "{}").get("line_idx", 0),
-             "duration": a["duration_sec"]}
-            for a in audio_assets if a["asset_type"] == "tts" and Path(a["file_path"]).exists()
-        ]
+        tts_files = get_shot_tts(project_id, shot.id)
 
-        out_path = str(composed_dir / f"shot_{shot.id:04d}_composed.mp4")
         result = compose_shot(
             shot_id=shot.id,
             video_path=video_path,

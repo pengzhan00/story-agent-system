@@ -329,6 +329,21 @@ def init_db():
 
             CREATE INDEX IF NOT EXISTS idx_audio_project ON audio_assets(project_id);
             CREATE INDEX IF NOT EXISTS idx_audio_shot ON audio_assets(shot_id);
+
+            CREATE TABLE IF NOT EXISTS pipeline_runs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL DEFAULT 0,
+                stage TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'running',
+                total INTEGER NOT NULL DEFAULT 0,
+                done_count INTEGER NOT NULL DEFAULT 0,
+                error TEXT NOT NULL DEFAULT '',
+                started_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_pipeline_runs_project ON pipeline_runs(project_id);
+            CREATE INDEX IF NOT EXISTS idx_pipeline_runs_stage ON pipeline_runs(stage);
         """)
         c.commit()
 

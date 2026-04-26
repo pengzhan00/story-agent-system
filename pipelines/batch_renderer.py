@@ -22,7 +22,7 @@ from pipelines.output_manager import (
     ensure_project_dirs, register_scene, load_timeline, save_timeline
 )
 
-RENDER_TIMEOUT = 1800  # 30分钟超时
+RENDER_TIMEOUT = 7200  # 2小时超时
 COMFYUI_URL = "http://127.0.0.1:8188"
 OUTPUT_DIR = PROJECT_ROOT / "output"
 COMFYUI_OUTPUT_DIR = Path(os.path.expanduser("~/Documents/ComfyUI/output"))
@@ -105,13 +105,26 @@ class BatchRenderer:
 
     def render_scene(self, scene: dict, scene_id: str = "",
                      timeout: int = RENDER_TIMEOUT) -> Optional[str]:
-        """渲染单个场景，等待完成后通过 history 精确匹配输出文件"""
+        """渲染单个场景，等待完成后通过 history 精确匹配输出文件。
+        渲染前先查 asset_registry，已完成则直接返回已有路径。
+        """
         import requests as req
         from core.database import create_render_job, update_render_job, update_shot
 
         if not scene_id:
             scene_id = scene.get("location", f"scene_{int(time.time())}")
         shot_id = scene.get("shot_id", 0)
+
+        # ── 复用检查：shot 已渲染且视频存在，直接返回 ──────────
+        if shot_id and self.project_id:
+            from core.asset_registry import get_shot_video, is_shot_rendered
+            if is_shot_rendered(shot_id):
+                existing = get_shot_video(self.project_id, shot_id, self.project_name)
+                if existing:
+                    self._progress(f"  ♻️  shot {shot_id} 已渲染，复用 {Path(existing).name}", 0)
+                    if existing not in self.results:
+                        self.results.append(existing)
+                    return existing
 
         prompt_text = self.build_prompt_from_scene(scene)
         render_job_id = create_render_job({

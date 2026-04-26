@@ -157,11 +157,20 @@ def generate_shot_tts(
 ) -> list[dict]:
     """
     为单个 shot 的所有对白生成 TTS 音频。
-    返回生成的音频文件列表。
+    生成前先查 asset_registry，已完成则直接返回已有记录。
+    返回音频文件列表。
     """
     shot = db.get_shot(shot_id)
     if not shot:
         return []
+
+    # ── 复用检查：TTS 已全部完成，直接返回 ──────────────────
+    from core.asset_registry import is_shot_tts_complete, get_shot_tts
+    if is_shot_tts_complete(project_id, shot_id):
+        existing = get_shot_tts(project_id, shot_id)
+        if existing:
+            print(f"[AudioPipeline] ♻️  shot {shot_id} TTS 已存在，复用 {len(existing)} 条")
+            return existing
 
     try:
         dialogue_list = json.loads(shot.dialogue) if shot.dialogue else []
@@ -172,6 +181,9 @@ def generate_shot_tts(
     shot_audio_dir = output_dir / f"shot_{shot_id:04d}" / "tts"
     shot_audio_dir.mkdir(parents=True, exist_ok=True)
 
+    # 已有部分行 — 按 line_idx 跳过已完成的
+    existing_indices = {a["line_idx"] for a in get_shot_tts(project_id, shot_id)}
+
     for idx, line in enumerate(dialogue_list):
         if not isinstance(line, dict):
             continue
@@ -179,6 +191,15 @@ def generate_shot_tts(
         character = line.get("character", "旁白")
         if not text:
             continue
+
+        # 行级复用：该行已生成且文件存在
+        if idx in existing_indices:
+            out_path = str(shot_audio_dir / f"line_{idx:03d}_{character}.mp3")
+            if Path(out_path).exists():
+                duration = _get_audio_duration(out_path)
+                results.append({"line_idx": idx, "character": character,
+                                 "text": text, "file": out_path, "duration": duration})
+                continue
 
         voice = get_voice_for_character(character, project_id)
         out_path = str(shot_audio_dir / f"line_{idx:03d}_{character}.mp3")
@@ -357,10 +378,14 @@ def run_audio_pipeline(
     results = {"tts": [], "music": [], "sfx": []}
 
     # TTS
+    from core.asset_registry import is_shot_tts_complete
     shots = db.list_shots(project_id=project_id)
     _progress(f"生成 TTS：{len(shots)} 个 shot", 0.0)
     for i, shot in enumerate(shots):
         pct = 0.1 + 0.4 * i / max(len(shots), 1)
+        if is_shot_tts_complete(project_id, shot.id):
+            _progress(f"  ♻️  shot {shot.id} TTS 已完成，跳过", pct)
+            continue
         _progress(f"TTS shot {shot.id} ({i+1}/{len(shots)})", pct)
         tts_results = generate_shot_tts(project_id, shot.id, out_dir)
         results["tts"].extend(tts_results)
