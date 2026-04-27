@@ -22,6 +22,8 @@ OUTPUT_DIR = PROJECT_ROOT / "output"
 # ── 可用 TTS 后端优先级 ────────────────────────────────────
 
 BARK_PYTHON = Path(os.path.expanduser("~/bark/venv/bin/python3"))
+CHATTTS_PYTHON = Path(os.path.expanduser("~/chattts/venv/bin/python3"))
+CHATTTS_MODEL_PATH = Path(os.path.expanduser("~/asset/ms/AI-ModelScope/ChatTTS"))
 
 
 def _check_edge_tts() -> bool:
@@ -44,7 +46,14 @@ def _check_bark() -> bool:
     return BARK_PYTHON.exists()
 
 
+def _check_chattts() -> bool:
+    return CHATTTS_PYTHON.exists() and (CHATTTS_MODEL_PATH / "asset" / "gpt").exists()
+
+
 def _pick_tts_backend() -> str:
+    # ChatTTS 优先：原生中文，效果最好
+    if _check_chattts():
+        return "chattts"
     if _check_bark():
         return "bark"
     if _check_edge_tts():
@@ -96,22 +105,27 @@ def generate_tts_kokoro(text: str, output_path: str, voice: str = "af_heart") ->
 # ── Bark TTS（~/bark/venv 独立环境）──────────────────────
 
 def generate_tts_bark(text: str, output_path: str, voice_preset: str = "v2/zh_speaker_0") -> bool:
-    """通过子进程调用 ~/bark/venv 中的 Bark 生成语音。"""
+    """通过子进程调用 ~/bark/venv 中的 Bark 生成语音（MPS 加速）。"""
     if not BARK_PYTHON.exists():
         return False
     script = f"""
-import sys, numpy as np
+import os, sys, numpy as np
+os.environ['SUNO_ENABLE_MPS'] = '1'
+os.environ['SUNO_OFFLOAD_CPU'] = '0'
+from bark.generation import preload_models
+preload_models(text_use_gpu=True, coarse_use_gpu=True, fine_use_gpu=True, codec_use_gpu=True)
 from bark import generate_audio, SAMPLE_RATE
 from scipy.io.wavfile import write as wav_write
 audio = generate_audio({repr(text)}, history_prompt={repr(voice_preset)})
 audio_int = (audio * 32767).astype(np.int16)
 wav_write({repr(str(Path(output_path).with_suffix('.wav')))}, SAMPLE_RATE, audio_int)
+print('OK', len(audio) / SAMPLE_RATE)
 """
     wav_path = str(Path(output_path).with_suffix('.wav'))
     try:
         result = subprocess.run(
             [str(BARK_PYTHON), "-c", script],
-            capture_output=True, text=True, timeout=120,
+            capture_output=True, text=True, timeout=300,
         )
         if result.returncode != 0:
             print(f"[Bark] 失败: {result.stderr[-300:]}")
@@ -130,12 +144,114 @@ wav_write({repr(str(Path(output_path).with_suffix('.wav')))}, SAMPLE_RATE, audio
         return False
 
 
+# ── ChatTTS（~/ChatTTS/venv 独立环境，原生中文）────────────
+
+# ChatTTS 使用固定种子保持音色稳定；不同 seed 对应不同音色
+_CHATTTS_VOICE_SEEDS = {
+    "男": 42,
+    "男性": 42,
+    "男孩": 2222,
+    "少年": 2222,
+    "老人": 6666,
+    "长者": 6666,
+    "反派": 888,
+    "女": 2,
+    "女性": 2,
+    "女孩": 5555,
+    "少女": 5555,
+    "温柔": 4444,
+    "旁白": 9999,
+    "解说": 9999,
+    "narrator": 9999,
+    "default": 2,
+}
+
+
+def generate_tts_chattts(text: str, output_path: str, voice_seed: int = 2) -> bool:
+    """通过子进程调用 ~/chattts/venv 中的 ChatTTS 生成中文语音（CPU，MPS 不可用）。"""
+    if not CHATTTS_PYTHON.exists():
+        return False
+    wav_path = str(Path(output_path).with_suffix('.wav'))
+    script = f"""
+import os, sys
+import numpy as np
+os.environ['TOKENIZERS_PARALLELISM'] = 'false'
+import torch
+import ChatTTS
+from scipy.io.wavfile import write as wav_write
+
+chat = ChatTTS.Chat()
+chat.load(source='custom', custom_path={repr(str(CHATTTS_MODEL_PATH))}, compile=False, device='cpu')
+
+torch.manual_seed({voice_seed})
+rand_spk = chat.sample_random_speaker()
+params_infer = ChatTTS.Chat.InferCodeParams(spk_emb=rand_spk, temperature=0.0003, top_P=0.7, top_K=20)
+params_refine = ChatTTS.Chat.RefineTextParams(prompt='[oral_2][laugh_0][break_6]')
+wavs = chat.infer([{repr(text)}], params_infer_code=params_infer, params_refine_text=params_refine, split_text=False)
+if not wavs:
+    sys.exit(1)
+wav = np.array(wavs[0], dtype=np.float32)
+wav_int = (np.clip(wav, -1.0, 1.0) * 32767).astype(np.int16)
+wav_write({repr(wav_path)}, 24000, wav_int)
+print('OK', len(wav) / 24000)
+"""
+    try:
+        result = subprocess.run(
+            [str(CHATTTS_PYTHON), "-c", script],
+            capture_output=True, text=True, timeout=180,
+        )
+        if result.returncode != 0:
+            print(f"[ChatTTS] 失败: {result.stderr[-500:]}")
+            return False
+        if not Path(wav_path).exists():
+            return False
+        subprocess.run(
+            ["ffmpeg", "-y", "-i", wav_path, "-c:a", "libmp3lame", "-b:a", "128k", output_path],
+            capture_output=True, timeout=30,
+        )
+        Path(wav_path).unlink(missing_ok=True)
+        return Path(output_path).exists()
+    except Exception as e:
+        print(f"[ChatTTS] 异常: {e}")
+        return False
+
+
+def get_voice_seed_chattts(character_name: str, project_id: int) -> int:
+    chars = db.list_characters(project_id)
+    char = next((c for c in chars if c.name == character_name), None)
+    if char:
+        profile = (char.voice_profile or "").lower()
+        for key, seed in _CHATTTS_VOICE_SEEDS.items():
+            if key in profile:
+                return seed
+        if char.gender in ("男", "男性"):
+            return _CHATTTS_VOICE_SEEDS["男"]
+        if char.gender in ("女", "女性"):
+            return _CHATTTS_VOICE_SEEDS["女"]
+    return _CHATTTS_VOICE_SEEDS["default"]
+
+
 _BARK_VOICE_MAP = {
+    # 男性角色
     "男": "v2/zh_speaker_2",
-    "女": "v2/zh_speaker_0",
+    "男性": "v2/zh_speaker_2",
     "男孩": "v2/zh_speaker_3",
+    "少年": "v2/zh_speaker_3",
+    "老男": "v2/zh_speaker_8",
+    "老人": "v2/zh_speaker_8",
+    "长者": "v2/zh_speaker_8",
+    "反派": "v2/zh_speaker_6",
+    "武士": "v2/zh_speaker_4",
+    # 女性角色
+    "女": "v2/zh_speaker_0",
+    "女性": "v2/zh_speaker_0",
     "女孩": "v2/zh_speaker_1",
+    "少女": "v2/zh_speaker_5",
+    "温柔": "v2/zh_speaker_7",
+    # 旁白/解说
     "旁白": "v2/zh_speaker_9",
+    "解说": "v2/zh_speaker_4",
+    "narrator": "v2/zh_speaker_9",
     "default": "v2/zh_speaker_0",
 }
 
@@ -203,13 +319,17 @@ def generate_tts(
     voice: str = "",
     backend: str = "",
     voice_preset: str = "",
+    voice_seed: int = 0,
 ) -> bool:
     if not backend:
         backend = _pick_tts_backend()
 
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
 
-    if backend == "bark":
+    if backend == "chattts":
+        seed = voice_seed or _CHATTTS_VOICE_SEEDS.get(voice, _CHATTTS_VOICE_SEEDS["default"])
+        return generate_tts_chattts(text, output_path, seed)
+    elif backend == "bark":
         preset = voice_preset or _BARK_VOICE_MAP.get(voice, _BARK_VOICE_MAP["default"])
         return generate_tts_bark(text, output_path, preset)
     elif backend == "edge_tts":
@@ -266,17 +386,20 @@ def generate_shot_tts(
         if not text:
             continue
 
+        out_path = str(shot_audio_dir / f"line_{idx:03d}_{character}.mp3")
+
         # 行级复用：该行已生成且文件存在
-        if idx in existing_indices:
-            out_path = str(shot_audio_dir / f"line_{idx:03d}_{character}.mp3")
-            if Path(out_path).exists():
-                duration = _get_audio_duration(out_path)
-                results.append({"line_idx": idx, "character": character,
-                                 "text": text, "file": out_path, "duration": duration})
-                continue
+        if idx in existing_indices and Path(out_path).exists():
+            duration = _get_audio_duration(out_path)
+            results.append({"line_idx": idx, "character": character,
+                             "text": text, "file": out_path, "duration": duration})
+            continue
 
         backend_used = backend or _pick_tts_backend()
-        if backend_used == "bark":
+        if backend_used == "chattts":
+            seed = get_voice_seed_chattts(character, project_id)
+            success = generate_tts(text, out_path, backend="chattts", voice_seed=seed)
+        elif backend_used == "bark":
             voice_preset = get_voice_preset_bark(character, project_id)
             success = generate_tts(text, out_path, backend="bark", voice_preset=voice_preset)
         else:

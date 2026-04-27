@@ -567,6 +567,270 @@ def get_pipeline_state(pid):
         return f"❌ 获取状态失败: {e}"
 
 
+# ─── 各步骤独立运行 ────────────────────────────────────────
+
+def run_music_step_flow(pid, progress=gr.Progress()):
+    """仅生成配乐，yield (log_md, audio_path)。"""
+    if not pid:
+        yield "❌ 无项目", None; return
+    proj = get_project(int(pid))
+    if not proj:
+        yield "❌ 项目不存在", None; return
+    progress(0.1, desc="初始化配乐生成…")
+    yield "### ⏳ 配乐生成中…", None
+    try:
+        from pathlib import Path as _P
+        from pipelines.audio_pipeline import generate_project_music
+        out_dir = _P("output/projects") / proj.name / "audio"
+        progress(0.3, desc="生成中…")
+        results = generate_project_music(int(pid), out_dir)
+        done = [r for r in results if r.get("success") or r.get("skipped")]
+        files = [r["file"] for r in done if r.get("file") and _P(r["file"]).exists()]
+        progress(1.0)
+        log = f"### ✅ 配乐生成完成\n共 {len(results)} 首，成功 {len(done)} 首"
+        for r in results:
+            st = "♻️ 复用" if r.get("skipped") else ("✅" if r.get("success") else "❌")
+            log += f"\n- {st} **{r.get('name','?')}**"
+        yield log, (files[0] if files else None)
+    except Exception as e:
+        import traceback
+        yield f"### ❌ 配乐生成失败\n```\n{e}\n{traceback.format_exc()[-400:]}\n```", None
+
+
+def run_tts_step_flow(pid, shot_id_str: str = "", progress=gr.Progress()):
+    """仅生成 TTS。shot_id_str 为空时处理全部 shot。yield (log_md, audio_path)。"""
+    if not pid:
+        yield "❌ 无项目", None; return
+    proj = get_project(int(pid))
+    if not proj:
+        yield "❌ 项目不存在", None; return
+    try:
+        from pathlib import Path as _P
+        from pipelines.audio_pipeline import generate_shot_tts
+        out_dir = _P("output/projects") / proj.name / "audio"
+        shots = list_shots(project_id=int(pid))
+        if shot_id_str and shot_id_str.strip():
+            try:
+                sid = int(shot_id_str)
+                shots = [s for s in shots if s.id == sid]
+            except ValueError:
+                pass
+        total = len(shots)
+        if not total:
+            yield "❌ 没有分镜", None; return
+        progress(0.0)
+        all_files = []
+        for i, shot in enumerate(shots):
+            progress((i + 1) / total, desc=f"TTS shot {shot.id}…")
+            yield f"### ⏳ TTS shot {shot.id} ({i+1}/{total})…", None
+            results = generate_shot_tts(int(pid), shot.id, out_dir)
+            all_files += [r["file"] for r in results if r.get("file")]
+        progress(1.0)
+        yield f"### ✅ TTS 生成完成，共 {len(all_files)} 条音频", (all_files[0] if all_files else None)
+    except Exception as e:
+        import traceback
+        yield f"### ❌ TTS 失败\n```\n{e}\n{traceback.format_exc()[-400:]}\n```", None
+
+
+def run_sfx_step_flow(pid, progress=gr.Progress()):
+    """仅生成音效，yield (log_md, audio_path)。"""
+    if not pid:
+        yield "❌ 无项目", None; return
+    proj = get_project(int(pid))
+    if not proj:
+        yield "❌ 项目不存在", None; return
+    try:
+        from pathlib import Path as _P
+        from pipelines.audio_pipeline import generate_project_sfx
+        out_dir = _P("output/projects") / proj.name / "audio"
+        progress(0.2)
+        yield "### ⏳ 音效生成中…", None
+        results = generate_project_sfx(int(pid), out_dir)
+        done = [r for r in results if r.get("success") or r.get("skipped")]
+        files = [r["file"] for r in done if r.get("file")]
+        progress(1.0)
+        log = f"### ✅ 音效完成，{len(done)}/{len(results)}"
+        for r in results:
+            st = "♻️" if r.get("skipped") else ("✅" if r.get("success") else "❌")
+            log += f"\n- {st} {r.get('name','?')}"
+        yield log, (files[0] if files else None)
+    except Exception as e:
+        import traceback
+        yield f"### ❌ 音效失败\n```\n{e}\n{traceback.format_exc()[-400:]}\n```", None
+
+
+def run_render_step_flow(pid, shot_id_str: str = "", progress=gr.Progress()):
+    """仅渲染视频帧。shot_id_str 为空处理全部，可逗号分隔多个 ID。yield (log_md, video_path)。"""
+    if not pid:
+        yield "❌ 无项目", None; return
+    proj = get_project(int(pid))
+    if not proj:
+        yield "❌ 项目不存在", None; return
+    try:
+        from pipelines.batch_renderer import BatchRenderer
+        renderer = BatchRenderer(proj.name, project_id=int(pid))
+        shots = list_shots(project_id=int(pid))
+        if shot_id_str and shot_id_str.strip():
+            ids = {int(x.strip()) for x in shot_id_str.split(",") if x.strip().isdigit()}
+            shots = [s for s in shots if s.id in ids]
+        if not shots:
+            yield "❌ 没有可渲染的分镜", None; return
+
+        from core.database import get_shot
+        scene_payloads = []
+        for shot in shots:
+            s = get_shot(shot.id)
+            if not s: continue
+            import json as _j
+            payload = _j.loads(s.render_payload) if s.render_payload else {}
+            payload["shot_id"] = s.id
+            scene_payloads.append(payload)
+
+        progress(0.1)
+        yield f"### ⏳ 渲染 {len(scene_payloads)} 个分镜…", None
+        videos = renderer.render_multi_scene(scene_payloads, max_workers=1)
+        progress(1.0)
+        log = f"### ✅ 渲染完成 {len(videos)}/{len(scene_payloads)}"
+        yield log, (videos[0] if videos else None)
+    except Exception as e:
+        import traceback
+        yield f"### ❌ 渲染失败\n```\n{e}\n{traceback.format_exc()[-400:]}\n```", None
+
+
+def run_composite_step_flow(pid, progress=gr.Progress()):
+    """仅运行合成步骤，yield (log_md, video_path)。"""
+    if not pid:
+        yield "❌ 无项目", None; return
+    proj = get_project(int(pid))
+    if not proj:
+        yield "❌ 项目不存在", None; return
+    try:
+        progress(0.2)
+        yield "### ⏳ 合成中…", None
+        from pipelines.compositor import run_compositor_pipeline
+        result = run_compositor_pipeline(
+            project_id=int(pid), episode=1, burn_subs=True, crossfade=0.5,
+        )
+        progress(1.0)
+        if result:
+            yield f"### ✅ 合成完成\n`{result}`", result
+        else:
+            yield "### ❌ 合成失败（可能缺少视频或音频素材）", None
+    except Exception as e:
+        import traceback
+        yield f"### ❌ 合成失败\n```\n{e}\n{traceback.format_exc()[-400:]}\n```", None
+
+
+def ai_enhance_step(pid, step: str, content: str, instruction: str, mdl: str = "") -> tuple[str, str]:
+    """用 AI 优化某一步骤的 prompt/content。
+    step: 'music' | 'sfx' | 'script' | 'chars' | 'scenes'
+    返回 (enhanced_content, status_msg)。
+    """
+    if not pid or not content:
+        return content, "❌ 无内容可优化"
+    try:
+        from core.ollama_client import call_ollama, resolve_model_profile
+        mdl = mdl or resolve_model_profile("art_music") or "qwen2.5:14b"
+        step_hints = {
+            "music": "优化配乐描述，使其更适合作为 AI 音乐生成 prompt。保留 JSON 结构，只修改 prompt_for_gen / description / mood / instruments / tempo 字段。",
+            "sfx": "优化音效描述，保留 JSON 结构，只修改 description / tags / category 字段，让其更精确。",
+            "script": "优化剧本内容，增强戏剧性和情感深度，保留 JSON 结构。",
+            "chars": "深化角色设定，丰富 appearance / personality / background / voice_profile，保留 JSON 结构。",
+            "scenes": "优化场景描述，增强视觉感和氛围细节，保留 JSON 结构。",
+        }
+        hint = step_hints.get(step, "优化内容，保留原有 JSON 结构。")
+        extra = f"\n用户额外要求：{instruction}" if instruction and instruction.strip() else ""
+        prompt = f"""你是专业的故事创作助手。{hint}{extra}
+
+直接返回修改后的完整 JSON，不要加任何说明文字。
+
+原始内容：
+{content[:3000]}"""
+        result = call_ollama(prompt, model=mdl, max_tokens=2048)
+        if not result:
+            return content, "❌ AI 响应为空"
+        # 从结果中提取 JSON
+        import re
+        m = re.search(r"```(?:json)?\s*([\s\S]+?)\s*```", result)
+        json_str = m.group(1) if m else result.strip()
+        # 验证 JSON
+        json.loads(json_str)
+        return json_str, f"✅ AI 优化完成（{step}）"
+    except json.JSONDecodeError:
+        return result, "⚠️ AI 返回了内容（但 JSON 格式可能有问题，请检查后保存）"
+    except Exception as e:
+        return content, f"❌ AI 优化失败: {e}"
+
+
+def load_music_status(pid) -> str:
+    """返回配乐状态 Markdown。"""
+    if not pid:
+        return ""
+    try:
+        from pathlib import Path as _P
+        tracks = list_music(int(pid))
+        if not tracks:
+            return "⚪ 暂无配乐（请先运行 Phase 1 生成内容）"
+        lines = []
+        for t in tracks:
+            has_file = bool(t.file_path and _P(t.file_path).exists())
+            icon = "✅" if has_file else "⚪"
+            lines.append(f"{icon} **{t.name}** — {t.mood or '?'} / {t.tempo or '?'}")
+        return "\n".join(lines)
+    except Exception as e:
+        return f"❌ {e}"
+
+
+def load_tts_status(pid) -> str:
+    """返回 TTS 状态 Markdown（按 shot 汇总）。"""
+    if not pid:
+        return ""
+    try:
+        from core.asset_registry import is_shot_tts_complete
+        shots = list_shots(project_id=int(pid))
+        if not shots:
+            return "⚪ 暂无分镜"
+        done = sum(1 for s in shots if is_shot_tts_complete(int(pid), s.id))
+        return f"**TTS 进度**: {done}/{len(shots)} 个 shot 已完成"
+    except Exception as e:
+        return f"❌ {e}"
+
+
+def load_render_status(pid) -> str:
+    """返回渲染状态 Markdown（按 shot 汇总）。"""
+    if not pid:
+        return ""
+    try:
+        from core.asset_registry import is_shot_rendered
+        shots = list_shots(project_id=int(pid))
+        if not shots:
+            return "⚪ 暂无分镜"
+        done = sum(1 for s in shots if is_shot_rendered(s.id))
+        return f"**渲染进度**: {done}/{len(shots)} 个 shot 已渲染"
+    except Exception as e:
+        return f"❌ {e}"
+
+
+def load_shot_tts_detail(pid, shot_id_str: str) -> tuple[str, str]:
+    """加载某 shot 的对白和 TTS 状态。返回 (dialogue_json, status_md)。"""
+    if not pid or not shot_id_str:
+        return "", ""
+    try:
+        sid = int(shot_id_str)
+        from core.database import get_shot as _get_shot
+        shot = _get_shot(sid)
+        if not shot:
+            return "", f"❌ Shot {sid} 不存在"
+        dialogue = shot.dialogue or "[]"
+        from core.asset_registry import is_shot_tts_complete, get_shot_tts
+        tts_done = is_shot_tts_complete(int(pid), sid)
+        tts_files = get_shot_tts(int(pid), sid)
+        status = f"{'✅ TTS 已完成' if tts_done else '⚪ TTS 未生成'} — {len(tts_files)} 条音频"
+        return dialogue, status
+    except Exception as e:
+        return "", f"❌ {e}"
+
+
 # ─── 系统状态 + 音频配置 ──────────────────────────────────
 
 def get_system_status() -> str:
@@ -588,14 +852,21 @@ def get_system_status() -> str:
 
     # TTS
     try:
-        from pipelines.audio_pipeline import _pick_tts_backend, BARK_PYTHON, _check_edge_tts
+        from pipelines.audio_pipeline import _pick_tts_backend, BARK_PYTHON, CHATTTS_PYTHON, _check_edge_tts
         backend = _pick_tts_backend()
+        chattts_ok = CHATTTS_PYTHON.exists()
         bark_ok = BARK_PYTHON.exists()
         edge_ok = _check_edge_tts()
-        tts_str = {"bark": "✅ Bark（本地，高质量）", "edge_tts": "✅ Edge-TTS（在线免费）",
-                   "kokoro": "✅ Kokoro（本地）", "pyttsx3": "⚠️ pyttsx3（系统回退）"}.get(backend, backend)
+        tts_str = {
+            "chattts": "✅ ChatTTS（本地，原生中文，推荐）",
+            "bark": "✅ Bark（本地，多语言）",
+            "edge_tts": "✅ Edge-TTS（在线免费）",
+            "kokoro": "✅ Kokoro（本地）",
+            "pyttsx3": "⚠️ pyttsx3（系统回退）",
+        }.get(backend, backend)
         lines.append(f"**TTS 后端**: {tts_str}")
         avail = []
+        if chattts_ok: avail.append("ChatTTS")
         if bark_ok: avail.append("Bark")
         if edge_ok: avail.append("Edge-TTS")
         if avail: lines.append(f"  *可用*: {', '.join(avail)}")
@@ -618,11 +889,17 @@ def get_system_status() -> str:
 def test_tts_preview(text: str, voice_type: str) -> tuple[str, str]:
     """生成一段 TTS 试听，返回 (audio_path, log)。"""
     import tempfile
-    from pipelines.audio_pipeline import generate_tts, _pick_tts_backend, _BARK_VOICE_MAP, _VOICE_MAP
+    from pipelines.audio_pipeline import (
+        generate_tts, _pick_tts_backend, _BARK_VOICE_MAP, _VOICE_MAP,
+        _CHATTTS_VOICE_SEEDS,
+    )
     backend = _pick_tts_backend()
     out = tempfile.mktemp(suffix=".mp3")
     try:
-        if backend == "bark":
+        if backend == "chattts":
+            seed = _CHATTTS_VOICE_SEEDS.get(voice_type, _CHATTTS_VOICE_SEEDS["default"])
+            ok = generate_tts(text, out, backend="chattts", voice_seed=seed)
+        elif backend == "bark":
             preset = _BARK_VOICE_MAP.get(voice_type, _BARK_VOICE_MAP["default"])
             ok = generate_tts(text, out, backend="bark", voice_preset=preset)
         else:
@@ -910,53 +1187,237 @@ def build_ui():
         project_id_state = gr.State(0)
         render_config_state = gr.State({})   # {checkpoint, loras, width, height, steps, cfg}
 
-        # ══════ 查看 + 编辑区 ════════════════════════
+        # ══════ 查看 + 编辑区（各步骤工作站）════════════
         gr.Markdown("---")
-        gr.Markdown("## ✏️ 查看 & 编辑内容")
+        gr.Markdown("## ✏️ 各步骤工作站  *每个 Tab 可独立编辑 & 单步执行*")
         production_overview = gr.Markdown("运行管线后自动展示生产指标。")
 
         with gr.Tabs():
+            # ─── 概览 ──────────────────────────────
             with gr.TabItem("📺 概览"):
                 view_md = gr.Markdown(value="运行管线后自动展示可读内容。")
 
+            # ─── 分镜 ──────────────────────────────
             with gr.TabItem("🎞️ 分镜"):
                 shot_table = gr.Dataframe(
                     headers=["ID", "Act", "Scene", "Shot", "场景", "镜头", "情绪", "角色", "状态"],
-                    value=[],
-                    interactive=False,
-                    label="分镜列表",
+                    value=[], interactive=False, label="分镜列表",
                 )
 
+            # ─── 剧本工作站 ───────────────────────────
             with gr.TabItem("📖 剧本"):
-                script_edit = gr.Textbox(label="剧本 JSON", lines=15)
+                with gr.Row():
+                    gr.Markdown("##### 状态")
+                    script_step_refresh_btn = gr.Button("🔄", size="sm", scale=0, min_width=40)
+                script_step_status = gr.Markdown("加载项目后显示状态")
+                script_edit = gr.Textbox(label="剧本 JSON（可直接编辑）", lines=15)
+                with gr.Accordion("🤖 AI 辅助", open=False):
+                    with gr.Row():
+                        script_ai_instr = gr.Textbox(
+                            label="优化指令（留空用默认）",
+                            placeholder="例如：加强第二幕的冲突感，让主角更有深度",
+                            lines=2, scale=3,
+                        )
+                        script_ai_model = gr.Dropdown(
+                            label="AI 模型", choices=models or [default_model],
+                            value="", allow_custom_value=True, scale=1,
+                        )
+                    script_ai_btn = gr.Button("🤖 AI 优化剧本", variant="secondary")
+                    script_ai_status = gr.Markdown("")
                 with gr.Row():
                     save_script_btn = gr.Button("💾 保存剧本", elem_classes="save-btn", scale=1)
+                    step1_run_btn = gr.Button("▶️ 重新生成剧本", scale=1)
                     script_status = gr.Markdown("")
 
+            # ─── 角色工作站 ───────────────────────────
             with gr.TabItem("👤 角色"):
-                char_edit = gr.Textbox(label="角色列表 JSON", lines=12)
+                char_edit = gr.Textbox(label="角色列表 JSON（可直接编辑）", lines=12)
+                with gr.Accordion("🤖 AI 辅助", open=False):
+                    with gr.Row():
+                        char_ai_instr = gr.Textbox(
+                            label="优化指令",
+                            placeholder="例如：让反派角色更有魅力，丰富支线角色背景",
+                            lines=2, scale=3,
+                        )
+                        char_ai_model = gr.Dropdown(
+                            label="AI 模型", choices=models or [default_model],
+                            value="", allow_custom_value=True, scale=1,
+                        )
+                    char_ai_btn = gr.Button("🤖 AI 优化角色", variant="secondary")
+                    char_ai_status = gr.Markdown("")
                 with gr.Row():
                     save_char_btn = gr.Button("💾 保存角色", elem_classes="save-btn", scale=1)
+                    step2_run_btn = gr.Button("▶️ 重新生成角色", scale=1)
                     char_status = gr.Markdown("")
 
+            # ─── 场景工作站 ───────────────────────────
             with gr.TabItem("🏞️ 场景"):
-                scene_edit = gr.Textbox(label="场景列表 JSON", lines=12)
+                scene_edit = gr.Textbox(label="场景列表 JSON（可直接编辑）", lines=12)
+                with gr.Accordion("🤖 AI 辅助", open=False):
+                    with gr.Row():
+                        scene_ai_instr = gr.Textbox(
+                            label="优化指令",
+                            placeholder="例如：增强视觉冲击力，让场景描述更适合动漫风格渲染",
+                            lines=2, scale=3,
+                        )
+                        scene_ai_model = gr.Dropdown(
+                            label="AI 模型", choices=models or [default_model],
+                            value="", allow_custom_value=True, scale=1,
+                        )
+                    scene_ai_btn = gr.Button("🤖 AI 优化场景", variant="secondary")
+                    scene_ai_status = gr.Markdown("")
                 with gr.Row():
                     save_scene_btn = gr.Button("💾 保存场景", elem_classes="save-btn", scale=1)
+                    step3_run_btn = gr.Button("▶️ 重新生成场景", scale=1)
                     scene_status = gr.Markdown("")
 
-            with gr.TabItem("🎵 音乐"):
-                music_edit = gr.Textbox(label="音乐数据 JSON", lines=10)
+            # ─── 配乐工作站 ───────────────────────────
+            with gr.TabItem("🎵 配乐"):
                 with gr.Row():
-                    save_music_btn = gr.Button("💾 保存音乐", elem_classes="save-btn", scale=1)
+                    music_step_status = gr.Markdown(load_music_status(0))
+                    music_status_refresh_btn = gr.Button("🔄 刷新", size="sm", scale=0, min_width=50)
+                gr.Markdown("##### 编辑配乐数据（JSON）")
+                gr.Markdown(
+                    "每条记录包含 `name`、`mood`、`tempo`、`instruments`、`description`、`prompt_for_gen`。\n"
+                    "`prompt_for_gen` 是实际传给 MusicGen 的英文描述，对音乐质量影响最大。",
+                    elem_classes="gr-text-small",
+                )
+                music_edit = gr.Textbox(
+                    label="配乐 JSON（可直接编辑 prompt_for_gen 字段）",
+                    lines=12,
+                )
+                with gr.Accordion("🤖 AI 辅助优化配乐描述", open=False):
+                    with gr.Row():
+                        music_ai_instr = gr.Textbox(
+                            label="优化指令（留空则自动优化 prompt_for_gen）",
+                            placeholder="例如：让配乐更有史诗感，加入东方乐器元素",
+                            lines=2, scale=3,
+                        )
+                        music_ai_model = gr.Dropdown(
+                            label="AI 模型", choices=models or [default_model],
+                            value="", allow_custom_value=True, scale=1,
+                        )
+                    music_ai_btn = gr.Button("🤖 AI 优化配乐描述", variant="secondary")
+                    music_ai_status = gr.Markdown("")
+                with gr.Row():
+                    save_music_btn = gr.Button("💾 保存配乐数据", elem_classes="save-btn", scale=1)
+                    music_run_btn = gr.Button("▶️ 单步生成配乐", variant="primary", scale=1)
                     music_status = gr.Markdown("")
+                music_run_log = gr.Markdown("")
+                music_preview_out = gr.Audio(
+                    label="配乐预览（生成后自动显示首曲）",
+                    type="filepath", interactive=False,
+                )
 
+            # ─── 音效工作站 ───────────────────────────
             with gr.TabItem("🔊 音效"):
-                sfx_edit = gr.Textbox(label="音效数据 JSON", lines=10)
+                sfx_edit = gr.Textbox(label="音效数据 JSON（可直接编辑）", lines=10)
+                with gr.Accordion("🤖 AI 辅助优化音效描述", open=False):
+                    with gr.Row():
+                        sfx_ai_instr = gr.Textbox(
+                            label="优化指令",
+                            placeholder="例如：让音效描述更具体，区分环境音和动作音",
+                            lines=2, scale=3,
+                        )
+                        sfx_ai_model = gr.Dropdown(
+                            label="AI 模型", choices=models or [default_model],
+                            value="", allow_custom_value=True, scale=1,
+                        )
+                    sfx_ai_btn = gr.Button("🤖 AI 优化音效描述", variant="secondary")
+                    sfx_ai_status = gr.Markdown("")
                 with gr.Row():
-                    save_sfx_btn = gr.Button("💾 保存音效", elem_classes="save-btn", scale=1)
+                    save_sfx_btn = gr.Button("💾 保存音效数据", elem_classes="save-btn", scale=1)
+                    sfx_run_btn = gr.Button("▶️ 单步生成音效", variant="primary", scale=1)
                     sfx_status = gr.Markdown("")
+                sfx_run_log = gr.Markdown("")
+                sfx_preview_out = gr.Audio(
+                    label="音效预览（生成后自动显示）",
+                    type="filepath", interactive=False,
+                )
 
+            # ─── TTS 工作站 ──────────────────────────
+            with gr.TabItem("🎤 TTS 配音"):
+                with gr.Row():
+                    tts_step_status_md = gr.Markdown(load_tts_status(0))
+                    tts_status_refresh_btn = gr.Button("🔄 刷新", size="sm", scale=0, min_width=50)
+                gr.Markdown(
+                    "可选择单个 Shot 查看/编辑对白，或直接批量生成全部 Shot 的 TTS。",
+                    elem_classes="gr-text-small",
+                )
+                with gr.Row():
+                    tts_shot_id_input = gr.Textbox(
+                        label="Shot ID（留空 = 全部）",
+                        placeholder="例如: 3  或  1,2,5",
+                        scale=2,
+                    )
+                    tts_load_shot_btn = gr.Button("📖 查看此 Shot 对白", scale=1)
+                tts_shot_status_md = gr.Markdown("")
+                tts_dialogue_edit = gr.Textbox(
+                    label="对白 JSON（可编辑 character / line / voice_preset 字段）",
+                    lines=10, placeholder="点击「查看此 Shot 对白」加载...",
+                )
+                gr.Markdown(
+                    "TTS 使用 **ChatTTS**（中文优先）→ Bark → Edge-TTS 自动降级。\n"
+                    "在模型管理 → TTS 试听 可以预先试听各音色。",
+                    elem_classes="gr-text-small",
+                )
+                with gr.Row():
+                    tts_run_shot_btn = gr.Button("▶️ 生成此 Shot TTS", scale=1)
+                    tts_run_all_btn = gr.Button("▶️ 生成全部 TTS", variant="primary", scale=1)
+                tts_run_log = gr.Markdown("")
+                tts_preview_out = gr.Audio(
+                    label="TTS 预览（生成后自动显示首条）",
+                    type="filepath", interactive=False,
+                )
+
+            # ─── 渲染工作站 ──────────────────────────
+            with gr.TabItem("🎬 渲染"):
+                with gr.Row():
+                    render_step_status_md = gr.Markdown(load_render_status(0))
+                    render_status_refresh_btn = gr.Button("🔄 刷新", size="sm", scale=0, min_width=50)
+                gr.Markdown(
+                    "渲染使用 ComfyUI（AnimateDiff 或静态帧兜底）。已渲染的 Shot 自动跳过。",
+                    elem_classes="gr-text-small",
+                )
+                with gr.Row():
+                    render_shot_id_input = gr.Textbox(
+                        label="Shot ID（留空 = 全部未渲染）",
+                        placeholder="例如: 3  或  1,2,5",
+                        scale=2,
+                    )
+                    render_run_btn = gr.Button("▶️ 渲染指定/全部", variant="primary", scale=1)
+                render_run_log = gr.Markdown("")
+                render_video_preview = gr.Video(
+                    label="渲染预览（完成后自动显示）", interactive=False,
+                )
+
+            # ─── 合成工作站 ──────────────────────────
+            with gr.TabItem("🎞️ 合成导出"):
+                gr.Markdown(
+                    "将所有已渲染视频 + TTS + BGM 合成为最终集数视频。\n"
+                    "需要完成渲染和音频生成后再执行。",
+                    elem_classes="gr-text-small",
+                )
+                with gr.Row():
+                    composite_run_btn = gr.Button("▶️ 执行合成", variant="primary", scale=1)
+                    episode_video_path = gr.Textbox(
+                        label="输出视频路径", interactive=False, scale=2,
+                    )
+                composite_run_log = gr.Markdown("")
+                composite_video_preview = gr.Video(
+                    label="最终视频预览", interactive=False,
+                )
+
+            # ─── 视频预览 ─────────────────────────────
+            with gr.TabItem("▶️ 视频预览"):
+                gr.Markdown("### Shot 视频预览")
+                with gr.Row():
+                    shot_preview_id = gr.Number(label="Shot ID", value=0, precision=0, scale=1)
+                    load_video_btn = gr.Button("▶️ 加载视频", scale=1)
+                shot_video_player = gr.Video(label="Shot 视频", interactive=False)
+                shot_video_status = gr.Markdown("")
+
+            # ─── AI 联动编辑 ──────────────────────────
             with gr.TabItem("🤖 AI 编辑"):
                 gr.Markdown("### AI 联动编辑\n输入自然语言指令，AI 扫描所有受影响字段并预览变更。")
                 with gr.Row():
@@ -976,29 +1437,12 @@ def build_ui():
                     ai_rollback_btn = gr.Button("↩️ 回滚最近编辑", scale=1)
                     show_manifest_btn = gr.Button("📋 显示/隐藏 JSON", scale=1)
                 ai_exec_status = gr.Markdown("")
-
                 gr.Markdown("#### 编辑历史")
                 edit_history_table = gr.Dataframe(
                     headers=["ID", "时间", "指令", "表", "字段", "旧值", "新值", "置信度"],
-                    value=[],
-                    interactive=False,
-                    label="近 30 条编辑记录",
+                    value=[], interactive=False, label="近 30 条编辑记录",
                 )
                 refresh_history_btn = gr.Button("🔄 刷新历史", size="sm")
-
-            with gr.TabItem("🎞️ 视频预览"):
-                gr.Markdown("### Shot 视频预览")
-                with gr.Row():
-                    shot_preview_id = gr.Number(label="Shot ID", value=0, precision=0, scale=1)
-                    load_video_btn = gr.Button("▶️ 加载视频", scale=1)
-                shot_video_player = gr.Video(label="Shot 视频", interactive=False)
-                shot_video_status = gr.Markdown("")
-
-                gr.Markdown("### 集数合成视频")
-                episode_video_path = gr.Textbox(
-                    label="集数视频路径（生成后自动填入）",
-                    interactive=False,
-                )
 
             with gr.TabItem("🗂️ 模型管理"):
                 gr.Markdown("### ComfyUI 模型管理\n查看已安装模型 / 搜索 / 下载缺失模型。")

@@ -27,6 +27,10 @@ nohup.out
 # ── AI Agent 缓存 ──
 .claude/
 
+# ── 模型/资产文件（不提交大文件） ──
+asset/
+models/
+
 # ── 配置文件 ──
 .env
 *.local
