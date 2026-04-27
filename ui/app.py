@@ -567,6 +567,81 @@ def get_pipeline_state(pid):
         return f"❌ 获取状态失败: {e}"
 
 
+# ─── 系统状态 + 音频配置 ──────────────────────────────────
+
+def get_system_status() -> str:
+    """返回整个渲染/音频管线的后端状态 Markdown。"""
+    from pathlib import Path as _Path
+    lines = ["### 🖥️ 系统状态"]
+
+    # ComfyUI
+    online = comfyui_online()
+    lines.append(f"**ComfyUI**: {'🟢 在线' if online else '🔴 离线'}")
+
+    # AnimateDiff
+    try:
+        from pipelines.animate_pipeline import animatediff_available
+        ade = animatediff_available()
+        lines.append(f"**AnimateDiff**: {'✅ ADE 运动工作流（16帧@8fps）' if ade else '⚠️ 静态单帧回退（缺 hsxl_temporal_layers.f16.safetensors）'}")
+    except Exception:
+        lines.append("**AnimateDiff**: ❓ 检测失败")
+
+    # TTS
+    try:
+        from pipelines.audio_pipeline import _pick_tts_backend, BARK_PYTHON, _check_edge_tts
+        backend = _pick_tts_backend()
+        bark_ok = BARK_PYTHON.exists()
+        edge_ok = _check_edge_tts()
+        tts_str = {"bark": "✅ Bark（本地，高质量）", "edge_tts": "✅ Edge-TTS（在线免费）",
+                   "kokoro": "✅ Kokoro（本地）", "pyttsx3": "⚠️ pyttsx3（系统回退）"}.get(backend, backend)
+        lines.append(f"**TTS 后端**: {tts_str}")
+        avail = []
+        if bark_ok: avail.append("Bark")
+        if edge_ok: avail.append("Edge-TTS")
+        if avail: lines.append(f"  *可用*: {', '.join(avail)}")
+    except Exception as e:
+        lines.append(f"**TTS**: ❓ {e}")
+
+    # BGM
+    lines.append("**BGM 生成**: ffmpeg 多声部合成（内置，无需安装）→ 可接 HeartMuLa/audiocraft 升级")
+
+    return "\n\n".join(lines)
+
+
+def test_tts_preview(text: str, voice_type: str) -> tuple[str, str]:
+    """生成一段 TTS 试听，返回 (audio_path, log)。"""
+    import tempfile
+    from pipelines.audio_pipeline import generate_tts, _pick_tts_backend, _BARK_VOICE_MAP, _VOICE_MAP
+    backend = _pick_tts_backend()
+    out = tempfile.mktemp(suffix=".mp3")
+    try:
+        if backend == "bark":
+            preset = _BARK_VOICE_MAP.get(voice_type, _BARK_VOICE_MAP["default"])
+            ok = generate_tts(text, out, backend="bark", voice_preset=preset)
+        else:
+            voice = _VOICE_MAP.get(voice_type, _VOICE_MAP["default"])
+            ok = generate_tts(text, out, voice=voice, backend=backend)
+        if ok:
+            return out, f"✅ 生成成功（{backend}）"
+        return None, f"❌ 生成失败（{backend}）"
+    except Exception as e:
+        return None, f"❌ {e}"
+
+
+def test_bgm_preview(mood: str, duration: int = 10) -> tuple[str, str]:
+    """生成一段 BGM 试听，返回 (audio_path, log)。"""
+    import tempfile
+    from pipelines.audio_pipeline import generate_music
+    out = tempfile.mktemp(suffix=".mp3")
+    try:
+        ok = generate_music("preview", out, duration=duration, mood=mood)
+        if ok:
+            return out, f"✅ BGM 生成成功（mood={mood}）"
+        return None, "❌ BGM 生成失败"
+    except Exception as e:
+        return None, f"❌ {e}"
+
+
 # ─── ComfyUI 模型管理 ────────────────────────────────
 
 MODEL_TYPE_LABELS = {
@@ -921,8 +996,65 @@ def build_ui():
             with gr.TabItem("🗂️ 模型管理"):
                 gr.Markdown("### ComfyUI 模型管理\n查看已安装模型 / 搜索 / 下载缺失模型。")
 
+                # ── 系统状态总览 ─────────────────────────
+                with gr.Accordion("🖥️ 系统状态总览", open=True):
+                    sys_status_md = gr.Markdown(get_system_status())
+                    sys_refresh_btn = gr.Button("🔄 刷新状态", size="sm")
+
+                # ── 渲染参数配置 ─────────────────────────
+                with gr.Accordion("⚙️ 渲染参数（Steps / CFG / 尺寸）", open=False):
+                    gr.Markdown("调整后点「应用」将参数合并到渲染配置。")
+                    with gr.Row():
+                        rp_steps = gr.Slider(label="Steps", minimum=10, maximum=50, value=20, step=1, scale=2)
+                        rp_cfg   = gr.Slider(label="CFG Scale", minimum=3.0, maximum=15.0, value=7.0, step=0.5, scale=2)
+                    with gr.Row():
+                        rp_width  = gr.Dropdown(label="宽度", choices=[512, 768, 832, 896, 1024, 1152], value=896, scale=1)
+                        rp_height = gr.Dropdown(label="高度", choices=[512, 768, 832, 896, 1024, 1152], value=1152, scale=1)
+                        rp_apply_btn = gr.Button("✅ 应用参数", variant="secondary", scale=1)
+                    rp_status_md = gr.Markdown("")
+
+                # ── TTS / 音频配置 ───────────────────────
+                with gr.Accordion("🎤 TTS 配置 & 试听", open=False):
+                    gr.Markdown(
+                        "TTS 后端优先级：**Bark**（`~/bark/venv`，本地高质量中文）"
+                        " → Edge-TTS（在线免费）→ Kokoro → pyttsx3。\n\n"
+                        "Bark 需要首次运行时自动下载模型（~5GB），之后离线可用。"
+                    )
+                    with gr.Row():
+                        tts_test_text  = gr.Textbox(
+                            label="试听文本",
+                            value="仙剑问情，一梦千年，何处是归途？",
+                            scale=3,
+                        )
+                        tts_voice_type = gr.Dropdown(
+                            label="音色类型",
+                            choices=["男", "女", "男孩", "女孩", "旁白"],
+                            value="旁白", scale=1,
+                        )
+                        tts_preview_btn = gr.Button("▶️ 试听", variant="primary", scale=1)
+                    tts_audio_out = gr.Audio(label="TTS 试听", type="filepath", interactive=False)
+                    tts_preview_log = gr.Markdown("")
+
+                # ── BGM 配置 & 试听 ──────────────────────
+                with gr.Accordion("🎵 BGM 配置 & 试听", open=False):
+                    gr.Markdown(
+                        "BGM 后端优先级：HeartMuLa → audiocraft → **ffmpeg 合成**（内置保底）。\n\n"
+                        "ffmpeg 合成根据情绪生成多声部和弦氛围音乐，无需任何额外安装。\n"
+                        "如需真实 AI 音乐，可在本机启动 [HeartMuLa](https://github.com/suno-ai/bark) 或安装 audiocraft。"
+                    )
+                    with gr.Row():
+                        bgm_mood_sel = gr.Dropdown(
+                            label="情绪",
+                            choices=["热血", "史诗", "神秘", "温馨", "黑暗", "浪漫", "悬疑", "epic", "warm", "dark"],
+                            value="热血", scale=2,
+                        )
+                        bgm_dur_sel = gr.Slider(label="时长(秒)", minimum=5, maximum=60, value=15, step=5, scale=2)
+                        bgm_preview_btn = gr.Button("▶️ 试听 BGM", variant="primary", scale=1)
+                    bgm_audio_out = gr.Audio(label="BGM 试听", type="filepath", interactive=False)
+                    bgm_preview_log = gr.Markdown("")
+
                 # ── 已安装模型浏览 ──────────────────────
-                with gr.Accordion("🔍 已安装模型浏览", open=True):
+                with gr.Accordion("🔍 已安装模型浏览", open=False):
                     cm_status_md = gr.Markdown("点击「加载」查询 ComfyUI 已安装模型。")
                     with gr.Row():
                         cm_load_btn = gr.Button("🔄 加载全部模型", variant="primary", scale=2)
@@ -1213,6 +1345,47 @@ def build_ui():
             inputs=[project_id_state, shot_preview_id],
             outputs=[shot_video_player, shot_video_status],
             queue=False,
+        )
+
+        # ── 系统状态 ──────────────────────────────────────
+        sys_refresh_btn.click(
+            fn=get_system_status,
+            inputs=[],
+            outputs=[sys_status_md],
+            queue=False,
+        )
+
+        # ── 渲染参数 ──────────────────────────────────────
+        def _apply_render_params(steps, cfg, width, height, cur_cfg: dict):
+            cfg_new = dict(cur_cfg or {})
+            cfg_new["steps"]  = int(steps)
+            cfg_new["cfg"]    = float(cfg)
+            cfg_new["width"]  = int(width)
+            cfg_new["height"] = int(height)
+            parts = [f"Steps={steps}", f"CFG={cfg}", f"{width}×{height}"]
+            if cfg_new.get("checkpoint"):
+                parts.insert(0, f"Checkpoint: {cfg_new['checkpoint']}")
+            return cfg_new, "✅ 参数已应用: " + " · ".join(parts)
+
+        rp_apply_btn.click(
+            fn=_apply_render_params,
+            inputs=[rp_steps, rp_cfg, rp_width, rp_height, render_config_state],
+            outputs=[render_config_state, rp_status_md],
+            queue=False,
+        )
+
+        # ── TTS 试听 ──────────────────────────────────────
+        tts_preview_btn.click(
+            fn=test_tts_preview,
+            inputs=[tts_test_text, tts_voice_type],
+            outputs=[tts_audio_out, tts_preview_log],
+        )
+
+        # ── BGM 试听 ──────────────────────────────────────
+        bgm_preview_btn.click(
+            fn=test_bgm_preview,
+            inputs=[bgm_mood_sel, bgm_dur_sel],
+            outputs=[bgm_audio_out, bgm_preview_log],
         )
 
         # ── 模型管理 ─────────────────────────────────────

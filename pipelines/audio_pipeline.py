@@ -409,7 +409,7 @@ def generate_music_audiocraft(prompt: str, output_path: str, duration: int = 30)
     """使用 audiocraft/MusicGen CLI 生成音乐（如果已安装）。"""
     try:
         cmd = [
-            "python", "-m", "audiocraft.generate",
+            "python3", "-m", "audiocraft.generate",
             "--model", "musicgen-small",
             "--text", prompt,
             "--duration", str(duration),
@@ -477,7 +477,7 @@ def generate_sfx_audiocraft(description: str, output_path: str, duration: int = 
     """使用 audiocraft AudioGen 生成音效。"""
     try:
         cmd = [
-            "python", "-m", "audiocraft.generate",
+            "python3", "-m", "audiocraft.generate",
             "--model", "audiogen-medium",
             "--text", description,
             "--duration", str(duration),
@@ -576,6 +576,8 @@ def _get_audio_duration(path: str) -> float:
 
 
 def _register_audio(project_id: int, shot_id: int, asset_type: str, file_path: str, ref_id: int = 0):
+    if not project_id:
+        return
     duration = _get_audio_duration(file_path)
     db.create_audio_asset({
         "project_id": project_id,
