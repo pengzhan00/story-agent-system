@@ -17,7 +17,7 @@ import sys
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from pipelines.animate_pipeline import submit_workflow, wait_for_completion, build_scene_prompt
+from pipelines.animate_pipeline import submit_workflow, wait_for_completion, build_scene_prompt, get_workflow, animatediff_available
 from pipelines.output_manager import (
     ensure_project_dirs, register_scene, load_timeline, save_timeline
 )
@@ -166,11 +166,13 @@ class BatchRenderer:
 
         # 构建 ComfyUI 工作流
         from pipelines.animate_pipeline import (
-            WORKFLOW_FILE, inject_prompt, inject_seed, inject_loras,
-            inject_checkpoint,
+            inject_prompt, inject_seed, inject_loras, inject_checkpoint,
             NEGATIVE_PROMPT, DEFAULT_STYLE_LORA, DEFAULT_STYLE_LORA_STRENGTH,
         )
-        workflow = json.loads(WORKFLOW_FILE.read_text())
+        using_ade = animatediff_available()
+        workflow = get_workflow()
+        if using_ade:
+            self._progress(f"  🎬 使用 AnimateDiff SDXL 运动工作流", 0)
 
         # 渲染配置覆盖（来自 UI 模型管理选择）
         render_cfg = scene.get("_render_config") or {}

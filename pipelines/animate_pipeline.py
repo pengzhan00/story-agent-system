@@ -19,14 +19,33 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 COMFYUI_URL = "http://127.0.0.1:8188"
 OUTPUT_DIR = Path(__file__).parent.parent / "output"
-WORKFLOW_FILE = Path(__file__).parent / "animatediff_workflow.json"
+WORKFLOW_FILE = Path(__file__).parent / "animatediff_workflow.json"          # 静态 SDXL 回退
+ADE_WORKFLOW_FILE = Path(__file__).parent / "animatediff_sdxl_workflow.json"  # AnimateDiff ADE
+
+# AnimateDiff SDXL 运动模型路径
+_ANIMATEDIFF_MODEL_PATH = Path(os.path.expanduser("~/Documents/ComfyUI")) / \
+    "custom_nodes/ComfyUI-AnimateDiff-Evolved/models/hsxl_temporal_layers.f16.safetensors"
 
 # SDXL 静态图像参数 (无 AnimateDiff，仅静态帧)
 SDXL_WIDTH = 896
 SDXL_HEIGHT = 1152
-FRAME_RATE = 1          # 1fps → 1帧=1秒静态视频
+FRAME_RATE = 1          # 静态回退：1fps
+ADE_FRAME_RATE = 8      # AnimateDiff：8fps × 16帧 = 2秒视频
+ADE_BATCH_SIZE = 16     # AnimateDiff 每次生成帧数
 SAMPLER_STEPS = 25
 CFG_SCALE = 7.0
+
+
+def animatediff_available() -> bool:
+    """检查 AnimateDiff SDXL 运动模块是否已安装。"""
+    return _ANIMATEDIFF_MODEL_PATH.exists() and ADE_WORKFLOW_FILE.exists()
+
+
+def get_workflow() -> dict:
+    """返回最优可用 workflow：ADE（有运动）优先，否则静态 SDXL 回退。"""
+    if animatediff_available():
+        return json.loads(ADE_WORKFLOW_FILE.read_text())
+    return json.loads(WORKFLOW_FILE.read_text())
 
 # 默认风格 LoRA (动漫风格)
 DEFAULT_STYLE_LORA = "anime.safetensors"

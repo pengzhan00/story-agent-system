@@ -742,20 +742,58 @@ def run_render_export_generator(
         else:
             yield emit(0.40, "⚠️ 没有场景数据可渲染")
 
-        # ── 5. 导出 ──────────────────────────────
+        # ── 5. 音频生成（TTS + BGM）────────────────
         if result.get("render"):
-            yield emit(0.85, "📦 合并导出视频...")
-            from pipelines.output_manager import merge_episode, export_project
+            yield emit(0.82, "🎵 生成语音 + BGM...")
             try:
-                merged = merge_episode(project_name, episode=1, overwrite=True)
-                if merged and os.path.exists(merged):
-                    result["export"] = merged
-                    size_mb = os.path.getsize(merged) / 1024 / 1024
-                    yield emit(0.95, f"✅ 导出完成: {merged} ({size_mb:.1f}MB)")
-                else:
-                    yield emit(0.90, "⚠️ 合并失败（可能缺少渲染视频文件）")
+                from pipelines.audio_pipeline import run_audio_pipeline
+                audio_result = run_audio_pipeline(
+                    project_id,
+                    progress_fn=lambda m, p: None,
+                )
+                n_tts = len(audio_result.get("tts", []))
+                n_mus = sum(1 for m in audio_result.get("music", []) if m.get("success") or m.get("skipped"))
+                yield emit(0.87, f"✅ 音频完成: TTS {n_tts} 条 · BGM {n_mus} 首")
             except Exception as e:
-                yield emit(0.88, f"⚠️ 导出异常: {e}")
+                yield emit(0.84, f"⚠️ 音频生成部分失败: {e}")
+
+        # ── 6. 音视频合成 + 导出 ─────────────────
+        if result.get("render"):
+            yield emit(0.88, "🎬 合成音视频...")
+            try:
+                from pipelines.compositor import run_compositor_pipeline
+                comp = run_compositor_pipeline(
+                    project_id=project_id,
+                    episode=1,
+                    burn_subs=True,
+                    crossfade=0.5,
+                )
+                if comp.get("success") and comp.get("episode_file"):
+                    final = comp["episode_file"]
+                    result["export"] = final
+                    size_mb = os.path.getsize(final) / 1024 / 1024
+                    yield emit(0.96, f"✅ 导出完成: {final} ({size_mb:.1f}MB)")
+                else:
+                    # 合成失败回退到简单拼接
+                    yield emit(0.91, "⚠️ 带音频合成失败，回退简单拼接...")
+                    from pipelines.output_manager import merge_episode
+                    merged = merge_episode(project_name, episode=1, overwrite=True)
+                    if merged and os.path.exists(merged):
+                        result["export"] = merged
+                        size_mb = os.path.getsize(merged) / 1024 / 1024
+                        yield emit(0.96, f"✅ 导出完成（无音频）: {merged} ({size_mb:.1f}MB)")
+                    else:
+                        yield emit(0.93, "⚠️ 合并失败")
+            except Exception as e:
+                yield emit(0.90, f"⚠️ 合成异常: {e}")
+                from pipelines.output_manager import merge_episode
+                try:
+                    merged = merge_episode(project_name, episode=1, overwrite=True)
+                    if merged and os.path.exists(merged):
+                        result["export"] = merged
+                        yield emit(0.95, f"✅ 导出完成（无音频）: {merged}")
+                except Exception:
+                    pass
         else:
             yield emit(0.82, "⏭️ 跳过导出（无渲染结果）")
 
