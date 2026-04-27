@@ -30,8 +30,8 @@ _ANIMATEDIFF_MODEL_PATH = Path(os.path.expanduser("~/Documents/ComfyUI")) / \
 SDXL_WIDTH = 896
 SDXL_HEIGHT = 1152
 FRAME_RATE = 1          # 静态回退：1fps
-ADE_FRAME_RATE = 8      # AnimateDiff：8fps × 16帧 = 2秒视频
-ADE_BATCH_SIZE = 16     # AnimateDiff 每次生成帧数
+ADE_FRAME_RATE = 8      # AnimateDiff：8fps × 8帧 = 1秒视频
+ADE_BATCH_SIZE = 8      # AnimateDiff 每次生成帧数（MPS 限制，>8 会 INT_MAX 溢出）
 SAMPLER_STEPS = 25
 CFG_SCALE = 7.0
 
