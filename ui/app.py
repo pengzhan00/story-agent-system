@@ -603,7 +603,14 @@ def get_system_status() -> str:
         lines.append(f"**TTS**: ❓ {e}")
 
     # BGM
-    lines.append("**BGM 生成**: ffmpeg 多声部合成（内置，无需安装）→ 可接 HeartMuLa/audiocraft 升级")
+    try:
+        from pipelines.audio_pipeline import _check_audiocraft
+        if _check_audiocraft():
+            lines.append("**BGM 生成**: ✅ MusicGen（facebook/musicgen-small，AI 音乐）→ ffmpeg 合成兜底")
+        else:
+            lines.append("**BGM 生成**: ⚠️ ffmpeg 合成（MusicGen 未就绪，模型可能正在下载）→ 可接 HeartMuLa 升级")
+    except Exception:
+        lines.append("**BGM 生成**: ffmpeg 合成（内置保底）")
 
     return "\n\n".join(lines)
 
@@ -1038,9 +1045,9 @@ def build_ui():
                 # ── BGM 配置 & 试听 ──────────────────────
                 with gr.Accordion("🎵 BGM 配置 & 试听", open=False):
                     gr.Markdown(
-                        "BGM 后端优先级：HeartMuLa → audiocraft → **ffmpeg 合成**（内置保底）。\n\n"
-                        "ffmpeg 合成根据情绪生成多声部和弦氛围音乐，无需任何额外安装。\n"
-                        "如需真实 AI 音乐，可在本机启动 [HeartMuLa](https://github.com/suno-ai/bark) 或安装 audiocraft。"
+                        "BGM 后端优先级：**HeartMuLa** → **MusicGen**（已安装，`facebook/musicgen-small`）→ ffmpeg 合成兜底。\n\n"
+                        "MusicGen 首次生成时自动下载模型（~300MB），之后离线可用，支持 10 种情绪 prompt。\n"
+                        "点「刷新状态」可确认 MusicGen 是否已就绪。"
                     )
                     with gr.Row():
                         bgm_mood_sel = gr.Dropdown(

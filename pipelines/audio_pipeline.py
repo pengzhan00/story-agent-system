@@ -405,20 +405,88 @@ def generate_music_heartmula(prompt: str, output_path: str, duration: int = 30) 
     return False
 
 
-def generate_music_audiocraft(prompt: str, output_path: str, duration: int = 30) -> bool:
-    """使用 audiocraft/MusicGen CLI 生成音乐（如果已安装）。"""
+# 中文情绪 → MusicGen 英文描述（效果更好）
+_MOOD_TO_MUSICGEN: dict[str, str] = {
+    "热血": "epic orchestral battle music, intense drums, brass fanfare, heroic melody, high energy",
+    "史诗": "cinematic epic score, full orchestra, soaring strings, powerful brass, dramatic",
+    "神秘": "mysterious ambient music, ethereal pads, distant flute, dark atmosphere, slow tempo",
+    "温馨": "warm heartfelt piano melody, gentle strings, soft acoustic guitar, emotional, tender",
+    "黑暗": "dark ominous music, low drones, dissonant strings, eerie atmosphere, tense",
+    "浪漫": "romantic piano and violin, soft strings, waltz feel, emotional, beautiful melody",
+    "悬疑": "suspenseful film music, staccato strings, building tension, mysterious, cinematic",
+    "轻松": "light playful music, acoustic guitar, xylophone, cheerful, gentle rhythm",
+    "治愈": "healing ambient music, soft piano, nature sounds, peaceful, meditative",
+    "搞笑": "playful comedic music, pizzicato strings, bouncy rhythm, light-hearted, fun",
+    "恐怖": "horror ambient music, deep drones, unsettling atmosphere, creepy, dark",
+    "epic":   "epic orchestral music, heroic brass, powerful drums, cinematic, triumphant",
+    "warm":   "warm acoustic music, gentle piano, soft strings, cozy, emotional",
+    "dark":   "dark cinematic music, minor key, low bass, ominous atmosphere",
+}
+_DEFAULT_MUSICGEN_PROMPT = "atmospheric background music, orchestral, cinematic, moderate tempo"
+
+
+def _check_audiocraft() -> bool:
+    """检查 bark venv 中是否有可用的 audiocraft。"""
+    if not BARK_PYTHON.exists():
+        return False
+    r = subprocess.run(
+        [str(BARK_PYTHON), "-c", "from audiocraft.models import MusicGen"],
+        capture_output=True, timeout=15,
+    )
+    return r.returncode == 0
+
+
+def generate_music_audiocraft(prompt: str, output_path: str, duration: int = 30, mood: str = "") -> bool:
+    """通过 bark venv 子进程调用 MusicGen 生成音乐。"""
+    if not BARK_PYTHON.exists():
+        return False
+
+    # 构建英文 prompt（MusicGen 对英文效果更好）
+    mood_key = (mood or "").strip()
+    en_prompt = _MOOD_TO_MUSICGEN.get(mood_key)
+    if not en_prompt:
+        # 尝试在 prompt 里匹配情绪关键词
+        for key, val in _MOOD_TO_MUSICGEN.items():
+            if key in (prompt or "").lower():
+                en_prompt = val
+                break
+    en_prompt = en_prompt or prompt or _DEFAULT_MUSICGEN_PROMPT
+
+    wav_path = str(Path(output_path).with_suffix(".wav"))
+    script = f"""
+import torch, sys
+try:
+    from audiocraft.models import MusicGen
+    from audiocraft.data.audio import audio_write
+except ImportError:
+    sys.exit(1)
+
+device = "mps" if torch.backends.mps.is_available() else "cpu"
+model = MusicGen.get_pretrained("facebook/musicgen-small", device=device)
+model.set_generation_params(duration={duration})
+wav = model.generate([{repr(en_prompt)}])
+import torchaudio
+torchaudio.save({repr(wav_path)}, wav[0].cpu(), model.sample_rate)
+"""
     try:
-        cmd = [
-            "python3", "-m", "audiocraft.generate",
-            "--model", "musicgen-small",
-            "--text", prompt,
-            "--duration", str(duration),
-            "--output", output_path,
-        ]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
-        return result.returncode == 0 and Path(output_path).exists()
+        result = subprocess.run(
+            [str(BARK_PYTHON), "-c", script],
+            capture_output=True, text=True, timeout=600,
+        )
+        if result.returncode != 0:
+            print(f"[MusicGen] 失败: {result.stderr[-300:]}")
+            return False
+        if not Path(wav_path).exists():
+            return False
+        # wav → mp3
+        subprocess.run(
+            ["ffmpeg", "-y", "-i", wav_path, "-c:a", "libmp3lame", "-b:a", "192k", output_path],
+            capture_output=True, timeout=30,
+        )
+        Path(wav_path).unlink(missing_ok=True)
+        return Path(output_path).exists()
     except Exception as e:
-        print(f"[audiocraft] 失败: {e}")
+        print(f"[MusicGen] 异常: {e}")
         return False
 
 
@@ -437,13 +505,15 @@ def generate_music(
         _register_audio(project_id, 0, "music", output_path, music_id)
         return True
 
-    if generate_music_audiocraft(prompt, output_path, duration):
+    # MusicGen（bark venv）优先于 ffmpeg 合成
+    if generate_music_audiocraft(prompt, output_path, duration, mood=mood):
+        print(f"[AudioPipeline] MusicGen 生成 BGM（mood={mood or ''}）")
         _register_audio(project_id, 0, "music", output_path, music_id)
         return True
 
-    # ffmpeg 合成回退：保证管线不因无 ML 模型而中断
+    # ffmpeg 合成保底
     if generate_music_ffmpeg(prompt, output_path, duration, mood=mood):
-        print(f"[AudioPipeline] 使用 ffmpeg 合成 BGM（mood={mood or '默认'}）")
+        print(f"[AudioPipeline] ffmpeg 合成 BGM（mood={mood or '默认'}）")
         _register_audio(project_id, 0, "music", output_path, music_id)
         return True
 
