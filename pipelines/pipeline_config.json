@@ -1,0 +1,119 @@
+{
+  "comfyui_url": "http://127.0.0.1:8188",
+  "comfyui_output_dir": "~/Documents/ComfyUI/output",
+
+  "pipelines": [
+    {
+      "name": "animatediff_animagine",
+      "class": "AnimateDiffPipeline",
+      "priority": 1,
+      "description": "AnimateDiff + animagine-xl-3.1 | 最佳动漫风格",
+      "config": {
+        "checkpoint": "animagine-xl-3.1/animagine-xl-3.1.safetensors",
+        "motion_model": "hsxl_temporal_layers.f16.safetensors",
+        "width": 1024,
+        "height": 1024,
+        "frames": 16,
+        "fps": 8,
+        "steps": 25,
+        "cfg": 7.0,
+        "timeout": 7200,
+        "workflow_file": "animatediff_workflow.json"
+      }
+    },
+    {
+      "name": "animatediff_sdxl",
+      "class": "AnimateDiffPipeline",
+      "priority": 2,
+      "description": "AnimateDiff + sd_xl_base_1.0 | 通用回退",
+      "config": {
+        "checkpoint": "sd_xl_base_1.0.safetensors",
+        "motion_model": "hsxl_temporal_layers.f16.safetensors",
+        "width": 1024,
+        "height": 1024,
+        "frames": 16,
+        "fps": 8,
+        "steps": 20,
+        "cfg": 7.0,
+        "timeout": 7200
+      }
+    },
+    {
+      "name": "flux_wan2_twostage",
+      "class": "FluxWan2TwoStagePipeline",
+      "priority": 2,
+      "description": "Flux2Klein9B txt2img → Wan2.2 TI2V | 最高质量两阶段管线",
+      "config": {
+        "flux_checkpoint": "~/myworkspace/ComfyUI_models/checkpoints/flux_2_klein_9B/flux-2-klein-9b.safetensors",
+        "min_flux_size_gb": 10,
+        "flux_workflow_file": "flux_txt2img_workflow.json",
+        "gguf_path": "~/myworkspace/ComfyUI_models/unet/Wan2.2-TI2V-5B-Q4_K_M.gguf",
+        "min_gguf_size_mb": 1200,
+        "text_encoder": "~/myworkspace/ComfyUI_models/text_encoders/wan2.2_umt5/models_t5_umt5-xxl-enc-bf16.pth",
+        "min_encoder_size_mb": 6000,
+        "wan2_workflow_file": "wan2_ti2v_workflow.json",
+        "width": 832,
+        "height": 480,
+        "frames": 49,
+        "fps": 16,
+        "flux_timeout": 600,
+        "timeout": 7200
+      }
+    },
+    {
+      "name": "wan2_ti2v",
+      "class": "Wan2TI2VPipeline",
+      "priority": 3,
+      "description": "Wan2.2 TI2V 5B GGUF | 文本+参考图→视频（需完整模型）",
+      "config": {
+        "gguf_path": "~/myworkspace/ComfyUI_models/unet/Wan2.2-TI2V-5B-Q4_K_M.gguf",
+        "min_gguf_size_mb": 1200,
+        "text_encoder": "~/myworkspace/ComfyUI_models/text_encoders/wan2.2_umt5/models_t5_umt5-xxl-enc-bf16.pth",
+        "min_encoder_size_mb": 6000,
+        "vae": "Wan2.2_VAE.safetensors",
+        "width": 832,
+        "height": 480,
+        "frames": 49,
+        "fps": 16,
+        "steps": 30,
+        "cfg": 6.0,
+        "timeout": 7200,
+        "workflow_file": "wan2_ti2v_workflow.json"
+      }
+    },
+    {
+      "name": "static_frame",
+      "class": "StaticFramePipeline",
+      "priority": 10,
+      "description": "单帧txt2img → ffmpeg成片 | 不需要AnimateDiff节点",
+      "config": {
+        "checkpoint": "animagine-xl-3.1/animagine-xl-3.1.safetensors",
+        "width": 1024,
+        "height": 1024,
+        "steps": 25,
+        "cfg": 7.0,
+        "duration_sec": 3.0,
+        "timeout": 300
+      }
+    },
+    {
+      "name": "stub",
+      "class": "StubPipeline",
+      "priority": 99,
+      "description": "ffmpeg纯黑帧占位 | 最终兜底",
+      "config": {
+        "width": 1024,
+        "height": 1024,
+        "duration_sec": 3.0
+      }
+    }
+  ],
+
+  "character_consistency": {
+    "instantid": {
+      "enabled": true,
+      "note": "全部就绪：ipadapter/ + controlnet/InstantID-ControlNet.safetensors + instantid/ip-adapter.bin + insightface/antelopev2",
+      "custom_node": "comfyui_instantid"
+    }
+  }
+}
