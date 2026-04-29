@@ -1,0 +1,158 @@
+{
+  "scanned_at": "2026-04-29",
+  "machine": "Apple Silicon Mac",
+
+  "video_generation": {
+    "animatediff_sdxl_animagine": {
+      "status": "READY",
+      "checkpoint": "checkpoints/animagine-xl-3.1/animagine-xl-3.1.safetensors",
+      "checkpoint_size_gb": 6.5,
+      "motion_model": "animatediff_models/hsxl_temporal_layers.f16.safetensors",
+      "motion_model_size_mb": 453,
+      "custom_node": "ComfyUI-AnimateDiff-Evolved",
+      "specialty": "anime风格SDXL动画，最适合本项目",
+      "output": "16帧 MP4 @ 8fps",
+      "note": "主力管线，优先使用"
+    },
+    "animatediff_sdxl_base": {
+      "status": "READY",
+      "checkpoint": "checkpoints/sd_xl_base_1.0.safetensors",
+      "checkpoint_size_gb": 6.5,
+      "motion_model": "animatediff_models/hsxl_temporal_layers.f16.safetensors",
+      "specialty": "通用SDXL，animagine不可用时回退",
+      "output": "16帧 MP4 @ 8fps"
+    },
+    "wan2_ti2v_5b": {
+      "status": "INCOMPLETE_DOWNLOAD",
+      "model_path": "unet/Wan2.2-TI2V-5B-Q4_K_M.gguf",
+      "actual_size_mb": 49,
+      "expected_size_gb": 3.2,
+      "text_encoder": "text_encoders/wan2.2_umt5/models_t5_umt5-xxl-enc-bf16.pth (8KB stub)",
+      "custom_node": "ComfyUI-GGUF",
+      "specialty": "文本+参考图→视频，角色一致性最强",
+      "action_required": "重新下载完整GGUF (3.2GB) 和 UMT5 encoder",
+      "note": "下载完成后优先级应排到第一位"
+    },
+    "flux2_klein_9b_static": {
+      "status": "READY_IMAGE_ONLY",
+      "checkpoint": "checkpoints/flux_2_klein_9B/flux-2-klein-9b.safetensors",
+      "checkpoint_size_gb": 17,
+      "specialty": "超高质量单帧图像生成，可作为参考帧再接Wan2.2 TI2V",
+      "output": "静态图 → ffmpeg成片",
+      "note": "图像质量最强，等Wan2.2就绪后形成 Flux→Wan2.2 TwoStage管线"
+    }
+  },
+
+  "character_consistency": {
+    "instantid": {
+      "status": "READY",
+      "controlnet": "controlnet/InstantID-ControlNet.safetensors (2.3GB)",
+      "ip_adapter": "instantid/ip-adapter.bin (1.6GB)",
+      "face_model": "insightface/models/antelopev2 (glintr100 249MB + scrfd 16MB + 3 others)",
+      "clip_vision": "clip_vision/ (3.7GB)",
+      "custom_node": "comfyui_instantid",
+      "specialty": "参考人脸图→跨镜头角色外貌一致",
+      "note": "已就绪但管线尚未集成，是最重要的待接入能力"
+    }
+  },
+
+  "controlnet": {
+    "canny_xl": {
+      "status": "READY",
+      "file": "controlnet/diffusers_xl_canny_mid.safetensors",
+      "size_gb": 4.7,
+      "use_case": "边缘/线稿引导构图"
+    },
+    "depth_xl": {
+      "status": "READY",
+      "file": "controlnet/diffusers_xl_depth_mid.safetensors",
+      "size_gb": 4.7,
+      "use_case": "深度图引导空间布局"
+    },
+    "kohya_controllllite_xl": {
+      "status": "FILES_MISSING",
+      "note": "目录中有名称但文件为空，实际未下载"
+    }
+  },
+
+  "audio_tts": {
+    "chattts": {
+      "status": "READY",
+      "venv": "~/chattts/venv",
+      "torch_version": "2.11.0",
+      "models": "~/asset/ms/AI-ModelScope/ChatTTS (DVAE/Embed/Vocos/Decoder/GPT)",
+      "language": "中文（最优），少量英文",
+      "seed_map": {
+        "男": 2,
+        "女": 42,
+        "note": "seed 2=男声，seed 42=女声（已校正）"
+      }
+    },
+    "bark": {
+      "status": "INCOMPLETE_DOWNLOAD",
+      "venv": "~/bark/venv (torch 2.11.0)",
+      "hf_cache": "incomplete (.incomplete标记)",
+      "note": "venv已就绪，需重新下载模型权重"
+    },
+    "edge_tts": {
+      "status": "NOT_INSTALLED",
+      "note": "在线服务，可 pip install edge-tts 后立即可用，无需模型文件"
+    }
+  },
+
+  "music_generation": {
+    "musicgen_small": {
+      "status": "READY",
+      "venv": "~/audiocraft/venv (torch 2.11.0)",
+      "hf_cache": "~/.cache/huggingface/hub/models--facebook--musicgen-small (802MB)",
+      "output": "WAV/MP3",
+      "note": "文字→背景音乐，已集成至audio_pipeline.py"
+    }
+  },
+
+  "system_tools": {
+    "ffmpeg": {
+      "status": "READY",
+      "version": "8.1",
+      "path": "/opt/homebrew/bin/ffmpeg",
+      "hardware_accel": "VideoToolbox (Apple Silicon), AudioToolbox",
+      "codecs": "libx264, libx265, libopus, libsvtav1, libvpx",
+      "use_cases": ["视频合成", "音视频混流", "格式转换", "字幕烧录", "SRT合并"]
+    },
+    "python": {
+      "version": "3.14.4",
+      "path": "/opt/homebrew/bin/python3"
+    },
+    "comfyui": {
+      "status": "INSTALLED",
+      "path": "~/Documents/ComfyUI",
+      "custom_nodes": [
+        "ComfyUI-AnimateDiff-Evolved",
+        "ComfyUI-GGUF",
+        "ComfyUI-VideoHelperSuite",
+        "ComfyUI_IPAdapter_plus",
+        "comfyui_instantid",
+        "comfyui_controlnet_aux",
+        "comfyui-vid2vid",
+        "was-node-suite-comfyui",
+        "ComfyUI-Manager"
+      ]
+    }
+  },
+
+  "pipeline_recommendation": {
+    "current_best_chain": [
+      "1. AnimateDiff(animagine-xl-3.1) → 16帧视频 [主力，已就绪]",
+      "2. AnimateDiff(sd_xl_base_1.0)  → 16帧视频 [回退1，已就绪]",
+      "3. Static(animagine-xl-3.1)→ffmpeg → 3s视频 [回退2，已就绪]",
+      "4. StubPipeline → 黑帧占位 [最终兜底]"
+    ],
+    "next_upgrade_path": [
+      "① 重新下载 Wan2.2-TI2V-5B-Q4_K_M.gguf (~3.2GB) 和完整UMT5 encoder",
+      "② 集成 InstantID → 角色参考图跨镜头一致性",
+      "③ Flux2Klein9B + InstantID → Wan2.2 TwoStage高质量管线",
+      "④ pip install edge-tts → TTS多一条在线回退链"
+    ],
+    "priority_bottleneck": "InstantID已全部就绪但未接入，是最快可提升一致性的改进"
+  }
+}

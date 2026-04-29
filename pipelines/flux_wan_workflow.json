@@ -1,0 +1,74 @@
+{
+  "__note__": "FLUX 2 → Wan 2.2 TI2V Pipeline Workflow Template",
+  "__instructions__": [
+    "This is a STRUCTURAL TEMPLATE. Open it in ComfyUI and adjust connections.",
+    "Flux 2 generates a still image; Wan 2.2 converts it to video.",
+    "Key nodes needed (not all connected correctly in this template):",
+    "",
+    "--- FLUX 2 STAGE ---",
+    "1. DiffusersLoader (model_path=checkpoints/flux_2_klein_4B) → MODEL, CLIP, VAE",
+    "2. CLIPTextEncodeFlux (clip→[1,1], clip_l=t5xxl=prompt, guidance=3.5) → CONDITIONING",
+    "3. EmptyFlux2LatentImage (1024x576, batch=1) → LATENT",
+    "4. Flux2Scheduler (steps=20, 1024x576) → SIGMAS",
+    "5. ModelSamplingFlux (model→[1,0]) → MODEL'",
+    "6. KSampler (model→[5,0], positive→[2,0], negative→[7,0], latent→[3,0]) → LATENT",
+    "7. CLIPTextEncodeFlux (empty prompt) → negative CONDITIONING",
+    "8. VAEDecode (samples→[6,0], vae→[1,2]) → IMAGE",
+    "",
+    "--- Wan 2.2 I2V STAGE ---",
+    "9. Load Wan model (via UNETLoader + GGUF custom node)",
+    "   file: wan2.2-ti2v-5b-Q4_K_M.gguf in checkpoints/wan2.2_5B_GGUF/",
+    "10. Wan22ImageToVideoLatent (vae, width=1280, height=704, length=49) → LATENT",
+    "11. WanImageToVideo (positive/negative CONDITIONING, vae, start_image→[8,0])",
+    "     → outputs video frames as LATENT",
+    "12. VAEDecode → IMAGES",
+    "13. VHS_VideoCombine → mp4 output",
+    "",
+    "--- ALTERNATIVE: Wan API nodes ---",
+    "Wan2ImageToVideoApi (wan2.7-i2v via API, text-to-image then video)",
+    "Wan2TextToVideoApi (text-to-video)",
+    "",
+    "--- DOWNLOADED MODELS ---",
+    "Flux 4B: checkpoints/flux_2_klein_4B/ (diffusers format)",
+    "Flux 9B: checkpoints/flux_2_klein_9B/ (diffusers format)",
+    "Wan GGUF: checkpoints/wan2.2_5B_GGUF/wan2.2-ti2v-5b-Q4_K_M.gguf",
+    "Wan UMT5: text_encoders/wan2.2_umt5/wanvideo-umt5-encoder-Q4_K_M.gguf",
+    "",
+    "NOTE: Wan 2.2 model needs to be loaded via GGUF custom node (UNETLoader",
+    "with GGUF file) or a dedicated Wan model loader. The conditioning may",
+    "need a separate Wan-specific CLIP/text encoder (not the Flux one).",
+    "This template structure is approximate — refine in ComfyUI GUI."
+  ],
+  "1": {
+    "class_type": "DiffusersLoader",
+    "inputs": {
+      "model_path": "checkpoints/flux_2_klein_4B"
+    }
+  },
+  "2": {
+    "class_type": "CLIPTextEncodeFlux",
+    "inputs": {
+      "clip": ["1", 1],
+      "clip_l": "positive prompt here",
+      "t5xxl": "positive prompt here",
+      "guidance": 3.5
+    }
+  },
+  "3": {
+    "class_type": "EmptyFlux2LatentImage",
+    "inputs": {
+      "width": 1024,
+      "height": 576,
+      "batch_size": 1
+    }
+  },
+  "7": {
+    "class_type": "CLIPTextEncodeFlux",
+    "inputs": {
+      "clip": ["1", 1],
+      "clip_l": "",
+      "t5xxl": "",
+      "guidance": 3.5
+    }
+  }
+}

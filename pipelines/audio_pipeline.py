@@ -22,7 +22,7 @@ OUTPUT_DIR = PROJECT_ROOT / "output"
 # ── 可用 TTS 后端优先级 ────────────────────────────────────
 
 BARK_PYTHON = Path(os.path.expanduser("~/bark/venv/bin/python3"))
-CHATTTS_PYTHON = Path(os.path.expanduser("~/chattts/venv/bin/python3"))
+CHATTTS_PYTHON = Path(os.path.expanduser("~/ChatTTS/venv/bin/python3"))
 CHATTTS_MODEL_PATH = Path(os.path.expanduser("~/asset/ms/AI-ModelScope/ChatTTS"))
 
 
@@ -43,7 +43,16 @@ def _check_kokoro() -> bool:
 
 
 def _check_bark() -> bool:
-    return BARK_PYTHON.exists()
+    """Bark venv 存在 且 模型权重已完整下载（无 .incomplete 文件）。"""
+    if not BARK_PYTHON.exists():
+        return False
+    bark_cache = Path.home() / ".cache" / "huggingface" / "hub" / "models--suno--bark"
+    if not bark_cache.exists():
+        return False
+    if list(bark_cache.glob("**/*.incomplete")):
+        return False          # 有未完成的分片
+    model_files = list(bark_cache.glob("**/*.bin")) + list(bark_cache.glob("**/*.pt"))
+    return len(model_files) > 0
 
 
 def _check_chattts() -> bool:
@@ -51,16 +60,30 @@ def _check_chattts() -> bool:
 
 
 def _pick_tts_backend() -> str:
+    """按优先级返回第一个可用后端。"""
     # ChatTTS 优先：原生中文，效果最好
     if _check_chattts():
         return "chattts"
+    if _check_edge_tts():     # 在线服务，比 Bark 更可靠
+        return "edge_tts"
     if _check_bark():
         return "bark"
-    if _check_edge_tts():
-        return "edge_tts"
     if _check_kokoro():
         return "kokoro"
     return "pyttsx3"
+
+
+def _ranked_tts_backends() -> list[str]:
+    """返回所有可用后端，按优先级排列，用于回退链。"""
+    order = ["chattts", "edge_tts", "bark", "kokoro", "pyttsx3"]
+    checks = {
+        "chattts": _check_chattts,
+        "edge_tts": _check_edge_tts,
+        "bark": _check_bark,
+        "kokoro": _check_kokoro,
+        "pyttsx3": lambda: True,
+    }
+    return [b for b in order if checks[b]()]
 
 
 # ── Edge-TTS ──────────────────────────────────────────────
@@ -147,27 +170,28 @@ print('OK', len(audio) / SAMPLE_RATE)
 # ── ChatTTS（~/ChatTTS/venv 独立环境，原生中文）────────────
 
 # ChatTTS 使用固定种子保持音色稳定；不同 seed 对应不同音色
+# seed 2  → 男声；seed 42 → 女声（实测，勿反）
 _CHATTTS_VOICE_SEEDS = {
-    "男": 42,
-    "男性": 42,
+    "男": 2,
+    "男性": 2,
     "男孩": 2222,
     "少年": 2222,
     "老人": 6666,
     "长者": 6666,
     "反派": 888,
-    "女": 2,
-    "女性": 2,
+    "女": 42,
+    "女性": 42,
     "女孩": 5555,
     "少女": 5555,
     "温柔": 4444,
     "旁白": 9999,
     "解说": 9999,
     "narrator": 9999,
-    "default": 2,
+    "default": 42,
 }
 
 
-def generate_tts_chattts(text: str, output_path: str, voice_seed: int = 2) -> bool:
+def generate_tts_chattts(text: str, output_path: str, voice_seed: int = 42) -> bool:
     """通过子进程调用 ~/chattts/venv 中的 ChatTTS 生成中文语音（CPU，MPS 不可用）。"""
     if not CHATTTS_PYTHON.exists():
         return False
@@ -181,7 +205,7 @@ import ChatTTS
 from scipy.io.wavfile import write as wav_write
 
 chat = ChatTTS.Chat()
-chat.load(source='custom', custom_path={repr(str(CHATTTS_MODEL_PATH))}, compile=False, device='cpu')
+chat.load(source='custom', custom_path={repr(str(CHATTTS_MODEL_PATH))}, compile=False)
 
 torch.manual_seed({voice_seed})
 rand_spk = chat.sample_random_speaker()
@@ -313,6 +337,34 @@ def get_voice_preset_bark(character_name: str, project_id: int) -> str:
     return _BARK_VOICE_MAP["default"]
 
 
+def _try_one_backend(
+    backend: str,
+    text: str,
+    output_path: str,
+    voice: str,
+    voice_preset: str,
+    voice_seed: int,
+) -> bool:
+    """尝试单个后端，失败返回 False（不抛异常）。"""
+    try:
+        if backend == "chattts":
+            seed = voice_seed or _CHATTTS_VOICE_SEEDS.get(voice, _CHATTTS_VOICE_SEEDS["default"])
+            return generate_tts_chattts(text, output_path, seed)
+        elif backend == "bark":
+            preset = voice_preset or _BARK_VOICE_MAP.get(voice, _BARK_VOICE_MAP["default"])
+            return generate_tts_bark(text, output_path, preset)
+        elif backend == "edge_tts":
+            v = voice if voice.startswith("zh-CN") else _VOICE_MAP.get(voice, _VOICE_MAP["default"])
+            return generate_tts_edge(text, output_path, v)
+        elif backend == "kokoro":
+            return generate_tts_kokoro(text, output_path)
+        else:
+            return generate_tts_pyttsx3(text, output_path)
+    except Exception as e:
+        print(f"[TTS] {backend} 失败: {e}，尝试下一个后端…")
+        return False
+
+
 def generate_tts(
     text: str,
     output_path: str,
@@ -321,24 +373,26 @@ def generate_tts(
     voice_preset: str = "",
     voice_seed: int = 0,
 ) -> bool:
-    if not backend:
-        backend = _pick_tts_backend()
-
+    """
+    生成 TTS 音频，内置回退链：
+      chattts → edge_tts → bark → kokoro → pyttsx3
+    指定 backend 时以该后端优先，失败后仍自动回退。
+    """
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
 
-    if backend == "chattts":
-        seed = voice_seed or _CHATTTS_VOICE_SEEDS.get(voice, _CHATTTS_VOICE_SEEDS["default"])
-        return generate_tts_chattts(text, output_path, seed)
-    elif backend == "bark":
-        preset = voice_preset or _BARK_VOICE_MAP.get(voice, _BARK_VOICE_MAP["default"])
-        return generate_tts_bark(text, output_path, preset)
-    elif backend == "edge_tts":
-        v = voice if voice.startswith("zh-CN") else _VOICE_MAP.get(voice, _VOICE_MAP["default"])
-        return generate_tts_edge(text, output_path, v)
-    elif backend == "kokoro":
-        return generate_tts_kokoro(text, output_path)
-    else:
-        return generate_tts_pyttsx3(text, output_path)
+    # 构建有序后端列表
+    ranked = _ranked_tts_backends()
+    if backend and backend in ranked:
+        ranked = [backend] + [b for b in ranked if b != backend]
+    elif backend:
+        ranked = [backend] + ranked  # 强制指定的放首位，即使 check 失败也试一次
+
+    for b in ranked:
+        if _try_one_backend(b, text, output_path, voice, voice_preset, voice_seed):
+            return True
+
+    print("[TTS] 所有后端均失败")
+    return False
 
 
 # ── Shot TTS 批量生成 ──────────────────────────────────────
@@ -584,7 +638,7 @@ try:
 except ImportError:
     sys.exit(1)
 
-device = "mps" if torch.backends.mps.is_available() else "cpu"
+device = "cpu"  # MPS causes OOM on musicgen-small in subprocess; CPU is stable
 model = MusicGen.get_pretrained("facebook/musicgen-small", device=device)
 model.set_generation_params(duration={duration})
 wav = model.generate([{repr(en_prompt)}])
@@ -594,7 +648,7 @@ torchaudio.save({repr(wav_path)}, wav[0].cpu(), model.sample_rate)
     try:
         result = subprocess.run(
             [str(BARK_PYTHON), "-c", script],
-            capture_output=True, text=True, timeout=600,
+            capture_output=True, text=True, timeout=900,
         )
         if result.returncode != 0:
             print(f"[MusicGen] 失败: {result.stderr[-300:]}")
@@ -613,6 +667,12 @@ torchaudio.save({repr(wav_path)}, wav[0].cpu(), model.sample_rate)
         return False
 
 
+def _audio_valid(path: str, min_bytes: int = 2048) -> bool:
+    """Return True only if file exists and has meaningful content."""
+    p = Path(path)
+    return p.exists() and p.stat().st_size >= min_bytes
+
+
 def generate_music(
     prompt: str,
     output_path: str,
@@ -621,26 +681,25 @@ def generate_music(
     music_id: int = 0,
     mood: str = "",
 ) -> bool:
-    """统一音乐生成接口，按优先级尝试各后端。"""
+    """统一音乐生成接口，按优先级尝试各后端。每个后端都验证输出文件非空。"""
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
 
-    if generate_music_heartmula(prompt, output_path, duration):
+    if generate_music_heartmula(prompt, output_path, duration) and _audio_valid(output_path):
         _register_audio(project_id, 0, "music", output_path, music_id)
         return True
 
-    # MusicGen（bark venv）优先于 ffmpeg 合成
-    if generate_music_audiocraft(prompt, output_path, duration, mood=mood):
+    if generate_music_audiocraft(prompt, output_path, duration, mood=mood) and _audio_valid(output_path):
         print(f"[AudioPipeline] MusicGen 生成 BGM（mood={mood or ''}）")
         _register_audio(project_id, 0, "music", output_path, music_id)
         return True
 
-    # ffmpeg 合成保底
-    if generate_music_ffmpeg(prompt, output_path, duration, mood=mood):
+    if generate_music_ffmpeg(prompt, output_path, duration, mood=mood) and _audio_valid(output_path):
         print(f"[AudioPipeline] ffmpeg 合成 BGM（mood={mood or '默认'}）")
         _register_audio(project_id, 0, "music", output_path, music_id)
         return True
 
-    print(f"[AudioPipeline] 音乐生成失败: {prompt[:60]}")
+    Path(output_path).unlink(missing_ok=True)
+    print(f"[AudioPipeline] 音乐生成失败（所有后端均无有效输出）: {prompt[:60]}")
     return False
 
 
@@ -657,7 +716,7 @@ def generate_project_music(project_id: int, output_dir: Path) -> list[dict]:
             continue
         prompt = m.prompt_for_gen or f"{m.mood} {m.tempo} {m.instruments} {m.description}"
         out_path = str(music_dir / f"music_{m.id}_{m.name[:20]}.mp3")
-        success = generate_music(prompt, out_path, project_id=project_id, music_id=m.id, mood=m.mood or "")
+        success = generate_music(prompt, out_path, duration=20, project_id=project_id, music_id=m.id, mood=m.mood or "")
         if success:
             db.update_music(m.id, {"file_path": out_path})
         results.append({"id": m.id, "name": m.name, "file": out_path if success else "", "success": success})
