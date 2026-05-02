@@ -1,11 +1,11 @@
 """
-能力声明式渲染管线
+能力声明式渲染管线 — Wan2.2 核心栈
 
   RenderPipeline (ABC)
-    ├── AnimateDiffPipeline  — ComfyUI AnimateDiff 动态帧 (animagine-xl-3.1 主力)
-    ├── Wan2TI2VPipeline     — Wan2.2 TI2V 5B GGUF，文本+参考图→视频（模型就绪后最优）
-    ├── StaticFramePipeline  — ComfyUI 单帧 txt2img → ffmpeg 成片（降级）
-    └── StubPipeline         — ffmpeg 纯黑帧占位（兜底，无 ComfyUI 依赖）
+    ├── Wan2TI2VPipeline  — Wan2.2 TI2V 5B GGUF，文本+参考图→视频（主力，production_ready）
+    ├── Wan2T2VPipeline   — Wan2.2 T2V-A14B GGUF，纯文本→视频（待下载模型）
+    ├── Wan2VACEPipeline  — Wan2.2 VACE-Fun-A14B，视频→视频（待下载模型）
+    └── StubPipeline      — ffmpeg 纯黑帧占位（兜底，无 ComfyUI 依赖）
 
   RenderDispatcher
     - 启动时调用 /object_info 探测，标记每条管线是否可用
@@ -1106,46 +1106,14 @@ class Wan2TI2VPipeline(RenderPipeline):
         return output_path
 
 
+
 # ══════════════════════════════════════════════════════
-# Dispatcher (placeholder — see RenderDispatcher below)
+# Dispatcher (removed FluxWan2TwoStagePipeline)
 # ══════════════════════════════════════════════════════
 
-class _RemovedPipelinePlaceholder(RenderPipeline):
-    """
-    两阶段高质量管线：
-      Stage 1 — Flux 2 Klein 9B txt2img → 高质量参考帧
-      Stage 2 — Wan2.2 TI2V 5B GGUF    → 参考帧动画化
-
-    所需模型（全部就绪后自动激活）：
-      • checkpoints/flux_2_klein_9B/flux-2-klein-9b.safetensors
-      • models/unet/Wan2.2-TI2V-5B-Q4_K_M.gguf
-      • text_encoders/wan2.2_umt5/models_t5_umt5-xxl-enc-bf16.pth
-
-    工作流文件：
-      • flux_txt2img_workflow.json  — Flux Stage 1
-      • wan2_ti2v_workflow.json     — Wan2.2 Stage 2
-    """
-
-    name = "flux_wan2_twostage"
-    required_nodes = [
-        "UNETLoader",
-        "CLIPLoader",
-        "VAELoader",
-        "CLIPTextEncodeFlux",
-        "FluxGuidance",
-        "ModelSamplingFlux",
-        "BasicScheduler",
-        "KSamplerSelect",
-        "SamplerCustomAdvanced",
-        "UnetLoaderGGUF",
-        "ModelSamplingSD3",
-        "Wan22ImageToVideoLatent",
-        "CreateVideo",
-        "SaveVideo",
-    ]
-
+class _RemovedPipelinePlaceholder_validate_stub:
     def validate(self, object_info: dict) -> list[str]:
-        missing = super().validate(object_info)
+        missing = []
 
         # Stage 1: Flux workflow
         flux_wf = _PIPELINES_DIR / self.config.get("flux_workflow_file", "flux_txt2img_workflow.json")
