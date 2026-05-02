@@ -145,6 +145,24 @@ def validate_render_output(path: str, min_duration: float = 1.0) -> QualityCheck
         errors.append(f"视频分辨率过低: {video['width']}x{video['height']}")
     else:
         checks.append("resolution_ok")
+
+    # 宽高比检查（红果要求 9:16，允许 ±8%）
+    if video["width"] > 0 and video["height"] > 0:
+        ratio = video["width"] / video["height"]
+        target = 9 / 16
+        if abs(ratio - target) / target < 0.08:
+            checks.append("aspect_ratio_9_16_ok")
+        else:
+            checks.append(f"aspect_ratio_warning:{video['width']}x{video['height']}")
+
+    # 帧率检查（交付要求 ≥24fps；生成阶段 16fps 可接受，由 compositor 升频）
+    if video["fps"] >= 24:
+        checks.append("fps_delivery_ok")
+    elif video["fps"] >= 15:
+        checks.append("fps_render_ok_needs_upscale")
+    else:
+        checks.append(f"fps_warning:{video['fps']:.1f}")
+
     if black_ratio > 0.85:
         errors.append(f"黑帧比例过高: {black_ratio:.2%}")
     else:

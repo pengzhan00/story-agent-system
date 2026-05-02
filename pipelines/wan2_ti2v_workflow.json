@@ -51,8 +51,8 @@
     "inputs": {
       "vae": ["39", 0],
       "start_image": ["56", 0],
-      "width": 832,
-      "height": 480,
+      "width": 480,
+      "height": 832,
       "length": 49,
       "batch_size": 1
     }

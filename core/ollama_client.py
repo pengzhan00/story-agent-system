@@ -10,18 +10,18 @@ from .database import log_generation
 
 
 OLLAMA_BASE = "http://localhost:11434"
-DEFAULT_MODEL = "qwen3:8b"            # Fast, good Chinese
-CREATIVE_MODEL = "qwen3:8b"           # For story generation
+DEFAULT_MODEL = "qwen3:8b"        # 快速阶段（场景/角色/音乐词）
+CREATIVE_MODEL = "deepseek-r1:70b" # 创作阶段（导演/编剧），本地已有42B模型
 DETAIL_MODEL = "qwen3:8b"             # For detailed reasoning
 
 STAGE_MODEL_DEFAULTS = {
-    "director": DEFAULT_MODEL,
-    "writer": CREATIVE_MODEL,
-    "character": CREATIVE_MODEL,
-    "scene": CREATIVE_MODEL,
-    "art": DETAIL_MODEL,
-    "music": DEFAULT_MODEL,
-    "sound": DEFAULT_MODEL,
+    "director": "deepseek-r1:70b",
+    "writer":   "deepseek-r1:70b",
+    "character": DEFAULT_MODEL,
+    "scene":    DEFAULT_MODEL,
+    "art":      DEFAULT_MODEL,
+    "music":    DEFAULT_MODEL,
+    "sound":    DEFAULT_MODEL,
     "review": DETAIL_MODEL,
 }
 

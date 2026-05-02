@@ -563,75 +563,62 @@ def generate_reference_keyframe_image(
     comfyui_url: str = "http://127.0.0.1:8188",
     config: Optional[dict] = None,
 ) -> Path:
-    """Generate a deterministic storyboard keyframe image for TI2V pipelines."""
+    """Generate a deterministic storyboard keyframe placeholder image for TI2V pipelines.
+
+    Uses PIL to create a 480×832 dark blue-gray placeholder with the scene description
+    text rendered in white. No ComfyUI dependency required.
+    """
+    from PIL import Image, ImageDraw
+
     config = config or {}
-    bundle = build_pipeline_prompt_bundle(shot_payload, "wan2_ti2v")
-    prompt = bundle.get("stage1_prompt") or bundle["positive_prompt"]
-    negative_prompt = bundle.get("negative_prompt", NEGATIVE_PROMPT)
-    seed = int(time.time() * 1000) % (2 ** 31)
-    width = int(config.get("reference_width", bundle.get("width") or 832))
-    height = int(config.get("reference_height", bundle.get("height") or 480))
-    steps = int(config.get("reference_steps", 24))
-    cfg_scale = float(config.get("reference_cfg", 7.0))
-    checkpoint = config.get("reference_checkpoint", "animagine-xl-3.1/animagine-xl-3.1.safetensors")
-    prefix = f"keyframe_{shot_payload.get('shot_id', 'scene')}"
-    wf = {
-        "1": {"class_type": "CheckpointLoaderSimple",
-              "inputs": {"ckpt_name": checkpoint}},
-        "2": {"class_type": "EmptyLatentImage",
-              "inputs": {"batch_size": 1, "width": width, "height": height}},
-        "3": {"class_type": "CLIPTextEncode",
-              "inputs": {"clip": ["1", 1], "text": prompt}},
-        "4": {"class_type": "CLIPTextEncode",
-              "inputs": {"clip": ["1", 1], "text": negative_prompt}},
-        "5": {"class_type": "KSampler",
-              "inputs": {"model": ["1", 0], "positive": ["3", 0],
-                         "negative": ["4", 0], "latent_image": ["2", 0],
-                         "steps": steps, "cfg": cfg_scale,
-                         "sampler_name": "euler", "scheduler": "karras",
-                         "seed": seed, "denoise": 1.0}},
-        "6": {"class_type": "VAEDecode",
-              "inputs": {"samples": ["5", 0], "vae": ["1", 2]}},
-        "7": {"class_type": "SaveImage",
-              "inputs": {"images": ["6", 0], "filename_prefix": prefix}},
-    }
-    ref_face = shot_payload.get("face_image") or shot_payload.get("reference_face_image")
-    if ref_face and Path(str(ref_face)).exists():
+    output_path = _resolve_reference_image_target(shot_payload)
+
+    # Cache hit: return immediately if a valid image already exists
+    if output_path.exists() and output_path.stat().st_size > 1024:
+        return output_path
+
+    # Build label text from scene description or prompt bundle
+    scene_text = shot_payload.get("scene_description", "")
+    if not scene_text:
         try:
-            with open(ref_face, "rb") as f:
-                import requests as req
-                r = req.post(
-                    f"{comfyui_url}/upload/image",
-                    files={"image": (Path(ref_face).name, f, "image/png")},
-                    data={"overwrite": "true"},
-                    timeout=30,
-                )
-            r.raise_for_status()
-            uploaded = r.json().get("name", Path(ref_face).name)
-            wf = inject_instantid(
-                wf,
-                uploaded,
-                ip_weight=float(config.get("instantid_ip_weight", 0.8)),
-                cn_strength=float(config.get("instantid_cn_strength", 0.8)),
-                comfyui_url=comfyui_url,
-            )
-        except Exception as exc:
-            print(f"[ReferenceKeyframe] InstantID 注入失败: {exc}")
-    prompt_id = submit_workflow(wf, comfyui_url)
-    if not prompt_id:
-        raise RenderError("关键帧提交失败")
-    result = wait_for_completion_result(prompt_id, comfyui_url, timeout=int(config.get("reference_timeout", 600)))
-    if result["status"] != "completed":
-        raise RenderError(
-            f"关键帧生成失败 ({result['error_type']}): {result['error_message']}"
-        )
-    src = _first_image_from_outputs(result["outputs"])
-    if not src:
-        raise RenderError("关键帧输出中无图像")
-    dest = _resolve_reference_image_target(shot_payload)
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(src, dest)
-    return dest
+            bundle = build_pipeline_prompt_bundle(shot_payload, "wan2_ti2v")
+            scene_text = (bundle.get("stage1_prompt") or bundle["positive_prompt"])[:80]
+        except Exception:
+            scene_text = ""
+
+    # Create 480×832 (W×H) cinematic dark blue-gray placeholder
+    img = Image.new("RGB", (480, 832), color=(80, 80, 90))
+    draw = ImageDraw.Draw(img)
+
+    # Wrap and center text
+    if scene_text:
+        max_chars_per_line = 36
+        words = scene_text.split()
+        lines: list[str] = []
+        current = ""
+        for word in words:
+            if len(current) + len(word) + 1 <= max_chars_per_line:
+                current = (current + " " + word).strip()
+            else:
+                if current:
+                    lines.append(current)
+                current = word
+        if current:
+            lines.append(current)
+
+        line_height = 24
+        total_height = len(lines) * line_height
+        y_start = (832 - total_height) // 2
+        for i, line in enumerate(lines):
+            # Default PIL font: each character is ~6px wide at size 10
+            text_width = len(line) * 6
+            x = (480 - text_width) // 2
+            draw.text((x, y_start + i * line_height), line, fill=(255, 255, 255))
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    img.save(str(output_path), format="PNG")
+    print(f"[Keyframe] PIL placeholder generated: {output_path}")
+    return output_path
 
 
 def build_scene_prompt(scene: dict) -> str:
@@ -874,304 +861,6 @@ class RenderPipeline(ABC):
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__} name={self.name!r}>"
 
-
-# ══════════════════════════════════════════════════════
-# AnimateDiffPipeline
-# ══════════════════════════════════════════════════════
-
-class AnimateDiffPipeline(RenderPipeline):
-    """ComfyUI AnimateDiff 动态帧管线（首选）。"""
-
-    name = "animatediff"
-    required_nodes = [
-        "CheckpointLoaderSimple",
-        "ADE_LoadAnimateDiffModel",
-        "ADE_ApplyAnimateDiffModelSimple",
-        "ADE_UseEvolvedSampling",
-        "KSampler",
-        "CLIPTextEncode",
-        "SaveImage",
-    ]
-
-    def validate(self, object_info: dict) -> list[str]:
-        missing = super().validate(object_info)
-        if "VAEDecode" not in object_info and "VAEDecodeTiled" not in object_info:
-            missing.append("node:VAEDecode|VAEDecodeTiled")
-        if not shutil.which("ffmpeg"):
-            missing.append("ffmpeg (not installed)")
-        return missing
-
-    def _normalize_output_node(self, workflow: dict, prefix: str) -> dict:
-        output_ids = []
-        for nid, node in workflow.items():
-            ct = node.get("class_type")
-            if ct in {"VHS_VideoCombine", "SaveAnimatedWEBP", "SaveVideo", "SaveWEBM"}:
-                output_ids.append(nid)
-        for nid in output_ids:
-            workflow.pop(nid, None)
-
-        decode_ids = find_nodes_by_type(workflow, "VAEDecode")
-        if not decode_ids:
-            decode_ids = find_nodes_by_type(workflow, "VAEDecodeTiled")
-        if not decode_ids:
-            raise RenderError("AnimateDiff workflow 缺少 VAEDecode/VAEDecodeTiled，无法挂接输出节点")
-
-        next_id = max((int(k) for k in workflow if k.isdigit()), default=0) + 1
-        workflow[str(next_id)] = {
-            "class_type": "SaveImage",
-            "inputs": {
-                "images": [decode_ids[0], 0],
-                "filename_prefix": prefix,
-            },
-        }
-        return workflow
-
-    def _build_workflow(self, prompt: str, scene_name: str, seed: int) -> dict:
-        cfg = self.config
-        checkpoint = cfg.get("checkpoint", "sd_xl_base_1.0.safetensors")
-        motion_model = cfg.get("motion_model", "hsxl_temporal_layers.f16.safetensors")
-        width = cfg.get("width", 1024)
-        height = cfg.get("height", 1024)
-        frames = cfg.get("frames", 16)
-        fps = cfg.get("fps", 8)
-        steps = cfg.get("steps", 20)
-        cfg_scale = cfg.get("cfg", 7.0)
-        prefix = f"scene_{scene_name[:20].replace(' ', '_')}"
-
-        # 优先加载 workflow 文件，覆盖其中的模型名
-        wf_file = cfg.get("workflow_file")
-        if wf_file:
-            wf_path = _PIPELINES_DIR / wf_file
-            if wf_path.exists():
-                wf = json.loads(wf_path.read_text())
-                for node in wf.values():
-                    ct = node.get("class_type", "")
-                    if ct == "CheckpointLoaderSimple":
-                        node["inputs"]["ckpt_name"] = checkpoint
-                    elif ct == "ADE_LoadAnimateDiffModel":
-                        node["inputs"]["model_name"] = motion_model
-                return self._normalize_output_node(wf, prefix)
-
-        # 无 workflow 文件时内联构建
-        return {
-            "1": {"class_type": "CheckpointLoaderSimple",
-                  "inputs": {"ckpt_name": checkpoint}},
-            "2": {"class_type": "ADE_EmptyLatentImageLarge",
-                  "inputs": {"batch_size": frames, "width": width, "height": height}},
-            "3": {"class_type": "CLIPTextEncode",
-                  "inputs": {"clip": ["1", 1], "text": prompt}},
-            "4": {"class_type": "CLIPTextEncode",
-                  "inputs": {"clip": ["1", 1], "text": NEGATIVE_PROMPT}},
-            "5": {"class_type": "ADE_LoadAnimateDiffModel",
-                  "inputs": {"model_name": motion_model}},
-            "6": {"class_type": "ADE_ApplyAnimateDiffModelSimple",
-                  "inputs": {"motion_model": ["5", 0]}},
-            "7": {"class_type": "ADE_UseEvolvedSampling",
-                  "inputs": {"model": ["1", 0], "beta_schedule": "autoselect",
-                             "m_models": ["6", 0]}},
-            "8": {"class_type": "KSampler",
-                  "inputs": {"model": ["7", 0], "positive": ["3", 0],
-                             "negative": ["4", 0], "latent_image": ["2", 0],
-                             "steps": steps, "cfg": cfg_scale,
-                             "sampler_name": "euler", "scheduler": "normal",
-                             "seed": seed, "denoise": 1.0}},
-            "9": {"class_type": "VAEDecode",
-                  "inputs": {"samples": ["8", 0], "vae": ["1", 2]}},
-            "10": {"class_type": "SaveImage",
-                   "inputs": {"images": ["9", 0], "filename_prefix": prefix}},
-        }
-
-    def render(self, shot_payload: dict, output_path: Path) -> Path:
-        bundle = build_pipeline_prompt_bundle(shot_payload, self.name)
-        normalized = normalize_shot_payload(shot_payload)
-        scene_name = normalized.get("location", shot_payload.get("name", "scene"))
-        prompt = bundle["positive_prompt"]
-        negative_prompt = bundle.get("negative_prompt", NEGATIVE_PROMPT)
-        seed = int(time.time() * 1000) % (2 ** 31)
-
-        wf = self._build_workflow(prompt, scene_name, seed)
-        wf = inject_prompt(wf, prompt, negative_prompt)
-        wf = inject_seed(wf, seed)
-        for node in wf.values():
-            inputs = node.get("inputs", {})
-            if "width" in inputs and isinstance(inputs["width"], (int, float)) and bundle.get("width"):
-                inputs["width"] = int(bundle["width"])
-            if "height" in inputs and isinstance(inputs["height"], (int, float)) and bundle.get("height"):
-                inputs["height"] = int(bundle["height"])
-            if "batch_size" in inputs and isinstance(inputs["batch_size"], (int, float)) and bundle.get("frames"):
-                inputs["batch_size"] = int(bundle["frames"])
-
-        lora_refs = shot_payload.get("lora_refs") or []
-        if lora_refs:
-            wf = inject_loras(wf, lora_refs)
-
-        cn_type = shot_payload.get("controlnet_type")
-        cn_ref = shot_payload.get("controlnet_image_ref")
-        if cn_type and cn_ref:
-            wf = inject_controlnet(wf, cn_type, image_ref=cn_ref,
-                                   comfyui_url=self.comfyui_url)
-
-        # ── InstantID：有参考人脸图时自动注入，提升角色一致性 ──
-        ref_face = shot_payload.get("face_image") or shot_payload.get("reference_face_image")
-        if ref_face and Path(str(ref_face)).exists():
-            try:
-                uploaded = self._upload_image(str(ref_face))
-                wf = inject_instantid(
-                    wf, uploaded,
-                    ip_weight=self.config.get("instantid_ip_weight", 0.8),
-                    cn_strength=self.config.get("instantid_cn_strength", 0.8),
-                    comfyui_url=self.comfyui_url,
-                )
-            except Exception as e:
-                print(f"[InstantID] 注入失败（{e}），继续无 InstantID 渲染")
-
-        prompt_id = submit_workflow(wf, self.comfyui_url)
-        if not prompt_id:
-            raise RenderError("ComfyUI 拒绝提交 AnimateDiff 工作流")
-
-        timeout = self.config.get("timeout", 7200)
-        result = wait_for_completion_result(prompt_id, self.comfyui_url, timeout=timeout)
-        if result["status"] != "completed":
-            raise RenderError(
-                f"AnimateDiff 渲染失败 ({result['error_type']}, prompt_id={prompt_id[:8]}): "
-                f"{result['error_message']}"
-            )
-        outputs = result["outputs"]
-
-        frame_paths: list[Path] = []
-        for node_out in outputs.values():
-            for item in node_out.get("images", []):
-                if isinstance(item, dict) and item.get("filename"):
-                    subfolder = item.get("subfolder", "")
-                    src = (_COMFYUI_OUTPUT_DIR / subfolder / item["filename"]
-                           if subfolder else _COMFYUI_OUTPUT_DIR / item["filename"])
-                    if src.exists():
-                        frame_paths.append(src)
-        if not frame_paths:
-            raise RenderError("AnimateDiff 输出中无图像帧")
-
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        fps = int(bundle.get("fps") or self.config.get("fps", 8))
-        with tempfile.TemporaryDirectory(prefix="story_ad_frames_") as tmpdir:
-            tmpdir_path = Path(tmpdir)
-            for idx, src in enumerate(frame_paths, start=1):
-                shutil.copy2(src, tmpdir_path / f"{idx:06d}.png")
-            r = subprocess.run(
-                [
-                    "ffmpeg", "-y",
-                    "-framerate", str(fps),
-                    "-i", str(tmpdir_path / "%06d.png"),
-                    "-c:v", "libx264",
-                    "-pix_fmt", "yuv420p",
-                    str(output_path),
-                ],
-                capture_output=True,
-            )
-            if r.returncode != 0:
-                raise RenderError(f"AnimateDiff 帧序列转视频失败: {r.stderr.decode()[:500]}")
-        return output_path
-
-
-# ══════════════════════════════════════════════════════
-# StaticFramePipeline
-# ══════════════════════════════════════════════════════
-
-class StaticFramePipeline(RenderPipeline):
-    """ComfyUI 单帧 txt2img → ffmpeg 成片，无 AnimateDiff 依赖（降级选项）。"""
-
-    name = "static_frame"
-    required_nodes = [
-        "CheckpointLoaderSimple",
-        "EmptyLatentImage",
-        "KSampler",
-        "CLIPTextEncode",
-        "VAEDecode",
-        "SaveImage",
-    ]
-
-    def validate(self, object_info: dict) -> list[str]:
-        missing = super().validate(object_info)
-        if not shutil.which("ffmpeg"):
-            missing.append("ffmpeg (not installed)")
-        return missing
-
-    def _build_workflow(self, prompt: str, seed: int) -> dict:
-        cfg = self.config
-        checkpoint = cfg.get("checkpoint", "v1-5-pruned-emaonly.safetensors")
-        width = cfg.get("width", 512)
-        height = cfg.get("height", 768)
-        steps = cfg.get("steps", 20)
-        cfg_scale = cfg.get("cfg", 7.0)
-        return {
-            "1": {"class_type": "CheckpointLoaderSimple",
-                  "inputs": {"ckpt_name": checkpoint}},
-            "2": {"class_type": "EmptyLatentImage",
-                  "inputs": {"batch_size": 1, "width": width, "height": height}},
-            "3": {"class_type": "CLIPTextEncode",
-                  "inputs": {"clip": ["1", 1], "text": prompt}},
-            "4": {"class_type": "CLIPTextEncode",
-                  "inputs": {"clip": ["1", 1], "text": NEGATIVE_PROMPT}},
-            "5": {"class_type": "KSampler",
-                  "inputs": {"model": ["1", 0], "positive": ["3", 0],
-                             "negative": ["4", 0], "latent_image": ["2", 0],
-                             "steps": steps, "cfg": cfg_scale,
-                             "sampler_name": "euler", "scheduler": "karras",
-                             "seed": seed, "denoise": 1.0}},
-            "6": {"class_type": "VAEDecode",
-                  "inputs": {"samples": ["5", 0], "vae": ["1", 2]}},
-            "7": {"class_type": "SaveImage",
-                  "inputs": {"images": ["6", 0], "filename_prefix": "static_frame"}},
-        }
-
-    def render(self, shot_payload: dict, output_path: Path) -> Path:
-        bundle = build_pipeline_prompt_bundle(shot_payload, self.name)
-        prompt = bundle["positive_prompt"]
-        negative_prompt = bundle.get("negative_prompt", NEGATIVE_PROMPT)
-        seed = int(time.time() * 1000) % (2 ** 31)
-        lora_refs = shot_payload.get("lora_refs") or []
-
-        wf = self._build_workflow(prompt, seed)
-        wf = inject_prompt(wf, prompt, negative_prompt)
-        if lora_refs:
-            wf = inject_loras(wf, lora_refs)
-
-        prompt_id = submit_workflow(wf, self.comfyui_url)
-        if not prompt_id:
-            raise RenderError("ComfyUI 拒绝提交静态帧工作流")
-
-        timeout = self.config.get("timeout", 300)
-        result = wait_for_completion_result(prompt_id, self.comfyui_url, timeout=timeout)
-        if result["status"] != "completed":
-            raise RenderError(f"静态帧渲染失败 ({result['error_type']}): {result['error_message']}")
-        outputs = result["outputs"]
-
-        img_path: Optional[Path] = None
-        for node_out in outputs.values():
-            for item in node_out.get("images", []):
-                if isinstance(item, dict) and item.get("filename"):
-                    subfolder = item.get("subfolder", "")
-                    p = (_COMFYUI_OUTPUT_DIR / subfolder / item["filename"]
-                         if subfolder else _COMFYUI_OUTPUT_DIR / item["filename"])
-                    if p.exists():
-                        img_path = p
-                        break
-            if img_path:
-                break
-        if not img_path:
-            raise RenderError("静态帧输出图像文件不存在")
-
-        duration = self.config.get("duration_sec", 3.0)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        r = subprocess.run(
-            ["ffmpeg", "-y", "-loop", "1", "-i", str(img_path),
-             "-t", str(duration),
-             "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
-             "-c:v", "libx264", "-pix_fmt", "yuv420p", str(output_path)],
-            capture_output=True,
-        )
-        if r.returncode != 0:
-            raise RenderError(f"ffmpeg 静态帧转视频失败: {r.stderr.decode()[:300]}")
-        return output_path
 
 
 # ══════════════════════════════════════════════════════
@@ -1418,10 +1107,10 @@ class Wan2TI2VPipeline(RenderPipeline):
 
 
 # ══════════════════════════════════════════════════════
-# FluxWan2TwoStagePipeline
+# Dispatcher (placeholder — see RenderDispatcher below)
 # ══════════════════════════════════════════════════════
 
-class FluxWan2TwoStagePipeline(RenderPipeline):
+class _RemovedPipelinePlaceholder(RenderPipeline):
     """
     两阶段高质量管线：
       Stage 1 — Flux 2 Klein 9B txt2img → 高质量参考帧
@@ -1728,12 +1417,45 @@ class FluxWan2TwoStagePipeline(RenderPipeline):
 # Dispatcher
 # ══════════════════════════════════════════════════════
 
+class Wan2T2VPipeline(RenderPipeline):
+    """
+    Wan2.2 T2V-A14B GGUF — 纯文本→视频（无需参考图）。
+    需要模型: wan2.2_t2v_high_noise_14B_Q4_K_M.gguf
+    """
+    NAME = "wan2_t2v"
+
+    def render(self, shot_payload: dict, output_path: Path) -> Path:
+        raise NotImplementedError(
+            "Wan2T2VPipeline: 模型 wan2.2_t2v_high_noise_14B_Q4_K_M.gguf 尚未下载。"
+            "请先运行: hf download bullerwins/Wan2.2-T2V-A14B-GGUF "
+            "wan2.2_t2v_high_noise_14B_Q4_K_M.gguf "
+            "--local-dir ~/myworkspace/ComfyUI_models/unet/"
+        )
+
+
+class Wan2VACEPipeline(RenderPipeline):
+    """
+    Wan2.2 VACE-Fun-A14B GGUF — 视频→视频 / 局部重绘。
+    需要模型: Wan2.2-VACE-Fun-A14B-high-noise-Q4_K_M.gguf
+    """
+    NAME = "wan2_vace"
+
+    def render(self, shot_payload: dict, output_path: Path) -> Path:
+        raise NotImplementedError(
+            "Wan2VACEPipeline: 模型 Wan2.2-VACE-Fun-A14B-high-noise-Q4_K_M.gguf 尚未下载。"
+            "请先运行: hf download QuantStack/Wan2.2-VACE-Fun-A14B-GGUF "
+            "'HighNoise/Wan2.2-VACE-Fun-A14B-high-noise-Q4_K_M.gguf' "
+            "--local-dir ~/myworkspace/ComfyUI_models/unet/"
+        )
+
+
 _PIPELINE_CLASSES: dict[str, type[RenderPipeline]] = {
-    "AnimateDiffPipeline": AnimateDiffPipeline,
-    "Wan2TI2VPipeline": Wan2TI2VPipeline,
-    "FluxWan2TwoStagePipeline": FluxWan2TwoStagePipeline,
-    "StaticFramePipeline": StaticFramePipeline,
-    "StubPipeline": StubPipeline,
+    # Wan2.2 核心栈
+    "Wan2TI2VPipeline":       Wan2TI2VPipeline,
+    "Wan2T2VPipeline":        Wan2T2VPipeline,
+    "Wan2VACEPipeline":       Wan2VACEPipeline,
+    # 兜底
+    "StubPipeline":           StubPipeline,
 }
 
 

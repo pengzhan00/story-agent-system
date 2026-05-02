@@ -6,6 +6,7 @@ One-Click Orchestrator — 一键全流程管线
 import json
 import time
 import os
+import shutil
 from typing import Optional, Generator
 from pathlib import Path
 
@@ -72,6 +73,18 @@ def _ensure_comfyui() -> bool:
 def _format_log(entries: list[str]) -> str:
     lines = "\n".join(entries) if entries else "等待启动..."
     return f"### 📋 管线日志\n```\n{lines}\n```"
+
+
+def _export_episode_file(final_path: str, project_name: str, episode: int = 1) -> Optional[str]:
+    """Copy the final episode master into output/exports for easy delivery."""
+    source = Path(final_path)
+    if not source.exists():
+        return None
+    export_dir = source.parents[2] / "exports"
+    export_dir.mkdir(parents=True, exist_ok=True)
+    dest = export_dir / f"{project_name}_ep{episode:03d}_final{source.suffix or '.mp4'}"
+    shutil.copy2(source, dest)
+    return str(dest)
 
 
 def _normalize_name_map(items) -> dict[str, object]:
@@ -187,8 +200,8 @@ def _build_render_payload(scene: dict, scene_asset, character_map: dict, style_g
             "costume_lock": scene.get("costume_lock", ""),
         },
         "output_spec": {
-            "width": int(scene.get("width", 832)),
-            "height": int(scene.get("height", 480)),
+            "width": int(scene.get("width", 480)),
+            "height": int(scene.get("height", 832)),
             "frames": int(scene.get("frames", 49)),
             "fps": int(scene.get("fps", 16)),
             "quality_tier": scene.get("quality_tier", "production"),
@@ -206,8 +219,8 @@ def _build_render_payload(scene: dict, scene_asset, character_map: dict, style_g
         "characters": character_refs,
         "style_guide": style_guide,
         "negative_prompt": negative_prompt,
-        "width": int(scene.get("width", 832)),
-        "height": int(scene.get("height", 480)),
+        "width": int(scene.get("width", 480)),
+        "height": int(scene.get("height", 832)),
         "frames": int(scene.get("frames", 49)),
         "fps": int(scene.get("fps", 16)),
     }
@@ -302,8 +315,8 @@ def _create_shot_plan_txn(project_id: int, script_id: int, acts_list: list, resu
                 payload["audio"]["bgm_mood"] = scene.get("bgm_mood", "")
                 payload["audio"]["tts_required"] = bool(dialogue_data)
                 payload["audio"]["sfx_cues"] = shot_def.get("sfx_cues", scene.get("sfx_cues", []))
-                payload["output_spec"]["width"] = int(shot_def.get("width", scene.get("width", 832)))
-                payload["output_spec"]["height"] = int(shot_def.get("height", scene.get("height", 480)))
+                payload["output_spec"]["width"] = int(shot_def.get("width", scene.get("width", 480)))
+                payload["output_spec"]["height"] = int(shot_def.get("height", scene.get("height", 832)))
                 payload["output_spec"]["frames"] = int(shot_def.get("frames", scene.get("frames", 49)))
                 payload["output_spec"]["fps"] = int(shot_def.get("fps", scene.get("fps", 16)))
 
@@ -710,187 +723,38 @@ def run_pipeline_generator(
         else:
             yield from emit(0.72, "⏭️ 渲染未启用（可勾选「启用渲染」重新运行）")
 
-        # ── 11. TTS 批量生成 ──────────────────────
+        # ── 11. 音频 / 合成 / 导出 ──────────────────
         if enable_render and result.get("render"):
-            yield from emit(0.86, "🎤 TTS 批量生成...")
-            from pipelines.audio_pipeline import generate_tts_chattts, _CHATTTS_VOICE_SEEDS
-            from core.database import create_audio_asset, list_shots
+            from pipelines.audio_pipeline import run_audio_pipeline
+            from pipelines.compositor import run_compositor_pipeline
 
-            audio_output = Path.home() / "myworkspace" / "projects" / "story-agent-system" / "output" / project_name / "audio"
-            audio_output.mkdir(parents=True, exist_ok=True)
+            yield from emit(0.86, "🎤 运行统一音频管线...")
+            audio_result = run_audio_pipeline(pid)
+            if audio_result.get("success"):
+                tts_done = len(audio_result.get("tts", []))
+                music_done = len(audio_result.get("music", []))
+                sfx_done = len(audio_result.get("sfx", []))
+                yield from emit(0.89, f"✅ 音频完成: TTS {tts_done} / BGM {music_done} / SFX {sfx_done}")
+            else:
+                yield from emit(0.88, f"⚠️ 音频管线失败: {audio_result.get('error', 'unknown error')}")
 
-            tts_shots = list_shots(project_id=pid, status="rendered")
-            tts_count = 0
-            for shot in tts_shots:
-                # 解析 dialogue
-                dialogue_list = []
-                if hasattr(shot, 'dialogue') and shot.dialogue:
-                    try:
-                        dialogue_list = json.loads(shot.dialogue) if isinstance(shot.dialogue, str) else shot.dialogue
-                    except Exception:
-                        dialogue_list = []
-                if not dialogue_list:
-                    continue
-
-                for idx, line in enumerate(dialogue_list):
-                    if not isinstance(line, dict):
-                        continue
-                    text = line.get("line", "").strip()
-                    character = line.get("character", "旁白")
-                    if not text:
-                        continue
-
-                    # 男声 seed=2, 女声 seed=42
-                    voice_seed = 2 if character in ("旁白", "解说", "narrator") else 42
-                    # 通过角色性别判断
-                    chars = list_characters(pid)
-                    found = next((c for c in chars if c.name == character), None)
-                    if found and found.gender == "男":
-                        voice_seed = _CHATTTS_VOICE_SEEDS.get("男", 2)
-                    elif found and found.gender == "女":
-                        voice_seed = _CHATTTS_VOICE_SEEDS.get("女", 42)
-
-                    wav_path = str(audio_output / f"shot{shot.id}_char{character}.wav")
-                    try:
-                        success = generate_tts_chattts(text, wav_path, voice_seed=voice_seed)
-                        if success and Path(wav_path).exists():
-                            create_audio_asset({
-                                "project_id": pid,
-                                "shot_id": shot.id,
-                                "asset_type": "tts",
-                                "file_path": wav_path,
-                                "duration_sec": 0,
-                                "metadata": json.dumps({"character": character, "line_idx": idx, "text": text}, ensure_ascii=False),
-                            })
-                            tts_count += 1
-                            yield from emit(0.86, f"  ✅ TTS shot {shot.id} char={character}")
-                        else:
-                            yield from emit(0.86, f"  ⚠️ TTS 失败 shot {shot.id} char={character}")
-                    except Exception as te:
-                        yield from emit(0.86, f"  ⚠️ TTS 异常 shot {shot.id}: {te}")
-
-            yield from emit(0.87, f"✅ TTS 完成: {tts_count} 条配音")
-        else:
-            yield from emit(0.86, "⏭️ 跳过 TTS（需要先渲染）")
-
-        # ── 12. BGM 生成 ─────────────────────────
-        if enable_render and result.get("render"):
-            yield from emit(0.88, "🎶 生成背景音乐...")
-            from pipelines.audio_pipeline import generate_music
-
-            audio_output = Path.home() / "myworkspace" / "projects" / "story-agent-system" / "output" / project_name / "audio"
-            audio_output.mkdir(parents=True, exist_ok=True)
-
-            # 按 episode 收集 bgm_mood
-            bgm_shots = list_shots(project_id=pid)
-            episode_bgm_moods = {}
-            for s in bgm_shots:
-                ep = s.episode_id or 1
-                if ep not in episode_bgm_moods:
-                    episode_bgm_moods[ep] = []
-                mood = s.mood or ""
-                if mood and mood not in episode_bgm_moods[ep]:
-                    episode_bgm_moods[ep].append(mood)
-
-            bgm_count = 0
-            for ep, moods in episode_bgm_moods.items():
-                bgm_path = str(audio_output / f"bgm_ep{ep}.wav")
-                prompt = "atmospheric background music for Chinese drama, " + ", ".join(moods[:3]) if moods else "atmospheric background music, cinematic, emotional"
-                try:
-                    success = generate_music(prompt, bgm_path, duration=10, mood=moods[0] if moods else "")
-                    if success and Path(bgm_path).exists():
-                        create_audio_asset({
-                            "project_id": pid,
-                            "shot_id": 0,
-                            "asset_type": "bgm",
-                            "file_path": bgm_path,
-                            "duration_sec": 10,
-                            "metadata": json.dumps({"episode": ep, "moods": moods, "prompt": prompt}, ensure_ascii=False),
-                        })
-                        bgm_count += 1
-                        yield from emit(0.88, f"  ✅ BGM ep{ep} 生成完成")
-                    else:
-                        yield from emit(0.88, f"  ⚠️ BGM ep{ep} 生成失败")
-                except Exception as be:
-                    yield from emit(0.88, f"  ⚠️ BGM ep{ep} 异常: {be}")
-
-            yield from emit(0.89, f"✅ BGM 完成: {bgm_count} 首")
-        else:
-            yield from emit(0.88, "⏭️ 跳过 BGM（需要先渲染）")
-
-        # ── 13. 合成阶段 ─────────────────────────
-        if enable_render and result.get("render"):
-            yield from emit(0.90, "🎞️ 音视频合成...")
-            from pipelines.compositor import compose_episode
-
-            base_output = Path.home() / "myworkspace" / "projects" / "story-agent-system" / "output" / project_name
-            composed_dir = base_output / "composed"
-            composed_dir.mkdir(parents=True, exist_ok=True)
-            audio_output = base_output / "audio"
-
-            # 按 episode 分组
-            all_rendered = list_shots(project_id=pid)
-            episode_shots = {}
-            for s in all_rendered:
-                ep = s.episode_id or 1
-                if ep not in episode_shots:
-                    episode_shots[ep] = []
-                episode_shots[ep].append(s)
-
-            for ep, shots_in_ep in episode_shots.items():
-                video_files = []
-                for s in shots_in_ep:
-                    # 查找渲染输出
-                    act = s.act_number or 1
-                    sc = s.scene_number or 1
-                    sh = s.shot_number or 1
-                    candidate = base_output / f"ep{ep:02d}_act{act:02d}_sc{sc:02d}_sh{sh:02d}.mp4"
-                    if candidate.exists():
-                        video_files.append(str(candidate))
-
-                if not video_files:
-                    yield from emit(0.90, f"  ⚠️ ep{ep} 无视频文件，跳过")
-                    continue
-
-                ep_output = str(base_output / f"ep{ep:02d}_final.mp4")
-                try:
-                    final = compose_episode(
-                        project_name=project_name,
-                        episode=ep,
-                        shot_videos=video_files,
-                        output_path=ep_output,
-                        crossfade_duration=0.5,
-                    )
-                    if final and Path(final).exists():
-                        result["export"] = final
-                        yield from emit(0.92, f"  ✅ ep{ep} 合成完成: {Path(final).name}")
-                    else:
-                        yield from emit(0.91, f"  ⚠️ ep{ep} 合成失败")
-                except Exception as ce:
-                    yield from emit(0.91, f"  ⚠️ ep{ep} 合成异常: {ce}")
-
-            yield from emit(0.93, f"✅ 合成完成")
-        else:
-            yield from emit(0.90, "⏭️ 跳过合成（需要先渲染）")
-
-        # ── 14. 导出 ────────────────────────────
-        if enable_render and result.get("render"):
-            yield from emit(0.90, "📦 合并导出视频...")
-            from pipelines.output_manager import merge_episode, export_project
-            try:
-                merged = merge_episode(project_name, episode=1, overwrite=True)
-                if merged and os.path.exists(merged):
-                    result["export"] = merged
-                    size_mb = os.path.getsize(merged) / 1024 / 1024
-                    yield from emit(0.94,
-                                    f"✅ 导出完成: {merged} ({size_mb:.1f}MB)")
+            yield from emit(0.90, "🎞️ 运行统一合成管线...")
+            composite_result = run_compositor_pipeline(pid, episode=1, burn_subs=True, crossfade=0.5)
+            final_episode = composite_result.get("episode_file")
+            if composite_result.get("success") and final_episode and Path(final_episode).exists():
+                yield from emit(0.93, f"✅ 合成完成: {Path(final_episode).name}")
+                exported = _export_episode_file(final_episode, project_name, episode=1)
+                if exported and Path(exported).exists():
+                    result["export"] = exported
+                    size_mb = Path(exported).stat().st_size / 1024 / 1024
+                    yield from emit(0.96, f"✅ 导出完成: {exported} ({size_mb:.1f}MB)")
                 else:
-                    yield from emit(0.93,
-                                    "⚠️ 合并失败（可能缺少渲染视频文件）")
-            except Exception as e:
-                yield from emit(0.92, f"⚠️ 导出异常: {e}")
+                    result["export"] = final_episode
+                    yield from emit(0.95, f"⚠️ 导出目录复制失败，保留合成成片: {final_episode}")
+            else:
+                yield from emit(0.92, f"⚠️ 合成失败: {composite_result.get('error', 'unknown error')}")
         else:
-            yield from emit(0.72, "⏭️ 跳过导出（需要渲染完成）")
+            yield from emit(0.86, "⏭️ 跳过音频/合成/导出（需要渲染完成）")
 
         # ── 完成 ────────────────────────────────
         update_project(pid, {"status": "completed"})
@@ -1019,20 +883,38 @@ def run_render_export_generator(
         else:
             yield emit(0.70, "⚠️ 所有镜头渲染失败")
 
-        # ── 5. 导出 ──────────────────────────────
+        # ── 5. 音频 / 合成 / 导出 ──────────────────
         if result.get("render"):
-            yield emit(0.85, "📦 合并导出视频...")
-            from pipelines.output_manager import merge_episode, export_project
-            try:
-                merged = merge_episode(project_name, episode=1, overwrite=True)
-                if merged and os.path.exists(merged):
-                    result["export"] = merged
-                    size_mb = os.path.getsize(merged) / 1024 / 1024
-                    yield emit(0.95, f"✅ 导出完成: {merged} ({size_mb:.1f}MB)")
+            from pipelines.audio_pipeline import run_audio_pipeline
+            from pipelines.compositor import run_compositor_pipeline
+
+            yield emit(0.84, "🎤 运行统一音频管线...")
+            audio_result = run_audio_pipeline(project_id)
+            if audio_result.get("success"):
+                yield emit(
+                    0.88,
+                    "✅ 音频完成: "
+                    f"TTS {len(audio_result.get('tts', []))} / "
+                    f"BGM {len(audio_result.get('music', []))} / "
+                    f"SFX {len(audio_result.get('sfx', []))}"
+                )
+            else:
+                yield emit(0.87, f"⚠️ 音频管线失败: {audio_result.get('error', 'unknown error')}")
+
+            yield emit(0.90, "🎞️ 运行统一合成管线...")
+            composite_result = run_compositor_pipeline(project_id, episode=1, burn_subs=True, crossfade=0.5)
+            final_episode = composite_result.get("episode_file")
+            if composite_result.get("success") and final_episode and Path(final_episode).exists():
+                exported = _export_episode_file(final_episode, project_name, episode=1)
+                if exported and Path(exported).exists():
+                    result["export"] = exported
+                    size_mb = Path(exported).stat().st_size / 1024 / 1024
+                    yield emit(0.96, f"✅ 导出完成: {exported} ({size_mb:.1f}MB)")
                 else:
-                    yield emit(0.90, "⚠️ 合并失败（可能缺少渲染视频文件）")
-            except Exception as e:
-                yield emit(0.88, f"⚠️ 导出异常: {e}")
+                    result["export"] = final_episode
+                    yield emit(0.94, f"⚠️ 导出目录复制失败，保留合成成片: {final_episode}")
+            else:
+                yield emit(0.92, f"⚠️ 合成失败: {composite_result.get('error', 'unknown error')}")
         else:
             yield emit(0.82, "⏭️ 跳过导出（无渲染结果）")
 
