@@ -1357,3 +1357,64 @@ def set_active_pipeline_name(pipeline_name: str, config_path: Optional[Path] = N
             )
     cfg["active_pipeline"] = pipeline_name
     return save_pipeline_config(cfg, config_path)
+
+
+# ─── 高层 API（供 batch_renderer 等调用方使用）────────────────────────────
+
+def generate_scene_video(
+    scene: dict,
+    project_name: str = "project",
+    seed: int = 0,
+    lora_refs: Optional[list] = None,
+    controlnet_type: Optional[str] = None,
+    controlnet_strength: float = 0.6,
+    fixed_seed: bool = False,
+) -> dict:
+    """
+    为单个场景生成视频，通过 RenderDispatcher 自动回退。
+    返回 {"scene", "success", "files", "output_path", "seed", [...]}。
+    """
+    import time as _time
+    scene_name = scene.get("name", scene.get("scene_name", scene.get("location", "scene")))
+    print(f"\n  === 场景: {scene_name} ===")
+
+    actual_seed = seed if fixed_seed else int(_time.time() * 1000) % (2 ** 31)
+
+    payload = dict(scene)
+    payload.setdefault("project_name", project_name)
+    if lora_refs:
+        payload["lora_refs"] = lora_refs
+    if controlnet_type:
+        payload["controlnet_type"] = controlnet_type
+        payload.setdefault("controlnet_strength", controlnet_strength)
+
+    out_dir = _PROJECT_ROOT / "output" / project_name / "scenes"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    safe_name = scene_name[:20].replace(" ", "_")
+    output_path = out_dir / f"{safe_name}_{actual_seed}.mp4"
+
+    try:
+        dispatcher = get_dispatcher()
+        render_result = dispatcher.render(payload, output_path)
+        out = render_result.path
+        print(f"  ✅ 生成完成: {out.name}, seed={actual_seed}, pipeline={render_result.pipeline_name}")
+        return {
+            "scene": scene_name,
+            "success": True,
+            "files": [{"filename": out.name, "path": str(out)}],
+            "output_path": str(out),
+            "pipeline_name": render_result.pipeline_name,
+            "requested_pipeline": render_result.requested_pipeline,
+            "fallback_used": render_result.fallback_used,
+            "fallback_from": render_result.fallback_from,
+            "render_tier": render_result.render_tier,
+            "seed": actual_seed,
+        }
+    except RenderError as e:
+        print(f"  ❌ 渲染失败: {e}")
+        return {
+            "scene": scene_name,
+            "success": False,
+            "error": str(e),
+            "seed": actual_seed,
+        }

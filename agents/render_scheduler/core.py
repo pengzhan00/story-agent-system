@@ -131,7 +131,7 @@ def schedule_render(
         "documentation": {
             "note": "Render task created. The 'submit_to_comfyui' action handler should:",
             "steps": [
-                "1. Load ComfyUI workflow from pipelines/animate_pipeline.py or default template",
+                "1. Load ComfyUI workflow via pipelines/render_pipeline.py (get_dispatcher().render())",
                 "2. Inject prompt text into the positive CLIPTextEncode node",
                 "3. Set seed to random value",
                 "4. POST workflow to http://127.0.0.1:8188/prompt",
@@ -246,12 +246,12 @@ def submit_batch(
         }
 
         # Add context from batch_renderer reference:
-        # - Uses animate_pipeline.submit_workflow + wait_for_completion
+        # - Uses render_pipeline.generate_scene_video → get_dispatcher().render()
         # - Output goes to project scenes dir
         # - Expects video file from ComfyUI output
         render_plan["_reference"] = {
-            "submission": "Use pipelines.animate_pipeline.submit_workflow(workflow)",
-            "completion": "Use pipelines.animate_pipeline.wait_for_completion(prompt_id, timeout=300)",
+            "submission": "Use pipelines.render_pipeline.submit_workflow(workflow)",
+            "completion": "Use pipelines.render_pipeline.wait_for_completion(prompt_id, timeout=300)",
             "output": "Copy latest video from ~/Documents/ComfyUI/output/ to project scenes directory",
         }
 

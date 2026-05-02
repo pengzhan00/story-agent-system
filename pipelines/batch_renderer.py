@@ -17,9 +17,10 @@ import sys
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from pipelines.animate_pipeline import (
+from pipelines.render_pipeline import (
     build_scene_prompt,
     generate_scene_video,
+    get_video_output,
 )
 from pipelines.output_manager import (
     ensure_project_dirs, register_scene, load_timeline, save_timeline
@@ -118,7 +119,6 @@ class BatchRenderer:
 
     def _find_video_from_outputs(self, outputs: dict) -> Optional[str]:
         """从 ComfyUI history outputs 中解析真实视频文件路径（不像 glob 那样靠猜）"""
-        from pipelines.animate_pipeline import get_video_output
         files = get_video_output(outputs)
         if not files:
             self._progress(f"  ComfyUI history 无视频记录", 0)
