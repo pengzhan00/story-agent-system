@@ -17,7 +17,10 @@ import sys
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from pipelines.animate_pipeline import submit_workflow, wait_for_completion, build_scene_prompt, get_workflow, animatediff_available
+from pipelines.animate_pipeline import (
+    build_scene_prompt,
+    generate_scene_video,
+)
 from pipelines.output_manager import (
     ensure_project_dirs, register_scene, load_timeline, save_timeline
 )
@@ -138,8 +141,8 @@ class BatchRenderer:
         """渲染单个场景，等待完成后通过 history 精确匹配输出文件。
         渲染前先查 asset_registry，已完成则直接返回已有路径。
         """
-        import requests as req
-        from core.database import create_render_job, update_render_job, update_shot
+        from core.database import create_render_job, update_render_job, update_shot, create_asset_version
+        from pipelines.quality_gate import validate_render_output
 
         if not scene_id:
             scene_id = scene.get("location", f"scene_{int(time.time())}")
@@ -156,93 +159,117 @@ class BatchRenderer:
                         self.results.append(existing)
                     return existing
 
-        prompt_text = self.build_prompt_from_scene(scene)
         render_job_id = create_render_job({
             "project_id": self.project_id,
             "shot_id": shot_id,
             "status": "running",
-            "workflow_name": "sdxl_static",
+            "workflow_name": "dispatcher",
+            "requested_pipeline": "",
+            "used_pipeline": "",
+            "fallback_used": 0,
+            "fallback_from": "",
+            "render_tier": "production",
         }) if self.project_id and shot_id else 0
 
-        # 构建 ComfyUI 工作流
-        from pipelines.animate_pipeline import (
-            inject_prompt, inject_seed, inject_loras, inject_checkpoint,
-            NEGATIVE_PROMPT, DEFAULT_STYLE_LORA, DEFAULT_STYLE_LORA_STRENGTH,
-        )
-        using_ade = animatediff_available()
-        workflow = get_workflow()
-        if using_ade:
-            self._progress(f"  🎬 使用 AnimateDiff SDXL 运动工作流", 0)
-
-        # 渲染配置覆盖（来自 UI 模型管理选择）
-        render_cfg = scene.get("_render_config") or {}
-        if render_cfg.get("checkpoint"):
-            workflow = inject_checkpoint(workflow, render_cfg["checkpoint"])
-
-        # KSampler 参数覆盖
-        for kid in [n for n, node in workflow.items() if node.get("class_type") == "KSampler"]:
-            if render_cfg.get("steps"):
-                workflow[kid]["inputs"]["steps"] = int(render_cfg["steps"])
-            if render_cfg.get("cfg"):
-                workflow[kid]["inputs"]["cfg"] = float(render_cfg["cfg"])
-            if render_cfg.get("width") and render_cfg.get("height"):
-                # 尺寸在 EmptyLatentImage 节点
-                pass
-
-        for nid, node in workflow.items():
-            if node.get("class_type") == "EmptyLatentImage":
-                if render_cfg.get("width"):
-                    workflow[nid]["inputs"]["width"] = int(render_cfg["width"])
-                if render_cfg.get("height"):
-                    workflow[nid]["inputs"]["height"] = int(render_cfg["height"])
-
-        # 动态注入 prompt + seed
-        workflow = inject_prompt(workflow, prompt_text, NEGATIVE_PROMPT)
-        workflow = inject_seed(workflow, int(time.time()) % (2**31))
-
-        # LoRA 注入：优先用场景指定的 → 渲染配置中的 → 默认动漫风格 LoRA
-        lora_refs = scene.get("_lora_refs") or render_cfg.get("loras") or []
-        if not lora_refs:
-            lora_refs = [{"name": DEFAULT_STYLE_LORA, "strength": DEFAULT_STYLE_LORA_STRENGTH}]
-        workflow = inject_loras(workflow, lora_refs)
-
-        # 提交
-        prompt_id = submit_workflow(workflow)
-        if not prompt_id:
-            if render_job_id:
-                update_render_job(render_job_id, {"status": "failed", "error": "提交失败"})
-            return None
-        if render_job_id:
-            update_render_job(render_job_id, {"prompt_id": prompt_id})
-
-        # 等待完成
-        self._progress(f"  等待渲染（超时 {timeout}s）...", 0)
-        outputs = wait_for_completion(prompt_id, timeout=timeout)
-        if not outputs:
-            if render_job_id:
-                update_render_job(render_job_id, {"status": "failed", "error": "渲染超时"})
-            return None
-
-        # 找生成的视频（从 history 精确匹配，不用 glob）
-        video_path = self._find_video_from_outputs(outputs)
-        if not video_path:
-            if render_job_id:
-                update_render_job(render_job_id, {"status": "failed", "error": "未找到输出视频"})
-            return None
-
-        # 复制到项目输出目录，并将静态单帧延长为3秒
+        prompt_text = self.build_prompt_from_scene(scene)
+        if shot_id:
+            update_shot(shot_id, {"status": "rendering"})
         dest = self.project_dirs["scenes"] / f"{scene_id}.mp4"
-        import shutil
-        extended = self._extend_static_frame(video_path, duration_sec=3.0)
-        shutil.copy2(extended or video_path, dest)
-        if extended and extended != video_path:
-            try:
-                os.remove(extended)
-            except Exception:
-                pass
+        scene["project_name"] = self.project_name
+        scene.setdefault("scene_id", scene_id)
+
+        result = generate_scene_video(
+            scene,
+            project_name=self.project_name,
+            seed=int(time.time()) % (2**31),
+            lora_refs=scene.get("_lora_refs"),
+            controlnet_type=scene.get("controlnet_type"),
+            controlnet_strength=float(scene.get("controlnet_strength", 0.6)),
+            fixed_seed=False,
+        )
+        if not result.get("success") or not result.get("output_path"):
+            if render_job_id:
+                update_render_job(render_job_id, {
+                    "status": "failed",
+                    "error": result.get("error", "渲染失败"),
+                    "requested_pipeline": result.get("requested_pipeline", ""),
+                    "used_pipeline": result.get("pipeline_name", ""),
+                    "fallback_used": int(bool(result.get("fallback_used"))),
+                    "fallback_from": result.get("fallback_from", ""),
+                    "render_tier": result.get("render_tier", "production"),
+                })
+            if shot_id:
+                update_shot(shot_id, {"status": "ready"})
+            return None
+
+        src_path = Path(result["output_path"])
+        if src_path != dest and src_path.exists():
+            import shutil
+            shutil.copy2(src_path, dest)
+        elif src_path == dest:
+            dest = src_path
+        else:
+            if render_job_id:
+                update_render_job(render_job_id, {"status": "failed", "error": "输出文件不存在"})
+            if shot_id:
+                update_shot(shot_id, {"status": "ready"})
+            return None
+
         self.results.append(str(dest))
+        qc = validate_render_output(str(dest))
+        if not qc.passed:
+            qc_error = "; ".join(qc.errors)[:500]
+            if render_job_id:
+                update_render_job(render_job_id, {
+                    "status": "failed",
+                    "error": f"质检失败: {qc_error}",
+                    "output_path": str(dest),
+                    "requested_pipeline": result.get("requested_pipeline", ""),
+                    "used_pipeline": result.get("pipeline_name", ""),
+                    "fallback_used": int(bool(result.get("fallback_used"))),
+                    "fallback_from": result.get("fallback_from", ""),
+                    "render_tier": result.get("render_tier", "production"),
+                    "output_meta": {
+                        "seed": result.get("seed", 0),
+                        "files": result.get("files", []),
+                        "quality_gate": qc.metrics,
+                    },
+                })
+            if shot_id:
+                update_shot(shot_id, {"status": "qc_failed", "error": qc_error})
+            return None
         if render_job_id:
-            update_render_job(render_job_id, {"status": "completed", "output_path": str(dest)})
+            update_render_job(render_job_id, {
+                "status": "completed",
+                "output_path": str(dest),
+                "requested_pipeline": result.get("requested_pipeline", ""),
+                "used_pipeline": result.get("pipeline_name", ""),
+                "fallback_used": int(bool(result.get("fallback_used"))),
+                "fallback_from": result.get("fallback_from", ""),
+                "render_tier": result.get("render_tier", "production"),
+                "output_meta": {
+                    "seed": result.get("seed", 0),
+                    "files": result.get("files", []),
+                    "quality_gate": qc.metrics,
+                },
+            })
+            create_asset_version({
+                "project_id": self.project_id,
+                "shot_id": shot_id,
+                "asset_type": "render",
+                "asset_ref_id": render_job_id,
+                "source_stage": "render_pipeline",
+                "file_path": str(dest),
+                "content_json": {
+                    "output_path": str(dest),
+                    "requested_pipeline": result.get("requested_pipeline", ""),
+                    "used_pipeline": result.get("pipeline_name", ""),
+                    "fallback_used": bool(result.get("fallback_used")),
+                    "render_tier": result.get("render_tier", "production"),
+                    "seed": result.get("seed", 0),
+                },
+                "notes": "render completed",
+            })
         if shot_id:
             update_shot(shot_id, {"status": "rendered"})
         register_scene(

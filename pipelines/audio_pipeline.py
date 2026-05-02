@@ -1,12 +1,14 @@
 """
-Audio Pipeline — TTS + 音乐生成 + 音效生成
-支持: Edge-TTS（免费在线）/ Kokoro（本地）/ OpenAI TTS（API）
-     HeartMuLa / audiocraft（本地音乐/音效）
+|Audio Pipeline — TTS + 音乐生成 + 音效生成
+|支持: Edge-TTS（免费在线）/ Kokoro（本地）/ OpenAI TTS（API）
+|     ffmpeg 合成 BGM（纯本地，0 依赖）
 """
 import asyncio
 import json
 import os
+import shutil
 import subprocess
+import tempfile
 import time
 from pathlib import Path
 from typing import Optional
@@ -16,14 +18,30 @@ PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 import core.database as db
+from core.asset_registry import get_shot_tts, is_shot_tts_complete
 
 OUTPUT_DIR = PROJECT_ROOT / "output"
 
 # ── 可用 TTS 后端优先级 ────────────────────────────────────
 
-BARK_PYTHON = Path(os.path.expanduser("~/bark/venv/bin/python3"))
-CHATTTS_PYTHON = Path(os.path.expanduser("~/ChatTTS/venv/bin/python3"))
-CHATTTS_MODEL_PATH = Path(os.path.expanduser("~/asset/ms/AI-ModelScope/ChatTTS"))
+def _first_existing(paths: list[str]) -> Path:
+    for item in paths:
+        path = Path(os.path.expanduser(item))
+        if path.exists():
+            return path
+    return Path(os.path.expanduser(paths[0]))
+
+
+BARK_PYTHON = _first_existing([
+    "~/bark/venv/bin/python3",
+])
+CHATTTS_PYTHON = _first_existing([
+    "~/ChatTTS/venv/bin/python3",
+    "~/chattts/venv/bin/python3",
+])
+CHATTTS_MODEL_PATH = _first_existing([
+    "~/asset/ms/AI-ModelScope/ChatTTS",
+])
 
 
 def _check_edge_tts() -> bool:
@@ -97,7 +115,7 @@ async def _edge_tts_generate(text: str, voice: str, output_path: str):
 def generate_tts_edge(text: str, output_path: str, voice: str = "zh-CN-XiaoxiaoNeural") -> bool:
     try:
         asyncio.run(_edge_tts_generate(text, voice, output_path))
-        return Path(output_path).exists()
+        return _audio_valid(output_path)
     except Exception as e:
         print(f"[EdgeTTS] 失败: {e}")
         return False
@@ -118,7 +136,7 @@ def generate_tts_kokoro(text: str, output_path: str, voice: str = "af_heart") ->
         if samples:
             audio_data = np.concatenate(samples)
             sf.write(output_path, audio_data, sample_rate)
-            return True
+            return _audio_valid(output_path)
         return False
     except Exception as e:
         print(f"[Kokoro] 失败: {e}")
@@ -161,7 +179,7 @@ print('OK', len(audio) / SAMPLE_RATE)
             capture_output=True, timeout=30,
         )
         Path(wav_path).unlink(missing_ok=True)
-        return Path(output_path).exists()
+        return _audio_valid(output_path)
     except Exception as e:
         print(f"[Bark] 异常: {e}")
         return False
@@ -205,7 +223,7 @@ import ChatTTS
 from scipy.io.wavfile import write as wav_write
 
 chat = ChatTTS.Chat()
-chat.load(source='custom', custom_path={repr(str(CHATTTS_MODEL_PATH))}, compile=False)
+chat.load(source='custom', custom_path={repr(str(CHATTTS_MODEL_PATH))}, compile=False, device='cpu')
 
 torch.manual_seed({voice_seed})
 rand_spk = chat.sample_random_speaker()
@@ -234,7 +252,7 @@ print('OK', len(wav) / 24000)
             capture_output=True, timeout=30,
         )
         Path(wav_path).unlink(missing_ok=True)
-        return Path(output_path).exists()
+        return _audio_valid(output_path)
     except Exception as e:
         print(f"[ChatTTS] 异常: {e}")
         return False
@@ -288,7 +306,7 @@ def generate_tts_pyttsx3(text: str, output_path: str) -> bool:
         engine = pyttsx3.init()
         engine.save_to_file(text, output_path)
         engine.runAndWait()
-        return Path(output_path).exists()
+        return _audio_valid(output_path, min_bytes=512)
     except Exception as e:
         print(f"[pyttsx3] 失败: {e}")
         return False
@@ -413,7 +431,6 @@ def generate_shot_tts(
         return []
 
     # ── 复用检查：TTS 已全部完成，直接返回 ──────────────────
-    from core.asset_registry import is_shot_tts_complete, get_shot_tts
     if is_shot_tts_complete(project_id, shot_id):
         existing = get_shot_tts(project_id, shot_id)
         if existing:
@@ -440,7 +457,8 @@ def generate_shot_tts(
         if not text:
             continue
 
-        out_path = str(shot_audio_dir / f"line_{idx:03d}_{character}.mp3")
+        safe_character = "".join(ch for ch in character if ch.isalnum() or ch in ("_", "-", "一", "二", "三", "四", "五", "六", "七", "八", "九", "十"))[:24] or "voice"
+        out_path = str(shot_audio_dir / f"line_{idx:03d}_{safe_character}.mp3")
 
         # 行级复用：该行已生成且文件存在
         if idx in existing_indices and Path(out_path).exists():
@@ -459,7 +477,7 @@ def generate_shot_tts(
         else:
             voice = get_voice_for_character(character, project_id)
             success = generate_tts(text, out_path, voice=voice, backend=backend_used)
-        if success:
+        if success and _audio_valid(out_path):
             duration = _get_audio_duration(out_path)
             results.append({
                 "line_idx": idx,
@@ -468,20 +486,266 @@ def generate_shot_tts(
                 "file": out_path,
                 "duration": duration,
             })
-            db.create_audio_asset({
-                "project_id": project_id,
-                "shot_id": shot_id,
-                "asset_type": "tts",
-                "file_path": out_path,
-                "duration_sec": duration,
-                "metadata": json.dumps({"character": character, "line_idx": idx}, ensure_ascii=False),
-                "created_at": _now(),
-            })
+            _register_audio(
+                project_id,
+                shot_id,
+                "tts",
+                out_path,
+                metadata={"character": character, "line_idx": idx},
+            )
 
     return results
 
 
-# ── 音乐生成 ──────────────────────────────────────────────
+def _load_shot_payload(shot) -> dict:
+    try:
+        payload = json.loads(shot.render_payload) if shot.render_payload else {}
+    except Exception:
+        payload = {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _get_audio_plan(shot) -> dict:
+    payload = _load_shot_payload(shot)
+    audio = payload.get("audio", {}) or {}
+    story = payload.get("story", {}) or {}
+    scene = payload.get("scene", {}) or {}
+    camera = payload.get("camera", {}) or {}
+    subject = payload.get("subject", {}) or {}
+    duration = camera.get("duration_sec") or 3.0
+    bgm_mood = audio.get("bgm_mood") or story.get("mood") or getattr(shot, "mood", "") or "紧张"
+    cues = audio.get("sfx_cues", []) or []
+    if not cues:
+        weather = scene.get("weather", "") or getattr(shot, "weather", "")
+        action = subject.get("action", "")
+        narration = story.get("narration", "") or getattr(shot, "narration", "")
+        inferred = []
+        if weather in ("雨", "雪", "雾"):
+            inferred.append({"name": weather, "description": f"{weather}环境声", "duration": duration})
+        if any(token in f"{action} {narration}" for token in ("奔跑", "跑", "追逐")):
+            inferred.append({"name": "脚步", "description": "急促脚步声", "duration": max(2, min(4, int(duration)))})
+        if any(token in f"{action} {narration}" for token in ("打斗", "碰撞", "爆炸", "出剑", "枪")):
+            inferred.append({"name": "打击", "description": "短促打击与碰撞音效", "duration": 2})
+        cues = inferred
+    return {
+        "payload": payload,
+        "bgm_mood": bgm_mood,
+        "duration_sec": float(duration),
+        "sfx_cues": cues,
+        "location": scene.get("location", "") or getattr(shot, "location", ""),
+        "time_of_day": scene.get("time_of_day", "") or getattr(shot, "time_of_day", ""),
+    }
+
+
+def _shot_audio_dir(output_dir: Path, shot_id: int, subdir: str) -> Path:
+    p = output_dir / f"shot_{shot_id:04d}" / subdir
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def _list_shot_audio_assets(project_id: int, shot_id: int, asset_type: str) -> list[dict]:
+    assets = db.list_audio_assets(project_id, shot_id=shot_id)
+    result = []
+    for asset in assets:
+        if asset.get("asset_type") == asset_type and asset.get("file_path") and Path(asset["file_path"]).exists():
+            result.append(asset)
+    return result
+
+
+def generate_shot_music(project_id: int, shot_id: int, output_dir: Path) -> list[dict]:
+    shot = db.get_shot(shot_id)
+    if not shot:
+        return []
+    existing = _list_shot_audio_assets(project_id, shot_id, "bgm_shot")
+    if existing:
+        return [{"shot_id": shot_id, "file": a["file_path"], "skipped": True, "success": True} for a in existing]
+    plan = _get_audio_plan(shot)
+    music_dir = _shot_audio_dir(output_dir, shot_id, "music")
+    out_path = str(music_dir / "bgm_shot.mp3")
+    prompt = f"{plan['location']} {plan['time_of_day']} {plan['bgm_mood']} 短剧背景音乐，情绪稳定，适合镜头时长 {plan['duration_sec']:.1f} 秒"
+    duration = max(6, min(20, int(round(plan["duration_sec"] * 2))))
+    success = generate_music(
+        prompt,
+        out_path,
+        duration=duration,
+        project_id=project_id,
+        mood=plan["bgm_mood"],
+    )
+    if success:
+        _register_audio(
+            project_id,
+            shot_id,
+            "bgm_shot",
+            out_path,
+            metadata={"mood": plan["bgm_mood"], "duration_target": plan["duration_sec"]},
+        )
+    return [{
+        "shot_id": shot_id,
+        "file": out_path if success else "",
+        "success": success,
+        "mood": plan["bgm_mood"],
+    }]
+
+
+def generate_shot_sfx(project_id: int, shot_id: int, output_dir: Path) -> list[dict]:
+    shot = db.get_shot(shot_id)
+    if not shot:
+        return []
+    plan = _get_audio_plan(shot)
+    cues = plan["sfx_cues"]
+    if not cues:
+        return []
+    sfx_dir = _shot_audio_dir(output_dir, shot_id, "sfx")
+    existing = _list_shot_audio_assets(project_id, shot_id, "sfx_shot")
+    if len(existing) >= len(cues):
+        return [{"shot_id": shot_id, "file": a["file_path"], "skipped": True, "success": True} for a in existing]
+    results = []
+    for idx, cue in enumerate(cues):
+        if isinstance(cue, str):
+            cue = {"name": cue, "description": cue, "duration": 3}
+        desc = cue.get("description") or cue.get("name") or "环境音效"
+        duration = int(cue.get("duration") or 3)
+        out_path = str(sfx_dir / f"sfx_{idx:02d}_{(cue.get('name') or 'cue')[:20]}.mp3")
+        success = generate_sfx_audiocraft(desc, out_path, duration=duration)
+        if not success:
+            success = generate_sfx_ffmpeg(desc, out_path, duration=duration)
+        if success:
+            _register_audio(
+                project_id,
+                shot_id,
+                "sfx_shot",
+                out_path,
+                metadata={"cue_idx": idx, "name": cue.get("name", ""), "description": desc},
+            )
+        results.append({
+            "shot_id": shot_id,
+            "cue_idx": idx,
+            "name": cue.get("name", ""),
+            "file": out_path if success else "",
+            "success": success,
+        })
+    return results
+
+
+# ── 音乐生成（Ace-Step / ffmpeg）───────────────────
+
+_ACE_STEP_MODELS = {
+    "unet": "acestep_v1.5_turbo.safetensors",
+    "clip1": "qwen_0.6b_ace15.safetensors",
+    "clip2": "qwen_4b_ace15.safetensors",
+    "vae": "ace_1.5_vae.safetensors",
+}
+
+
+def _check_acestep_music() -> bool:
+    try:
+        import requests as req
+        r = req.get("http://127.0.0.1:8188/object_info", timeout=5)
+        if r.status_code != 200:
+            return False
+        data = r.json()
+        required = {
+            "UNETLoader", "DualCLIPLoader", "VAELoader", "EmptyAceStep1.5LatentAudio",
+            "TextEncodeAceStepAudio1.5", "ConditioningZeroOut", "ModelSamplingAuraFlow",
+            "KSampler", "VAEDecodeAudio", "SaveAudioMP3",
+        }
+        if not required.issubset(data.keys()):
+            return False
+        model_base = Path(os.path.expanduser("~/Documents/ComfyUI/models"))
+        paths = [
+            model_base / "diffusion_models" / _ACE_STEP_MODELS["unet"],
+            model_base / "text_encoders" / _ACE_STEP_MODELS["clip1"],
+            model_base / "text_encoders" / _ACE_STEP_MODELS["clip2"],
+            model_base / "vae" / _ACE_STEP_MODELS["vae"],
+        ]
+        return all(path.exists() for path in paths)
+    except Exception:
+        return False
+
+
+def generate_music_acestep(
+    prompt: str,
+    output_path: str,
+    duration: int = 30,
+    mood: str = "",
+) -> bool:
+    """Use ComfyUI Ace-Step 1.5 when models are installed locally."""
+    if not _check_acestep_music():
+        return False
+    try:
+        from pipelines.render_pipeline import submit_workflow, wait_for_completion_result
+        seed = int(time.time() * 1000) % (2 ** 31)
+        tags = prompt.strip() or mood or "cinematic soundtrack, chinese fantasy, instrumental"
+        workflow = {
+            "1": {"class_type": "UNETLoader", "inputs": {"unet_name": _ACE_STEP_MODELS["unet"], "weight_dtype": "default"}},
+            "2": {"class_type": "DualCLIPLoader", "inputs": {
+                "clip_name1": _ACE_STEP_MODELS["clip1"],
+                "clip_name2": _ACE_STEP_MODELS["clip2"],
+                "type": "ace",
+                "device": "default",
+            }},
+            "3": {"class_type": "VAELoader", "inputs": {"vae_name": _ACE_STEP_MODELS["vae"]}},
+            "4": {"class_type": "TextEncodeAceStepAudio1.5", "inputs": {
+                "clip": ["2", 0],
+                "tags": tags,
+                "lyrics": "",
+                "seed": seed,
+                "bpm": 120,
+                "duration": float(duration),
+                "timesignature": "4",
+                "language": "zh",
+                "keyscale": "E minor",
+                "generate_audio_codes": True,
+                "cfg_scale": 2.0,
+                "temperature": 0.85,
+                "top_p": 0.9,
+                "top_k": 0,
+                "min_p": 0.0,
+            }},
+            "5": {"class_type": "ConditioningZeroOut", "inputs": {"conditioning": ["4", 0]}},
+            "6": {"class_type": "EmptyAceStep1.5LatentAudio", "inputs": {"seconds": float(duration), "batch_size": 1}},
+            "7": {"class_type": "ModelSamplingAuraFlow", "inputs": {"model": ["1", 0], "shift": 3.0}},
+            "8": {"class_type": "KSampler", "inputs": {
+                "model": ["7", 0],
+                "seed": seed,
+                "steps": 8,
+                "cfg": 1.0,
+                "sampler_name": "euler",
+                "scheduler": "simple",
+                "positive": ["4", 0],
+                "negative": ["5", 0],
+                "latent_image": ["6", 0],
+                "denoise": 1.0,
+            }},
+            "9": {"class_type": "VAEDecodeAudio", "inputs": {"samples": ["8", 0], "vae": ["3", 0]}},
+            "10": {"class_type": "SaveAudioMP3", "inputs": {
+                "audio": ["9", 0],
+                "filename_prefix": "audio/story_agent_acestep",
+                "quality": "128k",
+            }},
+        }
+        prompt_id = submit_workflow(workflow, "http://127.0.0.1:8188")
+        if not prompt_id:
+            return False
+        result = wait_for_completion_result(prompt_id, "http://127.0.0.1:8188", timeout=max(600, duration * 20))
+        if result["status"] != "completed":
+            print(f"[AceStep] 失败: {result['error_type']} {result['error_message']}")
+            return False
+        outputs = result.get("outputs", {})
+        for node_out in outputs.values():
+            for bucket in ("files", "audio", "audios"):
+                for item in node_out.get(bucket, []):
+                    if isinstance(item, dict) and item.get("filename"):
+                        sub = item.get("subfolder", "")
+                        src = Path(os.path.expanduser("~/Documents/ComfyUI/output")) / sub / item["filename"]
+                        if src.exists():
+                            Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+                            shutil.copy2(src, output_path)
+                            return _audio_valid(output_path)
+        return False
+    except Exception as e:
+        print(f"[AceStep] 异常: {e}")
+        return False
 
 # 情绪 → 和弦频率(Hz) + 混响参数 + AM 调制速率
 _MOOD_PROFILES: dict[str, dict] = {
@@ -507,7 +771,11 @@ def generate_music_ffmpeg(
     duration: int = 30,
     mood: str = "",
 ) -> bool:
-    """用 ffmpeg 多声部正弦合成生成氛围背景音乐（无需本地 ML 模型）。"""
+    """用 ffmpeg 多轨分层合成生成氛围背景音乐（无需本地 ML 模型）。
+    
+    升级版：和弦层 + 低音鼓 + hi-hat节奏 + 立体声展开。
+    仙侠/热血/悬疑等风格通过不同频率组合实现。
+    """
     TWO_PI = 6.28318530
     # 匹配情绪 profile
     mood_key = (mood or prompt or "").lower()
@@ -518,153 +786,112 @@ def generate_music_ffmpeg(
             break
 
     freqs = profile["freqs"]
-    amps  = profile["amps"]
+    amps = profile["amps"]
     echo_delays = profile["echo"]
     fade = min(3.0, duration * 0.1)
 
-    # 简单和弦：多个正弦波叠加，避免复杂嵌套表达式
-    def _expr(detune: float = 1.0) -> str:
-        terms = [f"{a}*sin({TWO_PI}*{f*detune:.3f}*t)" for f, a in zip(freqs, amps)]
-        return "+".join(terms)
-
-    aevalsrc = f"{_expr()}|{_expr(1.002)}"  # 轻微失谐立体声
-
-    af_chain = (
-        f"afade=t=in:d={fade},"
-        f"afade=t=out:st={max(0, duration-fade):.1f}:d={fade},"
-        f"aecho=0.8:0.9:{echo_delays}:0.3|0.25,"
-        "equalizer=f=200:t=o:w=200:g=4,"
-        "equalizer=f=3000:t=o:w=500:g=-3,"
-        "volume=0.85"
-    )
+    # BPM 计算：用情绪 profile 的 am 速率决定节奏快慢
+    am_rate = profile.get("am", 0.8)
+    bpm = max(60, min(140, int(am_rate * 60)))
+    beat_sec = 60.0 / bpm
 
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+
     try:
-        result = subprocess.run(
-            [
+        with tempfile.TemporaryDirectory(prefix="bgm_") as tmpdir:
+            tmp = Path(tmpdir)
+
+            # ── 1. 和弦层（pad）──
+            # 左声道：主和弦；右声道：轻微失谐立体声展开
+            chord_l = "+".join(
+                f"{a}*sin({TWO_PI}*{f}*t)" for f, a in zip(freqs, amps)
+            )
+            chord_r = "+".join(
+                f"{a}*sin({TWO_PI}*{f*1.003:.3f}*t)" for f, a in zip(freqs, amps)
+            )
+            aevalsrc = f"{chord_l}|{chord_r}"
+            chord_wav = tmp / "chord.wav"
+            subprocess.run(
+                ["ffmpeg", "-y", "-f", "lavfi",
+                 "-i", f"aevalsrc={aevalsrc}:s=44100:d={duration}",
+                 "-af", (
+                     f"afade=t=in:d={fade},"
+                     f"afade=t=out:st={max(0, duration-fade):.1f}:d={fade},"
+                     f"aecho=0.8:0.9:{echo_delays}:0.3|0.25,"
+                     "equalizer=f=80:t=o:w=60:g=3,"
+                     "equalizer=f=250:t=o:w=150:g=4,"
+                     "equalizer=f=4000:t=o:w=1000:g=-2,"
+                     "volume=0.5"
+                 ),
+                 str(chord_wav)],
+                capture_output=True, timeout=30,
+            )
+            if not chord_wav.exists():
+                raise RuntimeError("chord generation failed")
+
+            # ── 2. 低音鼓（kick）单脉冲 ──
+            bass_freq = freqs[0] * 0.5 if freqs[0] > 40 else freqs[0]
+            kick_wav = tmp / "kick.wav"
+            subprocess.run(
+                ["ffmpeg", "-y", "-f", "lavfi",
+                 "-i", f"aevalsrc=sin({TWO_PI}*{bass_freq:.1f}*t)*exp(-5*t):s=44100:d={beat_sec*0.6:.2f}",
+                 "-af", "volume=0.5",
+                 str(kick_wav)],
+                capture_output=True, timeout=10,
+            )
+
+            # ── 3. hi-hat（白噪声）单脉冲 ──
+            hat_wav = tmp / "hat.wav"
+            subprocess.run(
+                ["ffmpeg", "-y", "-f", "lavfi",
+                 "-i", "aevalsrc=random(0)*exp(-8*t):s=44100:d=0.08",
+                 "-af", "volume=0.12",
+                 str(hat_wav)],
+                capture_output=True, timeout=10,
+            )
+
+            # ── 4. 混合所有层 ──
+            # 使用 amovie 循环鼓和 hi-hat
+            mix_cmd = [
                 "ffmpeg", "-y",
-                "-f", "lavfi",
-                "-i", f"aevalsrc={aevalsrc}:s=44100:d={duration}",
-                "-af", af_chain,
-                "-c:a", "libmp3lame", "-b:a", "128k",
-                output_path,
-            ],
-            capture_output=True, timeout=60,
-        )
-        return result.returncode == 0 and Path(output_path).exists()
-    except Exception as e:
-        print(f"[ffmpeg music] 失败: {e}")
-        return False
+                "-i", str(chord_wav),
+                "-f", "lavfi", "-i", f"amovie={kick_wav}:loop=0",
+                "-f", "lavfi", "-i", f"amovie={hat_wav}:loop=0",
+                "-filter_complex",
+                (
+                    "[1:a]volume=0.45[kick];"
+                    "[2:a]volume=0.12[hat];"
+                    "[0:a][kick][hat]amix=inputs=3:duration=first:dropout_transition=0,"
+                    "volume=0.8"
+                    "[out]"
+                ),
+                "-map", "[out]",
+                "-c:a", "libmp3lame", "-b:a", "192k",
+                str(output_path),
+            ]
+            r = subprocess.run(mix_cmd, capture_output=True, timeout=120)
+            if r.returncode != 0:
+                # Fallback: chord only
+                print(f"[ffmpeg music] 混音失败，回退和弦层: {r.stderr.decode()[:200]}")
+                import shutil
+                shutil.copy2(str(chord_wav), output_path)
+                return Path(output_path).exists()
+            return Path(output_path).exists()
 
-def generate_music_heartmula(prompt: str, output_path: str, duration: int = 30) -> bool:
-    """
-    尝试调用本地 HeartMuLa 服务生成音乐。
-    HeartMuLa 通常监听 http://127.0.0.1:7860 或类似端口。
-    """
-    import requests
-    endpoints = [
-        "http://127.0.0.1:7861/generate",
-        "http://127.0.0.1:7862/generate",
-        "http://127.0.0.1:8080/generate",
-    ]
-    for url in endpoints:
+    except Exception as e:
+        print(f"[ffmpeg music] 异常: {e}")
+        # Last resort: simple sine
         try:
-            r = requests.post(url, json={"prompt": prompt, "duration": duration}, timeout=120)
-            if r.status_code == 200:
-                data = r.json()
-                audio_url = data.get("audio_url") or data.get("file")
-                if audio_url:
-                    audio_r = requests.get(audio_url, timeout=30)
-                    Path(output_path).write_bytes(audio_r.content)
-                    return True
+            subprocess.run(
+                ["ffmpeg", "-y", "-f", "lavfi",
+                 "-i", f"aevalsrc=sin({TWO_PI}*130*t):s=44100:d={duration}",
+                 "-af", f"afade=t=in:d={fade},volume=0.3",
+                 str(output_path)],
+                capture_output=True, timeout=30,
+            )
+            return Path(output_path).exists()
         except Exception:
-            continue
-    return False
-
-
-# 中文情绪 → MusicGen 英文描述（效果更好）
-_MOOD_TO_MUSICGEN: dict[str, str] = {
-    "热血": "epic orchestral battle music, intense drums, brass fanfare, heroic melody, high energy",
-    "史诗": "cinematic epic score, full orchestra, soaring strings, powerful brass, dramatic",
-    "神秘": "mysterious ambient music, ethereal pads, distant flute, dark atmosphere, slow tempo",
-    "温馨": "warm heartfelt piano melody, gentle strings, soft acoustic guitar, emotional, tender",
-    "黑暗": "dark ominous music, low drones, dissonant strings, eerie atmosphere, tense",
-    "浪漫": "romantic piano and violin, soft strings, waltz feel, emotional, beautiful melody",
-    "悬疑": "suspenseful film music, staccato strings, building tension, mysterious, cinematic",
-    "轻松": "light playful music, acoustic guitar, xylophone, cheerful, gentle rhythm",
-    "治愈": "healing ambient music, soft piano, nature sounds, peaceful, meditative",
-    "搞笑": "playful comedic music, pizzicato strings, bouncy rhythm, light-hearted, fun",
-    "恐怖": "horror ambient music, deep drones, unsettling atmosphere, creepy, dark",
-    "epic":   "epic orchestral music, heroic brass, powerful drums, cinematic, triumphant",
-    "warm":   "warm acoustic music, gentle piano, soft strings, cozy, emotional",
-    "dark":   "dark cinematic music, minor key, low bass, ominous atmosphere",
-}
-_DEFAULT_MUSICGEN_PROMPT = "atmospheric background music, orchestral, cinematic, moderate tempo"
-
-
-def _check_audiocraft() -> bool:
-    """检查 bark venv 中是否有可用的 audiocraft。"""
-    if not BARK_PYTHON.exists():
-        return False
-    r = subprocess.run(
-        [str(BARK_PYTHON), "-c", "from audiocraft.models import MusicGen"],
-        capture_output=True, timeout=15,
-    )
-    return r.returncode == 0
-
-
-def generate_music_audiocraft(prompt: str, output_path: str, duration: int = 30, mood: str = "") -> bool:
-    """通过 bark venv 子进程调用 MusicGen 生成音乐。"""
-    if not BARK_PYTHON.exists():
-        return False
-
-    # 构建英文 prompt（MusicGen 对英文效果更好）
-    mood_key = (mood or "").strip()
-    en_prompt = _MOOD_TO_MUSICGEN.get(mood_key)
-    if not en_prompt:
-        # 尝试在 prompt 里匹配情绪关键词
-        for key, val in _MOOD_TO_MUSICGEN.items():
-            if key in (prompt or "").lower():
-                en_prompt = val
-                break
-    en_prompt = en_prompt or prompt or _DEFAULT_MUSICGEN_PROMPT
-
-    wav_path = str(Path(output_path).with_suffix(".wav"))
-    script = f"""
-import torch, sys
-try:
-    from audiocraft.models import MusicGen
-    from audiocraft.data.audio import audio_write
-except ImportError:
-    sys.exit(1)
-
-device = "cpu"  # MPS causes OOM on musicgen-small in subprocess; CPU is stable
-model = MusicGen.get_pretrained("facebook/musicgen-small", device=device)
-model.set_generation_params(duration={duration})
-wav = model.generate([{repr(en_prompt)}])
-import torchaudio
-torchaudio.save({repr(wav_path)}, wav[0].cpu(), model.sample_rate)
-"""
-    try:
-        result = subprocess.run(
-            [str(BARK_PYTHON), "-c", script],
-            capture_output=True, text=True, timeout=900,
-        )
-        if result.returncode != 0:
-            print(f"[MusicGen] 失败: {result.stderr[-300:]}")
             return False
-        if not Path(wav_path).exists():
-            return False
-        # wav → mp3
-        subprocess.run(
-            ["ffmpeg", "-y", "-i", wav_path, "-c:a", "libmp3lame", "-b:a", "192k", output_path],
-            capture_output=True, timeout=30,
-        )
-        Path(wav_path).unlink(missing_ok=True)
-        return Path(output_path).exists()
-    except Exception as e:
-        print(f"[MusicGen] 异常: {e}")
-        return False
 
 
 def _audio_valid(path: str, min_bytes: int = 2048) -> bool:
@@ -684,12 +911,8 @@ def generate_music(
     """统一音乐生成接口，按优先级尝试各后端。每个后端都验证输出文件非空。"""
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
 
-    if generate_music_heartmula(prompt, output_path, duration) and _audio_valid(output_path):
-        _register_audio(project_id, 0, "music", output_path, music_id)
-        return True
-
-    if generate_music_audiocraft(prompt, output_path, duration, mood=mood) and _audio_valid(output_path):
-        print(f"[AudioPipeline] MusicGen 生成 BGM（mood={mood or ''}）")
+    if generate_music_acestep(prompt, output_path, duration, mood=mood) and _audio_valid(output_path):
+        print(f"[AudioPipeline] Ace-Step 生成 BGM（mood={mood or '默认'}）")
         _register_audio(project_id, 0, "music", output_path, music_id)
         return True
 
@@ -729,16 +952,42 @@ def generate_sfx_audiocraft(description: str, output_path: str, duration: int = 
     """使用 audiocraft AudioGen 生成音效。"""
     try:
         cmd = [
-            "python3", "-m", "audiocraft.generate",
+            sys.executable, "-m", "audiocraft.generate",
             "--model", "audiogen-medium",
             "--text", description,
             "--duration", str(duration),
             "--output", output_path,
         ]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-        return result.returncode == 0 and Path(output_path).exists()
+        return result.returncode == 0 and _audio_valid(output_path)
     except Exception as e:
         print(f"[audiocraft-sfx] 失败: {e}")
+        return False
+
+
+def generate_sfx_ffmpeg(description: str, output_path: str, duration: int = 3) -> bool:
+    """Local synthesized SFX fallback so the line never fully breaks."""
+    desc = description.lower()
+    if any(token in desc for token in ("风", "wind", "呼啸")):
+        expr = "anoisesrc=color=pink:amplitude=0.5"
+        af = "lowpass=f=1800,highpass=f=120,afade=t=in:d=0.05,afade=t=out:d=0.2"
+    elif any(token in desc for token in ("雨", "rain", "下雨")):
+        expr = "anoisesrc=color=white:amplitude=0.35"
+        af = "highpass=f=600,lowpass=f=6000,afade=t=in:d=0.05,afade=t=out:d=0.2"
+    elif any(token in desc for token in ("打斗", "碰撞", "hit", "impact", "boom", "爆炸")):
+        expr = "aevalsrc=if(lt(t\\,0.15)\\,sin(2*PI*55*t)*exp(-18*t)\\,0):s=44100"
+        af = "volume=1.6,lowpass=f=1400"
+    else:
+        expr = "aevalsrc=sin(2*PI*220*t)*exp(-6*t):s=44100"
+        af = "afade=t=in:d=0.02,afade=t=out:d=0.4,volume=0.6"
+    try:
+        subprocess.run(
+            ["ffmpeg", "-y", "-f", "lavfi", "-i", f"{expr}:d={duration}", "-af", af, "-c:a", "libmp3lame", "-b:a", "128k", output_path],
+            capture_output=True, timeout=60,
+        )
+        return _audio_valid(output_path)
+    except Exception as e:
+        print(f"[ffmpeg-sfx] 失败: {e}")
         return False
 
 
@@ -756,6 +1005,8 @@ def generate_project_sfx(project_id: int, output_dir: Path) -> list[dict]:
         out_path = str(sfx_dir / f"sfx_{sfx.id}_{sfx.name[:20]}.mp3")
         desc = sfx.description or f"{sfx.category} {sfx.name}"
         success = generate_sfx_audiocraft(desc, out_path)
+        if not success:
+            success = generate_sfx_ffmpeg(desc, out_path)
         if success:
             db.update_sfx(sfx.id, {"file_path": out_path})
         results.append({"id": sfx.id, "name": sfx.name, "file": out_path if success else "", "success": success})
@@ -799,15 +1050,33 @@ def run_audio_pipeline(
         tts_results = generate_shot_tts(project_id, shot.id, out_dir)
         results["tts"].extend(tts_results)
 
-    # 音乐
-    _progress("生成音乐主题...", 0.5)
-    results["music"] = generate_project_music(project_id, out_dir)
-    _progress(f"音乐完成: {sum(1 for m in results['music'] if m.get('success'))}/{len(results['music'])}", 0.7)
+    # Shot 级音乐
+    _progress("生成 Shot 级 BGM...", 0.5)
+    shot_music_results = []
+    for i, shot in enumerate(shots):
+        pct = 0.5 + 0.12 * i / max(len(shots), 1)
+        _progress(f"Shot BGM {shot.id} ({i+1}/{len(shots)})", pct)
+        shot_music_results.extend(generate_shot_music(project_id, shot.id, out_dir))
 
-    # 音效
-    _progress("生成音效...", 0.75)
-    results["sfx"] = generate_project_sfx(project_id, out_dir)
-    _progress(f"音效完成: {sum(1 for s in results['sfx'] if s.get('success'))}/{len(results['sfx'])}", 0.9)
+    # 项目级音乐（保留为兜底/主题）
+    _progress("生成项目主题音乐...", 0.64)
+    project_music_results = generate_project_music(project_id, out_dir)
+    results["music"] = shot_music_results + project_music_results
+    _progress(f"音乐完成: {sum(1 for m in results['music'] if m.get('success') or m.get('skipped'))}/{len(results['music'])}", 0.74)
+
+    # Shot 级音效
+    _progress("生成 Shot 级音效...", 0.76)
+    shot_sfx_results = []
+    for i, shot in enumerate(shots):
+        pct = 0.76 + 0.12 * i / max(len(shots), 1)
+        _progress(f"Shot SFX {shot.id} ({i+1}/{len(shots)})", pct)
+        shot_sfx_results.extend(generate_shot_sfx(project_id, shot.id, out_dir))
+
+    # 项目级音效（保留为公共资产）
+    _progress("生成项目级音效...", 0.9)
+    project_sfx_results = generate_project_sfx(project_id, out_dir)
+    results["sfx"] = shot_sfx_results + project_sfx_results
+    _progress(f"音效完成: {sum(1 for s in results['sfx'] if s.get('success') or s.get('skipped'))}/{len(results['sfx'])}", 0.96)
 
     _progress("音频管线完成", 1.0)
     return {"success": True, "project_id": project_id, **results}
@@ -827,19 +1096,46 @@ def _get_audio_duration(path: str) -> float:
         return 0.0
 
 
-def _register_audio(project_id: int, shot_id: int, asset_type: str, file_path: str, ref_id: int = 0):
+def _register_audio(
+    project_id: int,
+    shot_id: int,
+    asset_type: str,
+    file_path: str,
+    ref_id: int = 0,
+    metadata: Optional[dict] = None,
+):
     if not project_id:
         return
     duration = _get_audio_duration(file_path)
-    db.create_audio_asset({
+    meta = dict(metadata or {})
+    meta.setdefault("ref_id", ref_id)
+    audio_asset_id = db.create_audio_asset({
         "project_id": project_id,
         "shot_id": shot_id,
         "asset_type": asset_type,
         "file_path": file_path,
         "duration_sec": duration,
-        "metadata": json.dumps({"ref_id": ref_id}, ensure_ascii=False),
+        "metadata": meta,
         "created_at": _now(),
     })
+    try:
+        db.create_asset_version({
+            "project_id": project_id,
+            "shot_id": shot_id,
+            "asset_type": asset_type,
+            "asset_ref_id": audio_asset_id,
+            "source_stage": "audio_pipeline",
+            "file_path": file_path,
+            "content_json": {
+                "asset_type": asset_type,
+                "file_path": file_path,
+                "duration_sec": duration,
+                "metadata": meta,
+            },
+            "notes": "audio generated",
+        })
+    except Exception:
+        pass
 
 
 def _now() -> str:

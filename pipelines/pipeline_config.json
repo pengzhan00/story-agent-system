@@ -1,12 +1,13 @@
 {
   "comfyui_url": "http://127.0.0.1:8188",
   "comfyui_output_dir": "~/Documents/ComfyUI/output",
-
+  "active_pipeline": "wan2_ti2v",
   "pipelines": [
     {
       "name": "animatediff_animagine",
       "class": "AnimateDiffPipeline",
       "priority": 1,
+      "production_ready": false,
       "description": "AnimateDiff + animagine-xl-3.1 | 最佳动漫风格",
       "config": {
         "checkpoint": "animagine-xl-3.1/animagine-xl-3.1.safetensors",
@@ -18,13 +19,16 @@
         "steps": 25,
         "cfg": 7.0,
         "timeout": 7200,
-        "workflow_file": "animatediff_workflow.json"
+        "workflow_file": "animatediff_workflow.json",
+        "instantid_ip_weight": 0.8,
+        "instantid_cn_strength": 0.8
       }
     },
     {
       "name": "animatediff_sdxl",
       "class": "AnimateDiffPipeline",
       "priority": 2,
+      "production_ready": false,
       "description": "AnimateDiff + sd_xl_base_1.0 | 通用回退",
       "config": {
         "checkpoint": "sd_xl_base_1.0.safetensors",
@@ -35,56 +39,95 @@
         "fps": 8,
         "steps": 20,
         "cfg": 7.0,
-        "timeout": 7200
+        "timeout": 7200,
+        "instantid_ip_weight": 0.8,
+        "instantid_cn_strength": 0.8
       }
     },
     {
       "name": "flux_wan2_twostage",
       "class": "FluxWan2TwoStagePipeline",
       "priority": 2,
-      "description": "Flux2Klein9B txt2img → Wan2.2 TI2V | 最高质量两阶段管线",
+      "production_ready": false,
+      "description": "Flux2Klein4B txt2img → Wan2.2 TI2V 5B | 高质量参考帧→视频",
       "config": {
-        "flux_checkpoint": "~/myworkspace/ComfyUI_models/checkpoints/flux_2_klein_9B/flux-2-klein-9b.safetensors",
-        "min_flux_size_gb": 10,
+        "flux_checkpoint": "~/Documents/ComfyUI/models/diffusion_models/flux-2-klein-4b.safetensors",
+        "min_flux_size_gb": 5,
+        "flux_text_encoder": "~/Documents/ComfyUI/models/text_encoders/qwen_3_4b_fp4_flux2.safetensors",
+        "min_flux_text_encoder_gb": 2,
+        "flux_vae": "full_encoder_small_decoder.safetensors",
+        "min_flux_vae_mb": 150,
+        "flux_vae_path": "~/Documents/ComfyUI/models/vae/full_encoder_small_decoder.safetensors",
         "flux_workflow_file": "flux_txt2img_workflow.json",
-        "gguf_path": "~/myworkspace/ComfyUI_models/unet/Wan2.2-TI2V-5B-Q4_K_M.gguf",
+        "gguf_path": "~/Documents/ComfyUI/models/unet/Wan2.2-TI2V-5B-Q4_K_M.gguf",
         "min_gguf_size_mb": 1200,
-        "text_encoder": "~/myworkspace/ComfyUI_models/text_encoders/wan2.2_umt5/models_t5_umt5-xxl-enc-bf16.pth",
-        "min_encoder_size_mb": 6000,
+        "text_encoder": "~/Documents/ComfyUI/models/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+        "min_encoder_size_mb": 1000,
+        "vae": "Wan2.2_VAE.safetensors",
         "wan2_workflow_file": "wan2_ti2v_workflow.json",
         "width": 832,
         "height": 480,
         "frames": 49,
         "fps": 16,
+        "steps": 20,
+        "cfg": 5.0,
+        "shift": 8.0,
+        "sampler_name": "uni_pc",
+        "scheduler": "simple",
+        "smoke": {
+          "width": 512,
+          "height": 288,
+          "frames": 9,
+          "fps": 8,
+          "steps": 8,
+          "cfg": 4.5
+        },
         "flux_timeout": 600,
-        "timeout": 7200
+        "timeout": 7200,
+        "instantid_ip_weight": 0.8,
+        "instantid_cn_strength": 0.8
       }
     },
     {
       "name": "wan2_ti2v",
       "class": "Wan2TI2VPipeline",
       "priority": 3,
+      "production_ready": true,
       "description": "Wan2.2 TI2V 5B GGUF | 文本+参考图→视频（需完整模型）",
       "config": {
-        "gguf_path": "~/myworkspace/ComfyUI_models/unet/Wan2.2-TI2V-5B-Q4_K_M.gguf",
+        "gguf_path": "~/Documents/ComfyUI/models/unet/Wan2.2-TI2V-5B-Q4_K_M.gguf",
         "min_gguf_size_mb": 1200,
-        "text_encoder": "~/myworkspace/ComfyUI_models/text_encoders/wan2.2_umt5/models_t5_umt5-xxl-enc-bf16.pth",
-        "min_encoder_size_mb": 6000,
+        "text_encoder": "~/Documents/ComfyUI/models/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+        "min_encoder_size_mb": 1000,
         "vae": "Wan2.2_VAE.safetensors",
         "width": 832,
         "height": 480,
         "frames": 49,
         "fps": 16,
-        "steps": 30,
-        "cfg": 6.0,
+        "steps": 20,
+        "cfg": 5.0,
+        "shift": 8.0,
+        "sampler_name": "uni_pc",
+        "scheduler": "simple",
+        "smoke": {
+          "width": 512,
+          "height": 288,
+          "frames": 9,
+          "fps": 8,
+          "steps": 8,
+          "cfg": 4.5
+        },
         "timeout": 7200,
-        "workflow_file": "wan2_ti2v_workflow.json"
+        "workflow_file": "wan2_ti2v_workflow.json",
+        "instantid_ip_weight": 0.8,
+        "instantid_cn_strength": 0.8
       }
     },
     {
       "name": "static_frame",
       "class": "StaticFramePipeline",
       "priority": 10,
+      "production_ready": false,
       "description": "单帧txt2img → ffmpeg成片 | 不需要AnimateDiff节点",
       "config": {
         "checkpoint": "animagine-xl-3.1/animagine-xl-3.1.safetensors",
@@ -100,6 +143,7 @@
       "name": "stub",
       "class": "StubPipeline",
       "priority": 99,
+      "production_ready": false,
       "description": "ffmpeg纯黑帧占位 | 最终兜底",
       "config": {
         "width": 1024,
@@ -108,7 +152,6 @@
       }
     }
   ],
-
   "character_consistency": {
     "instantid": {
       "enabled": true,

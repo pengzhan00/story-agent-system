@@ -18,6 +18,7 @@ import json
 import os
 import shutil
 import subprocess
+import tempfile
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -33,6 +34,251 @@ NEGATIVE_PROMPT = (
     "watermark, text, extra limbs, fused fingers, deformed hands, "
     "poorly drawn face, mutation, mutated, extra limbs, gross proportions"
 )
+
+
+def normalize_shot_payload(raw_scene: dict) -> dict:
+    """Normalize legacy / shot.v1 / shot.v2 payloads into one render contract."""
+    story = raw_scene.get("story", {}) or {}
+    camera = raw_scene.get("camera", {}) or {}
+    audio = raw_scene.get("audio", {}) or {}
+    refs = raw_scene.get("references", {}) or {}
+    style = raw_scene.get("style", {}) or {}
+    subject = raw_scene.get("subject", {}) or {}
+    scene_block = raw_scene.get("scene", {}) or {}
+    continuity = raw_scene.get("continuity", {}) or {}
+    output_spec = raw_scene.get("output_spec", {}) or {}
+    scene_asset = refs.get("scene_asset") or raw_scene.get("scene_asset", {}) or {}
+    characters = refs.get("characters") or raw_scene.get("characters", []) or []
+    dialogue = (
+        story.get("dialogue_snippets")
+        or raw_scene.get("dialogue_snippets", [])
+        or raw_scene.get("dialogue", [])
+        or []
+    )
+    location = scene_block.get("location") or story.get("location") or raw_scene.get("location", "")
+    mood = story.get("mood") or raw_scene.get("mood", "")
+    narration = story.get("narration") or story.get("beat") or raw_scene.get("narration", "")
+    shot_type = camera.get("shot_type") or raw_scene.get("shot_type", raw_scene.get("camera_angle", ""))
+    camera_angle = camera.get("camera_angle") or shot_type or raw_scene.get("camera_angle", "")
+    width = raw_scene.get("width") or output_spec.get("width") or scene_asset.get("width")
+    height = raw_scene.get("height") or output_spec.get("height") or scene_asset.get("height")
+    frames = raw_scene.get("frames") or output_spec.get("frames")
+    fps = raw_scene.get("fps") or output_spec.get("fps")
+    negative_prompt = style.get("negative_prompt") or raw_scene.get("negative_prompt", NEGATIVE_PROMPT)
+    return {
+        "schema_version": raw_scene.get("schema_version", "legacy"),
+        "subject": {
+            "characters": subject.get("characters") or characters,
+            "primary_character": subject.get("primary_character", ""),
+            "emotion": subject.get("emotion") or mood,
+            "action": subject.get("action", ""),
+            "expression": subject.get("expression", ""),
+        },
+        "scene": {
+            "location": location,
+            "time_of_day": scene_block.get("time_of_day") or story.get("time_of_day") or raw_scene.get("time_of_day", ""),
+            "weather": scene_block.get("weather") or story.get("weather") or raw_scene.get("weather", ""),
+            "lighting": scene_block.get("lighting") or scene_asset.get("lighting", ""),
+            "atmosphere": scene_block.get("atmosphere") or scene_asset.get("atmosphere", ""),
+            "props": scene_block.get("props", []),
+        },
+        "story": {
+            "beat": story.get("beat") or narration,
+            "mood": mood,
+            "narration": narration,
+            "dialogue_snippets": dialogue,
+            "intent": story.get("intent", ""),
+        },
+        "camera": {
+            "shot_type": shot_type,
+            "camera_angle": camera_angle,
+            "framing": camera.get("framing") or shot_type,
+            "movement": camera.get("movement") or raw_scene.get("camera_movement", ""),
+            "lens_language": camera.get("lens_language", ""),
+            "duration_sec": camera.get("duration_sec") or raw_scene.get("duration_sec", 3.0),
+        },
+        "audio": {
+            "bgm_mood": audio.get("bgm_mood") or raw_scene.get("bgm_mood", ""),
+            "tts_required": bool(audio.get("tts_required", dialogue)),
+            "sfx_cues": audio.get("sfx_cues", []),
+        },
+        "references": {
+            "scene_asset": scene_asset,
+            "characters": characters,
+        },
+        "style": {
+            "style_guide": style.get("style_guide") or raw_scene.get("style_guide", ""),
+            "visual_style": style.get("visual_style", ""),
+            "color_script": style.get("color_script") or scene_asset.get("color_palette", ""),
+            "negative_prompt": negative_prompt,
+            "quality_target": style.get("quality_target", "production"),
+        },
+        "continuity": {
+            "character_anchor": continuity.get("character_anchor", ""),
+            "scene_anchor": continuity.get("scene_anchor", ""),
+            "previous_shot_summary": continuity.get("previous_shot_summary", ""),
+            "costume_lock": continuity.get("costume_lock", ""),
+        },
+        "output_spec": {
+            "width": width,
+            "height": height,
+            "frames": frames,
+            "fps": fps,
+            "quality_tier": output_spec.get("quality_tier", "production"),
+        },
+        "location": location,
+        "time_of_day": scene_block.get("time_of_day") or story.get("time_of_day") or raw_scene.get("time_of_day", ""),
+        "weather": scene_block.get("weather") or story.get("weather") or raw_scene.get("weather", ""),
+        "mood": mood,
+        "narration": narration,
+        "dialogue_snippets": dialogue,
+        "scene_asset": scene_asset,
+        "characters": characters,
+        "style_guide": style.get("style_guide") or raw_scene.get("style_guide", ""),
+        "bgm_mood": audio.get("bgm_mood") or raw_scene.get("bgm_mood", ""),
+        "camera_angle": camera_angle,
+        "shot_type": shot_type,
+        "width": width,
+        "height": height,
+        "frames": frames,
+        "fps": fps,
+        "negative_prompt": negative_prompt,
+        "allow_fallback": bool(raw_scene.get("allow_fallback", False)),
+    }
+
+
+def _join_non_empty(parts: list[str]) -> str:
+    return ", ".join([p.strip() for p in parts if isinstance(p, str) and p.strip()])
+
+
+def _character_descriptors(normalized: dict) -> tuple[list[str], list[str]]:
+    appearance_parts: list[str] = []
+    anchor_parts: list[str] = []
+    for char in normalized.get("characters", []):
+        if isinstance(char, dict):
+            appearance = _join_non_empty([
+                char.get("name", ""),
+                char.get("appearance", ""),
+                char.get("costume", ""),
+                char.get("expression", ""),
+                char.get("action", ""),
+            ])
+            if appearance:
+                appearance_parts.append(appearance)
+            anchor = _join_non_empty([
+                char.get("name", ""),
+                char.get("prompt_template", ""),
+                char.get("voice_profile", ""),
+            ])
+            if anchor:
+                anchor_parts.append(anchor)
+        elif char:
+            appearance_parts.append(str(char))
+    return appearance_parts, anchor_parts
+
+
+def build_pipeline_prompt_bundle(scene: dict, pipeline_name: str) -> dict:
+    """Map normalized shot payload into deterministic prompts/config for a pipeline."""
+    normalized = normalize_shot_payload(scene)
+    scene_block = normalized.get("scene", {}) or {}
+    story = normalized.get("story", {}) or {}
+    camera = normalized.get("camera", {}) or {}
+    style = normalized.get("style", {}) or {}
+    continuity = normalized.get("continuity", {}) or {}
+    subject = normalized.get("subject", {}) or {}
+    scene_asset = normalized.get("scene_asset", {}) or {}
+    appearance_parts, anchor_parts = _character_descriptors(normalized)
+    base_visual = [
+        scene_block.get("location", ""),
+        scene_asset.get("description", ""),
+        scene_block.get("lighting", ""),
+        scene_block.get("atmosphere", ""),
+        f"palette {style.get('color_script', '')}" if style.get("color_script") else "",
+        scene_block.get("time_of_day", ""),
+        scene_block.get("weather", ""),
+        story.get("mood", ""),
+        camera.get("shot_type", ""),
+        camera.get("camera_angle", ""),
+        camera.get("framing", ""),
+        camera.get("movement", ""),
+        camera.get("lens_language", ""),
+        story.get("narration", ""),
+        style.get("style_guide", ""),
+        style.get("visual_style", ""),
+    ]
+    continuity_parts = [
+        continuity.get("character_anchor", ""),
+        continuity.get("scene_anchor", ""),
+        continuity.get("previous_shot_summary", ""),
+        continuity.get("costume_lock", ""),
+    ]
+    dialogue_lines: list[str] = []
+    for line in (story.get("dialogue_snippets") or [])[:3]:
+        if isinstance(line, dict):
+            dialogue_lines.append(_join_non_empty([
+                line.get("character", ""),
+                line.get("line", ""),
+                line.get("emotion", ""),
+            ]))
+        elif line:
+            dialogue_lines.append(str(line))
+
+    if pipeline_name.startswith("wan2") or pipeline_name == "flux_wan2_twostage":
+        positive_parts = [
+            _join_non_empty(base_visual),
+            _join_non_empty(appearance_parts),
+            _join_non_empty(continuity_parts),
+            _join_non_empty(dialogue_lines),
+            _join_non_empty([subject.get("action", ""), subject.get("expression", ""), subject.get("emotion", "")]),
+            "cinematic anime video shot, coherent motion, consistent face, production-ready short drama frame",
+        ]
+        stage1_parts = [
+            _join_non_empty(base_visual),
+            _join_non_empty(appearance_parts + anchor_parts),
+            _join_non_empty([subject.get("action", ""), subject.get("expression", "")]),
+            "hero storyboard keyframe, crisp linework, strong composition, stable identity",
+        ]
+        return {
+            "positive_prompt": _join_non_empty(positive_parts),
+            "negative_prompt": style.get("negative_prompt", NEGATIVE_PROMPT),
+            "stage1_prompt": _join_non_empty(stage1_parts),
+            "reference_required": True,
+            "width": normalized.get("width") or 832,
+            "height": normalized.get("height") or 480,
+            "frames": normalized.get("frames") or 49,
+            "fps": normalized.get("fps") or 16,
+        }
+
+    if pipeline_name.startswith("animatediff"):
+        positive_parts = [
+            _join_non_empty(base_visual),
+            _join_non_empty(appearance_parts),
+            _join_non_empty([subject.get("action", ""), subject.get("expression", ""), subject.get("emotion", "")]),
+            _join_non_empty(dialogue_lines),
+            _join_non_empty(continuity_parts),
+            "anime storyboard frame sequence, dynamic motion, consistent character design, detailed background, high quality",
+        ]
+        return {
+            "positive_prompt": _join_non_empty(positive_parts),
+            "negative_prompt": style.get("negative_prompt", NEGATIVE_PROMPT),
+            "width": normalized.get("width") or 1024,
+            "height": normalized.get("height") or 1024,
+            "frames": normalized.get("frames") or 16,
+            "fps": normalized.get("fps") or 8,
+        }
+
+    positive_parts = [
+        _join_non_empty(base_visual),
+        _join_non_empty(appearance_parts),
+        _join_non_empty([subject.get("action", ""), subject.get("expression", "")]),
+        "anime storyboard frame, cinematic composition, detailed background, high quality",
+    ]
+    return {
+        "positive_prompt": _join_non_empty(positive_parts),
+        "negative_prompt": style.get("negative_prompt", NEGATIVE_PROMPT),
+        "width": normalized.get("width") or 512,
+        "height": normalized.get("height") or 768,
+    }
 
 
 # ══════════════════════════════════════════════════════
@@ -201,6 +447,17 @@ def wait_for_completion(
     comfyui_url: str = "http://127.0.0.1:8188",
     timeout: int = 7200,
 ) -> Optional[dict]:
+    result = wait_for_completion_result(prompt_id, comfyui_url, timeout)
+    if result["status"] == "completed":
+        return result["outputs"]
+    return None
+
+
+def wait_for_completion_result(
+    prompt_id: str,
+    comfyui_url: str = "http://127.0.0.1:8188",
+    timeout: int = 7200,
+) -> dict:
     import requests as req
     deadline = time.time() + timeout
     while time.time() < deadline:
@@ -209,15 +466,48 @@ def wait_for_completion(
             if r.status_code == 200 and r.text not in ("", "{}"):
                 hist = r.json()
                 if prompt_id in hist:
-                    status = hist[prompt_id].get("status", {})
+                    payload = hist[prompt_id]
+                    status = payload.get("status", {})
                     if status.get("completed"):
-                        return hist[prompt_id].get("outputs", {})
-                    if status.get("error"):
-                        return None
-        except Exception:
-            pass
+                        return {
+                            "status": "completed",
+                            "outputs": payload.get("outputs", {}),
+                            "error_type": "",
+                            "error_message": "",
+                        }
+                    if status.get("status_str") == "error" or status.get("error"):
+                        messages = status.get("messages") or []
+                        error_message = "ComfyUI execution failed"
+                        error_type = "workflow_error"
+                        for item in reversed(messages):
+                            if item and item[0] == "execution_error":
+                                details = item[1]
+                                error_type = str(details.get("exception_type") or "workflow_error")
+                                node_type = details.get("node_type") or details.get("node_id") or "unknown"
+                                error_message = (
+                                    f"{node_type}: {details.get('exception_message') or 'execution_error'}"
+                                )
+                                break
+                        return {
+                            "status": "error",
+                            "outputs": {},
+                            "error_type": error_type,
+                            "error_message": error_message,
+                        }
+        except Exception as exc:
+            return {
+                "status": "error",
+                "outputs": {},
+                "error_type": "transport_error",
+                "error_message": str(exc),
+            }
         time.sleep(3)
-    return None
+    return {
+        "status": "timeout",
+        "outputs": {},
+        "error_type": "timeout",
+        "error_message": f"ComfyUI execution timed out after {timeout}s",
+    }
 
 
 def get_video_output(comfyui_outputs: dict) -> list[dict]:
@@ -232,52 +522,181 @@ def get_video_output(comfyui_outputs: dict) -> list[dict]:
                         "type": item.get("type", "output"),
                         "node": node_id,
                     })
+        for key in ("files",):
+            for item in node_out.get(key, []):
+                if isinstance(item, dict) and item.get("filename"):
+                    files.append({
+                        "filename": item["filename"],
+                        "subfolder": item.get("subfolder", ""),
+                        "type": item.get("type", "output"),
+                        "node": node_id,
+                    })
     return files
 
 
-def build_scene_prompt(scene: dict) -> str:
-    """从统一 render_payload 构建 ComfyUI 生成 prompt。"""
-    parts: list[str] = []
-    scene_asset = scene.get("scene_asset", {}) or {}
-    for key in ("description", "lighting", "atmosphere"):
-        v = scene_asset.get(key, "")
-        if v:
-            parts.append(v)
-    color = scene_asset.get("color_palette", "")
-    if color:
-        parts.append(f"palette {color}")
-    location = scene.get("location", scene_asset.get("name", ""))
-    if location:
-        parts.insert(0, location)
-    for key in ("time_of_day", "weather", "mood", "camera_angle", "narration", "style_guide"):
-        v = scene.get(key, "")
-        if v:
-            parts.append(v)
-    for char in scene.get("characters", []):
-        if isinstance(char, dict):
-            s = ", ".join(p for p in (char.get("name", ""), char.get("appearance", "")) if p)
-            if s:
-                parts.append(s)
-        elif char:
-            parts.append(str(char))
-    dialogue = scene.get("dialogue_snippets", [])
-    if dialogue:
-        lines = []
-        for line in dialogue[:2]:
-            if isinstance(line, dict):
-                l = " ".join(
-                    p for p in (line.get("character", ""), line.get("line", ""),
-                                line.get("emotion", "")) if p
+def _resolve_reference_image_target(shot_payload: dict) -> Path:
+    project_name = shot_payload.get("project_name", "project")
+    shot_id = int(shot_payload.get("shot_id", 0) or 0)
+    scene_id = shot_payload.get("scene_id", "") or shot_payload.get("location", "scene")
+    safe_scene = str(scene_id).replace(" ", "_")[:40]
+    ref_dir = _PROJECT_ROOT / "output" / "projects" / project_name / "references"
+    ref_dir.mkdir(parents=True, exist_ok=True)
+    if shot_id:
+        return ref_dir / f"shot_{shot_id:04d}_keyframe.png"
+    return ref_dir / f"{safe_scene}_keyframe.png"
+
+
+def _first_image_from_outputs(comfyui_outputs: dict) -> Optional[Path]:
+    for node_out in comfyui_outputs.values():
+        for item in node_out.get("images", []):
+            if isinstance(item, dict) and item.get("filename"):
+                subfolder = item.get("subfolder", "")
+                p = (_COMFYUI_OUTPUT_DIR / subfolder / item["filename"]
+                     if subfolder else _COMFYUI_OUTPUT_DIR / item["filename"])
+                if p.exists():
+                    return p
+    return None
+
+
+def generate_reference_keyframe_image(
+    shot_payload: dict,
+    comfyui_url: str = "http://127.0.0.1:8188",
+    config: Optional[dict] = None,
+) -> Path:
+    """Generate a deterministic storyboard keyframe image for TI2V pipelines."""
+    config = config or {}
+    bundle = build_pipeline_prompt_bundle(shot_payload, "wan2_ti2v")
+    prompt = bundle.get("stage1_prompt") or bundle["positive_prompt"]
+    negative_prompt = bundle.get("negative_prompt", NEGATIVE_PROMPT)
+    seed = int(time.time() * 1000) % (2 ** 31)
+    width = int(config.get("reference_width", bundle.get("width") or 832))
+    height = int(config.get("reference_height", bundle.get("height") or 480))
+    steps = int(config.get("reference_steps", 24))
+    cfg_scale = float(config.get("reference_cfg", 7.0))
+    checkpoint = config.get("reference_checkpoint", "animagine-xl-3.1/animagine-xl-3.1.safetensors")
+    prefix = f"keyframe_{shot_payload.get('shot_id', 'scene')}"
+    wf = {
+        "1": {"class_type": "CheckpointLoaderSimple",
+              "inputs": {"ckpt_name": checkpoint}},
+        "2": {"class_type": "EmptyLatentImage",
+              "inputs": {"batch_size": 1, "width": width, "height": height}},
+        "3": {"class_type": "CLIPTextEncode",
+              "inputs": {"clip": ["1", 1], "text": prompt}},
+        "4": {"class_type": "CLIPTextEncode",
+              "inputs": {"clip": ["1", 1], "text": negative_prompt}},
+        "5": {"class_type": "KSampler",
+              "inputs": {"model": ["1", 0], "positive": ["3", 0],
+                         "negative": ["4", 0], "latent_image": ["2", 0],
+                         "steps": steps, "cfg": cfg_scale,
+                         "sampler_name": "euler", "scheduler": "karras",
+                         "seed": seed, "denoise": 1.0}},
+        "6": {"class_type": "VAEDecode",
+              "inputs": {"samples": ["5", 0], "vae": ["1", 2]}},
+        "7": {"class_type": "SaveImage",
+              "inputs": {"images": ["6", 0], "filename_prefix": prefix}},
+    }
+    ref_face = shot_payload.get("face_image") or shot_payload.get("reference_face_image")
+    if ref_face and Path(str(ref_face)).exists():
+        try:
+            with open(ref_face, "rb") as f:
+                import requests as req
+                r = req.post(
+                    f"{comfyui_url}/upload/image",
+                    files={"image": (Path(ref_face).name, f, "image/png")},
+                    data={"overwrite": "true"},
+                    timeout=30,
                 )
-                if l:
-                    lines.append(l)
-        if lines:
-            parts.append("dialogue beat: " + " | ".join(lines))
-    parts.append(
-        "anime storyboard frame, cinematic composition, detailed background, "
-        "consistent character design, high quality"
-    )
-    return ", ".join(p for p in parts if p)
+            r.raise_for_status()
+            uploaded = r.json().get("name", Path(ref_face).name)
+            wf = inject_instantid(
+                wf,
+                uploaded,
+                ip_weight=float(config.get("instantid_ip_weight", 0.8)),
+                cn_strength=float(config.get("instantid_cn_strength", 0.8)),
+                comfyui_url=comfyui_url,
+            )
+        except Exception as exc:
+            print(f"[ReferenceKeyframe] InstantID 注入失败: {exc}")
+    prompt_id = submit_workflow(wf, comfyui_url)
+    if not prompt_id:
+        raise RenderError("关键帧提交失败")
+    result = wait_for_completion_result(prompt_id, comfyui_url, timeout=int(config.get("reference_timeout", 600)))
+    if result["status"] != "completed":
+        raise RenderError(
+            f"关键帧生成失败 ({result['error_type']}): {result['error_message']}"
+        )
+    src = _first_image_from_outputs(result["outputs"])
+    if not src:
+        raise RenderError("关键帧输出中无图像")
+    dest = _resolve_reference_image_target(shot_payload)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(src, dest)
+    return dest
+
+
+def build_scene_prompt(scene: dict) -> str:
+    """Backward-compatible generic prompt builder."""
+    return build_pipeline_prompt_bundle(scene, "generic")["positive_prompt"]
+
+
+def inject_prompts(workflow_json: dict, shot, pipeline_name: str = "generic") -> dict:
+    """
+    动态注入 shot 的 dialogue + visual_prompt + 分辨率到 workflow JSON。
+    shot 可以是 core.models.Shot 实例或 dict（包含 dialogue/visual_prompt）。
+    返回修改后的 workflow。
+    """
+    import copy
+
+    wf = copy.deepcopy(workflow_json)
+
+    normalized = None
+    if hasattr(shot, "render_payload"):
+        rp = shot.render_payload
+        if isinstance(rp, str):
+            try:
+                rp = json.loads(rp)
+            except Exception:
+                rp = {}
+        if isinstance(rp, dict):
+            normalized = normalize_shot_payload(rp)
+    elif isinstance(shot, dict):
+        normalized = normalize_shot_payload(shot)
+    if normalized is None:
+        normalized = normalize_shot_payload({})
+    bundle = build_pipeline_prompt_bundle(normalized, pipeline_name)
+    prompt_text = bundle["positive_prompt"]
+    negative_prompt = bundle.get("negative_prompt", NEGATIVE_PROMPT)
+
+    # ── 3. 替换占位符文本字段 ─────────────────────
+    for node in wf.values():
+        inputs = node.get("inputs", {})
+        if "clip_l" in inputs and isinstance(inputs["clip_l"], str):
+            inputs["clip_l"] = prompt_text
+        if "t5xxl" in inputs and isinstance(inputs["t5xxl"], str):
+            inputs["t5xxl"] = bundle.get("stage1_prompt", prompt_text)
+        if "text" in inputs and isinstance(inputs["text"], str):
+            current = inputs["text"].lower()
+            if any(token in current for token in ("negative", "low quality", "blurry", "watermark")):
+                inputs["text"] = negative_prompt
+            else:
+                inputs["text"] = prompt_text
+
+    # ── 4. 替换 width/height ──────────────────────
+    width = int(bundle.get("width") or 832)
+    height = int(bundle.get("height") or 480)
+
+    for node in wf.values():
+        inputs = node.get("inputs", {})
+        if "width" in inputs and isinstance(inputs["width"], (int, float)):
+            inputs["width"] = width
+        if "height" in inputs and isinstance(inputs["height"], (int, float)):
+            inputs["height"] = height
+        if "length" in inputs and isinstance(inputs["length"], (int, float)) and bundle.get("frames"):
+            inputs["length"] = int(bundle["frames"])
+        if "fps" in inputs and isinstance(inputs["fps"], (int, float)) and bundle.get("fps"):
+            inputs["fps"] = int(bundle["fps"])
+
+    return wf
 
 
 # ══════════════════════════════════════════════════════
@@ -299,6 +718,11 @@ def inject_instantid(
     依赖 comfyui_instantid 自定义节点（InstantIDModelLoader / InstantIDFaceAnalysis /
     ApplyInstantID）以及 controlnet/InstantID-ControlNet.safetensors、
     instantid/ip-adapter.bin、insightface/antelopev2。
+
+    自动适配以下管线：
+      - SDXL/CheckpointLoaderSimple → Checkpoint[0] 为 model ref
+      - Flux/UNETLoader             → UNETLoader[0] 为 model ref
+      - Wan/UnetLoaderGGUF          → UnetLoaderGGUF[0] 为 model ref
 
     若节点不可用则静默跳过，workflow 保持不变（降级为无 InstantID 渲染）。
     """
@@ -338,15 +762,25 @@ def inject_instantid(
         "inputs": {"image": face_image_name, "upload": "image"},
     }
 
-    # 找当前 positive / negative / model 引用点
-    ckpt_ids = find_nodes_by_type(workflow, "CheckpointLoaderSimple")
+    # 找 model ref：支持多种管线类型
+    model_ref = None
+    for node_type in ("CheckpointLoaderSimple", "UNETLoader", "UnetLoaderGGUF"):
+        ids = find_nodes_by_type(workflow, node_type)
+        if ids:
+            model_ref = [ids[0], 0]
+            break
+    if model_ref is None:
+        model_ref = ["1", 0]  # fallback
+
+    # 找 positive / negative
     pos_id = find_ksampler_positive_node(workflow)
     neg_id = find_ksampler_negative_node(workflow)
-    model_ref = [ckpt_ids[0], 0] if ckpt_ids else ["1", 0]
     pos_ref = [pos_id, 0] if pos_id else ["3", 0]
     neg_ref = [neg_id, 0] if neg_id else ["4", 0]
 
     # ApplyInstantID → 输出 [0]=model, [1]=positive, [2]=negative
+    # 新版 ApplyInstantID API：weight 作为独立FLOAT输入（非 ip_weight/cn_strength）
+    instantid_weight = min(ip_weight, cn_strength) * 0.8 + 0.2  # 综合权重
     workflow[apply_id] = {
         "class_type": "ApplyInstantID",
         "inputs": {
@@ -357,8 +791,7 @@ def inject_instantid(
             "model": model_ref,
             "positive": pos_ref,
             "negative": neg_ref,
-            "ip_weight": ip_weight,
-            "cn_strength": cn_strength,
+            "weight": round(instantid_weight, 2),
             "start_at": 0.0,
             "end_at": 1.0,
         },
@@ -383,6 +816,16 @@ def inject_instantid(
 
 class RenderError(RuntimeError):
     pass
+
+
+@dataclass
+class RenderResult:
+    path: Path
+    pipeline_name: str
+    requested_pipeline: str = ""
+    fallback_used: bool = False
+    fallback_from: str = ""
+    render_tier: str = "production"
 
 
 # ══════════════════════════════════════════════════════
@@ -411,7 +854,7 @@ class RenderPipeline(ABC):
         return [f"node:{n}" for n in self.required_nodes if n not in object_info]
 
     @abstractmethod
-    def render(self, shot_payload: dict, output_path: Path) -> Path:
+    def render(self, shot_payload: dict, output_path: Path) -> RenderResult:
         """渲染 shot 到 output_path。成功返回路径，失败抛 RenderError。"""
         ...
 
@@ -447,9 +890,41 @@ class AnimateDiffPipeline(RenderPipeline):
         "ADE_UseEvolvedSampling",
         "KSampler",
         "CLIPTextEncode",
-        "VAEDecodeTiled",
-        "VHS_VideoCombine",
+        "SaveImage",
     ]
+
+    def validate(self, object_info: dict) -> list[str]:
+        missing = super().validate(object_info)
+        if "VAEDecode" not in object_info and "VAEDecodeTiled" not in object_info:
+            missing.append("node:VAEDecode|VAEDecodeTiled")
+        if not shutil.which("ffmpeg"):
+            missing.append("ffmpeg (not installed)")
+        return missing
+
+    def _normalize_output_node(self, workflow: dict, prefix: str) -> dict:
+        output_ids = []
+        for nid, node in workflow.items():
+            ct = node.get("class_type")
+            if ct in {"VHS_VideoCombine", "SaveAnimatedWEBP", "SaveVideo", "SaveWEBM"}:
+                output_ids.append(nid)
+        for nid in output_ids:
+            workflow.pop(nid, None)
+
+        decode_ids = find_nodes_by_type(workflow, "VAEDecode")
+        if not decode_ids:
+            decode_ids = find_nodes_by_type(workflow, "VAEDecodeTiled")
+        if not decode_ids:
+            raise RenderError("AnimateDiff workflow 缺少 VAEDecode/VAEDecodeTiled，无法挂接输出节点")
+
+        next_id = max((int(k) for k in workflow if k.isdigit()), default=0) + 1
+        workflow[str(next_id)] = {
+            "class_type": "SaveImage",
+            "inputs": {
+                "images": [decode_ids[0], 0],
+                "filename_prefix": prefix,
+            },
+        }
+        return workflow
 
     def _build_workflow(self, prompt: str, scene_name: str, seed: int) -> dict:
         cfg = self.config
@@ -475,7 +950,7 @@ class AnimateDiffPipeline(RenderPipeline):
                         node["inputs"]["ckpt_name"] = checkpoint
                     elif ct == "ADE_LoadAnimateDiffModel":
                         node["inputs"]["model_name"] = motion_model
-                return wf
+                return self._normalize_output_node(wf, prefix)
 
         # 无 workflow 文件时内联构建
         return {
@@ -500,24 +975,31 @@ class AnimateDiffPipeline(RenderPipeline):
                              "steps": steps, "cfg": cfg_scale,
                              "sampler_name": "euler", "scheduler": "normal",
                              "seed": seed, "denoise": 1.0}},
-            "9": {"class_type": "VAEDecodeTiled",
-                  "inputs": {"samples": ["8", 0], "vae": ["1", 2],
-                             "tile_size": 512, "overlap": 64,
-                             "temporal_size": 64, "temporal_overlap": 8}},
-            "10": {"class_type": "VHS_VideoCombine",
-                   "inputs": {"images": ["9", 0], "frame_rate": fps, "loop_count": 0,
-                              "filename_prefix": prefix, "format": "video/h264-mp4",
-                              "pingpong": False, "save_output": True}},
+            "9": {"class_type": "VAEDecode",
+                  "inputs": {"samples": ["8", 0], "vae": ["1", 2]}},
+            "10": {"class_type": "SaveImage",
+                   "inputs": {"images": ["9", 0], "filename_prefix": prefix}},
         }
 
     def render(self, shot_payload: dict, output_path: Path) -> Path:
-        scene_name = shot_payload.get("location", shot_payload.get("name", "scene"))
-        prompt = build_scene_prompt(shot_payload)
+        bundle = build_pipeline_prompt_bundle(shot_payload, self.name)
+        normalized = normalize_shot_payload(shot_payload)
+        scene_name = normalized.get("location", shot_payload.get("name", "scene"))
+        prompt = bundle["positive_prompt"]
+        negative_prompt = bundle.get("negative_prompt", NEGATIVE_PROMPT)
         seed = int(time.time() * 1000) % (2 ** 31)
 
         wf = self._build_workflow(prompt, scene_name, seed)
-        wf = inject_prompt(wf, prompt, NEGATIVE_PROMPT)
+        wf = inject_prompt(wf, prompt, negative_prompt)
         wf = inject_seed(wf, seed)
+        for node in wf.values():
+            inputs = node.get("inputs", {})
+            if "width" in inputs and isinstance(inputs["width"], (int, float)) and bundle.get("width"):
+                inputs["width"] = int(bundle["width"])
+            if "height" in inputs and isinstance(inputs["height"], (int, float)) and bundle.get("height"):
+                inputs["height"] = int(bundle["height"])
+            if "batch_size" in inputs and isinstance(inputs["batch_size"], (int, float)) and bundle.get("frames"):
+                inputs["batch_size"] = int(bundle["frames"])
 
         lora_refs = shot_payload.get("lora_refs") or []
         if lora_refs:
@@ -530,7 +1012,7 @@ class AnimateDiffPipeline(RenderPipeline):
                                    comfyui_url=self.comfyui_url)
 
         # ── InstantID：有参考人脸图时自动注入，提升角色一致性 ──
-        ref_face = shot_payload.get("reference_face_image")
+        ref_face = shot_payload.get("face_image") or shot_payload.get("reference_face_image")
         if ref_face and Path(str(ref_face)).exists():
             try:
                 uploaded = self._upload_image(str(ref_face))
@@ -548,23 +1030,45 @@ class AnimateDiffPipeline(RenderPipeline):
             raise RenderError("ComfyUI 拒绝提交 AnimateDiff 工作流")
 
         timeout = self.config.get("timeout", 7200)
-        outputs = wait_for_completion(prompt_id, self.comfyui_url, timeout=timeout)
-        if not outputs:
-            raise RenderError(f"AnimateDiff 渲染超时 (prompt_id={prompt_id[:8]})")
+        result = wait_for_completion_result(prompt_id, self.comfyui_url, timeout=timeout)
+        if result["status"] != "completed":
+            raise RenderError(
+                f"AnimateDiff 渲染失败 ({result['error_type']}, prompt_id={prompt_id[:8]}): "
+                f"{result['error_message']}"
+            )
+        outputs = result["outputs"]
 
-        files = get_video_output(outputs)
-        if not files:
-            raise RenderError("ComfyUI 输出中无视频文件")
-
-        vf = files[0]
-        subfolder = vf.get("subfolder", "")
-        src = (_COMFYUI_OUTPUT_DIR / subfolder / vf["filename"]
-               if subfolder else _COMFYUI_OUTPUT_DIR / vf["filename"])
-        if not src.exists():
-            raise RenderError(f"输出视频文件不存在: {src}")
+        frame_paths: list[Path] = []
+        for node_out in outputs.values():
+            for item in node_out.get("images", []):
+                if isinstance(item, dict) and item.get("filename"):
+                    subfolder = item.get("subfolder", "")
+                    src = (_COMFYUI_OUTPUT_DIR / subfolder / item["filename"]
+                           if subfolder else _COMFYUI_OUTPUT_DIR / item["filename"])
+                    if src.exists():
+                        frame_paths.append(src)
+        if not frame_paths:
+            raise RenderError("AnimateDiff 输出中无图像帧")
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(src, output_path)
+        fps = int(bundle.get("fps") or self.config.get("fps", 8))
+        with tempfile.TemporaryDirectory(prefix="story_ad_frames_") as tmpdir:
+            tmpdir_path = Path(tmpdir)
+            for idx, src in enumerate(frame_paths, start=1):
+                shutil.copy2(src, tmpdir_path / f"{idx:06d}.png")
+            r = subprocess.run(
+                [
+                    "ffmpeg", "-y",
+                    "-framerate", str(fps),
+                    "-i", str(tmpdir_path / "%06d.png"),
+                    "-c:v", "libx264",
+                    "-pix_fmt", "yuv420p",
+                    str(output_path),
+                ],
+                capture_output=True,
+            )
+            if r.returncode != 0:
+                raise RenderError(f"AnimateDiff 帧序列转视频失败: {r.stderr.decode()[:500]}")
         return output_path
 
 
@@ -611,7 +1115,7 @@ class StaticFramePipeline(RenderPipeline):
                   "inputs": {"model": ["1", 0], "positive": ["3", 0],
                              "negative": ["4", 0], "latent_image": ["2", 0],
                              "steps": steps, "cfg": cfg_scale,
-                             "sampler_name": "euler_a", "scheduler": "karras",
+                             "sampler_name": "euler", "scheduler": "karras",
                              "seed": seed, "denoise": 1.0}},
             "6": {"class_type": "VAEDecode",
                   "inputs": {"samples": ["5", 0], "vae": ["1", 2]}},
@@ -620,11 +1124,14 @@ class StaticFramePipeline(RenderPipeline):
         }
 
     def render(self, shot_payload: dict, output_path: Path) -> Path:
-        prompt = build_scene_prompt(shot_payload)
+        bundle = build_pipeline_prompt_bundle(shot_payload, self.name)
+        prompt = bundle["positive_prompt"]
+        negative_prompt = bundle.get("negative_prompt", NEGATIVE_PROMPT)
         seed = int(time.time() * 1000) % (2 ** 31)
         lora_refs = shot_payload.get("lora_refs") or []
 
         wf = self._build_workflow(prompt, seed)
+        wf = inject_prompt(wf, prompt, negative_prompt)
         if lora_refs:
             wf = inject_loras(wf, lora_refs)
 
@@ -633,9 +1140,10 @@ class StaticFramePipeline(RenderPipeline):
             raise RenderError("ComfyUI 拒绝提交静态帧工作流")
 
         timeout = self.config.get("timeout", 300)
-        outputs = wait_for_completion(prompt_id, self.comfyui_url, timeout=timeout)
-        if not outputs:
-            raise RenderError("静态帧渲染超时")
+        result = wait_for_completion_result(prompt_id, self.comfyui_url, timeout=timeout)
+        if result["status"] != "completed":
+            raise RenderError(f"静态帧渲染失败 ({result['error_type']}): {result['error_message']}")
+        outputs = result["outputs"]
 
         img_path: Optional[Path] = None
         for node_out in outputs.values():
@@ -717,7 +1225,7 @@ class Wan2TI2VPipeline(RenderPipeline):
     依赖：
       - ComfyUI-GGUF 自定义节点（UnetLoaderGGUF）
       - ComfyUI-VideoHelperSuite（VHS_VideoCombine）
-      - Wan2.2-TI2V-5B-Q4_K_M.gguf ≥ 3 GB（当前文件仅 49 MB，下载不完整）
+      - Wan2.2-TI2V-5B-Q4_K_M.gguf（建议完整文件 >= 1.2 GB）
       - UMT5-XXL text encoder
       - wan2_ti2v_workflow.json 工作流文件（手动配置）
 
@@ -727,7 +1235,11 @@ class Wan2TI2VPipeline(RenderPipeline):
     name = "wan2_ti2v"
     required_nodes = [
         "UnetLoaderGGUF",
-        "VHS_VideoCombine",
+        "CLIPLoader",
+        "ModelSamplingSD3",
+        "Wan22ImageToVideoLatent",
+        "CreateVideo",
+        "SaveVideo",
     ]
 
     def validate(self, object_info: dict) -> list[str]:
@@ -757,7 +1269,7 @@ class Wan2TI2VPipeline(RenderPipeline):
         enc_raw = self.config.get("text_encoder", "")
         if enc_raw:
             enc_path = Path(os.path.expanduser(enc_raw))
-            min_enc_mb = self.config.get("min_encoder_size_mb", 9000)
+            min_enc_mb = self.config.get("min_encoder_size_mb", 1000)
             if not enc_path.exists():
                 missing.append(f"encoder:{enc_path.name} (文件不存在)")
             else:
@@ -787,26 +1299,40 @@ class Wan2TI2VPipeline(RenderPipeline):
         wf_file = _PIPELINES_DIR / self.config.get("workflow_file", "wan2_ti2v_workflow.json")
         wf = json.loads(wf_file.read_text())
 
-        prompt = build_scene_prompt(shot_payload)
+        bundle = build_pipeline_prompt_bundle(shot_payload, self.name)
+        prompt = bundle["positive_prompt"]
+        negative_prompt = bundle.get("negative_prompt", NEGATIVE_PROMPT)
         seed = int(time.time() * 1000) % (2 ** 31)
 
-        # Wan2 工作流拓扑：CLIPTextEncode → WanImageToVideo → KSampler
-        # inject_prompt 只追踪 KSampler.positive 一跳，会落到 WanImageToVideo（无 text 字段）
-        # 因此直接向 CLIPTextEncode 节点注入文本
+        # 官方 Wan2.2 TI2V 拓扑：CLIPTextEncode → KSampler，latent 由 Wan22ImageToVideoLatent 提供
         clip_ids = find_nodes_by_type(wf, "CLIPTextEncode")
         if clip_ids:
             wf[clip_ids[0]]["inputs"]["text"] = prompt   # 第一个 = positive
+            if len(clip_ids) > 1:
+                wf[clip_ids[1]]["inputs"]["text"] = negative_prompt
         else:
-            wf = inject_prompt(wf, prompt, "")           # fallback
+            wf = inject_prompt(wf, prompt, negative_prompt)           # fallback
         wf = inject_seed(wf, seed)
 
         # 注入参考图（TI2V 必须）
         ref_image = shot_payload.get("reference_image_path")
+        reference_strategy = (
+            (shot_payload.get("references", {}) or {}).get("reference_strategy")
+            or shot_payload.get("reference_strategy")
+            or "auto_keyframe"
+        )
         if not ref_image or not Path(str(ref_image)).exists():
-            raise RenderError(
-                "Wan2TI2VPipeline 需要 shot_payload['reference_image_path']，"
-                "当前 shot 无参考图，回退至 AnimateDiff"
-            )
+            if reference_strategy == "auto_keyframe":
+                ref_image = str(generate_reference_keyframe_image(
+                    shot_payload,
+                    comfyui_url=self.comfyui_url,
+                    config=self.config,
+                ))
+            else:
+                raise RenderError(
+                    "Wan2TI2VPipeline 需要 shot_payload['reference_image_path']，"
+                    "当前 shot 无参考图且 reference_strategy 不是 auto_keyframe"
+                )
         uploaded_name = self._upload_image(ref_image)
         # 找 LoadImage 节点并注入文件名
         for node in wf.values():
@@ -814,21 +1340,66 @@ class Wan2TI2VPipeline(RenderPipeline):
                 node["inputs"]["image"] = uploaded_name
                 break
 
-        # 注入 GGUF 模型路径
+        # 注入 UNET / CLIP / VAE / latent / sampler 参数
         gguf_name = Path(os.path.expanduser(self.config.get("gguf_path", ""))).name
+        encoder_name = Path(os.path.expanduser(self.config.get("text_encoder", ""))).name
+        vae_name = self.config.get("vae", "Wan2.2_VAE.safetensors")
         for node in wf.values():
-            if node.get("class_type") == "UnetLoaderGGUF":
+            ct = node.get("class_type")
+            if ct in {"UNETLoader", "UnetLoaderGGUF"}:
                 node["inputs"]["unet_name"] = gguf_name
-                break
+            elif ct == "CLIPLoader" and encoder_name:
+                node["inputs"]["clip_name"] = encoder_name
+                node["inputs"]["type"] = "wan"
+            elif ct == "VAELoader":
+                node["inputs"]["vae_name"] = vae_name
+            elif ct == "Wan22ImageToVideoLatent":
+                node["inputs"]["width"] = int(bundle.get("width") or self.config.get("width", 832))
+                node["inputs"]["height"] = int(bundle.get("height") or self.config.get("height", 480))
+                node["inputs"]["length"] = int(bundle.get("frames") or self.config.get("frames", 49))
+                node["inputs"]["batch_size"] = 1
+            elif ct == "ModelSamplingSD3":
+                node["inputs"]["shift"] = float(self.config.get("shift", 8.0))
+            elif ct == "KSampler":
+                node["inputs"]["steps"] = int(self.config.get("steps", 20))
+                node["inputs"]["cfg"] = float(self.config.get("cfg", 5.0))
+                node["inputs"]["sampler_name"] = self.config.get("sampler_name", "uni_pc")
+                node["inputs"]["scheduler"] = self.config.get("scheduler", "simple")
+                node["inputs"]["denoise"] = float(self.config.get("denoise", 1.0))
+            elif ct == "CreateVideo":
+                node["inputs"]["fps"] = float(bundle.get("fps") or self.config.get("fps", 16))
+            elif ct == "SaveVideo":
+                prefix = shot_payload.get("output_prefix") or "video/wan2_scene"
+                node["inputs"]["filename_prefix"] = prefix
+                node["inputs"]["format"] = "mp4"
+                node["inputs"]["codec"] = "h264"
+
+        # ── InstantID：有参考人脸图时自动注入 ──
+        ref_face = shot_payload.get("face_image")
+        if ref_face and Path(str(ref_face)).exists():
+            try:
+                uploaded = self._upload_image(str(ref_face))
+                wf = inject_instantid(
+                    wf, uploaded,
+                    ip_weight=self.config.get("instantid_ip_weight", 0.8),
+                    cn_strength=self.config.get("instantid_cn_strength", 0.8),
+                    comfyui_url=self.comfyui_url,
+                )
+            except Exception as e:
+                print(f"[InstantID] Wan2 注入失败（{e}），继续无 InstantID 渲染")
 
         prompt_id = submit_workflow(wf, self.comfyui_url)
         if not prompt_id:
             raise RenderError("ComfyUI 拒绝提交 Wan2.2 工作流")
 
         timeout = self.config.get("timeout", 7200)
-        outputs = wait_for_completion(prompt_id, self.comfyui_url, timeout=timeout)
-        if not outputs:
-            raise RenderError(f"Wan2.2 渲染超时 (prompt_id={prompt_id[:8]})")
+        result = wait_for_completion_result(prompt_id, self.comfyui_url, timeout=timeout)
+        if result["status"] != "completed":
+            raise RenderError(
+                f"Wan2.2 渲染失败 ({result['error_type']}, prompt_id={prompt_id[:8]}): "
+                f"{result['error_message']}"
+            )
+        outputs = result["outputs"]
 
         files = get_video_output(outputs)
         if not files:
@@ -857,9 +1428,9 @@ class FluxWan2TwoStagePipeline(RenderPipeline):
       Stage 2 — Wan2.2 TI2V 5B GGUF    → 参考帧动画化
 
     所需模型（全部就绪后自动激活）：
-      • checkpoints/flux_2_klein_9B/flux-2-klein-9b.safetensors  ✅ 已下载 17GB
-      • unet/Wan2.2-TI2V-5B-Q4_K_M.gguf                         ❌ 下载不完整 (49MB/3.2GB)
-      • text_encoders/wan2.2_umt5/models_t5_umt5-xxl-enc-bf16.pth ❌ 缺失
+      • checkpoints/flux_2_klein_9B/flux-2-klein-9b.safetensors
+      • models/unet/Wan2.2-TI2V-5B-Q4_K_M.gguf
+      • text_encoders/wan2.2_umt5/models_t5_umt5-xxl-enc-bf16.pth
 
     工作流文件：
       • flux_txt2img_workflow.json  — Flux Stage 1
@@ -867,7 +1438,22 @@ class FluxWan2TwoStagePipeline(RenderPipeline):
     """
 
     name = "flux_wan2_twostage"
-    required_nodes = ["UnetLoaderGGUF", "VHS_VideoCombine"]
+    required_nodes = [
+        "UNETLoader",
+        "CLIPLoader",
+        "VAELoader",
+        "CLIPTextEncodeFlux",
+        "FluxGuidance",
+        "ModelSamplingFlux",
+        "BasicScheduler",
+        "KSamplerSelect",
+        "SamplerCustomAdvanced",
+        "UnetLoaderGGUF",
+        "ModelSamplingSD3",
+        "Wan22ImageToVideoLatent",
+        "CreateVideo",
+        "SaveVideo",
+    ]
 
     def validate(self, object_info: dict) -> list[str]:
         missing = super().validate(object_info)
@@ -888,6 +1474,29 @@ class FluxWan2TwoStagePipeline(RenderPipeline):
             elif flux_ckpt.stat().st_size / (1024 ** 3) < min_flux_gb:
                 missing.append(f"flux_ckpt:{flux_ckpt.name} 下载不完整")
 
+        flux_enc_raw = self.config.get("flux_text_encoder", "")
+        if flux_enc_raw:
+            flux_enc = Path(os.path.expanduser(flux_enc_raw))
+            min_flux_enc_gb = self.config.get("min_flux_text_encoder_gb", 7)
+            if not flux_enc.exists():
+                missing.append(f"flux_encoder:{flux_enc.name} (不存在)")
+            elif flux_enc.stat().st_size / (1024 ** 3) < min_flux_enc_gb:
+                missing.append(f"flux_encoder:{flux_enc.name} 下载不完整")
+
+        flux_vae_name = self.config.get("flux_vae", "")
+        if flux_vae_name:
+            # 优先使用 config 中的完整路径，否则 fallback 到硬编码路径
+            flux_vae_raw = self.config.get("flux_vae_path", "")
+            if flux_vae_raw:
+                flux_vae = Path(os.path.expanduser(flux_vae_raw))
+            else:
+                flux_vae = Path(os.path.expanduser(f"~/Documents/ComfyUI/models/vae/{flux_vae_name}"))
+            min_flux_vae_mb = self.config.get("min_flux_vae_mb", 200)
+            if not flux_vae.exists():
+                missing.append(f"flux_vae:{flux_vae.name} (不存在)")
+            elif flux_vae.stat().st_size / (1024 * 1024) < min_flux_vae_mb:
+                missing.append(f"flux_vae:{flux_vae.name} 下载不完整")
+
         # Stage 2: Wan2.2 GGUF
         wan_wf = _PIPELINES_DIR / self.config.get("wan2_workflow_file", "wan2_ti2v_workflow.json")
         if not wan_wf.exists():
@@ -906,7 +1515,7 @@ class FluxWan2TwoStagePipeline(RenderPipeline):
         enc_raw = self.config.get("text_encoder", "")
         if enc_raw:
             enc_path = Path(os.path.expanduser(enc_raw))
-            min_enc_mb = self.config.get("min_encoder_size_mb", 9000)
+            min_enc_mb = self.config.get("min_encoder_size_mb", 1000)
             if not enc_path.exists():
                 missing.append(f"encoder:{enc_path.name} (不存在)")
             elif enc_path.stat().st_size / (1024 * 1024) < min_enc_mb:
@@ -921,27 +1530,78 @@ class FluxWan2TwoStagePipeline(RenderPipeline):
         # ── Stage 1: Flux txt2img ─────────────────────────────
         flux_wf_file = _PIPELINES_DIR / self.config.get("flux_workflow_file", "flux_txt2img_workflow.json")
         flux_wf = json.loads(flux_wf_file.read_text())
-        prompt = build_scene_prompt(shot_payload)
+        bundle = build_pipeline_prompt_bundle(shot_payload, self.name)
+        prompt = bundle["positive_prompt"]
+        stage1_prompt = bundle.get("stage1_prompt", prompt)
+        negative_prompt = bundle.get("negative_prompt", NEGATIVE_PROMPT)
         seed = int(time.time() * 1000) % (2 ** 31)
 
-        # Flux 工作流使用 CLIPTextEncodeFlux（字段名 t5xxl/clip_l，无 text 字段）
-        # inject_prompt 无法正确注入；直接写 t5xxl / clip_l
+        # 动态 prompt 注入：将 shot_payload 视为 shot dict 注入 dialogue/visual_prompt
+        inject_ok = False
+        try:
+            flux_wf = inject_prompts(flux_wf, shot_payload, pipeline_name=self.name)
+            inject_ok = True
+        except Exception:
+            pass  # fallback to standard prompt injection below
+
         flux_clip_ids = find_nodes_by_type(flux_wf, "CLIPTextEncodeFlux")
         if flux_clip_ids:
-            flux_wf[flux_clip_ids[0]]["inputs"]["t5xxl"] = prompt
-            flux_wf[flux_clip_ids[0]]["inputs"]["clip_l"] = prompt
+            # 如果 inject_prompts 成功注入了对话内容，不要再覆盖
+            if not inject_ok:
+                flux_wf[flux_clip_ids[0]]["inputs"]["t5xxl"] = stage1_prompt
+                flux_wf[flux_clip_ids[0]]["inputs"]["clip_l"] = prompt
+            flux_wf[flux_clip_ids[0]]["inputs"]["guidance"] = float(self.config.get("flux_guidance", 3.5))
         else:
-            flux_wf = inject_prompt(flux_wf, prompt, "")  # fallback
+            flux_wf = inject_prompt(flux_wf, prompt, negative_prompt)
+
+        flux_ckpt_name = Path(os.path.expanduser(self.config.get("flux_checkpoint", ""))).name
+        flux_enc_name = Path(os.path.expanduser(self.config.get("flux_text_encoder", ""))).name
+        flux_vae_name = self.config.get("flux_vae", "full_encoder_small_decoder.safetensors")
+        for node in flux_wf.values():
+            ct = node.get("class_type")
+            if ct == "UNETLoader":
+                node["inputs"]["unet_name"] = flux_ckpt_name
+            elif ct == "CLIPLoader" and flux_enc_name:
+                node["inputs"]["clip_name"] = flux_enc_name
+                node["inputs"]["type"] = "flux2"
+            elif ct == "VAELoader":
+                node["inputs"]["vae_name"] = flux_vae_name
+            elif ct == "EmptyFlux2LatentImage":
+                node["inputs"]["width"] = int(bundle.get("width") or self.config.get("width", 832))
+                node["inputs"]["height"] = int(bundle.get("height") or self.config.get("height", 480))
+                node["inputs"]["batch_size"] = 1
+            elif ct == "ModelSamplingFlux":
+                node["inputs"]["width"] = int(bundle.get("width") or self.config.get("width", 832))
+                node["inputs"]["height"] = int(bundle.get("height") or self.config.get("height", 480))
+                node["inputs"]["max_shift"] = float(self.config.get("flux_max_shift", 1.15))
+                node["inputs"]["base_shift"] = float(self.config.get("flux_base_shift", 0.5))
+            elif ct == "FluxGuidance":
+                node["inputs"]["guidance"] = float(self.config.get("flux_guidance", 3.5))
+            elif ct == "BasicScheduler":
+                node["inputs"]["scheduler"] = self.config.get("flux_scheduler", "simple")
+                node["inputs"]["steps"] = int(self.config.get("flux_steps", 4))
+                node["inputs"]["denoise"] = float(self.config.get("flux_denoise", 1.0))
+            elif ct == "KSamplerSelect":
+                node["inputs"]["sampler_name"] = self.config.get("flux_sampler_name", "euler")
+            elif ct == "RandomNoise":
+                node["inputs"]["noise_seed"] = seed
         flux_wf = inject_seed(flux_wf, seed)
 
         flux_id = submit_workflow(flux_wf, self.comfyui_url)
         if not flux_id:
             raise RenderError("Flux Stage1 提交失败")
 
-        flux_outputs = wait_for_completion(flux_id, self.comfyui_url,
-                                           timeout=self.config.get("flux_timeout", 600))
-        if not flux_outputs:
-            raise RenderError("Flux Stage1 渲染超时")
+        flux_result = wait_for_completion_result(
+            flux_id,
+            self.comfyui_url,
+            timeout=self.config.get("flux_timeout", 600),
+        )
+        if flux_result["status"] != "completed":
+            raise RenderError(
+                f"Flux Stage1 失败 ({flux_result['error_type']}): "
+                f"{flux_result['error_message']}"
+            )
+        flux_outputs = flux_result["outputs"]
 
         # 找生成的图片
         ref_img_path: Optional[Path] = None
@@ -962,12 +1622,22 @@ class FluxWan2TwoStagePipeline(RenderPipeline):
         # ── Stage 2: Wan2.2 TI2V ─────────────────────────────
         wan_wf_file = _PIPELINES_DIR / self.config.get("wan2_workflow_file", "wan2_ti2v_workflow.json")
         wan_wf = json.loads(wan_wf_file.read_text())
+        # 动态 prompt 注入
+        wan_inject_ok = False
+        try:
+            wan_wf = inject_prompts(wan_wf, shot_payload, pipeline_name="wan2_ti2v")
+            wan_inject_ok = True
+        except Exception:
+            pass
         # Wan2 工作流同样需要直接写 CLIPTextEncode（与 Wan2TI2VPipeline.render 保持一致）
         wan_clip_ids = find_nodes_by_type(wan_wf, "CLIPTextEncode")
         if wan_clip_ids:
-            wan_wf[wan_clip_ids[0]]["inputs"]["text"] = prompt
+            if not wan_inject_ok:
+                wan_wf[wan_clip_ids[0]]["inputs"]["text"] = prompt
+                if len(wan_clip_ids) > 1:
+                    wan_wf[wan_clip_ids[1]]["inputs"]["text"] = negative_prompt
         else:
-            wan_wf = inject_prompt(wan_wf, prompt, "")
+            wan_wf = inject_prompt(wan_wf, prompt, negative_prompt)
         wan_wf = inject_seed(wan_wf, seed + 1)
 
         uploaded = self._upload_image(str(ref_img_path))
@@ -977,19 +1647,66 @@ class FluxWan2TwoStagePipeline(RenderPipeline):
                 break
 
         gguf_name = Path(os.path.expanduser(self.config.get("gguf_path", ""))).name
+        encoder_name = Path(os.path.expanduser(self.config.get("text_encoder", ""))).name
+        vae_name = self.config.get("vae", "Wan2.2_VAE.safetensors")
         for node in wan_wf.values():
-            if node.get("class_type") == "UnetLoaderGGUF":
+            ct = node.get("class_type")
+            if ct in {"UNETLoader", "UnetLoaderGGUF"}:
                 node["inputs"]["unet_name"] = gguf_name
-                break
+            elif ct == "CLIPLoader" and encoder_name:
+                node["inputs"]["clip_name"] = encoder_name
+                node["inputs"]["type"] = "wan"
+            elif ct == "VAELoader":
+                node["inputs"]["vae_name"] = vae_name
+            elif ct == "Wan22ImageToVideoLatent":
+                node["inputs"]["width"] = int(bundle.get("width") or self.config.get("width", 832))
+                node["inputs"]["height"] = int(bundle.get("height") or self.config.get("height", 480))
+                node["inputs"]["length"] = int(bundle.get("frames") or self.config.get("frames", 49))
+                node["inputs"]["batch_size"] = 1
+            elif ct == "ModelSamplingSD3":
+                node["inputs"]["shift"] = float(self.config.get("shift", 8.0))
+            elif ct == "KSampler":
+                node["inputs"]["steps"] = int(self.config.get("steps", 20))
+                node["inputs"]["cfg"] = float(self.config.get("cfg", 5.0))
+                node["inputs"]["sampler_name"] = self.config.get("sampler_name", "uni_pc")
+                node["inputs"]["scheduler"] = self.config.get("scheduler", "simple")
+                node["inputs"]["denoise"] = float(self.config.get("denoise", 1.0))
+            elif ct == "CreateVideo":
+                node["inputs"]["fps"] = float(bundle.get("fps") or self.config.get("fps", 16))
+            elif ct == "SaveVideo":
+                node["inputs"]["filename_prefix"] = "video/wan2_stage2"
+                node["inputs"]["format"] = "mp4"
+                node["inputs"]["codec"] = "h264"
+
+        # ── InstantID：有参考人脸图时自动注入 Stage2 ──
+        ref_face = shot_payload.get("face_image")
+        if ref_face and Path(str(ref_face)).exists():
+            try:
+                uploaded = self._upload_image(str(ref_face))
+                wan_wf = inject_instantid(
+                    wan_wf, uploaded,
+                    ip_weight=self.config.get("instantid_ip_weight", 0.8),
+                    cn_strength=self.config.get("instantid_cn_strength", 0.8),
+                    comfyui_url=self.comfyui_url,
+                )
+            except Exception as e:
+                print(f"[InstantID] FluxWan2 Stage2 注入失败（{e}），继续无 InstantID 渲染")
 
         wan_id = submit_workflow(wan_wf, self.comfyui_url)
         if not wan_id:
             raise RenderError("Wan2.2 Stage2 提交失败")
 
-        wan_outputs = wait_for_completion(wan_id, self.comfyui_url,
-                                          timeout=self.config.get("timeout", 7200))
-        if not wan_outputs:
-            raise RenderError("Wan2.2 Stage2 渲染超时")
+        wan_result = wait_for_completion_result(
+            wan_id,
+            self.comfyui_url,
+            timeout=self.config.get("timeout", 7200),
+        )
+        if wan_result["status"] != "completed":
+            raise RenderError(
+                f"Wan2.2 Stage2 失败 ({wan_result['error_type']}): "
+                f"{wan_result['error_message']}"
+            )
+        wan_outputs = wan_result["outputs"]
 
         files = get_video_output(wan_outputs)
         if not files:
@@ -1038,11 +1755,13 @@ class RenderDispatcher:
     """
 
     def __init__(self, pipelines: list[tuple[int, RenderPipeline]],
-                 comfyui_url: str = "http://127.0.0.1:8188"):
+                 comfyui_url: str = "http://127.0.0.1:8188",
+                 active_pipeline: str = ""):
         self._pipelines = sorted(pipelines, key=lambda x: x[0])
         self.comfyui_url = comfyui_url
         self._status: dict[str, PipelineStatus] = {}
         self._probed = False
+        self.active_pipeline = active_pipeline
 
     @classmethod
     def from_config(cls, config_path: Optional[Path] = None) -> "RenderDispatcher":
@@ -1059,7 +1778,7 @@ class RenderDispatcher:
             p = pipeline_cls(config=entry.get("config", {}), comfyui_url=url)
             p.name = entry["name"]
             pipelines.append((entry.get("priority", 99), p))
-        return cls(pipelines, comfyui_url=url)
+        return cls(pipelines, comfyui_url=url, active_pipeline=cfg.get("active_pipeline", ""))
 
     def probe(self, force: bool = False) -> dict[str, PipelineStatus]:
         """
@@ -1087,10 +1806,16 @@ class RenderDispatcher:
         """按优先级返回当前可用管线（自动触发 probe）。"""
         if not self._probed:
             self.probe()
-        return [
+        ordered = [
             p for _, p in self._pipelines
             if self._status.get(p.name, PipelineStatus(False)).available
         ]
+        if self.active_pipeline:
+            ordered.sort(key=lambda p: 0 if p.name == self.active_pipeline else 1)
+        return ordered
+
+    def set_active_pipeline(self, pipeline_name: str) -> None:
+        self.active_pipeline = pipeline_name
 
     def render(self, shot_payload: dict, output_path: Path) -> Path:
         """
@@ -1103,14 +1828,39 @@ class RenderDispatcher:
                 "没有可用的渲染管线（ComfyUI 离线且 ffmpeg 不可用？）\n"
                 f"探测结果: {self.capability_matrix()}"
             )
+        normalized = normalize_shot_payload(shot_payload)
+        allow_fallback = normalized.get("allow_fallback") or os.getenv("STORY_AGENT_ALLOW_RENDER_FALLBACK", "").lower() in {"1", "true", "yes"}
+        preferred: Optional[RenderPipeline] = None
+        if self.active_pipeline:
+            preferred = next((p for p in candidates if p.name == self.active_pipeline), None)
+        if preferred is None:
+            preferred = candidates[0]
+        ordered = [preferred] + [p for p in candidates if p.name != preferred.name]
+        requested_name = preferred.name
         errors: list[str] = []
-        for pipeline in candidates:
+        for idx, pipeline in enumerate(ordered):
+            if idx > 0 and not allow_fallback:
+                break
             try:
-                return pipeline.render(shot_payload, output_path)
+                path = pipeline.render(shot_payload, output_path)
+                return RenderResult(
+                    path=path,
+                    pipeline_name=pipeline.name,
+                    requested_pipeline=requested_name,
+                    fallback_used=(pipeline.name != requested_name),
+                    fallback_from=requested_name if pipeline.name != requested_name else "",
+                    render_tier="fallback" if pipeline.name != requested_name else "production",
+                )
             except Exception as e:
                 err = f"[{pipeline.name}] {e}"
                 errors.append(err)
                 self._status[pipeline.name].last_error = str(e)
+                if idx == 0 and not allow_fallback:
+                    raise RenderError(
+                        f"首选生产管线失败且已禁止静默降级: {err}\n"
+                        "如需显式回退，请在 shot payload 中设置 allow_fallback=true "
+                        "或导出 STORY_AGENT_ALLOW_RENDER_FALLBACK=1"
+                    ) from e
                 print(f"  ⚠️ {err}，尝试下一条管线…")
         raise RenderError("所有管线均失败:\n" + "\n".join(errors))
 
@@ -1145,3 +1895,54 @@ def reset_dispatcher() -> None:
     """重置单例（配置变更或测试时使用）。"""
     global _dispatcher
     _dispatcher = None
+
+
+def load_pipeline_config(config_path: Optional[Path] = None) -> dict:
+    if config_path is None:
+        config_path = _PIPELINES_DIR / "pipeline_config.json"
+    return json.loads(config_path.read_text())
+
+
+def save_pipeline_config(cfg: dict, config_path: Optional[Path] = None) -> dict:
+    if config_path is None:
+        config_path = _PIPELINES_DIR / "pipeline_config.json"
+    config_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2))
+    reset_dispatcher()
+    return cfg
+
+
+def classify_pipeline_missing(missing: list[str]) -> tuple[str, str]:
+    if not missing:
+        return ("ready", "✅ 可生产")
+    text = " ".join(missing).lower()
+    if "workflow_file:" in text:
+        return ("workflow_refinement_required", "🛠️ Workflow 待接线")
+    if "node:" in text:
+        return ("missing_nodes", "🧩 节点缺失")
+    if any(token in text for token in ("gguf:", "encoder:", "flux_ckpt:", "ffmpeg")):
+        return ("missing_models", "📦 模型/依赖缺失")
+    return ("blocked", "⚠️ 待排查")
+
+
+def set_active_pipeline_name(pipeline_name: str, config_path: Optional[Path] = None) -> dict:
+    cfg = load_pipeline_config(config_path)
+    entries = cfg.get("pipelines", [])
+    names = [entry.get("name", "") for entry in entries]
+    if pipeline_name not in names:
+        raise ValueError(f"未知管线: {pipeline_name}，可用: {names}")
+    debug_override = os.getenv("STORY_AGENT_ALLOW_UNREADY_PIPELINES", "").lower() in {"1", "true", "yes"}
+    if not debug_override:
+        entry = next((item for item in entries if item.get("name") == pipeline_name), {})
+        if entry.get("production_ready") is False:
+            raise ValueError(f"管线尚未通过生产验证，禁止切换到生产激活位: {pipeline_name}")
+        dispatcher = RenderDispatcher.from_config(config_path or (_PIPELINES_DIR / "pipeline_config.json"))
+        matrix = dispatcher.probe(force=True)
+        status = matrix.get(pipeline_name)
+        if status and not status.available:
+            state_key, state_text = classify_pipeline_missing(status.missing)
+            raise ValueError(
+                f"管线未就绪，禁止切换到生产激活位: {pipeline_name} "
+                f"({state_text}/{state_key})；阻塞项: {'; '.join(status.missing[:4])}"
+            )
+    cfg["active_pipeline"] = pipeline_name
+    return save_pipeline_config(cfg, config_path)

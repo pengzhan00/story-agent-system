@@ -10,9 +10,9 @@ from .database import log_generation
 
 
 OLLAMA_BASE = "http://localhost:11434"
-DEFAULT_MODEL = "gemma4:latest"       # Light, fast, good Chinese
-CREATIVE_MODEL = "gemma4:latest"      # For story generation
-DETAIL_MODEL = "deepseek-r1:70b"      # For detailed reasoning (when needed)
+DEFAULT_MODEL = "qwen3:8b"            # Fast, good Chinese
+CREATIVE_MODEL = "qwen3:8b"           # For story generation
+DETAIL_MODEL = "qwen3:8b"             # For detailed reasoning
 
 STAGE_MODEL_DEFAULTS = {
     "director": DEFAULT_MODEL,
@@ -120,7 +120,7 @@ def generate(
         resp = requests.post(
             f"{OLLAMA_BASE}/api/generate",
             json=payload,
-            timeout=300,
+            timeout=900,
         )
         duration = int((time.time() - start) * 1000)
 

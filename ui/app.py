@@ -4,16 +4,19 @@
 Phase 1: 一键生成全部内容（不渲染）→ 可读查看 + JSON 编辑
 Phase 2: 渲染 + 导出（用编辑后的数据）
 """
-import sys, os, json
+import sys, os, json, re, shutil
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import gradio as gr
 
+from core.comfyui_env import COMFYUI_DIR, resolve_comfyui_python, comfyui_main_py
 from core.database import init_db, get_script, list_scripts, list_characters, list_scene_assets, list_music, list_sfx
 from core.database import (
-    update_script, update_character, update_scene_asset, update_music, update_sfx,
-    get_project, list_shots, list_episodes, list_render_jobs, list_projects,
+    update_script, update_character, update_scene_asset, update_music, update_sfx, update_shot, get_shot,
+    get_project, list_shots, list_episodes, list_render_jobs, list_projects, delete_project,
+    create_shot_review, list_shot_reviews, create_export_manifest, list_export_manifests,
+    create_asset_version, create_subtitle_revision, create_delivery_package,
 )
 from core.ollama_client import list_models, refresh_models, resolve_model_profile
 from core.model_manager import (
@@ -212,9 +215,21 @@ def format_model_profile(model_selection: str) -> str:
 def build_shot_table(pid: int) -> list[list[str]]:
     if not pid:
         return []
+    from core.asset_registry import get_shot_bgm, get_shot_sfx, is_shot_tts_complete
     rows = []
     for shot in list_shots(project_id=pid):
         characters = json.loads(shot.characters) if shot.characters else []
+        jobs = list_render_jobs(project_id=pid, shot_id=shot.id)
+        latest_job = jobs[0] if jobs else None
+        used_pipeline = latest_job.used_pipeline if latest_job else ""
+        fallback_used = bool(getattr(latest_job, "fallback_used", 0)) if latest_job else False
+        audio_flags = []
+        if is_shot_tts_complete(pid, shot.id):
+            audio_flags.append("TTS")
+        if get_shot_bgm(pid, shot.id):
+            audio_flags.append("BGM")
+        if get_shot_sfx(pid, shot.id):
+            audio_flags.append("SFX")
         rows.append([
             shot.id,
             shot.act_number,
@@ -225,6 +240,10 @@ def build_shot_table(pid: int) -> list[list[str]]:
             shot.mood,
             ", ".join(characters[:3]),
             shot.status,
+            used_pipeline[:14] if used_pipeline else "",
+            "⚠️" if fallback_used else "",
+            "/".join(audio_flags),
+            "🔒" if int(getattr(shot, "locked", 0)) == 1 else "",
         ])
     return rows
 
@@ -232,11 +251,18 @@ def build_shot_table(pid: int) -> list[list[str]]:
 def format_production_overview(pid: int) -> str:
     if not pid:
         return "运行管线后自动展示生产指标。"
+    from core.asset_registry import project_snapshot
     proj = get_project(pid)
     episodes = list_episodes(pid)
     shots = list_shots(project_id=pid)
     ready = sum(1 for s in shots if s.status == "ready")
     rendered = sum(1 for s in shots if s.status == "rendered")
+    approved = sum(1 for s in shots if s.status == "approved")
+    rejected = sum(1 for s in shots if s.status == "rejected")
+    qc_failed = sum(1 for s in shots if s.status == "qc_failed")
+    locked = sum(1 for s in shots if int(getattr(s, "locked", 0)) == 1)
+    exports = list_export_manifests(project_id=pid, limit=3)
+    snap = project_snapshot(pid, proj.name if proj else "")
     return "\n".join([
         "### 🏭 生产总览",
         f"- 项目: {proj.name if proj else '未知'}",
@@ -244,7 +270,172 @@ def format_production_overview(pid: int) -> str:
         f"- 分镜数: {len(shots)}",
         f"- 待渲染: {ready}",
         f"- 已渲染: {rendered}",
+        f"- 质检失败: {qc_failed}",
+        f"- 已通过审核: {approved}",
+        f"- 已退回: {rejected}",
+        f"- 已锁定: {locked}",
+        f"- TTS 完成: {snap.get('tts_done', 0)}/{snap.get('total_shots', 0)}",
+        f"- 已合成: {snap.get('composed', 0)}/{snap.get('total_shots', 0)}",
+        f"- 最近导出: {len(exports)}",
     ])
+
+
+def shot_runtime_summary(pid: int, shot_id: int) -> str:
+    from core.asset_registry import get_shot_bgm, get_shot_sfx, get_shot_tts
+    jobs = list_render_jobs(project_id=int(pid), shot_id=int(shot_id))
+    latest = jobs[0] if jobs else None
+    lines = [f"### Shot {shot_id} 运行状态"]
+    if latest:
+        lines.append(f"- 渲染任务: `{latest.status}`")
+        if latest.used_pipeline:
+            lines.append(f"- 实际管线: `{latest.used_pipeline}`")
+        if latest.requested_pipeline:
+            lines.append(f"- 请求管线: `{latest.requested_pipeline}`")
+        if int(getattr(latest, 'fallback_used', 0)) == 1:
+            lines.append(f"- 降级回退: `{latest.fallback_from}` → `{latest.used_pipeline}`")
+        meta_raw = getattr(latest, "output_meta", "{}") or "{}"
+        try:
+            meta = json.loads(meta_raw) if isinstance(meta_raw, str) else meta_raw
+        except Exception:
+            meta = {}
+        qg = meta.get("quality_gate", {}) if isinstance(meta, dict) else {}
+        if qg:
+            if qg.get("black_ratio") is not None:
+                lines.append(f"- 黑帧比例: {float(qg.get('black_ratio', 0)):.1%}")
+            if qg.get("freeze_detected") is not None:
+                lines.append(f"- 静帧检测: {'是' if qg.get('freeze_detected') else '否'}")
+    else:
+        lines.append("- 渲染任务: 暂无")
+    tts_count = len(get_shot_tts(int(pid), int(shot_id)))
+    bgm_ready = bool(get_shot_bgm(int(pid), int(shot_id)))
+    sfx_count = len(get_shot_sfx(int(pid), int(shot_id)))
+    lines.append(f"- 音频命中: TTS {tts_count} 条 / BGM {'1' if bgm_ready else '0'} / SFX {sfx_count} 条")
+    return "\n".join(lines)
+
+
+def load_shot_form(pid: int, shot_id_text: str):
+    empty = (
+        "❌ 请输入有效 Shot ID",
+        0, 1, 1, 1, "", "中景", "", "白天", "晴", "", "", "", "ready", False,
+        "[]", "{}",
+    )
+    if not pid:
+        return empty
+    text = (shot_id_text or "").strip()
+    if not text:
+        return empty
+    try:
+        shot_id = int(text)
+    except ValueError:
+        return empty
+    shot = next((s for s in list_shots(project_id=int(pid)) if s.id == shot_id), None)
+    if not shot:
+        return (f"❌ Shot {shot_id} 不存在",) + empty[1:]
+    render_payload = shot.render_payload
+    if isinstance(render_payload, str):
+        try:
+            render_payload = json.loads(render_payload) if render_payload else {}
+        except Exception:
+            render_payload = {}
+    return (
+        f"✅ 已载入 Shot {shot.id}",
+        shot.id,
+        shot.act_number,
+        shot.scene_number,
+        shot.shot_number,
+        shot.location,
+        shot.shot_type,
+        shot.mood,
+        shot.time_of_day,
+        shot.weather,
+        shot.narration,
+        shot.camera_notes,
+        shot.status,
+        bool(int(shot.locked or 0)),
+        shot.characters or "[]",
+        json.dumps(render_payload, ensure_ascii=False, indent=2),
+    )
+
+
+def save_shot_form(
+    pid: int,
+    shot_id: int,
+    act_number: int,
+    scene_number: int,
+    shot_number: int,
+    location: str,
+    shot_type: str,
+    mood: str,
+    time_of_day: str,
+    weather: str,
+    narration: str,
+    camera_notes: str,
+    status: str,
+    locked: bool,
+    characters_text: str,
+    payload_text: str,
+):
+    if not pid or not shot_id:
+        return "❌ 请先载入 Shot", build_shot_edit_json(pid), build_shot_table(pid), format_production_overview(pid)
+    try:
+        characters = json.loads(characters_text or "[]")
+        payload = json.loads(payload_text or "{}")
+    except Exception as e:
+        return f"❌ JSON 解析失败: {e}", build_shot_edit_json(pid), build_shot_table(pid), format_production_overview(pid)
+    payload.update({
+        "location": location or "",
+        "time_of_day": time_of_day or "白天",
+        "weather": weather or "晴",
+        "mood": mood or "",
+        "narration": narration or "",
+        "camera_angle": shot_type or "中景",
+        "shot_type": shot_type or "中景",
+        "characters": payload.get("characters") or characters,
+    })
+    update_shot(int(shot_id), {
+        "act_number": int(act_number or 1),
+        "scene_number": int(scene_number or 1),
+        "shot_number": int(shot_number or 1),
+        "location": location or "",
+        "shot_type": shot_type or "中景",
+        "mood": mood or "",
+        "time_of_day": time_of_day or "白天",
+        "weather": weather or "晴",
+        "characters": characters,
+        "narration": narration or "",
+        "camera_notes": camera_notes or "",
+        "status": status or "ready",
+        "locked": 1 if locked else 0,
+        "render_payload": payload,
+    })
+    _record_shot_asset_version(
+        pid,
+        int(shot_id),
+        {
+            "act_number": int(act_number or 1),
+            "scene_number": int(scene_number or 1),
+            "shot_number": int(shot_number or 1),
+            "location": location or "",
+            "shot_type": shot_type or "中景",
+            "mood": mood or "",
+            "time_of_day": time_of_day or "白天",
+            "weather": weather or "晴",
+            "characters": characters,
+            "narration": narration or "",
+            "camera_notes": camera_notes or "",
+            "status": status or "ready",
+            "locked": 1 if locked else 0,
+            "render_payload": payload,
+        },
+        source_stage="shot_form_editor",
+        notes="structured shot save",
+    )
+    return (
+        f"✅ Shot {shot_id} 已保存",
+        build_shot_edit_json(pid),
+        build_shot_table(pid),
+        format_production_overview(pid),
+    )
 
 
 # ─── 保存回调 ────────────────────────────────────────
@@ -331,6 +522,361 @@ def save_sfx_text(pid: int, text: str) -> str:
     except Exception as e: return f"❌ 保存失败: {e}"
 
 
+def _sanitize_project_name(name: str) -> str:
+    safe = re.sub(r"[^\w\-\u4e00-\u9fff ]+", "_", (name or "").strip())
+    safe = safe.replace("..", "_")
+    safe = re.sub(r"\s+", " ", safe).strip(" ._")
+    return safe[:80] or "未命名项目"
+
+
+def _subtitle_dir(project_name: str) -> Path:
+    return Path("output/projects") / project_name / "subtitles"
+
+
+def _record_shot_asset_version(pid: int, shot_id: int, payload: dict, source_stage: str, notes: str = ""):
+    create_asset_version({
+        "project_id": int(pid),
+        "shot_id": int(shot_id),
+        "asset_type": "shot",
+        "asset_ref_id": int(shot_id),
+        "source_stage": source_stage,
+        "content_json": payload,
+        "notes": notes,
+    })
+
+
+def build_shot_edit_json(pid: int) -> str:
+    if not pid:
+        return ""
+    shots = list_shots(project_id=int(pid))
+    data = []
+    for s in shots:
+        render_payload = s.render_payload
+        if isinstance(render_payload, str):
+            try:
+                render_payload = json.loads(render_payload) if render_payload else {}
+            except Exception:
+                render_payload = {}
+        data.append({
+            "id": s.id,
+            "act_number": s.act_number,
+            "scene_number": s.scene_number,
+            "shot_number": s.shot_number,
+            "location": s.location,
+            "shot_type": s.shot_type,
+            "mood": s.mood,
+            "time_of_day": s.time_of_day,
+            "weather": s.weather,
+            "characters": json.loads(s.characters) if s.characters else [],
+            "narration": s.narration,
+            "camera_notes": s.camera_notes,
+            "status": s.status,
+            "locked": s.locked,
+            "render_payload": render_payload,
+        })
+    return json.dumps(data, ensure_ascii=False, indent=2)
+
+
+def save_shot_edit_text(pid: int, text: str) -> str:
+    if not pid or not text:
+        return "❌ 无分镜数据"
+    try:
+        items = json.loads(text)
+        count = 0
+        for item in items:
+            payload = item.get("render_payload", {}) or {}
+            if isinstance(payload, str):
+                try:
+                    payload = json.loads(payload)
+                except Exception:
+                    payload = {}
+            payload.update({
+                "location": item.get("location", ""),
+                "time_of_day": item.get("time_of_day", "白天"),
+                "weather": item.get("weather", "晴"),
+                "mood": item.get("mood", ""),
+                "narration": item.get("narration", ""),
+                "camera_angle": item.get("shot_type", "中景"),
+                "characters": payload.get("characters", []),
+            })
+            update_shot(int(item["id"]), {
+                "location": item.get("location", ""),
+                "shot_type": item.get("shot_type", "中景"),
+                "mood": item.get("mood", ""),
+                "time_of_day": item.get("time_of_day", "白天"),
+                "weather": item.get("weather", "晴"),
+                "characters": item.get("characters", []),
+                "narration": item.get("narration", ""),
+                "camera_notes": item.get("camera_notes", ""),
+                "status": item.get("status", "ready"),
+                "locked": int(item.get("locked", 0)),
+                "render_payload": payload,
+            })
+            _record_shot_asset_version(
+                pid,
+                int(item["id"]),
+                {
+                    "location": item.get("location", ""),
+                    "shot_type": item.get("shot_type", "中景"),
+                    "mood": item.get("mood", ""),
+                    "time_of_day": item.get("time_of_day", "白天"),
+                    "weather": item.get("weather", "晴"),
+                    "characters": item.get("characters", []),
+                    "narration": item.get("narration", ""),
+                    "camera_notes": item.get("camera_notes", ""),
+                    "status": item.get("status", "ready"),
+                    "locked": int(item.get("locked", 0)),
+                    "render_payload": payload,
+                },
+                source_stage="shot_json_editor",
+                notes="bulk shot json save",
+            )
+            count += 1
+        return f"✅ {count} 个分镜已保存"
+    except Exception as e:
+        return f"❌ 保存失败: {e}"
+
+
+def review_shot_action(pid: int, shot_id_text: str, action: str, notes: str = "") -> tuple[str, str]:
+    if not pid:
+        return "❌ 请先加载项目", build_shot_edit_json(pid)
+    shot_id_text = (shot_id_text or "").strip()
+    if not shot_id_text:
+        return "❌ 请输入 Shot ID", build_shot_edit_json(pid)
+    try:
+        shot_id = int(shot_id_text)
+    except ValueError:
+        return "❌ Shot ID 必须是整数", build_shot_edit_json(pid)
+    shot = next((s for s in list_shots(project_id=int(pid)) if s.id == shot_id), None)
+    if not shot:
+        return f"❌ Shot {shot_id} 不存在", build_shot_edit_json(pid)
+    update_data = {}
+    review_status = "pending"
+    if action == "approve":
+        update_data["status"] = "approved"
+        review_status = "approved"
+    elif action == "reject":
+        update_data["status"] = "rejected"
+        review_status = "rejected"
+    elif action == "lock":
+        update_data["locked"] = 1
+    elif action == "unlock":
+        update_data["locked"] = 0
+    if update_data:
+        update_shot(shot_id, update_data)
+    create_shot_review({
+        "project_id": int(pid),
+        "shot_id": shot_id,
+        "status": review_status,
+        "reviewer": "ui_operator",
+        "notes": (notes or action)[:500],
+    })
+    return f"✅ Shot {shot_id} 已执行: {action}", build_shot_edit_json(pid)
+
+
+def approve_shot_action(pid: int, shot_id_text: str, notes: str = "", auto_lock: bool = False) -> tuple[str, str]:
+    status_msg, shot_json = review_shot_action(pid, shot_id_text, "approve", notes)
+    if not auto_lock or not status_msg.startswith("✅"):
+        return status_msg, shot_json
+    lock_note = f"{notes} / auto-lock".strip(" /") or "auto-lock after approve"
+    lock_msg, shot_json = review_shot_action(pid, shot_id_text, "lock", lock_note)
+    return f"{status_msg}\n{lock_msg}", shot_json
+
+
+def run_shot_rerender_flow(
+    pid: int,
+    shot_id_text: str,
+    notes: str = "",
+    mode: str = "rerender",
+    progress=gr.Progress(),
+):
+    if not pid:
+        yield "❌ 请先加载项目", None
+        return
+    text = (shot_id_text or "").strip()
+    if not text:
+        yield "❌ 请输入 Shot ID", None
+        return
+    try:
+        shot_id = int(text)
+    except ValueError:
+        yield "❌ Shot ID 必须是整数", None
+        return
+    shot = get_shot(shot_id)
+    if not shot or int(shot.project_id) != int(pid):
+        yield f"❌ Shot {shot_id} 不存在", None
+        return
+
+    operator_note = (notes or "").strip()
+    review_status = "rework_requested" if mode == "rework" else "rerender_requested"
+    label = "退回并重跑" if mode == "rework" else "重渲染"
+    update_data = {
+        "status": "ready",
+        "locked": 0,
+        "error": "",
+    }
+    update_shot(shot_id, update_data)
+    create_shot_review({
+        "project_id": int(pid),
+        "shot_id": shot_id,
+        "status": review_status,
+        "reviewer": "ui_operator",
+        "notes": (operator_note or label)[:500],
+    })
+    yield f"### ⏳ {label} Shot {shot_id}\n已重置为 `ready`，准备提交渲染。", None
+    for log_md, video_path in run_render_step_flow(pid, str(shot_id), progress=progress):
+        yield f"### 🎬 {label} Shot {shot_id}\n\n{log_md}", video_path
+
+
+def get_shot_review_summary(pid: int, shot_id_text: str) -> str:
+    if not pid:
+        return "请先加载项目"
+    text = (shot_id_text or "").strip()
+    if not text:
+        return "输入 Shot ID 查看审核历史"
+    try:
+        shot_id = int(text)
+    except ValueError:
+        return "Shot ID 必须是整数"
+    rows = list_shot_reviews(project_id=int(pid), shot_id=shot_id, limit=10)
+    if not rows:
+        return f"Shot {shot_id} 暂无审核记录"
+    lines = [f"### Shot {shot_id} 审核历史"]
+    for row in rows:
+        lines.append(f"- `{row['created_at'][:19]}` · **{row['status']}** · {row.get('notes', '')[:120]}")
+    return "\n".join(lines)
+
+
+def record_export_manifest_for_project(pid: int, export_path: str) -> str:
+    if not pid or not export_path:
+        return ""
+    proj = get_project(int(pid))
+    if not proj:
+        return ""
+    shots = list_shots(project_id=int(pid))
+    create_export_manifest({
+        "project_id": int(pid),
+        "episode_id": 0,
+        "export_type": "episode",
+        "file_path": export_path,
+        "manifest_json": {
+            "project_name": proj.name,
+            "shot_count": len(shots),
+            "approved_shots": [s.id for s in shots if s.status == "approved"],
+            "rendered_shots": [s.id for s in shots if s.status in ("rendered", "approved")],
+        },
+    })
+    create_delivery_package({
+        "project_id": int(pid),
+        "episode_id": 0,
+        "package_type": "hongguo_short_drama",
+        "package_path": export_path,
+        "assets_json": {
+            "episode_video": export_path,
+            "approved_shots": [s.id for s in shots if s.status == "approved"],
+            "rendered_shots": [s.id for s in shots if s.status in ("rendered", "approved")],
+        },
+        "manifest_json": {
+            "project_name": proj.name,
+            "delivery_target": "hongguo_short_drama",
+            "shot_count": len(shots),
+        },
+        "status": "assembled",
+    })
+    return f"✅ 已登记导出清单: {Path(export_path).name}"
+
+
+def load_subtitle_workspace(pid: int, shot_id_text: str = "") -> tuple[str, str, str]:
+    if not pid:
+        return "", "", "❌ 请先加载项目"
+    proj = get_project(int(pid))
+    if not proj:
+        return "", "", "❌ 项目不存在"
+    shot_id_text = (shot_id_text or "").strip()
+    if not shot_id_text:
+        return "", "", "请输入 Shot ID"
+    try:
+        shot_id = int(shot_id_text)
+    except ValueError:
+        return "", "", "Shot ID 必须是整数"
+    shot = next((s for s in list_shots(project_id=int(pid)) if s.id == shot_id), None)
+    if not shot:
+        return "", "", f"❌ Shot {shot_id} 不存在"
+
+    subtitle_dir = _subtitle_dir(proj.name)
+    subtitle_dir.mkdir(parents=True, exist_ok=True)
+    subtitle_path = subtitle_dir / f"shot_{shot_id:04d}.srt"
+    if subtitle_path.exists():
+        return subtitle_path.read_text(encoding="utf-8"), str(subtitle_path), f"✅ 已加载已有字幕: {subtitle_path.name}"
+
+    try:
+        dialogue = json.loads(shot.dialogue) if shot.dialogue else []
+    except Exception:
+        dialogue = []
+    from core.asset_registry import get_shot_tts
+    from pipelines.compositor import dialogue_to_srt
+    srt_text = dialogue_to_srt(dialogue, get_shot_tts(int(pid), shot_id))
+    return srt_text, str(subtitle_path), "⚪ 由对白自动生成预览字幕，保存后生效"
+
+
+def save_subtitle_text(pid: int, shot_id_text: str, subtitle_text: str) -> str:
+    if not pid:
+        return "❌ 请先加载项目"
+    proj = get_project(int(pid))
+    if not proj:
+        return "❌ 项目不存在"
+    shot_id_text = (shot_id_text or "").strip()
+    subtitle_text = subtitle_text or ""
+    if not shot_id_text:
+        return "❌ 请输入 Shot ID"
+    try:
+        shot_id = int(shot_id_text)
+    except ValueError:
+        return "❌ Shot ID 必须是整数"
+    subtitle_dir = _subtitle_dir(proj.name)
+    subtitle_dir.mkdir(parents=True, exist_ok=True)
+    subtitle_path = subtitle_dir / f"shot_{shot_id:04d}.srt"
+    subtitle_path.write_text(subtitle_text, encoding="utf-8")
+    create_subtitle_revision({
+        "project_id": int(pid),
+        "shot_id": shot_id,
+        "file_path": str(subtitle_path),
+        "subtitle_text": subtitle_text,
+        "source": "ui_subtitle_editor",
+    })
+    create_asset_version({
+        "project_id": int(pid),
+        "shot_id": shot_id,
+        "asset_type": "subtitle",
+        "asset_ref_id": shot_id,
+        "source_stage": "subtitle_editor",
+        "file_path": str(subtitle_path),
+        "content_json": {
+            "subtitle_text": subtitle_text,
+            "file_path": str(subtitle_path),
+        },
+        "notes": "subtitle save",
+    })
+    return f"✅ 字幕已保存: {subtitle_path}"
+
+
+def delete_project_with_outputs(proj_choice: str) -> tuple[object, str]:
+    if not proj_choice or not str(proj_choice).startswith("#"):
+        return gr.update(choices=get_project_choices(), value=None), "❌ 请先选择项目"
+    try:
+        pid = int(str(proj_choice).split()[0].lstrip("#"))
+    except Exception:
+        return gr.update(choices=get_project_choices(), value=None), "❌ 项目标识无效"
+    proj = get_project(pid)
+    if not proj:
+        return gr.update(choices=get_project_choices(), value=None), "❌ 项目不存在"
+    out_dir = Path("output/projects") / proj.name
+    delete_project(pid)
+    if out_dir.exists():
+        shutil.rmtree(out_dir, ignore_errors=True)
+    return gr.update(choices=get_project_choices(), value=None), f"✅ 已删除项目 #{pid}: {proj.name}"
+
+
 # ─── 各阶段独立运行流 ────────────────────────────
 
 def _relay_stage(stage_gen, log_lines: list, result_ref: dict):
@@ -355,7 +901,7 @@ def story_stage_flow(pid, premise, pname, genre, tone, acts, stage_m, global_m, 
     result = {}
     for pct, log_md, partial in run_stage_story(
         project_id=int(pid or 0), premise=premise.strip(),
-        project_name=pname.strip() if pname else "",
+        project_name=_sanitize_project_name(pname) if pname else "",
         genre=genre or "玄幻", tone=tone or "热血",
         acts=int(acts or 3), model=model,
     ):
@@ -430,7 +976,7 @@ def full_pipeline_flow(premise, project_name, genre, tone, acts, model,
                        progress=gr.Progress()):
     """yield (gen_log, gen_result, view_md, edit_data..., pid)"""
     if not premise or not premise.strip():
-        yield ("### ⚠️ 请先输入创作构想", None, "", "", "", "", "", "", "", [], 0)
+        yield ("### ⚠️ 请先输入创作构想", None, "", "", "", "", "", "", "", [], "", "", "", 0)
         return
 
     # 构建 per-stage 模型配置，未填则回退到全局 model
@@ -451,7 +997,7 @@ def full_pipeline_flow(premise, project_name, genre, tone, acts, model,
     try:
         for pct, log_md, partial in run_pipeline_generator(
             premise=premise.strip(),
-            project_name=project_name.strip() if project_name else "",
+            project_name=_sanitize_project_name(project_name) if project_name else "",
             genre=genre or "玄幻", tone=tone or "热血",
             acts=int(acts) if acts else 3,
             model=base,
@@ -462,11 +1008,12 @@ def full_pipeline_flow(premise, project_name, genre, tone, acts, model,
             result = partial
             yield (log_md, partial, gr.update(), gr.update(), gr.update(),
                    gr.update(), gr.update(), gr.update(), gr.update(), gr.update(),
+                   gr.update(), gr.update(), gr.update(),
                    result.get("project_id", 0) if result else 0)
     except Exception as e:
         import traceback
-        yield (f"### ❌ 管线崩溃\n```\n{e}\n{traceback.format_exc()[-500:]}\n```",
-               result, "", "", "", "", "", "", "", [], 0)
+        yield (f"### ❌ 管线崩溃\n```\n{e}\n{traceback.format_exc()[-2000:]}\n```",
+               result, "", "", "", "", "", "", "", [], "", "", "", 0)
         return
 
     pid = (result or {}).get("project_id", 0)
@@ -494,6 +1041,9 @@ def full_pipeline_flow(premise, project_name, genre, tone, acts, model,
         edit_data.get("sfx", ""),
         format_production_overview(pid),
         build_shot_table(pid),
+        build_shot_edit_json(pid),
+        "",
+        "",
         pid,
     )
 
@@ -519,7 +1069,7 @@ def render_export_flow(pid, project_name, render_cfg, progress=gr.Progress()):
             yield (log_md, partial, pid)
     except Exception as e:
         import traceback
-        yield (f"### ❌ 渲染出错\n```\n{e}\n{traceback.format_exc()[-500:]}\n```",
+        yield (f"### ❌ 渲染出错\n```\n{e}\n{traceback.format_exc()[-2000:]}\n```",
                result, pid)
 
 
@@ -544,7 +1094,7 @@ def resume_pipeline_flow(pid, progress=gr.Progress()):
                 break
     except Exception as e:
         import traceback
-        yield (f"### ❌ 续跑出错\n```\n{e}\n{traceback.format_exc()[-500:]}\n```",
+        yield (f"### ❌ 续跑出错\n```\n{e}\n{traceback.format_exc()[-2000:]}\n```",
                gr.update())
         return
 
@@ -565,6 +1115,273 @@ def get_pipeline_state(pid):
         return describe_state(int(pid))
     except Exception as e:
         return f"❌ 获取状态失败: {e}"
+
+
+# ─── 管线选择器 ─────────────────────────────────────────
+
+def _pipeline_choices():
+    """Build (display_label, pipeline_name) choices for dropdown."""
+    from pipelines.render_pipeline import (
+        load_pipeline_config, get_dispatcher, PipelineStatus,
+    )
+    cfg = load_pipeline_config()
+    entries = cfg.get("pipelines", [])
+    try:
+        matrix = get_dispatcher().capability_matrix()
+    except Exception:
+        matrix = {}
+    choices = []
+    active_name = cfg.get("active_pipeline", "")
+    for entry in sorted(entries, key=lambda e: e.get("priority", 99)):
+        name = entry["name"]
+        desc = entry.get("description", "无描述")[:45]
+        prod = entry.get("production_ready", True)
+        s = matrix.get(name, {})
+        avail = s.get("available", False)
+        if avail and prod:
+            icon = "🟢"
+        elif avail and not prod:
+            icon = "🟡"
+        elif not avail and prod:
+            icon = "🔴"
+        else:
+            icon = "⚪"
+        choices.append((f"{icon} {name} · {desc}", name))
+    return choices, active_name
+
+
+def _pipeline_status_card(pipeline_name):
+    """Generate a Markdown status card for a pipeline."""
+    from pipelines.render_pipeline import (
+        load_pipeline_config, get_dispatcher, classify_pipeline_missing,
+    )
+    cfg = load_pipeline_config()
+    entries = cfg.get("pipelines", [])
+    entry = next((e for e in entries if e["name"] == pipeline_name), None)
+    if not entry:
+        return f"### ❌ 管线 `{pipeline_name}` 未找到"
+
+    desc = entry.get("description", "无描述")
+    prod = entry.get("production_ready", False)
+    try:
+        matrix = get_dispatcher().probe(force=True)
+    except Exception as e:
+        matrix = {}
+    status = matrix.get(pipeline_name)
+    avail = status.available if status else False
+    missing = status.missing if status else []
+    last_err = status.last_error if status else ""
+
+    ecfg = entry.get("config", {})
+    w = ecfg.get("width", "?")
+    h = ecfg.get("height", "?")
+    fps = ecfg.get("fps", "?")
+    frames = ecfg.get("frames", "?")
+
+    lines = []
+    if avail and prod:
+        lines.append(f"##### 🟢 **{pipeline_name}** · 可生产 · {desc}")
+    elif avail and not prod:
+        lines.append(f"##### 🟡 **{pipeline_name}** · 验证中 · {desc}")
+    else:
+        lines.append(f"##### 🔴 **{pipeline_name}** · 不可用 · {desc}")
+
+    if w != "?":
+        res_str = f"*{w}×{h}"
+        if frames != "?":
+            res_str += f" · {frames}帧"
+        if fps != "?":
+            res_str += f" · {fps}fps"
+        lines.append(res_str + "*")
+
+    if missing:
+        sk, st = classify_pipeline_missing(missing)
+        lines.append(f"\n**状态:** {st}  |  缺失 ({len(missing)} 项):")
+        for m in missing:
+            lines.append(f"- `{m}`")
+    else:
+        lines.append("\n✅ 所有组件就绪")
+
+    if last_err:
+        lines.append(f"\n⚠️ 上次错误: `{last_err[:100]}`")
+
+    return "\n".join(lines)
+
+
+def _on_pipeline_select(pipeline_name):
+    """Dropdown change: set active pipeline + show status card."""
+    if not pipeline_name:
+        return "", "### 请选择一条渲染管线"
+    from pipelines.render_pipeline import set_active_pipeline_name
+    try:
+        set_active_pipeline_name(pipeline_name)
+        status_md = _pipeline_status_card(pipeline_name)
+        return pipeline_name, status_md
+    except ValueError as e:
+        return pipeline_name, f"### ⚠️ 无法切换管线\n```\n{e}\n```"
+
+
+def _detect_missing_models(_pid=None):
+    """Scan active pipeline config for missing files on disk."""
+    import os
+    from pipelines.render_pipeline import load_pipeline_config
+    cfg = load_pipeline_config()
+    active = cfg.get("active_pipeline", "")
+    entry = next((e for e in cfg.get("pipelines", []) if e["name"] == active), None)
+    if not entry:
+        return "### ⚠️ 无活跃管线"
+
+    config = entry.get("config", {})
+    # ComfyUI 模型基路径 — 所有相对路径相对于此目录下的子文件夹
+    COMFY_MODELS_BASE = os.path.expanduser("~/Documents/ComfyUI/models")
+    # 字段名 → 子文件夹映射（相对路径字段所属子目录）
+    SUBDIR_MAP = {
+        "checkpoint": "checkpoints",
+        "motion_model": "animatediff_models",
+        "vae": "vae",
+        "flux_vae": "vae",
+    }
+    file_fields = [
+        "checkpoint", "motion_model", "gguf_path", "text_encoder", "vae",
+        "flux_checkpoint", "flux_text_encoder", "flux_vae",
+    ]
+    missing = []
+    found = []
+    # 优先检查全路径字段（如 flux_vae_path），再查短字段名
+    full_path_aliases = {"flux_vae": "flux_vae_path"}
+    for key in file_fields:
+        # 如果存在对应的全路径字段，用它替代
+        alias = full_path_aliases.get(key)
+        alias_val = config.get(alias) if alias else None
+        path_str = alias_val or config.get(key)
+        if not path_str:
+            continue
+        full_path = os.path.expanduser(path_str)
+        # 如果是相对路径，尝试拼接 ComfyUI 模型目录
+        if not os.path.isfile(full_path) and not full_path.startswith("/"):
+            subdir = SUBDIR_MAP.get(key, "")
+            if subdir and full_path.startswith(subdir + "/"):
+                # 已经是子目录格式，直接拼接
+                guessed = os.path.join(COMFY_MODELS_BASE, full_path)
+            else:
+                guessed = os.path.join(COMFY_MODELS_BASE, subdir, full_path) if subdir else full_path
+            if os.path.isfile(guessed):
+                full_path = guessed
+        if os.path.isfile(full_path):
+            st = os.path.getsize(full_path)
+            sz_str = f"{st/1024**3:.1f}GB" if st > 1024**3 else f"{st/1024**2:.0f}MB"
+            found.append((key, sz_str))
+        else:
+            missing.append((key, path_str))
+
+    lines = [f"### 🔍 管线 `{active}` 模型文件检测"]
+    md_lines = []
+    if found:
+        md_lines.append(f"\n✅ 已就绪 ({len(found)} 项):")
+        for k, sz in found:
+            md_lines.append(f"- `{k}` ({sz})")
+    if missing:
+        md_lines.append(f"\n❌ 缺失 ({len(missing)} 项):")
+        for k, v in missing:
+            md_lines.append(f"- `{k}` → `{v}`")
+    if not found and not missing:
+        md_lines.append("\n没有可检测的模型路径")
+
+    return "\n".join(lines + md_lines)
+
+
+def _auto_download_missing(_pid=None):
+    """Try to download missing model files for the active pipeline."""
+    import os, subprocess, json
+    from pipelines.render_pipeline import load_pipeline_config
+
+    cfg = load_pipeline_config()
+    active = cfg.get("active_pipeline", "")
+    entry = next((e for e in cfg.get("pipelines", []) if e["name"] == active), None)
+    if not entry:
+        return "### ⚠️ 无活跃管线"
+
+    config = entry.get("config", {})
+    file_fields = [
+        "checkpoint", "motion_model", "gguf_path", "text_encoder", "vae",
+        "flux_checkpoint", "flux_text_encoder", "flux_vae",
+    ]
+
+    # ── 已知 ModelScope 下载源 ──
+    KNOWN_SOURCES = {
+        "Wan2.2_VAE.safetensors":
+            ("modelscope", "AI-ModelScope/Wan2.1-ComfyUI", "Wan2.2_VAE.safetensors"),
+        "umt5_xxl_fp8_e4m3fn_scaled.safetensors":
+            ("modelscope", "Kijai/umt5-xxl-fp8-e4m3fn-scaled", "umt5_xxl_fp8_e4m3fn_scaled.safetensors"),
+        "Wan2.2-TI2V-5B-Q4_K_M.gguf":
+            ("modelscope", "Kijai/Wan2.2-TI2V-5B-gguf", "Wan2.2-TI2V-5B-Q4_K_M.gguf"),
+        "hsxl_temporal_layers.f16.safetensors":
+            ("hf", "Kijai/hsxl_temporal_layers_fp16", "hsxl_temporal_layers.f16.safetensors"),
+    }
+
+    missing_files = []
+    for key in file_fields:
+        path_str = config.get(key)
+        if not path_str:
+            continue
+        full_path = os.path.expanduser(path_str)
+        if not os.path.isfile(full_path):
+            missing_files.append((key, path_str))
+
+    if not missing_files:
+        return "### ✅ 管线 `{}` 所有模型文件已就绪".format(active)
+
+    lines = ["### ⬇️ 正在尝试下载缺失模型..."]
+    results = []
+
+    for key, path_str in missing_files:
+        basename = os.path.basename(path_str)
+        target_dir = os.path.dirname(os.path.expanduser(path_str))
+        os.makedirs(target_dir, exist_ok=True)
+
+        if basename in KNOWN_SOURCES:
+            source_type, repo, filename = KNOWN_SOURCES[basename]
+            lines.append(f"\n📥 **{basename}**")
+            lines.append(f"   源: {source_type}/{repo}")
+
+            if source_type == "modelscope":
+                cmd = [
+                    "python", "-m", "modelscope", "download",
+                    "--local_dir", target_dir,
+                    repo, filename,
+                ]
+            else:
+                # HF
+                cmd = [
+                    "hf", "download", repo, filename,
+                    "--local-dir", target_dir,
+                ]
+
+            try:
+                subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+                if os.path.isfile(os.path.join(target_dir, filename)):
+                    results.append(f"✅ {basename} — 下载成功")
+                else:
+                    results.append(f"❌ {basename} — 下载后未找到文件")
+            except subprocess.TimeoutExpired:
+                results.append(f"⏱️ {basename} — 下载超时")
+            except FileNotFoundError:
+                results.append(f"⚠️ {basename} — CLI 工具不可用 (`{cmd[0]}`)")
+            except Exception as e:
+                results.append(f"❌ {basename} — {str(e)[:80]}")
+        else:
+            results.append(f"⚠️ {basename} — 未知下载源，请手动下载到 `{target_dir}`")
+
+    lines.append("\n---\n### 下载结果")
+    for r in results:
+        lines.append(r)
+
+    # Refresh status card by re-probing
+    from pipelines.render_pipeline import reset_dispatcher
+    reset_dispatcher()
+
+    lines.append("\n\n> 💡 重新探测状态后可查看最新管线就绪情况")
+    return "\n".join(lines)
 
 
 # ─── 各步骤独立运行 ────────────────────────────────────────
@@ -594,7 +1411,7 @@ def run_music_step_flow(pid, progress=gr.Progress()):
         yield log, (files[0] if files else None)
     except Exception as e:
         import traceback
-        yield f"### ❌ 配乐生成失败\n```\n{e}\n{traceback.format_exc()[-400:]}\n```", None
+        yield f"### ❌ 配乐生成失败\n```\n{e}\n{traceback.format_exc()[-2000:]}\n```", None
 
 
 def run_tts_step_flow(pid, shot_id_str: str = "", progress=gr.Progress()):
@@ -629,7 +1446,7 @@ def run_tts_step_flow(pid, shot_id_str: str = "", progress=gr.Progress()):
         yield f"### ✅ TTS 生成完成，共 {len(all_files)} 条音频", (all_files[0] if all_files else None)
     except Exception as e:
         import traceback
-        yield f"### ❌ TTS 失败\n```\n{e}\n{traceback.format_exc()[-400:]}\n```", None
+        yield f"### ❌ TTS 失败\n```\n{e}\n{traceback.format_exc()[-2000:]}\n```", None
 
 
 def run_sfx_step_flow(pid, progress=gr.Progress()):
@@ -656,7 +1473,7 @@ def run_sfx_step_flow(pid, progress=gr.Progress()):
         yield log, (files[0] if files else None)
     except Exception as e:
         import traceback
-        yield f"### ❌ 音效失败\n```\n{e}\n{traceback.format_exc()[-400:]}\n```", None
+        yield f"### ❌ 音效失败\n```\n{e}\n{traceback.format_exc()[-2000:]}\n```", None
 
 
 def run_render_step_flow(pid, shot_id_str: str = "", progress=gr.Progress()):
@@ -694,7 +1511,7 @@ def run_render_step_flow(pid, shot_id_str: str = "", progress=gr.Progress()):
         yield log, (videos[0] if videos else None)
     except Exception as e:
         import traceback
-        yield f"### ❌ 渲染失败\n```\n{e}\n{traceback.format_exc()[-400:]}\n```", None
+        yield f"### ❌ 渲染失败\n```\n{e}\n{traceback.format_exc()[-2000:]}\n```", None
 
 
 def run_composite_step_flow(pid, progress=gr.Progress()):
@@ -718,7 +1535,7 @@ def run_composite_step_flow(pid, progress=gr.Progress()):
             yield "### ❌ 合成失败（可能缺少视频或音频素材）", None
     except Exception as e:
         import traceback
-        yield f"### ❌ 合成失败\n```\n{e}\n{traceback.format_exc()[-400:]}\n```", None
+        yield f"### ❌ 合成失败\n```\n{e}\n{traceback.format_exc()[-2000:]}\n```", None
 
 
 def ai_enhance_step(pid, step: str, content: str, instruction: str, mdl: str = "") -> tuple[str, str]:
@@ -875,11 +1692,11 @@ def get_system_status() -> str:
 
     # BGM
     try:
-        from pipelines.audio_pipeline import _check_audiocraft
-        if _check_audiocraft():
-            lines.append("**BGM 生成**: ✅ MusicGen（facebook/musicgen-small，AI 音乐）→ ffmpeg 合成兜底")
+        from pipelines.audio_pipeline import _check_acestep_music
+        if _check_acestep_music():
+            lines.append("**BGM 生成**: ✅ Ace-Step 1.5（ComfyUI）→ ffmpeg 合成兜底")
         else:
-            lines.append("**BGM 生成**: ⚠️ ffmpeg 合成（MusicGen 未就绪，模型可能正在下载）→ 可接 HeartMuLa 升级")
+            lines.append("**BGM 生成**: ⚠️ ffmpeg 合成（Ace-Step 未就绪或缺模型）")
     except Exception:
         lines.append("**BGM 生成**: ffmpeg 合成（内置保底）")
 
@@ -1016,7 +1833,8 @@ def get_project_choices() -> list[str]:
 
 def load_existing_project(proj_choice: str):
     """加载已有项目到 UI（非流式，queue=False）。"""
-    empty = ("", None, "请先选择项目", "", "", "", "", "", "运行管线后自动展示生产指标。", [], 0)
+    empty = ("", None, "请先选择项目", "", "", "", "", "", "运行管线后自动展示生产指标。", [], 0,
+             "⚪ 未生成", "⚪ 未生成", "⚪ 未渲染", "", "", "")
     if not proj_choice or not str(proj_choice).startswith("#"):
         return empty
     try:
@@ -1025,7 +1843,8 @@ def load_existing_project(proj_choice: str):
         return empty
     proj = get_project(pid)
     if not proj:
-        return ("❌ 项目不存在", None, "", "", "", "", "", "", "", [], 0)
+        return ("❌ 项目不存在", None, "", "", "", "", "", "", "", [], 0,
+                "⚪ 未生成", "⚪ 未生成", "⚪ 未渲染", "", "", "")
 
     view_md = format_content_markdown(pid)
     edit_data = load_edit_data(pid)
@@ -1043,12 +1862,17 @@ def load_existing_project(proj_choice: str):
         overview,
         shot_rows,
         pid,
+        load_music_status(pid),
+        load_tts_status(pid),
+        load_render_status(pid),
+        build_shot_edit_json(pid),
+        "",
+        "",
     )
 
 
 # ─── ComfyUI 启动 ─────────────────────────────────────
 
-COMFYUI_DIR = Path(os.path.expanduser("~/Documents/ComfyUI"))
 _comfyui_proc = None
 
 
@@ -1061,16 +1885,16 @@ def launch_comfyui() -> str:
     global _comfyui_proc
     if comfyui_online():
         return "✅ ComfyUI 已在运行"
-    main_py = COMFYUI_DIR / "main.py"
+    main_py = comfyui_main_py()
     if not main_py.exists():
         return f"❌ 未找到 {main_py}"
-    # 尝试 venv python，否则 fallback 到系统 python3
-    venv_py = COMFYUI_DIR / "venv" / "bin" / "python3"
-    python_exe = str(venv_py) if venv_py.exists() else "python3"
+    python_exe = resolve_comfyui_python()
+    if not python_exe.exists():
+        return f"❌ 未找到 ComfyUI 专用 Python: {python_exe}"
     try:
         import subprocess
         _comfyui_proc = subprocess.Popen(
-            [python_exe, str(main_py), "--listen", "127.0.0.1", "--port", "8188"],
+            [str(python_exe), str(main_py), "--listen", "127.0.0.1", "--port", "8188"],
             cwd=str(COMFYUI_DIR),
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
@@ -1109,6 +1933,8 @@ def build_ui():
             )
             proj_refresh_btn = gr.Button("🔄", scale=1, size="sm", min_width=60)
             proj_load_btn = gr.Button("📂 加载", variant="primary", scale=1, min_width=80)
+            proj_delete_btn = gr.Button("🗑️ 删除项目", variant="stop", scale=1, min_width=100)
+        proj_action_status = gr.Markdown("")
 
         # ══════ Phase 1: 内容生成 ═══════════════════
         gr.Markdown("## 📝 Phase 1: 内容生成")
@@ -1167,19 +1993,38 @@ def build_ui():
         gr.Markdown("## 🎬 Phase 2: 渲染 + 导出")
         gr.Markdown("用数据库中最新内容渲染视频。可先编辑内容再执行。")
 
+        # ── ComfyUI 状态行 ──
         with gr.Row():
             comfyui_status_md = gr.Markdown(_comfyui_status_text())
             comfyui_launch_btn = gr.Button("🚀 启动 ComfyUI", scale=1, size="sm")
             comfyui_refresh_btn = gr.Button("🔄 刷新状态", scale=1, size="sm")
         comfyui_launch_log = gr.Markdown("", visible=False)
 
+        # ── 管线选择 & 状态 ──
+        pipeline_choices, active_pipeline_name = _pipeline_choices()
+        with gr.Accordion("🔧 渲染管线控制", open=True):
+            with gr.Row():
+                pipeline_selector_dd = gr.Dropdown(
+                    choices=pipeline_choices, value=active_pipeline_name,
+                    label="活跃管线", scale=3, interactive=True,
+                )
+                pipeline_detect_btn = gr.Button("🔍 检测缺失", size="sm", scale=1, min_width=80)
+                pipeline_download_btn = gr.Button("⬇️ 一键下载", size="sm", scale=1, min_width=80,
+                                                  variant="primary")
+            pipeline_status_card_md = gr.Markdown(
+                _pipeline_status_card(active_pipeline_name)
+            )
+            pipeline_detect_log = gr.Markdown("", visible=False)
+
+        # ── 渲染操作按钮 ──
         with gr.Row():
-            render_btn = gr.Button("🎬 渲染导出", variant="secondary", size="lg",
+            render_btn = gr.Button("🚀 全量渲染+导出", variant="secondary", size="lg",
                                    elem_classes="gr-button-secondary", scale=2)
-            resume_btn = gr.Button("🔄 继续上次", variant="primary", size="lg", scale=2)
+            resume_btn = gr.Button("♻️ 断点续跑", variant="primary", size="lg", scale=2)
             pipeline_state_btn = gr.Button("📊 查看状态", size="lg", scale=1)
 
-        render_log = gr.Markdown("点击「渲染导出」开始，或点击「继续上次」从断点续跑...")
+        gr.Markdown("`全量渲染+导出`：从头检查并执行完整 Phase 2。`断点续跑`：跳过已完成 shot，仅补未完成阶段。`渲染工作站`：只跑指定 shot。")
+        render_log = gr.Markdown("点击「全量渲染+导出」开始，或点击「断点续跑」从断点续跑...")
         render_results = gr.JSON(value=None, label="渲染结果")
         pipeline_state_md = gr.Markdown("", label="管线状态")
 
@@ -1200,9 +2045,84 @@ def build_ui():
             # ─── 分镜 ──────────────────────────────
             with gr.TabItem("🎞️ 分镜"):
                 shot_table = gr.Dataframe(
-                    headers=["ID", "Act", "Scene", "Shot", "场景", "镜头", "情绪", "角色", "状态"],
+                    headers=["ID", "Act", "Scene", "Shot", "场景", "镜头", "情绪", "角色", "状态", "锁定"],
                     value=[], interactive=False, label="分镜列表",
                 )
+                with gr.Row():
+                    shot_action_id = gr.Textbox(label="Shot ID", placeholder="例如 12", scale=1)
+                    shot_review_note = gr.Textbox(label="审核备注", placeholder="例如：镜头节奏通过 / 角色口型不对", scale=3)
+                with gr.Row():
+                    shot_load_btn = gr.Button("📥 载入 Shot", scale=1)
+                    shot_approve_btn = gr.Button("✅ 通过", scale=1)
+                    shot_reject_btn = gr.Button("↩️ 退回", scale=1)
+                    shot_lock_btn = gr.Button("🔒 锁定", scale=1)
+                    shot_unlock_btn = gr.Button("🔓 解锁", scale=1)
+                shot_auto_lock_on_approve = gr.Checkbox(label="审核通过后自动锁定", value=True)
+                gr.Markdown("##### 结构化分镜工位")
+                shot_form_status_md = gr.Markdown("输入 Shot ID 后点击“载入 Shot”进行结构化编辑。")
+                shot_form_id = gr.Number(label="Shot 内部 ID", value=0, precision=0, visible=False)
+                with gr.Row():
+                    shot_form_act = gr.Number(label="Act", value=1, precision=0, scale=1)
+                    shot_form_scene = gr.Number(label="Scene", value=1, precision=0, scale=1)
+                    shot_form_number = gr.Number(label="Shot", value=1, precision=0, scale=1)
+                    shot_form_status = gr.Dropdown(
+                        label="状态",
+                        choices=["ready", "rendered", "approved", "rejected"],
+                        value="ready",
+                        scale=1,
+                    )
+                    shot_form_locked = gr.Checkbox(label="锁定", value=False, scale=1)
+                with gr.Row():
+                    shot_form_location = gr.Textbox(label="场景地点", scale=2)
+                    shot_form_type = gr.Dropdown(
+                        label="镜头类型",
+                        choices=["特写", "近景", "中景", "全景", "远景", "俯拍", "仰拍", "跟拍"],
+                        value="中景",
+                        scale=1,
+                    )
+                    shot_form_mood = gr.Textbox(label="情绪", scale=1)
+                with gr.Row():
+                    shot_form_time = gr.Dropdown(
+                        label="时间",
+                        choices=["清晨", "白天", "黄昏", "夜晚"],
+                        value="白天",
+                        scale=1,
+                    )
+                    shot_form_weather = gr.Dropdown(
+                        label="天气",
+                        choices=["晴", "阴", "雨", "雪", "雾"],
+                        value="晴",
+                        scale=1,
+                    )
+                shot_form_characters = gr.Textbox(
+                    label="角色列表 JSON",
+                    lines=2,
+                    placeholder='["主角", "反派"]',
+                )
+                shot_form_narration = gr.Textbox(label="旁白 / 镜头描述", lines=3)
+                shot_form_camera_notes = gr.Textbox(label="机位 / 运镜备注", lines=2)
+                shot_form_payload = gr.Textbox(
+                    label="Render Payload JSON",
+                    lines=8,
+                    placeholder="高级模式：需要时再编辑底层 render payload",
+                )
+                with gr.Row():
+                    shot_form_save_btn = gr.Button("💾 保存结构化分镜", elem_classes="save-btn", scale=1)
+                    shot_rerender_btn = gr.Button("🎬 重渲染当前 Shot", variant="primary", scale=1)
+                    shot_rework_btn = gr.Button("🔁 退回并重跑", scale=1)
+                shot_edit = gr.Textbox(
+                    label="分镜 JSON（高级模式）",
+                    lines=14,
+                )
+                with gr.Row():
+                    shot_reload_btn = gr.Button("🔄 载入分镜 JSON", scale=1)
+                    save_shot_btn = gr.Button("💾 保存分镜", elem_classes="save-btn", scale=1)
+                    shot_status = gr.Markdown("")
+                shot_render_log = gr.Markdown("")
+                shot_render_preview = gr.Video(
+                    label="当前 Shot 渲染预览", interactive=False,
+                )
+                shot_review_history_md = gr.Markdown("输入 Shot ID 查看审核历史。")
 
             # ─── 剧本工作站 ───────────────────────────
             with gr.TabItem("📖 剧本"):
@@ -1404,9 +2324,21 @@ def build_ui():
                         label="输出视频路径", interactive=False, scale=2,
                     )
                 composite_run_log = gr.Markdown("")
+                export_manifest_md = gr.Markdown("")
                 composite_video_preview = gr.Video(
                     label="最终视频预览", interactive=False,
                 )
+
+            # ─── 字幕工作站 ──────────────────────────
+            with gr.TabItem("💬 字幕"):
+                gr.Markdown("输入 Shot ID 生成/读取字幕，可直接编辑 `.srt` 文本后保存。")
+                with gr.Row():
+                    subtitle_shot_id = gr.Textbox(label="Shot ID", placeholder="例如 12", scale=1)
+                    subtitle_load_btn = gr.Button("📖 加载字幕", scale=1)
+                    subtitle_save_btn = gr.Button("💾 保存字幕", elem_classes="save-btn", scale=1)
+                subtitle_path_md = gr.Markdown("")
+                subtitle_text = gr.Textbox(label="字幕 SRT 文本", lines=16)
+                subtitle_status = gr.Markdown("")
 
             # ─── 视频预览 ─────────────────────────────
             with gr.TabItem("▶️ 视频预览"):
@@ -1467,9 +2399,9 @@ def build_ui():
                 # ── TTS / 音频配置 ───────────────────────
                 with gr.Accordion("🎤 TTS 配置 & 试听", open=False):
                     gr.Markdown(
-                        "TTS 后端优先级：**Bark**（`~/bark/venv`，本地高质量中文）"
-                        " → Edge-TTS（在线免费）→ Kokoro → pyttsx3。\n\n"
-                        "Bark 需要首次运行时自动下载模型（~5GB），之后离线可用。"
+                        "TTS 后端优先级：**ChatTTS**（本地，中文主力）"
+                        " → Edge-TTS → Bark → Kokoro → pyttsx3。\n\n"
+                        "ChatTTS 使用本机独立 venv 与本地模型目录；失败时才会自动回退。"
                     )
                     with gr.Row():
                         tts_test_text  = gr.Textbox(
@@ -1489,9 +2421,8 @@ def build_ui():
                 # ── BGM 配置 & 试听 ──────────────────────
                 with gr.Accordion("🎵 BGM 配置 & 试听", open=False):
                     gr.Markdown(
-                        "BGM 后端优先级：**HeartMuLa** → **MusicGen**（已安装，`facebook/musicgen-small`）→ ffmpeg 合成兜底。\n\n"
-                        "MusicGen 首次生成时自动下载模型（~300MB），之后离线可用，支持 10 种情绪 prompt。\n"
-                        "点「刷新状态」可确认 MusicGen 是否已就绪。"
+                        "BGM 后端优先级：**Ace-Step 1.5**（ComfyUI，模型就绪时）→ ffmpeg 合成兜底。\n\n"
+                        "如果本机未安装 Ace-Step 音频模型，系统会自动改用本地 ffmpeg 合成，不会把整条音频链跑死。"
                     )
                     with gr.Row():
                         bgm_mood_sel = gr.Dropdown(
@@ -1578,6 +2509,8 @@ def build_ui():
             script_edit, char_edit, scene_edit, music_edit, sfx_edit,
             production_overview, shot_table,
             project_id_state,
+            music_step_status, tts_step_status_md, render_step_status_md,
+            shot_edit, subtitle_text, subtitle_path_md,
         ]
         proj_load_btn.click(
             fn=load_existing_project,
@@ -1589,6 +2522,12 @@ def build_ui():
             fn=lambda: gr.update(choices=get_project_choices()),
             inputs=[],
             outputs=[proj_dropdown],
+            queue=False,
+        )
+        proj_delete_btn.click(
+            fn=delete_project_with_outputs,
+            inputs=[proj_dropdown],
+            outputs=[proj_dropdown, proj_action_status],
             queue=False,
         )
 
@@ -1616,6 +2555,7 @@ def build_ui():
             view_md,
             script_edit, char_edit, scene_edit, music_edit, sfx_edit,
             production_overview, shot_table,
+            shot_edit, subtitle_text, subtitle_path_md,
             project_id_state,
         ]
         gen_btn.click(
@@ -1669,12 +2609,158 @@ def build_ui():
             queue=False,
         )
 
+        # ── 工作站：各步骤 AI 辅助 + 单步运行 ─────────────────
+
+        # 剧本 AI 辅助
+        script_ai_btn.click(
+            fn=lambda pid, content, instr, mdl: ai_enhance_step(pid, "script", content, instr, mdl),
+            inputs=[project_id_state, script_edit, script_ai_instr, script_ai_model],
+            outputs=[script_edit, script_ai_status],
+            concurrency_limit=2,
+        )
+        script_step_refresh_btn.click(
+            fn=lambda pid: f"**剧本**：{'已有剧本' if pid and list_scripts(int(pid)) else '⚪ 未生成'}",
+            inputs=[project_id_state], outputs=[script_step_status], queue=False,
+        )
+        step1_run_btn.click(
+            fn=story_stage_flow,
+            inputs=[project_id_state, premise, project_name, genre, tone, acts, story_model, model],
+            outputs=[gen_log, gen_results, project_id_state],
+            concurrency_limit=2,
+        )
+
+        # 角色 AI 辅助
+        char_ai_btn.click(
+            fn=lambda pid, content, instr, mdl: ai_enhance_step(pid, "chars", content, instr, mdl),
+            inputs=[project_id_state, char_edit, char_ai_instr, char_ai_model],
+            outputs=[char_edit, char_ai_status],
+            concurrency_limit=2,
+        )
+        step2_run_btn.click(
+            fn=chars_stage_flow,
+            inputs=[project_id_state, char_model, model],
+            outputs=[gen_log, gen_results, project_id_state],
+            concurrency_limit=2,
+        )
+
+        # 场景 AI 辅助
+        scene_ai_btn.click(
+            fn=lambda pid, content, instr, mdl: ai_enhance_step(pid, "scenes", content, instr, mdl),
+            inputs=[project_id_state, scene_edit, scene_ai_instr, scene_ai_model],
+            outputs=[scene_edit, scene_ai_status],
+            concurrency_limit=2,
+        )
+        step3_run_btn.click(
+            fn=scenes_stage_flow,
+            inputs=[project_id_state, scene_model, model],
+            outputs=[gen_log, gen_results, project_id_state],
+            concurrency_limit=2,
+        )
+
+        # 配乐：AI 辅助 + 单步生成
+        music_ai_btn.click(
+            fn=lambda pid, content, instr, mdl: ai_enhance_step(pid, "music", content, instr, mdl),
+            inputs=[project_id_state, music_edit, music_ai_instr, music_ai_model],
+            outputs=[music_edit, music_ai_status],
+            concurrency_limit=2,
+        )
+        music_status_refresh_btn.click(
+            fn=lambda pid: load_music_status(int(pid) if pid else 0),
+            inputs=[project_id_state], outputs=[music_step_status], queue=False,
+        )
+        music_run_btn.click(
+            fn=run_music_step_flow,
+            inputs=[project_id_state],
+            outputs=[music_run_log, music_preview_out],
+            concurrency_limit=2,
+        ).then(
+            fn=lambda pid: load_music_status(int(pid) if pid else 0),
+            inputs=[project_id_state], outputs=[music_step_status], queue=False,
+        )
+
+        # 音效：AI 辅助 + 单步生成
+        sfx_ai_btn.click(
+            fn=lambda pid, content, instr, mdl: ai_enhance_step(pid, "sfx", content, instr, mdl),
+            inputs=[project_id_state, sfx_edit, sfx_ai_instr, sfx_ai_model],
+            outputs=[sfx_edit, sfx_ai_status],
+            concurrency_limit=2,
+        )
+        sfx_run_btn.click(
+            fn=run_sfx_step_flow,
+            inputs=[project_id_state],
+            outputs=[sfx_run_log, sfx_preview_out],
+            concurrency_limit=2,
+        )
+
+        # TTS：查看 shot + 单步/全部生成
+        tts_load_shot_btn.click(
+            fn=lambda pid, sid: load_shot_tts_detail(int(pid) if pid else 0, sid),
+            inputs=[project_id_state, tts_shot_id_input],
+            outputs=[tts_dialogue_edit, tts_shot_status_md],
+            queue=False,
+        )
+        tts_status_refresh_btn.click(
+            fn=lambda pid: load_tts_status(int(pid) if pid else 0),
+            inputs=[project_id_state], outputs=[tts_step_status_md], queue=False,
+        )
+        tts_run_shot_btn.click(
+            fn=run_tts_step_flow,
+            inputs=[project_id_state, tts_shot_id_input],
+            outputs=[tts_run_log, tts_preview_out],
+            concurrency_limit=2,
+        ).then(
+            fn=lambda pid: load_tts_status(int(pid) if pid else 0),
+            inputs=[project_id_state], outputs=[tts_step_status_md], queue=False,
+        )
+        tts_run_all_btn.click(
+            fn=lambda pid: run_tts_step_flow(pid, ""),
+            inputs=[project_id_state],
+            outputs=[tts_run_log, tts_preview_out],
+            concurrency_limit=2,
+        ).then(
+            fn=lambda pid: load_tts_status(int(pid) if pid else 0),
+            inputs=[project_id_state], outputs=[tts_step_status_md], queue=False,
+        )
+
+        # 渲染：单步/指定 shot
+        render_status_refresh_btn.click(
+            fn=lambda pid: load_render_status(int(pid) if pid else 0),
+            inputs=[project_id_state], outputs=[render_step_status_md], queue=False,
+        )
+        render_run_btn.click(
+            fn=run_render_step_flow,
+            inputs=[project_id_state, render_shot_id_input],
+            outputs=[render_run_log, render_video_preview],
+            concurrency_limit=2,
+        ).then(
+            fn=lambda pid: load_render_status(int(pid) if pid else 0),
+            inputs=[project_id_state], outputs=[render_step_status_md], queue=False,
+        )
+
+        # 合成导出
+        composite_run_btn.click(
+            fn=run_composite_step_flow,
+            inputs=[project_id_state],
+            outputs=[composite_run_log, composite_video_preview],
+            concurrency_limit=2,
+        ).then(
+            fn=lambda log, vid: gr.update(value=vid or ""),
+            inputs=[composite_run_log, composite_video_preview],
+            outputs=[episode_video_path],
+            queue=False,
+        ).then(
+            fn=lambda pid, path: record_export_manifest_for_project(pid, path or ""),
+            inputs=[project_id_state, episode_video_path],
+            outputs=[export_manifest_md],
+            queue=False,
+        )
+
         # 清空（绕过 queue，防止被生成器堵住）
         clear_btn.click(
             fn=lambda: (
                 "### 📋 管线日志\n等待启动...", None,
                 "运行管线后自动展示可读内容。",
-                "", "", "", "", "", "运行管线后自动展示生产指标。", [], 0,
+                "", "", "", "", "", "运行管线后自动展示生产指标。", [], "", "", "", 0,
             ),
             inputs=[],
             outputs=gen_outputs,
@@ -1696,7 +2782,41 @@ def build_ui():
             outputs=[render_log, pipeline_state_md],
         )
 
-        # Phase 2: 查看管线状态
+        # Phase 2: 管线选择器切换
+        pipeline_selector_dd.change(
+            fn=_on_pipeline_select,
+            inputs=[pipeline_selector_dd],
+            outputs=[pipeline_selector_dd, pipeline_status_card_md],
+            queue=False,
+        )
+
+        # Phase 2: 检测缺失模型
+        pipeline_detect_btn.click(
+            fn=_detect_missing_models,
+            inputs=[project_id_state],
+            outputs=[pipeline_detect_log],
+            queue=False,
+        ).then(
+            fn=lambda: gr.update(visible=True),
+            inputs=None,
+            outputs=[pipeline_detect_log],
+            queue=False,
+        )
+
+        # Phase 2: 一键下载缺失模型
+        pipeline_download_btn.click(
+            fn=_auto_download_missing,
+            inputs=[project_id_state],
+            outputs=[pipeline_detect_log],
+            queue=False,
+        ).then(
+            fn=lambda: gr.update(visible=True),
+            inputs=None,
+            outputs=[pipeline_detect_log],
+            queue=False,
+        )
+
+        # Phase 2: 查看管线状态（旧按钮保留）
         pipeline_state_btn.click(
             fn=get_pipeline_state,
             inputs=[project_id_state],
@@ -1733,6 +2853,253 @@ def build_ui():
             fn=save_sfx_text,
             inputs=[project_id_state, sfx_edit],
             outputs=[sfx_status],
+            queue=False,
+        )
+        shot_reload_btn.click(
+            fn=build_shot_edit_json,
+            inputs=[project_id_state],
+            outputs=[shot_edit],
+            queue=False,
+        )
+        save_shot_btn.click(
+            fn=save_shot_edit_text,
+            inputs=[project_id_state, shot_edit],
+            outputs=[shot_status],
+            queue=False,
+        )
+        shot_load_btn.click(
+            fn=load_shot_form,
+            inputs=[project_id_state, shot_action_id],
+            outputs=[
+                shot_form_status_md,
+                shot_form_id,
+                shot_form_act,
+                shot_form_scene,
+                shot_form_number,
+                shot_form_location,
+                shot_form_type,
+                shot_form_mood,
+                shot_form_time,
+                shot_form_weather,
+                shot_form_narration,
+                shot_form_camera_notes,
+                shot_form_status,
+                shot_form_locked,
+                shot_form_characters,
+                shot_form_payload,
+            ],
+            queue=False,
+        )
+        shot_form_save_btn.click(
+            fn=save_shot_form,
+            inputs=[
+                project_id_state,
+                shot_form_id,
+                shot_form_act,
+                shot_form_scene,
+                shot_form_number,
+                shot_form_location,
+                shot_form_type,
+                shot_form_mood,
+                shot_form_time,
+                shot_form_weather,
+                shot_form_narration,
+                shot_form_camera_notes,
+                shot_form_status,
+                shot_form_locked,
+                shot_form_characters,
+                shot_form_payload,
+            ],
+            outputs=[shot_form_status_md, shot_edit, shot_table, production_overview],
+            queue=False,
+        ).then(
+            fn=get_shot_review_summary,
+            inputs=[project_id_state, shot_action_id],
+            outputs=[shot_review_history_md],
+            queue=False,
+        )
+        shot_action_id.change(
+            fn=get_shot_review_summary,
+            inputs=[project_id_state, shot_action_id],
+            outputs=[shot_review_history_md],
+            queue=False,
+        )
+        shot_approve_btn.click(
+            fn=approve_shot_action,
+            inputs=[project_id_state, shot_action_id, shot_review_note, shot_auto_lock_on_approve],
+            outputs=[shot_status, shot_edit],
+            queue=False,
+        ).then(
+            fn=build_shot_table,
+            inputs=[project_id_state],
+            outputs=[shot_table],
+            queue=False,
+        ).then(
+            fn=format_production_overview,
+            inputs=[project_id_state],
+            outputs=[production_overview],
+            queue=False,
+        ).then(
+            fn=get_shot_review_summary,
+            inputs=[project_id_state, shot_action_id],
+            outputs=[shot_review_history_md],
+            queue=False,
+        ).then(
+            fn=load_render_status,
+            inputs=[project_id_state],
+            outputs=[render_step_status_md],
+            queue=False,
+        )
+        shot_reject_btn.click(
+            fn=lambda pid, sid, note: review_shot_action(pid, sid, "reject", note),
+            inputs=[project_id_state, shot_action_id, shot_review_note],
+            outputs=[shot_status, shot_edit],
+            queue=False,
+        ).then(
+            fn=build_shot_table,
+            inputs=[project_id_state],
+            outputs=[shot_table],
+            queue=False,
+        ).then(
+            fn=format_production_overview,
+            inputs=[project_id_state],
+            outputs=[production_overview],
+            queue=False,
+        ).then(
+            fn=get_shot_review_summary,
+            inputs=[project_id_state, shot_action_id],
+            outputs=[shot_review_history_md],
+            queue=False,
+        ).then(
+            fn=load_render_status,
+            inputs=[project_id_state],
+            outputs=[render_step_status_md],
+            queue=False,
+        )
+        shot_lock_btn.click(
+            fn=lambda pid, sid, note: review_shot_action(pid, sid, "lock", note),
+            inputs=[project_id_state, shot_action_id, shot_review_note],
+            outputs=[shot_status, shot_edit],
+            queue=False,
+        ).then(
+            fn=build_shot_table,
+            inputs=[project_id_state],
+            outputs=[shot_table],
+            queue=False,
+        ).then(
+            fn=format_production_overview,
+            inputs=[project_id_state],
+            outputs=[production_overview],
+            queue=False,
+        ).then(
+            fn=get_shot_review_summary,
+            inputs=[project_id_state, shot_action_id],
+            outputs=[shot_review_history_md],
+            queue=False,
+        ).then(
+            fn=load_render_status,
+            inputs=[project_id_state],
+            outputs=[render_step_status_md],
+            queue=False,
+        )
+        shot_unlock_btn.click(
+            fn=lambda pid, sid, note: review_shot_action(pid, sid, "unlock", note),
+            inputs=[project_id_state, shot_action_id, shot_review_note],
+            outputs=[shot_status, shot_edit],
+            queue=False,
+        ).then(
+            fn=build_shot_table,
+            inputs=[project_id_state],
+            outputs=[shot_table],
+            queue=False,
+        ).then(
+            fn=format_production_overview,
+            inputs=[project_id_state],
+            outputs=[production_overview],
+            queue=False,
+        ).then(
+            fn=get_shot_review_summary,
+            inputs=[project_id_state, shot_action_id],
+            outputs=[shot_review_history_md],
+            queue=False,
+        ).then(
+            fn=load_render_status,
+            inputs=[project_id_state],
+            outputs=[render_step_status_md],
+            queue=False,
+        )
+        shot_rerender_btn.click(
+            fn=lambda pid, sid, note, auto_lock: run_shot_rerender_flow(pid, sid, note, mode="rerender"),
+            inputs=[project_id_state, shot_action_id, shot_review_note, shot_auto_lock_on_approve],
+            outputs=[shot_render_log, shot_render_preview],
+            concurrency_limit=2,
+        ).then(
+            fn=build_shot_edit_json,
+            inputs=[project_id_state],
+            outputs=[shot_edit],
+            queue=False,
+        ).then(
+            fn=build_shot_table,
+            inputs=[project_id_state],
+            outputs=[shot_table],
+            queue=False,
+        ).then(
+            fn=format_production_overview,
+            inputs=[project_id_state],
+            outputs=[production_overview],
+            queue=False,
+        ).then(
+            fn=get_shot_review_summary,
+            inputs=[project_id_state, shot_action_id],
+            outputs=[shot_review_history_md],
+            queue=False,
+        ).then(
+            fn=load_render_status,
+            inputs=[project_id_state],
+            outputs=[render_step_status_md],
+            queue=False,
+        )
+        shot_rework_btn.click(
+            fn=lambda pid, sid, note, auto_lock: run_shot_rerender_flow(pid, sid, note, mode="rework"),
+            inputs=[project_id_state, shot_action_id, shot_review_note, shot_auto_lock_on_approve],
+            outputs=[shot_render_log, shot_render_preview],
+            concurrency_limit=2,
+        ).then(
+            fn=build_shot_edit_json,
+            inputs=[project_id_state],
+            outputs=[shot_edit],
+            queue=False,
+        ).then(
+            fn=build_shot_table,
+            inputs=[project_id_state],
+            outputs=[shot_table],
+            queue=False,
+        ).then(
+            fn=format_production_overview,
+            inputs=[project_id_state],
+            outputs=[production_overview],
+            queue=False,
+        ).then(
+            fn=get_shot_review_summary,
+            inputs=[project_id_state, shot_action_id],
+            outputs=[shot_review_history_md],
+            queue=False,
+        ).then(
+            fn=load_render_status,
+            inputs=[project_id_state],
+            outputs=[render_step_status_md],
+            queue=False,
+        )
+        subtitle_load_btn.click(
+            fn=load_subtitle_workspace,
+            inputs=[project_id_state, subtitle_shot_id],
+            outputs=[subtitle_text, subtitle_path_md, subtitle_status],
+            queue=False,
+        )
+        subtitle_save_btn.click(
+            fn=save_subtitle_text,
+            inputs=[project_id_state, subtitle_shot_id, subtitle_text],
+            outputs=[subtitle_status],
             queue=False,
         )
 

@@ -14,6 +14,7 @@ PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 import core.database as db
+from pipelines.quality_gate import validate_composite_output
 
 OUTPUT_DIR = PROJECT_ROOT / "output"
 
@@ -102,10 +103,15 @@ def _seconds_to_srt_time(s: float) -> str:
 
 def burn_subtitles(video_path: str, srt_path: str, output_path: str) -> bool:
     """将 SRT 字幕烧录进视频。"""
-    srt_escaped = srt_path.replace(":", "\\:").replace("'", "\\'")
+    # macOS ffmpeg: escape colons and backslashes; force_style must NOT use outer single quotes
+    # when the path itself is wrapped in single quotes — use a separate -filter_complex approach
+    # or pass path without quotes and escape special chars.
+    srt_escaped = srt_path.replace("\\", "\\\\").replace("'", "\\'").replace(":", "\\:")
+    # Use double-escaped force_style to avoid single-quote collision inside filter string
+    vf = f"subtitles={srt_escaped}:force_style=FontSize=24\\,PrimaryColour=&H00FFFFFF"
     ok, err = _ffmpeg(
         "-i", video_path,
-        "-vf", f"subtitles='{srt_escaped}':force_style='FontSize=24,PrimaryColour=&H00FFFFFF'",
+        "-vf", vf,
         "-c:a", "copy",
         output_path,
     )
@@ -211,23 +217,41 @@ def compose_shot(
         if burn_subs and tts_files:
             shot = db.get_shot(shot_id) if shot_id else None
             if shot:
-                try:
-                    dialogue_list = json.loads(shot.dialogue) if shot.dialogue else []
-                except Exception:
-                    dialogue_list = []
-                srt_content = dialogue_to_srt(dialogue_list, tts_files)
                 srt_path = str(tmp / "subs.srt")
-                Path(srt_path).write_text(srt_content, encoding="utf-8")
+                external_srt = None
+                if project_id:
+                    proj = db.get_project(project_id)
+                    if proj:
+                        candidate = OUTPUT_DIR / "projects" / proj.name / "subtitles" / f"shot_{shot_id:04d}.srt"
+                        if candidate.exists():
+                            external_srt = str(candidate)
+                if external_srt:
+                    Path(srt_path).write_text(Path(external_srt).read_text(encoding="utf-8"), encoding="utf-8")
+                else:
+                    try:
+                        dialogue_list = json.loads(shot.dialogue) if shot.dialogue else []
+                    except Exception:
+                        dialogue_list = []
+                    srt_content = dialogue_to_srt(dialogue_list, tts_files)
+                    Path(srt_path).write_text(srt_content, encoding="utf-8")
                 final_video = str(tmp / "final.mp4")
                 if burn_subtitles(mixed_video, srt_path, final_video):
                     import shutil
                     shutil.copy2(final_video, output_path)
-                    return output_path
+                    qc = validate_composite_output(output_path, require_audio=bool(tts_files or music_path or sfx_paths), subtitle_expected=True, min_duration=1.0)
+                    if qc.passed:
+                        return output_path
+                    print(f"[Compositor] Shot {shot_id} 合成质检失败: {'; '.join(qc.errors)}")
+                    return None
 
         # 字幕失败或不需要 — 直接用混音结果
         import shutil
         shutil.copy2(mixed_video, output_path)
-        return output_path
+        qc = validate_composite_output(output_path, require_audio=bool(tts_files or music_path or sfx_paths), subtitle_expected=False, min_duration=1.0)
+        if qc.passed:
+            return output_path
+        print(f"[Compositor] Shot {shot_id} 合成质检失败: {'; '.join(qc.errors)}")
+        return None
 
 
 # ── 剧集合成 ──────────────────────────────────────────────
@@ -383,7 +407,10 @@ def run_compositor_pipeline(
             bgm_path = m.file_path
             break
 
-    from core.asset_registry import get_shot_video, get_shot_tts, is_shot_composed
+    from core.asset_registry import (
+        get_project_bgm, get_project_sfx, get_shot_bgm, get_shot_sfx,
+        get_shot_video, get_shot_tts, is_shot_composed,
+    )
 
     composed_videos = []
     for i, shot in enumerate(shots):
@@ -406,13 +433,18 @@ def run_compositor_pipeline(
             continue
 
         tts_files = get_shot_tts(project_id, shot.id)
+        shot_bgm_path = get_shot_bgm(project_id, shot.id) or bgm_path or get_project_bgm(project_id)
+        shot_sfx_assets = get_shot_sfx(project_id, shot.id)
+        shot_sfx_paths = [a.get("file_path", "") for a in shot_sfx_assets if a.get("file_path")]
+        if not shot_sfx_paths:
+            shot_sfx_paths = [a.get("file", "") for a in get_project_sfx(project_id) if a.get("file")]
 
         result = compose_shot(
             shot_id=shot.id,
             video_path=video_path,
             tts_files=tts_files,
-            music_path=bgm_path,
-            sfx_paths=[],
+            music_path=shot_bgm_path,
+            sfx_paths=shot_sfx_paths,
             output_path=out_path,
             burn_subs=burn_subs,
             project_id=project_id,
@@ -437,10 +469,28 @@ def run_compositor_pipeline(
         crossfade_duration=crossfade,
     )
 
+    if final:
+        qc = validate_composite_output(
+            final,
+            require_audio=True,
+            subtitle_expected=burn_subs,
+            min_duration=2.0,
+        )
+        if not qc.passed:
+            return {
+                "success": False,
+                "error": f"成片质检失败: {'; '.join(qc.errors)}",
+                "episode_file": final,
+                "composed_shots": len(composed_videos),
+                "total_shots": len(shots),
+                "quality_gate": qc.metrics,
+            }
+
     _progress("合成管线完成", 1.0)
     return {
         "success": bool(final),
         "episode_file": final,
         "composed_shots": len(composed_videos),
         "total_shots": len(shots),
+        "quality_gate": validate_composite_output(final, require_audio=True, subtitle_expected=burn_subs, min_duration=2.0).metrics if final else {},
     }

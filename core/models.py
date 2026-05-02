@@ -272,7 +272,76 @@ class RenderJob:
     model_name: str = ""
     workflow_name: str = ""
     prompt_id: str = ""
+    requested_pipeline: str = ""
+    used_pipeline: str = ""
+    fallback_used: int = 0
+    fallback_from: str = ""
+    render_tier: str = "production"
     output_path: str = ""
+    output_meta: str = "{}"
     error: str = ""
+    created_at: str = field(default_factory=_now)
+    updated_at: str = field(default_factory=_now)
+
+
+@dataclass
+class ShotReview:
+    id: Optional[int] = None
+    project_id: int = 0
+    shot_id: int = 0
+    status: str = "pending"          # pending | approved | rejected
+    reviewer: str = ""
+    notes: str = ""
+    created_at: str = field(default_factory=_now)
+
+
+@dataclass
+class ExportManifest:
+    id: Optional[int] = None
+    project_id: int = 0
+    episode_id: int = 0
+    export_type: str = "episode"
+    file_path: str = ""
+    manifest_json: str = "{}"
+    created_at: str = field(default_factory=_now)
+
+
+@dataclass
+class AssetVersion:
+    id: Optional[int] = None
+    project_id: int = 0
+    shot_id: int = 0
+    asset_type: str = "shot"        # shot | render | audio | subtitle | episode
+    asset_ref_id: int = 0
+    version_number: int = 1
+    source_stage: str = "ui"
+    file_path: str = ""
+    content_json: str = "{}"
+    notes: str = ""
+    created_at: str = field(default_factory=_now)
+
+
+@dataclass
+class SubtitleRevision:
+    id: Optional[int] = None
+    project_id: int = 0
+    shot_id: int = 0
+    version_number: int = 1
+    file_path: str = ""
+    subtitle_text: str = ""
+    source: str = "ui"
+    created_at: str = field(default_factory=_now)
+
+
+@dataclass
+class DeliveryPackage:
+    id: Optional[int] = None
+    project_id: int = 0
+    episode_id: int = 0
+    package_type: str = "hongguo_short_drama"
+    package_path: str = ""
+    assets_json: str = "{}"
+    manifest_json: str = "{}"
+    status: str = "assembled"       # assembled | verified | delivered
     created_at: str = field(default_factory=_now)
     updated_at: str = field(default_factory=_now)

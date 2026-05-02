@@ -130,6 +130,7 @@ pip install -r requirements.txt
 ollama serve
 
 # 2. 启动 ComfyUI（可选，渲染需要）
+# ⚠️ 必须使用 ComfyUI 自己的 .venv（包含 torch）！
 cd ~/Documents/ComfyUI && ./.venv/bin/python3 main.py --listen 127.0.0.1
 
 # 3. 启动本系统
@@ -137,6 +138,27 @@ cd ~/myworkspace/projects/story-agent-system
 source .venv/bin/activate
 python3 main.py
 ```
+
+### 🔍 环境诊断
+
+如遇渲染失败，先检查环境：
+
+```bash
+./start.sh --env
+# 输出示例（关键指标）：
+#   ComfyUI Python: ~/Documents/ComfyUI/.venv/bin/python3
+#   ComfyUI torch:  2.11.0         ← 必须成功，否则渲染不工作
+#   ComfyUI pid:    12345
+```
+
+**常见问题排查：**
+
+| 症状 | 原因 | 修复 |
+|------|------|------|
+| ComfyUI 端口通但 `KeyError: 't5xxl'` | 用错了 Python（无 torch 的 venv） | `./start.sh --restart` 自动修复 |
+| CLIPTextEncodeFlux 节点不存在 | ComfyUI 降级模式运行 | 检查 `/tmp/comfyui.log` 的 ModuleNotFoundError |
+| 渲染很慢或 MPS 崩溃 | batch_size 过大 | 降到 batch_size=8（ADE）或 1（Wan） |
+| ComfyUI 启动后 BrokenPipeError | 后台运行未重定向 stdout | `nohup ... > file 2>&1 &`（start.sh 已处理） |
 
 ---
 

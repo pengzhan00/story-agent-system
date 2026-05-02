@@ -6,17 +6,20 @@ import sqlite3
 import json
 import os
 import threading
+from contextlib import contextmanager
 from typing import Optional, List, Type, TypeVar
 from datetime import datetime, timezone
 
 from .models import (
     Project, Script, Character, SceneAsset,
     MusicTheme, SoundEffect, PromptTemplate, GenerationLog,
-    Episode, Shot, RenderJob
+    Episode, Shot, RenderJob, ShotReview, ExportManifest,
+    AssetVersion, SubtitleRevision, DeliveryPackage,
 )
 
 T = TypeVar("T")
-_lock = threading.Lock()
+_lock = threading.RLock()
+_tl = threading.local()
 
 DB_PATH = os.path.expanduser(
     "~/myworkspace/projects/story-agent-system/data/story_agents.db"
@@ -34,6 +37,11 @@ _table_map = {
     Episode: "episodes",
     Shot: "shots",
     RenderJob: "render_jobs",
+    ShotReview: "shot_reviews",
+    ExportManifest: "export_manifests",
+    AssetVersion: "asset_versions",
+    SubtitleRevision: "subtitle_revisions",
+    DeliveryPackage: "delivery_packages",
 }
 
 # JSON fields per table (auto-serialized/deserialized)
@@ -43,6 +51,9 @@ _json_fields = {
     "scenes": ["ref_images"],
     "prompt_templates": ["variables"],
     "shots": ["characters", "dialogue", "render_payload"],
+    "export_manifests": ["manifest_json"],
+    "asset_versions": ["content_json"],
+    "delivery_packages": ["assets_json", "manifest_json"],
 }
 
 # ───────── Single connection (thread-safe) ─────────
@@ -62,8 +73,44 @@ def _get_conn() -> sqlite3.Connection:
     return _conn
 
 
+@contextmanager
+def transaction():
+    """Atomic block: all writes succeed together or all roll back.
+
+    Usage::
+        with transaction():
+            delete_shots_by_project(pid)
+            create_episode({...})
+            create_shot({...})
+    """
+    with _lock:
+        c = _get_conn()
+        already = getattr(_tl, "in_txn", False)
+        _tl.in_txn = True
+        if not already:
+            c.execute("BEGIN IMMEDIATE")
+        try:
+            yield
+            if not already:
+                c.commit()
+        except Exception:
+            if not already:
+                c.rollback()
+            raise
+        finally:
+            _tl.in_txn = already
+
+
 def _execute(sql: str, params: tuple = ()):
-    """Execute with automatic commit and lock."""
+    """Execute with auto-commit; skips individual commit when inside transaction()."""
+    if getattr(_tl, "in_txn", False):
+        c = _get_conn()
+        try:
+            return c.execute(sql, params)
+        except Exception as e:
+            param_types = [(i, type(v).__name__, str(v)[:80]) for i, v in enumerate(params)]
+            print(f"[DB TXN ERROR] {e}\n[SQL] {sql[:200]}\n[PARAMS] {param_types}", flush=True)
+            raise
     with _lock:
         c = _get_conn()
         try:
@@ -71,7 +118,6 @@ def _execute(sql: str, params: tuple = ()):
             c.commit()
             return cur
         except Exception as e:
-            # 调试：打印 SQL 和参数类型
             param_types = [(i, type(v).__name__, str(v)[:80]) for i, v in enumerate(params)]
             print(f"[DB ERROR] {e}", flush=True)
             print(f"[DB SQL] {sql[:200]}", flush=True)
@@ -250,7 +296,13 @@ def init_db():
                 model_name TEXT NOT NULL DEFAULT '',
                 workflow_name TEXT NOT NULL DEFAULT '',
                 prompt_id TEXT NOT NULL DEFAULT '',
+                requested_pipeline TEXT NOT NULL DEFAULT '',
+                used_pipeline TEXT NOT NULL DEFAULT '',
+                fallback_used INTEGER NOT NULL DEFAULT 0,
+                fallback_from TEXT NOT NULL DEFAULT '',
+                render_tier TEXT NOT NULL DEFAULT 'production',
                 output_path TEXT NOT NULL DEFAULT '',
+                output_meta TEXT NOT NULL DEFAULT '{}',
                 error TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
@@ -344,8 +396,94 @@ def init_db():
 
             CREATE INDEX IF NOT EXISTS idx_pipeline_runs_project ON pipeline_runs(project_id);
             CREATE INDEX IF NOT EXISTS idx_pipeline_runs_stage ON pipeline_runs(stage);
+
+            CREATE TABLE IF NOT EXISTS shot_reviews (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                shot_id INTEGER NOT NULL REFERENCES shots(id) ON DELETE CASCADE,
+                status TEXT NOT NULL DEFAULT 'pending',
+                reviewer TEXT NOT NULL DEFAULT '',
+                notes TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_shot_reviews_project ON shot_reviews(project_id);
+            CREATE INDEX IF NOT EXISTS idx_shot_reviews_shot ON shot_reviews(shot_id);
+
+            CREATE TABLE IF NOT EXISTS export_manifests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                episode_id INTEGER NOT NULL DEFAULT 0 REFERENCES episodes(id) ON DELETE CASCADE,
+                export_type TEXT NOT NULL DEFAULT 'episode',
+                file_path TEXT NOT NULL DEFAULT '',
+                manifest_json TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_exports_project ON export_manifests(project_id);
+            CREATE INDEX IF NOT EXISTS idx_exports_episode ON export_manifests(episode_id);
+
+            CREATE TABLE IF NOT EXISTS asset_versions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                shot_id INTEGER NOT NULL DEFAULT 0,
+                asset_type TEXT NOT NULL DEFAULT 'shot',
+                asset_ref_id INTEGER NOT NULL DEFAULT 0,
+                version_number INTEGER NOT NULL DEFAULT 1,
+                source_stage TEXT NOT NULL DEFAULT 'ui',
+                file_path TEXT NOT NULL DEFAULT '',
+                content_json TEXT NOT NULL DEFAULT '{}',
+                notes TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_asset_versions_project ON asset_versions(project_id);
+            CREATE INDEX IF NOT EXISTS idx_asset_versions_shot ON asset_versions(shot_id);
+            CREATE INDEX IF NOT EXISTS idx_asset_versions_ref ON asset_versions(asset_type, asset_ref_id);
+
+            CREATE TABLE IF NOT EXISTS subtitle_revisions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                shot_id INTEGER NOT NULL DEFAULT 0 REFERENCES shots(id) ON DELETE CASCADE,
+                version_number INTEGER NOT NULL DEFAULT 1,
+                file_path TEXT NOT NULL DEFAULT '',
+                subtitle_text TEXT NOT NULL DEFAULT '',
+                source TEXT NOT NULL DEFAULT 'ui',
+                created_at TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_subtitle_revisions_project ON subtitle_revisions(project_id);
+            CREATE INDEX IF NOT EXISTS idx_subtitle_revisions_shot ON subtitle_revisions(shot_id);
+
+            CREATE TABLE IF NOT EXISTS delivery_packages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                episode_id INTEGER NOT NULL DEFAULT 0 REFERENCES episodes(id) ON DELETE CASCADE,
+                package_type TEXT NOT NULL DEFAULT 'hongguo_short_drama',
+                package_path TEXT NOT NULL DEFAULT '',
+                assets_json TEXT NOT NULL DEFAULT '{}',
+                manifest_json TEXT NOT NULL DEFAULT '{}',
+                status TEXT NOT NULL DEFAULT 'assembled',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_delivery_packages_project ON delivery_packages(project_id);
+            CREATE INDEX IF NOT EXISTS idx_delivery_packages_episode ON delivery_packages(episode_id);
         """)
+        _ensure_column(c, "render_jobs", "requested_pipeline", "TEXT NOT NULL DEFAULT ''")
+        _ensure_column(c, "render_jobs", "used_pipeline", "TEXT NOT NULL DEFAULT ''")
+        _ensure_column(c, "render_jobs", "fallback_used", "INTEGER NOT NULL DEFAULT 0")
+        _ensure_column(c, "render_jobs", "fallback_from", "TEXT NOT NULL DEFAULT ''")
+        _ensure_column(c, "render_jobs", "render_tier", "TEXT NOT NULL DEFAULT 'production'")
+        _ensure_column(c, "render_jobs", "output_meta", "TEXT NOT NULL DEFAULT '{}'")
         c.commit()
+
+
+def _ensure_column(conn: sqlite3.Connection, table: str, column: str, ddl: str):
+    cols = [row["name"] if isinstance(row, sqlite3.Row) else row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()]
+    if column not in cols:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
 
 
 # ───────── Row ↔ Model conversion ─────────
@@ -634,6 +772,149 @@ def list_render_jobs(project_id: int = 0, shot_id: int = 0) -> List[RenderJob]:
     return _list("render_jobs", RenderJob, clause, tuple(params))
 
 
+def create_shot_review(data: dict) -> int:
+    return _insert("shot_reviews", data)
+
+
+def list_shot_reviews(project_id: int = 0, shot_id: int = 0, limit: int = 100) -> list[dict]:
+    where = []
+    params: list = []
+    if project_id:
+        where.append("project_id=?")
+        params.append(project_id)
+    if shot_id:
+        where.append("shot_id=?")
+        params.append(shot_id)
+    clause = " AND ".join(where) if where else "1=1"
+    rows = _fetchall(
+        f"SELECT * FROM shot_reviews WHERE {clause} ORDER BY id DESC LIMIT ?",
+        tuple(params + [limit]),
+    )
+    return [dict(r) for r in rows]
+
+
+def create_export_manifest(data: dict) -> int:
+    return _insert("export_manifests", data)
+
+
+def list_export_manifests(project_id: int = 0, episode_id: int = 0, limit: int = 100) -> list[dict]:
+    where = []
+    params: list = []
+    if project_id:
+        where.append("project_id=?")
+        params.append(project_id)
+    if episode_id:
+        where.append("episode_id=?")
+        params.append(episode_id)
+    clause = " AND ".join(where) if where else "1=1"
+    rows = _fetchall(
+        f"SELECT * FROM export_manifests WHERE {clause} ORDER BY id DESC LIMIT ?",
+        tuple(params + [limit]),
+    )
+    return [dict(r) for r in rows]
+
+
+def _next_version_number(table: str, where_clause: str, params: tuple) -> int:
+    row = _fetchone(
+        f"SELECT COALESCE(MAX(version_number), 0) AS n FROM {table} WHERE {where_clause}",
+        params,
+    )
+    return int(row["n"] or 0) + 1 if row else 1
+
+
+def create_asset_version(data: dict) -> int:
+    version_number = data.get("version_number")
+    if not version_number:
+        version_number = _next_version_number(
+            "asset_versions",
+            "project_id=? AND asset_type=? AND asset_ref_id=?",
+            (data.get("project_id", 0), data.get("asset_type", "shot"), data.get("asset_ref_id", 0)),
+        )
+    payload = dict(data)
+    payload["version_number"] = version_number
+    return _insert("asset_versions", payload)
+
+
+def list_asset_versions(
+    project_id: int = 0,
+    shot_id: int = 0,
+    asset_type: str = "",
+    asset_ref_id: int = 0,
+    limit: int = 100,
+) -> list[dict]:
+    where = []
+    params: list = []
+    if project_id:
+        where.append("project_id=?")
+        params.append(project_id)
+    if shot_id:
+        where.append("shot_id=?")
+        params.append(shot_id)
+    if asset_type:
+        where.append("asset_type=?")
+        params.append(asset_type)
+    if asset_ref_id:
+        where.append("asset_ref_id=?")
+        params.append(asset_ref_id)
+    clause = " AND ".join(where) if where else "1=1"
+    rows = _fetchall(
+        f"SELECT * FROM asset_versions WHERE {clause} ORDER BY id DESC LIMIT ?",
+        tuple(params + [limit]),
+    )
+    return [dict(r) for r in rows]
+
+
+def create_subtitle_revision(data: dict) -> int:
+    version_number = data.get("version_number")
+    if not version_number:
+        version_number = _next_version_number(
+            "subtitle_revisions",
+            "project_id=? AND shot_id=?",
+            (data.get("project_id", 0), data.get("shot_id", 0)),
+        )
+    payload = dict(data)
+    payload["version_number"] = version_number
+    return _insert("subtitle_revisions", payload)
+
+
+def list_subtitle_revisions(project_id: int = 0, shot_id: int = 0, limit: int = 100) -> list[dict]:
+    where = []
+    params: list = []
+    if project_id:
+        where.append("project_id=?")
+        params.append(project_id)
+    if shot_id:
+        where.append("shot_id=?")
+        params.append(shot_id)
+    clause = " AND ".join(where) if where else "1=1"
+    rows = _fetchall(
+        f"SELECT * FROM subtitle_revisions WHERE {clause} ORDER BY id DESC LIMIT ?",
+        tuple(params + [limit]),
+    )
+    return [dict(r) for r in rows]
+
+
+def create_delivery_package(data: dict) -> int:
+    return _insert("delivery_packages", data)
+
+
+def list_delivery_packages(project_id: int = 0, episode_id: int = 0, limit: int = 100) -> list[dict]:
+    where = []
+    params: list = []
+    if project_id:
+        where.append("project_id=?")
+        params.append(project_id)
+    if episode_id:
+        where.append("episode_id=?")
+        params.append(episode_id)
+    clause = " AND ".join(where) if where else "1=1"
+    rows = _fetchall(
+        f"SELECT * FROM delivery_packages WHERE {clause} ORDER BY id DESC LIMIT ?",
+        tuple(params + [limit]),
+    )
+    return [dict(r) for r in rows]
+
+
 # ══════════════════════════════════════════════
 #  Task Queue API
 # ══════════════════════════════════════════════
@@ -702,6 +983,34 @@ def list_tasks(project_id: int = 0, agent_type: str = "", status: str = "", limi
     w = " AND ".join(where) if where else "1=1"
     rows = _fetchall(f"SELECT * FROM task_queue WHERE {w} ORDER BY id DESC LIMIT ?", params + [limit])
     return [dict(r) for r in rows]
+
+
+def cancel_running_tasks(agent_type: str = "") -> int:
+    where = ["status='running'"]
+    params: list = []
+    if agent_type:
+        where.append("agent_type=?")
+        params.append(agent_type)
+    count_row = _fetchone(f"SELECT COUNT(*) AS n FROM task_queue WHERE {' AND '.join(where)}", tuple(params))
+    count = int(count_row["n"]) if count_row else 0
+    if count:
+        now = datetime.now(timezone.utc).isoformat()
+        _execute(
+            f"UPDATE task_queue SET status='failed', error=?, completed_at=? WHERE {' AND '.join(where)}",
+            ("cancelled by operator", now, *params),
+        )
+    return count
+
+
+def cancel_running_render_jobs() -> int:
+    count_row = _fetchone("SELECT COUNT(*) AS n FROM render_jobs WHERE status='running'", ())
+    count = int(count_row["n"]) if count_row else 0
+    if count:
+        _execute(
+            "UPDATE render_jobs SET status='failed', error=? WHERE status='running'",
+            ("cancelled by operator",),
+        )
+    return count
 
 
 def add_agent_log(task_id: int, agent_type: str, action: str, level: str, message: str):

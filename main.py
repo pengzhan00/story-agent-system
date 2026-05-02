@@ -13,6 +13,7 @@ Usage:
 """
 import sys
 import os
+import socket
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -33,6 +34,40 @@ BANNER = r"""
  | (_| | \__ \ \__ \|  __/ |_||_| \__,_| \___/ \___|
   \__,_| |___/ |___/ \___|
 """
+
+
+def _port_available(host: str, port: int) -> bool:
+    """Return True when the TCP port can be bound on the target host."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            sock.bind((host, port))
+            return True
+        except OSError:
+            return False
+
+
+def _resolve_launch_port(default_port: int, host: str = "127.0.0.1", span: int = 20) -> int:
+    """Pick a launch port, preferring env override, then the next available port."""
+    env_value = os.getenv("GRADIO_SERVER_PORT", "").strip()
+    if env_value:
+        try:
+            chosen = int(env_value)
+        except ValueError:
+            raise RuntimeError(f"GRADIO_SERVER_PORT 不是有效端口: {env_value}")
+        if _port_available(host, chosen):
+            return chosen
+        raise RuntimeError(
+            f"端口 {chosen} 已被占用，请修改 GRADIO_SERVER_PORT 后重试。"
+        )
+
+    for port in range(default_port, default_port + span):
+        if _port_available(host, port):
+            return port
+
+    raise RuntimeError(
+        f"无法在 {default_port}-{default_port + span - 1} 范围内找到可用端口。"
+    )
 
 
 def check_environment() -> dict:
@@ -139,14 +174,15 @@ def main():
 
     if "--render" in sys.argv:
         init_db()
-        print("🎬 启动独立渲染服务 (端口 7861)...")
+        port = _resolve_launch_port(7861)
+        print(f"🎬 启动独立渲染服务 (端口 {port})...")
         from ui.render_app import build_render_ui
         app = build_render_ui()
-        print("  🌐 http://127.0.0.1:7861")
+        print(f"  🌐 http://127.0.0.1:{port}")
         print("  💡 按 Ctrl+C 退出\n")
         app.launch(
             server_name="127.0.0.1",
-            server_port=7861,
+            server_port=port,
             share=False,
             show_error=True,
         )
@@ -161,14 +197,15 @@ def main():
 
     from ui.app import build_ui
     app = build_ui()
+    port = _resolve_launch_port(7860)
 
-    print("  🌐 http://127.0.0.1:7860")
+    print(f"  🌐 http://127.0.0.1:{port}")
     print("  📁 工作目录: ~/myworkspace/projects/story-agent-system/")
     print("  💡 按 Ctrl+C 退出\n")
 
     app.launch(
         server_name="127.0.0.1",
-        server_port=7860,
+        server_port=port,
         share=False,
         show_error=True,
     )

@@ -152,6 +152,25 @@ def get_project_bgm(project_id: int) -> Optional[str]:
     return None
 
 
+def get_shot_bgm(project_id: int, shot_id: int) -> Optional[str]:
+    assets = db.list_audio_assets(project_id, shot_id=shot_id)
+    for asset in assets:
+        fp = asset.get("file_path", "")
+        if asset.get("asset_type") == "bgm_shot" and fp and Path(fp).exists():
+            return fp
+    return None
+
+
+def get_shot_sfx(project_id: int, shot_id: int) -> list[dict]:
+    assets = db.list_audio_assets(project_id, shot_id=shot_id)
+    result = []
+    for asset in assets:
+        fp = asset.get("file_path", "")
+        if asset.get("asset_type") == "sfx_shot" and fp and Path(fp).exists():
+            result.append(asset)
+    return result
+
+
 def get_project_sfx(project_id: int) -> list[dict]:
     """返回已生成的音效文件列表。"""
     sfx_list = db.list_sfx(project_id)
