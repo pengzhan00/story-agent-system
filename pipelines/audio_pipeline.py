@@ -629,52 +629,38 @@ def generate_shot_sfx(project_id: int, shot_id: int, output_dir: Path) -> list[d
 
 # ── 音乐生成（Ace-Step / ffmpeg）───────────────────
 
-_ACE_STEP_MODELS = {
-    "unet": "acestep_v1.5_xl_sft_bf16.safetensors",        # 9.3GB，最高质量
-    "unet_turbo": "acestep_v1.5_xl_turbo_bf16.safetensors", # 9.3GB，快速回退
-    "clip1": "qwen_0.6b_ace15.safetensors",
-    "clip2": "qwen_4b_ace15.safetensors",
-    "vae": "ace_1.5_vae.safetensors",
-}
-
-# 模型实际存放路径（通过 extra_model_paths.yaml 映射到 ComfyUI）
-_ACE_STEP_MODEL_BASE = Path(os.path.expanduser("~/myworkspace/ComfyUI_models"))
+# NOTE: The installed ACE-Step-ComfyUI plugin (custom_nodes/ACE-Step-ComfyUI)
+# is a pure API/server plugin — it calls the ACE-Step REST API at
+# http://127.0.0.1:8002 and does NOT load local model weights itself.
+# The plugin's NODE_CLASS_MAPPINGS contains only:
+#   AceStepText2MusicGenParams, AceStepSettings, AceStepText2MusicServer,
+#   AceStepAudioCodes, AceStepShowText
+# There are no UNETLoader / DualCLIPLoader / VAELoader nodes in this plugin.
+# If you switch to a local-inference variant in the future, restore the model
+# path constants below and update _check_acestep_music() / generate_music_acestep().
 
 
 def _check_acestep_music() -> bool:
+    """Check that ComfyUI is running and the ACE-Step server plugin is loaded.
+
+    The installed plugin (ACE-Step-ComfyUI) is a pure API/server plugin.
+    Its NODE_CLASS_MAPPINGS only contains:
+      AceStepText2MusicGenParams, AceStepSettings, AceStepText2MusicServer,
+      AceStepAudioCodes, AceStepShowText
+    There are NO local-model-loader nodes (UNETLoader, DualCLIPLoader, etc.)
+    in this plugin — those were from a different (local-inference) variant.
+    """
     try:
         import requests as req
         r = req.get("http://127.0.0.1:8188/object_info", timeout=5)
         if r.status_code != 200:
             return False
         data = r.json()
-        required = {
-            "UNETLoader", "DualCLIPLoader", "VAELoader", "EmptyAceStep1.5LatentAudio",
-            "TextEncodeAceStepAudio1.5", "ConditioningZeroOut", "ModelSamplingAuraFlow",
-            "KSampler", "VAEDecodeAudio", "SaveAudioMP3",
-        }
-        if not required.issubset(data.keys()):
-            return False
-        # 至少有一个 unet（XL 或 turbo）+ clip + vae
-        unet_ok = (
-            (_ACE_STEP_MODEL_BASE / "diffusion_models" / _ACE_STEP_MODELS["unet"]).exists()
-            or (_ACE_STEP_MODEL_BASE / "diffusion_models" / _ACE_STEP_MODELS["unet_turbo"]).exists()
-        )
-        other_ok = all([
-            (_ACE_STEP_MODEL_BASE / "text_encoders" / _ACE_STEP_MODELS["clip1"]).exists(),
-            (_ACE_STEP_MODEL_BASE / "text_encoders" / _ACE_STEP_MODELS["clip2"]).exists(),
-            (_ACE_STEP_MODEL_BASE / "vae" / _ACE_STEP_MODELS["vae"]).exists(),
-        ])
-        return unet_ok and other_ok
+        # The ACE-Step ComfyUI plugin exposes server-mode nodes only.
+        required = {"AceStepText2MusicGenParams", "AceStepSettings", "AceStepText2MusicServer"}
+        return required.issubset(data.keys())
     except Exception:
         return False
-
-
-def _acestep_unet_name() -> str:
-    """返回当前可用的最优 ACE-Step UNet 名称（XL 优先，turbo 回退）。"""
-    if (_ACE_STEP_MODEL_BASE / "diffusion_models" / _ACE_STEP_MODELS["unet"]).exists():
-        return _ACE_STEP_MODELS["unet"]
-    return _ACE_STEP_MODELS["unet_turbo"]
 
 
 def generate_music_acestep(
@@ -683,61 +669,90 @@ def generate_music_acestep(
     duration: int = 30,
     mood: str = "",
 ) -> bool:
-    """Use ComfyUI Ace-Step 1.5 when models are installed locally."""
+    """Generate music via the ACE-Step ComfyUI server plugin.
+
+    The installed ACE-Step-ComfyUI plugin is a pure API/server plugin.
+    NODE_CLASS_MAPPINGS (verified from __init__.py / nodes.py):
+      - AceStepText2MusicGenParams  (builds gen_params bundle)
+      - AceStepSettings             (builds inference settings bundle)
+      - AceStepText2MusicServer     (calls ACE-Step REST API, returns AUDIO)
+      - SaveAudio                   (built-in ComfyUI node, saves result)
+
+    The old workflow that referenced UNETLoader / DualCLIPLoader / VAELoader /
+    TextEncodeAceStepAudio1.5 / EmptyAceStep1.5LatentAudio / KSampler etc.
+    was written for a different local-inference variant of the plugin and does
+    not match the installed plugin's node names at all.
+    """
     if not _check_acestep_music():
         return False
     try:
         from pipelines.render_pipeline import submit_workflow, wait_for_completion_result
-        seed = int(time.time() * 1000) % (2 ** 31)
-        tags = prompt.strip() or mood or "cinematic soundtrack, chinese fantasy, instrumental"
-        unet_name = _acestep_unet_name()
+        seed = str(int(time.time() * 1000) % (2 ** 31))
+        caption = prompt.strip() or mood or "cinematic soundtrack, chinese fantasy, instrumental"
+
+        # Workflow uses only nodes that exist in the installed plugin.
+        # AceStepText2MusicGenParams INPUT_TYPES (optional fields used here):
+        #   caption (STRING), lyrics (STRING), duration (FLOAT),
+        #   vocal_language (enum), is_instrumental (BOOLEAN), auto (BOOLEAN),
+        #   bpm (INT), key (STRING), time_signature (STRING)
+        # AceStepSettings INPUT_TYPES (required fields):
+        #   seed (STRING), thinking (BOOLEAN), use_cot_caption (BOOLEAN),
+        #   use_cot_language (BOOLEAN), temperature (FLOAT), lm_cfg_scale (FLOAT),
+        #   lm_top_p (FLOAT), lm_top_k (INT), dit_guidance_scale (FLOAT),
+        #   dit_inference_steps (INT), dit_infer_method (enum: ode|sde)
+        # AceStepText2MusicServer INPUT_TYPES (required fields):
+        #   mode (enum: cloud|local), server_url (STRING),
+        #   gen_params (ACESTEP_GEN_PARAMS), settings (ACESTEP_SETTINGS)
+        # SaveAudio INPUT_TYPES (required fields):
+        #   audio (AUDIO), filename_prefix (STRING)
         workflow = {
-            "1": {"class_type": "UNETLoader", "inputs": {"unet_name": unet_name, "weight_dtype": "default"}},
-            "2": {"class_type": "DualCLIPLoader", "inputs": {
-                "clip_name1": _ACE_STEP_MODELS["clip1"],
-                "clip_name2": _ACE_STEP_MODELS["clip2"],
-                "type": "ace",
-                "device": "default",
-            }},
-            "3": {"class_type": "VAELoader", "inputs": {"vae_name": _ACE_STEP_MODELS["vae"]}},
-            "4": {"class_type": "TextEncodeAceStepAudio1.5", "inputs": {
-                "clip": ["2", 0],
-                "tags": tags,
-                "lyrics": "",
-                "seed": seed,
-                "bpm": 120,
-                "duration": float(duration),
-                "timesignature": "4",
-                "language": "zh",
-                "keyscale": "E minor",
-                "generate_audio_codes": True,
-                "cfg_scale": 2.0,
-                "temperature": 0.85,
-                "top_p": 0.9,
-                "top_k": 0,
-                "min_p": 0.0,
-            }},
-            "5": {"class_type": "ConditioningZeroOut", "inputs": {"conditioning": ["4", 0]}},
-            "6": {"class_type": "EmptyAceStep1.5LatentAudio", "inputs": {"seconds": float(duration), "batch_size": 1}},
-            "7": {"class_type": "ModelSamplingAuraFlow", "inputs": {"model": ["1", 0], "shift": 3.0}},
-            "8": {"class_type": "KSampler", "inputs": {
-                "model": ["7", 0],
-                "seed": seed,
-                "steps": 8,
-                "cfg": 1.0,
-                "sampler_name": "euler",
-                "scheduler": "simple",
-                "positive": ["4", 0],
-                "negative": ["5", 0],
-                "latent_image": ["6", 0],
-                "denoise": 1.0,
-            }},
-            "9": {"class_type": "VAEDecodeAudio", "inputs": {"samples": ["8", 0], "vae": ["3", 0]}},
-            "10": {"class_type": "SaveAudioMP3", "inputs": {
-                "audio": ["9", 0],
-                "filename_prefix": "audio/story_agent_acestep",
-                "quality": "128k",
-            }},
+            "1": {
+                "class_type": "AceStepText2MusicGenParams",
+                "inputs": {
+                    "sample_mode": False,
+                    "vocal_language": "zh",
+                    "caption": caption,
+                    "lyrics": "",
+                    "is_instrumental": True,
+                    "auto": False,
+                    "bpm": 120,
+                    "key": "E minor",
+                    "duration": float(duration),
+                    "time_signature": "4",
+                },
+            },
+            "2": {
+                "class_type": "AceStepSettings",
+                "inputs": {
+                    "seed": seed,
+                    "thinking": True,
+                    "use_cot_caption": True,
+                    "use_cot_language": True,
+                    "temperature": 0.85,
+                    "lm_cfg_scale": 2.0,
+                    "lm_top_p": 0.9,
+                    "lm_top_k": 0,
+                    "dit_guidance_scale": 7.0,
+                    "dit_inference_steps": 8,
+                    "dit_infer_method": "ode",
+                },
+            },
+            "3": {
+                "class_type": "AceStepText2MusicServer",
+                "inputs": {
+                    "mode": "local",
+                    "server_url": "http://127.0.0.1:8002",
+                    "gen_params": ["1", 0],
+                    "settings": ["2", 0],
+                },
+            },
+            "4": {
+                "class_type": "SaveAudio",
+                "inputs": {
+                    "audio": ["3", 0],
+                    "filename_prefix": "audio/story_agent_acestep",
+                },
+            },
         }
         prompt_id = submit_workflow(workflow, "http://127.0.0.1:8188")
         if not prompt_id:

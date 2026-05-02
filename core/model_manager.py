@@ -23,7 +23,6 @@ _NODE_FIELD = {
     "vae":          ("VAELoader",              "vae_name"),
     "controlnet":   ("ControlNetLoader",       "control_net_name"),
     "upscale":      ("UpscaleModelLoader",     "model_name"),
-    "animatediff":  ("ADE_LoadAnimateDiffModel", "model_name"),
     "ipadapter":    ("IPAdapterModelLoader",   "ipadapter_file"),
     "clip_vision":  ("CLIPVisionLoader",       "clip_name"),
 }
@@ -35,13 +34,12 @@ _MODEL_SUBDIR = {
     "vae":         "models/vae",
     "controlnet":  "models/controlnet",
     "upscale":     "models/upscale_models",
-    "animatediff": "custom_nodes/ComfyUI-AnimateDiff-Evolved/models",
     "ipadapter":   "models/ipadapter",
     "clip_vision": "models/clip_vision",
 }
 
 
-# ── object_info 缓存（与 animate_pipeline 共享同一端点）──
+# ── object_info 缓存（ComfyUI object_info 缓存）──
 
 _cache: Optional[dict] = None
 _cache_time: float = 0.0

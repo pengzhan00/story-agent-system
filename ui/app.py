@@ -1237,7 +1237,6 @@ def _detect_missing_models(_pid=None):
     # 字段名 → 子文件夹映射（相对路径字段所属子目录）
     SUBDIR_MAP = {
         "checkpoint": "checkpoints",
-        "motion_model": "animatediff_models",
         "vae": "vae",
         "flux_vae": "vae",
     }
@@ -1659,13 +1658,7 @@ def get_system_status() -> str:
     online = comfyui_online()
     lines.append(f"**ComfyUI**: {'🟢 在线' if online else '🔴 离线'}")
 
-    # AnimateDiff
-    try:
-        from pipelines.animate_pipeline import animatediff_available
-        ade = animatediff_available()
-        lines.append(f"**AnimateDiff**: {'✅ ADE 运动工作流（16帧@8fps）' if ade else '⚠️ 静态单帧回退（缺 hsxl_temporal_layers.f16.safetensors）'}")
-    except Exception:
-        lines.append("**AnimateDiff**: ❓ 检测失败")
+    lines.append("**视频生成**: Wan2.2 TI2V 5B ✅")
 
     # TTS
     try:
@@ -1750,7 +1743,6 @@ MODEL_TYPE_LABELS = {
     "lora":        "LoRA (风格/角色)",
     "vae":         "VAE",
     "controlnet":  "ControlNet",
-    "animatediff": "AnimateDiff 动态模块",
     "upscale":     "Upscale 模型",
 }
 
@@ -1869,6 +1861,425 @@ def load_existing_project(proj_choice: str):
         "",
         "",
     )
+
+
+MODEL_AUDIT_SPECS = [
+    {
+        "group": "Wan 2.2 视频主线",
+        "name": "Wan2.2-TI2V-5B GGUF",
+        "kind": "file",
+        "path": "~/myworkspace/ComfyUI_models/unet/Wan2.2-TI2V-5B-Q4_K_M.gguf",
+        "min_size_mb": 1200,
+        "critical": True,
+    },
+    {
+        "group": "Wan 2.2 视频主线",
+        "name": "Wan2.2-T2V 14B/T2V A14B",
+        "kind": "any",
+        "paths": [
+            "~/myworkspace/ComfyUI_models/unet/Wan2.2-T2V-14B-Q4_K_M.gguf",
+            "~/myworkspace/ComfyUI_models/unet/Wan2.2-T2V-A14B-Q4_K_M.gguf",
+            "~/myworkspace/ComfyUI_models/wan_t2v/Wan2.2-T2V-A14B",
+        ],
+        "patterns": ["*.gguf", "*.safetensors", "*.bin", "*.pt"],
+        "critical": False,
+    },
+    {
+        "group": "Wan 2.2 视频主线",
+        "name": "Wan2.2-I2V A14B",
+        "kind": "dir",
+        "path": "~/myworkspace/ComfyUI_models/wan_i2v/Wan2.2-I2V-A14B",
+        "patterns": ["*.gguf", "*.safetensors", "*.bin", "*.pt"],
+        "critical": False,
+    },
+    {
+        "group": "Wan 编辑 / 动画",
+        "name": "Wan2.1-VACE-1.3B",
+        "kind": "dir",
+        "path": "~/myworkspace/ComfyUI_models/wan_vace/Wan2.1-VACE-1.3B",
+        "patterns": ["*.safetensors", "*.bin", "*.pt", "*.gguf"],
+        "critical": False,
+    },
+    {
+        "group": "Wan 编辑 / 动画",
+        "name": "Wan2.2-Animate-14B",
+        "kind": "dir",
+        "path": "~/myworkspace/ComfyUI_models/wan_animate/Wan2.2-Animate-14B",
+        "patterns": ["*.safetensors", "*.bin", "*.pt", "*.gguf"],
+        "critical": False,
+    },
+    {
+        "group": "Wan 编码器 / VAE",
+        "name": "Wan UMT5 FP8",
+        "kind": "file",
+        "path": "~/myworkspace/ComfyUI_models/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+        "min_size_mb": 1000,
+        "critical": True,
+    },
+    {
+        "group": "Wan 编码器 / VAE",
+        "name": "Wan UMT5 BF16",
+        "kind": "file",
+        "path": "~/myworkspace/ComfyUI_models/text_encoders/wan2.2_umt5/models_t5_umt5-xxl-enc-bf16.pth",
+        "min_size_mb": 1000,
+        "critical": True,
+    },
+    {
+        "group": "Wan 编码器 / VAE",
+        "name": "Wan2.2 VAE",
+        "kind": "file",
+        "path": "~/myworkspace/ComfyUI_models/vae/Wan2.2_VAE.safetensors",
+        "min_size_mb": 500,
+        "critical": True,
+    },
+    {
+        "group": "FLUX",
+        "name": "FLUX.2-klein-4B",
+        "kind": "any",
+        "paths": [
+            "~/myworkspace/ComfyUI_models/checkpoints/flux-2-klein-4b.safetensors",
+            "~/myworkspace/ComfyUI_models/diffusion_models/flux-2-klein-4b.safetensors",
+            "~/myworkspace/ComfyUI_models/checkpoints/flux_2_klein_4B",
+        ],
+        "patterns": ["*flux*4b*.safetensors"],
+        "critical": False,
+    },
+    {
+        "group": "FLUX",
+        "name": "FLUX VAE ae.safetensors",
+        "kind": "file",
+        "path": "~/myworkspace/ComfyUI_models/vae/ae.safetensors",
+        "min_size_mb": 100,
+        "critical": False,
+    },
+    {
+        "group": "ACE-Step 音乐",
+        "name": "ACE-Step XL SFT",
+        "kind": "file",
+        "path": "~/myworkspace/ComfyUI_models/diffusion_models/acestep_v1.5_xl_sft_bf16.safetensors",
+        "min_size_mb": 3000,
+        "critical": True,
+    },
+    {
+        "group": "ACE-Step 音乐",
+        "name": "ACE-Step XL Turbo",
+        "kind": "file",
+        "path": "~/myworkspace/ComfyUI_models/diffusion_models/acestep_v1.5_xl_turbo_bf16.safetensors",
+        "min_size_mb": 3000,
+        "critical": True,
+    },
+    {
+        "group": "ACE-Step 音乐",
+        "name": "ACE-Step Turbo AIO",
+        "kind": "file",
+        "path": "~/myworkspace/ComfyUI_models/diffusion_models/acestep_v1.5_turbo.safetensors",
+        "min_size_mb": 1000,
+        "critical": False,
+    },
+    {
+        "group": "ACE-Step 音乐",
+        "name": "ACE-Step Qwen 0.6B",
+        "kind": "file",
+        "path": "~/myworkspace/ComfyUI_models/text_encoders/qwen_0.6b_ace15.safetensors",
+        "min_size_mb": 500,
+        "critical": True,
+    },
+    {
+        "group": "ACE-Step 音乐",
+        "name": "ACE-Step Qwen 4B",
+        "kind": "file",
+        "path": "~/myworkspace/ComfyUI_models/text_encoders/qwen_4b_ace15.safetensors",
+        "min_size_mb": 1000,
+        "critical": True,
+    },
+    {
+        "group": "ACE-Step 音乐",
+        "name": "ACE-Step VAE",
+        "kind": "file",
+        "path": "~/myworkspace/ComfyUI_models/vae/ace_1.5_vae.safetensors",
+        "min_size_mb": 100,
+        "critical": True,
+    },
+    {
+        "group": "角色一致性",
+        "name": "InstantID ControlNet",
+        "kind": "file",
+        "path": "~/myworkspace/ComfyUI_models/controlnet/InstantID-ControlNet.safetensors",
+        "min_size_mb": 500,
+        "critical": True,
+    },
+    {
+        "group": "角色一致性",
+        "name": "InstantID IP-Adapter",
+        "kind": "file",
+        "path": "~/myworkspace/ComfyUI_models/instantid/ip-adapter.bin",
+        "min_size_mb": 500,
+        "critical": True,
+    },
+    {
+        "group": "角色一致性",
+        "name": "CLIP Vision H14",
+        "kind": "file",
+        "path": "~/myworkspace/ComfyUI_models/clip_vision/CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors",
+        "min_size_mb": 1000,
+        "critical": True,
+    },
+    {
+        "group": "角色一致性",
+        "name": "InsightFace antelopev2",
+        "kind": "dir",
+        "path": "~/myworkspace/ComfyUI_models/insightface/models/antelopev2",
+        "patterns": ["*.onnx"],
+        "critical": True,
+    },
+]
+
+
+def _human_size(num_bytes: int) -> str:
+    if num_bytes >= 1024 ** 3:
+        return f"{num_bytes / 1024 ** 3:.1f} GiB"
+    if num_bytes >= 1024 ** 2:
+        return f"{num_bytes / 1024 ** 2:.1f} MiB"
+    if num_bytes >= 1024:
+        return f"{num_bytes / 1024:.1f} KiB"
+    return f"{num_bytes} B"
+
+
+def _is_metadata_only_file(path: Path) -> bool:
+    name = path.name
+    meta_suffixes = (".metadata", ".lock", ".aria2", ".idmdownload", ".part")
+    meta_names = {".gitattributes", ".gitignore", "README.md", "CACHEDIR.TAG", ".DS_Store", ".msc", ".mv"}
+    return (
+        name in meta_names
+        or name.endswith(meta_suffixes)
+        or ".cache/huggingface" in str(path)
+    )
+
+
+def _find_real_payload_files(root: Path, patterns: list[str]) -> list[Path]:
+    files: list[Path] = []
+    for pattern in patterns:
+        files.extend([p for p in root.rglob(pattern) if p.is_file() and not _is_metadata_only_file(p)])
+    uniq = []
+    seen = set()
+    for item in files:
+        if item in seen:
+            continue
+        seen.add(item)
+        uniq.append(item)
+    return uniq
+
+
+def _find_downloading_artifacts(root: Path) -> list[Path]:
+    artifacts = []
+    for pattern in ("*.idmdownload", "*.aria2", "*.part", "*.lock"):
+        artifacts.extend([p for p in root.rglob(pattern) if p.is_file()])
+    return artifacts
+
+
+def _evaluate_model_spec(spec: dict) -> dict:
+    min_size_bytes = int(spec.get("min_size_mb", 0) * 1024 * 1024)
+    paths = [Path(os.path.expanduser(p)) for p in spec.get("paths", [])] or [Path(os.path.expanduser(spec["path"]))]
+    patterns = spec.get("patterns", ["*.safetensors", "*.bin", "*.pt", "*.gguf", "*.onnx"])
+    best = {
+        "name": spec["name"],
+        "group": spec["group"],
+        "critical": bool(spec.get("critical", False)),
+        "status": "missing",
+        "path": str(paths[0]),
+        "detail": "未发现可用文件",
+        "size_bytes": 0,
+    }
+
+    for path in paths:
+        kind = spec["kind"]
+        if kind in {"file", "any"} and path.exists() and path.is_file():
+            size = path.resolve().stat().st_size if path.is_symlink() else path.stat().st_size
+            if size >= min_size_bytes:
+                return {
+                    **best,
+                    "status": "ready",
+                    "path": str(path),
+                    "detail": f"文件可用 · {_human_size(size)}",
+                    "size_bytes": size,
+                }
+        if kind == "file":
+            downloads = _find_downloading_artifacts(path.parent) if path.parent.exists() else []
+            related = [p for p in downloads if path.stem in p.name or path.name in p.name]
+            if related:
+                size = sum(p.stat().st_size for p in related if p.exists())
+                best = {
+                    **best,
+                    "status": "downloading",
+                    "path": str(path.parent),
+                    "detail": f"下载中 {len(related)} 项 · {_human_size(size)}",
+                    "size_bytes": size,
+                }
+        else:
+            if path.exists() and path.is_dir():
+                payloads = _find_real_payload_files(path, patterns)
+                if payloads:
+                    size = sum(p.stat().st_size for p in payloads if p.exists())
+                    return {
+                        **best,
+                        "status": "ready",
+                        "path": str(path),
+                        "detail": f"目录就绪 · {len(payloads)} 个主文件 · {_human_size(size)}",
+                        "size_bytes": size,
+                    }
+                downloads = _find_downloading_artifacts(path)
+                if downloads:
+                    size = sum(p.stat().st_size for p in downloads if p.exists())
+                    best = {
+                        **best,
+                        "status": "downloading",
+                        "path": str(path),
+                        "detail": f"目录下载中 · {len(downloads)} 个分片 · {_human_size(size)}",
+                        "size_bytes": size,
+                    }
+                elif any(path.rglob("*")):
+                    best = {
+                        **best,
+                        "status": "metadata",
+                        "path": str(path),
+                        "detail": "仅有 README / cache / metadata，暂无主权重",
+                        "size_bytes": 0,
+                    }
+        if spec["kind"] == "any" and best["status"] == "ready":
+            return best
+    return best
+
+
+def collect_model_audit() -> list[dict]:
+    return [_evaluate_model_spec(spec) for spec in MODEL_AUDIT_SPECS]
+
+
+def format_model_audit_markdown() -> str:
+    entries = collect_model_audit()
+    icon = {
+        "ready": "✅",
+        "downloading": "⏳",
+        "metadata": "⚠️",
+        "missing": "❌",
+    }
+    summary = {
+        "ready": sum(1 for e in entries if e["status"] == "ready"),
+        "downloading": sum(1 for e in entries if e["status"] == "downloading"),
+        "metadata": sum(1 for e in entries if e["status"] == "metadata"),
+        "missing": sum(1 for e in entries if e["status"] == "missing"),
+    }
+    lines = [
+        "### 🧱 模型资产审计",
+        f"- 已可用: {summary['ready']}",
+        f"- 下载中: {summary['downloading']}",
+        f"- 空壳目录: {summary['metadata']}",
+        f"- 真缺失: {summary['missing']}",
+        "",
+    ]
+    groups: dict[str, list[dict]] = {}
+    for entry in entries:
+        groups.setdefault(entry["group"], []).append(entry)
+    for group, rows in groups.items():
+        lines.append(f"#### {group}")
+        for row in rows:
+            critical = " [关键]" if row["critical"] else ""
+            path_text = row["path"].replace(str(Path.home()), "~")
+            lines.append(f"- {icon[row['status']]} **{row['name']}**{critical}")
+            lines.append(f"  路径: `{path_text}`")
+            lines.append(f"  状态: {row['detail']}")
+    return "\n".join(lines)
+
+
+def format_industrial_sop_markdown() -> str:
+    return "\n".join([
+        "### 🏭 工业化 SOP",
+        "1. 模型资产审计：先保证 `Wan2.2-TI2V`、Wan 编码器、ACE-Step、InstantID 四组关键资产可用。",
+        "2. 内容生成：优先用 `🔥 一键全流程生成` 生成剧本、角色、场景、音乐、音效和分镜。",
+        "3. 分镜审校：在 `🎞️ 分镜` Tab 按 shot 审核，通过后自动锁定，退回的 shot 直接重跑。",
+        "4. 批量渲染：优先使用 `🚀 全量渲染+导出`，中途中断时改用 `♻️ 断点续跑`。",
+        "5. 音频与合成：让统一音频管线自动跑 TTS/BGM/SFX，再由统一合成管线输出成片。",
+        "6. 交付留痕：导出后保留导出清单、字幕修订和 shot 审核历史，避免返工时丢上下文。",
+    ])
+
+
+def format_industrial_console(pid: int) -> tuple[str, str, str]:
+    entries = collect_model_audit()
+    critical_missing = [e for e in entries if e["critical"] and e["status"] != "ready"]
+    critical_ready = [e for e in entries if e["critical"] and e["status"] == "ready"]
+
+    try:
+        from pipelines.render_pipeline import get_dispatcher, load_pipeline_config
+        cfg = load_pipeline_config()
+        active_pipeline = cfg.get("active_pipeline", "")
+        matrix = get_dispatcher().capability_matrix()
+        pipeline_state = matrix.get(active_pipeline, {})
+        pipeline_text = (
+            f"- 活跃管线: `{active_pipeline}`\n"
+            f"- 管线可用: {'是' if pipeline_state.get('available') else '否'}\n"
+        )
+    except Exception as e:
+        active_pipeline = ""
+        pipeline_text = f"- 管线状态读取失败: `{str(e)[:120]}`\n"
+
+    if not pid:
+        next_action = "先创建或加载项目，然后执行 `🔥 一键全流程生成`。"
+        project_text = "- 当前未加载项目"
+    else:
+        proj = get_project(int(pid))
+        stage = _stage_status(int(pid))
+        shots = list_shots(project_id=int(pid))
+        ready = sum(1 for s in shots if s.status == "ready")
+        rendered = sum(1 for s in shots if s.status == "rendered")
+        approved = sum(1 for s in shots if s.status == "approved")
+        qc_failed = sum(1 for s in shots if s.status == "qc_failed")
+        if not stage.get("story"):
+            next_action = "先补齐内容阶段，优先执行 `🔥 一键全流程生成`。"
+        elif not stage.get("shots"):
+            next_action = "内容已生成但分镜未规划，运行 `步骤5: 分镜` 或重新全流程生成。"
+        elif approved < len(shots) and len(shots) > 0:
+            next_action = "进入 `🎞️ 分镜` Tab 批量审核并锁定关键 shot，再启动全量渲染。"
+        elif rendered < len(shots):
+            next_action = "使用 `🚀 全量渲染+导出`；若中断，改用 `♻️ 断点续跑`。"
+        elif qc_failed > 0:
+            next_action = "先处理 `qc_failed` 的 shot，再重新批量渲染。"
+        else:
+            next_action = "素材基本就绪，可直接做合成导出或抽查成片质量。"
+        project_text = "\n".join([
+            f"- 当前项目: `{proj.name if proj else pid}`",
+            f"- 分镜数: {len(shots)}",
+            f"- 待渲染: {ready}",
+            f"- 已渲染: {rendered}",
+            f"- 已通过审核: {approved}",
+            f"- 质检失败: {qc_failed}",
+        ])
+
+    ops_md = "\n".join([
+        "### 🎛️ 工业化总控",
+        project_text,
+        pipeline_text.rstrip(),
+        f"- 关键模型就绪: {len(critical_ready)}/{len(critical_ready) + len(critical_missing)}",
+        f"- 当前建议: {next_action}",
+        "",
+        "#### 快捷入口",
+        "- `🔥 一键全流程生成`：从故事到分镜一口气完成。",
+        "- `🚀 全量渲染+导出`：统一跑渲染、音频、合成、导出。",
+        "- `♻️ 断点续跑`：项目中断后只补未完成的 shot 和阶段。",
+        "- `🎞️ 分镜` Tab：审核、锁定、退回、重渲染都在这里闭环。",
+    ])
+
+    missing_lines = ["### 🚨 当前瓶颈"]
+    if critical_missing:
+        for item in critical_missing:
+            missing_lines.append(f"- `{item['name']}`: {item['detail']}")
+    else:
+        missing_lines.append("- 关键生产模型已就绪，当前可按工业化流程推进。")
+    return ops_md, "\n".join(missing_lines), format_industrial_sop_markdown()
+
+
+def load_industrial_dashboard(pid: int) -> tuple[str, str, str, str]:
+    ops_md, bottleneck_md, sop_md = format_industrial_console(int(pid or 0))
+    audit_md = format_model_audit_markdown()
+    return ops_md, bottleneck_md, audit_md, sop_md
 
 
 # ─── ComfyUI 启动 ─────────────────────────────────────
@@ -2036,8 +2447,25 @@ def build_ui():
         gr.Markdown("---")
         gr.Markdown("## ✏️ 各步骤工作站  *每个 Tab 可独立编辑 & 单步执行*")
         production_overview = gr.Markdown("运行管线后自动展示生产指标。")
+        industrial_ops_default = "### 🎛️ 工业化总控\n先加载项目或生成内容。"
+        industrial_bottleneck_default = "### 🚨 当前瓶颈\n等待审计。"
+        industrial_model_audit_default = format_model_audit_markdown()
+        industrial_sop_default = format_industrial_sop_markdown()
 
         with gr.Tabs():
+            with gr.TabItem("🏭 工业化控制台"):
+                gr.Markdown("### 面向批量生产的总控面板\n把模型资产、阶段状态、推荐动作和快捷入口放到一个界面。")
+                with gr.Row():
+                    industrial_refresh_btn = gr.Button("🔄 刷新控制台", variant="primary", scale=1)
+                    industrial_refresh_models_btn = gr.Button("🧱 只刷新模型审计", scale=1)
+                with gr.Row():
+                    with gr.Column(scale=1):
+                        industrial_ops_card = gr.Markdown(value=industrial_ops_default)
+                        industrial_bottleneck_card = gr.Markdown(value=industrial_bottleneck_default)
+                    with gr.Column(scale=1):
+                        industrial_model_audit_card = gr.Markdown(value=industrial_model_audit_default)
+                        industrial_sop_card = gr.Markdown(value=industrial_sop_default)
+
             # ─── 概览 ──────────────────────────────
             with gr.TabItem("📺 概览"):
                 view_md = gr.Markdown(value="运行管线后自动展示可读内容。")
@@ -2045,7 +2473,7 @@ def build_ui():
             # ─── 分镜 ──────────────────────────────
             with gr.TabItem("🎞️ 分镜"):
                 shot_table = gr.Dataframe(
-                    headers=["ID", "Act", "Scene", "Shot", "场景", "镜头", "情绪", "角色", "状态", "锁定"],
+                    headers=["ID", "Act", "Scene", "Shot", "场景", "镜头", "情绪", "角色", "状态", "管线", "回退", "音频", "锁定"],
                     value=[], interactive=False, label="分镜列表",
                 )
                 with gr.Row():
@@ -2296,7 +2724,7 @@ def build_ui():
                     render_step_status_md = gr.Markdown(load_render_status(0))
                     render_status_refresh_btn = gr.Button("🔄 刷新", size="sm", scale=0, min_width=50)
                 gr.Markdown(
-                    "渲染使用 ComfyUI（AnimateDiff 或静态帧兜底）。已渲染的 Shot 自动跳过。",
+                    "渲染使用 ComfyUI（Wan2.2 TI2V）。已渲染的 Shot 自动跳过。",
                     elem_classes="gr-text-small",
                 )
                 with gr.Row():
@@ -2517,6 +2945,11 @@ def build_ui():
             inputs=[proj_dropdown],
             outputs=_load_proj_outputs,
             queue=False,
+        ).then(
+            fn=load_industrial_dashboard,
+            inputs=[project_id_state],
+            outputs=[industrial_ops_card, industrial_bottleneck_card, industrial_model_audit_card, industrial_sop_card],
+            queue=False,
         )
         proj_refresh_btn.click(
             fn=lambda: gr.update(choices=get_project_choices()),
@@ -2564,6 +2997,11 @@ def build_ui():
                     story_model, char_model, scene_model, art_model],
             outputs=gen_outputs,
             concurrency_limit=2,
+        ).then(
+            fn=load_industrial_dashboard,
+            inputs=[project_id_state],
+            outputs=[industrial_ops_card, industrial_bottleneck_card, industrial_model_audit_card, industrial_sop_card],
+            queue=False,
         )
 
         # Phase 1: 分步运行
@@ -2773,6 +3211,11 @@ def build_ui():
             inputs=[project_id_state, project_name, render_config_state],
             outputs=[render_log, render_results, project_id_state],
             concurrency_limit=2,
+        ).then(
+            fn=load_industrial_dashboard,
+            inputs=[project_id_state],
+            outputs=[industrial_ops_card, industrial_bottleneck_card, industrial_model_audit_card, industrial_sop_card],
+            queue=False,
         )
 
         # Phase 2: 续跑
@@ -2780,6 +3223,24 @@ def build_ui():
             fn=resume_pipeline_flow,
             inputs=[project_id_state],
             outputs=[render_log, pipeline_state_md],
+        ).then(
+            fn=load_industrial_dashboard,
+            inputs=[project_id_state],
+            outputs=[industrial_ops_card, industrial_bottleneck_card, industrial_model_audit_card, industrial_sop_card],
+            queue=False,
+        )
+
+        industrial_refresh_btn.click(
+            fn=load_industrial_dashboard,
+            inputs=[project_id_state],
+            outputs=[industrial_ops_card, industrial_bottleneck_card, industrial_model_audit_card, industrial_sop_card],
+            queue=False,
+        )
+        industrial_refresh_models_btn.click(
+            fn=format_model_audit_markdown,
+            inputs=[],
+            outputs=[industrial_model_audit_card],
+            queue=False,
         )
 
         # Phase 2: 管线选择器切换

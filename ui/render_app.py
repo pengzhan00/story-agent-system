@@ -5,10 +5,12 @@ ComfyUI 不可用时优雅降级，仅显示任务列表。
 """
 import gradio as gr
 import json
+import json as _json
 import os
 import time
 import threading
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 from core.database import (
@@ -16,13 +18,33 @@ from core.database import (
     add_agent_log, list_agent_logs, get_project,
     cancel_running_tasks, cancel_running_render_jobs,
 )
-from pipelines.animate_pipeline import (
-    inspect_pipeline_capability,
-    get_pipeline_config,
-    get_active_pipeline,
-    list_pipelines_with_capabilities,
-    set_active_pipeline,
-)
+def get_pipeline_config() -> dict:
+    _cfg_path = Path(__file__).parent.parent / "pipelines" / "pipeline_config.json"
+    return _json.loads(_cfg_path.read_text())
+
+def get_active_pipeline() -> str:
+    return get_pipeline_config().get("active_pipeline", "wan2_ti2v")
+
+def list_pipelines_with_capabilities() -> list:
+    cfg = get_pipeline_config()
+    return [
+        {"id": p["name"], "name": p["name"], "description": p.get("description", ""),
+         "production_ready": p.get("production_ready", False)}
+        for p in cfg.get("pipelines", [])
+    ]
+
+def set_active_pipeline(pipeline_id: str) -> dict:
+    _cfg_path = Path(__file__).parent.parent / "pipelines" / "pipeline_config.json"
+    cfg = _json.loads(_cfg_path.read_text())
+    cfg["active_pipeline"] = pipeline_id
+    _cfg_path.write_text(_json.dumps(cfg, indent=2, ensure_ascii=False))
+    return {"active": pipeline_id}
+
+def inspect_pipeline_capability(pipeline_id: str) -> dict:
+    cfg = get_pipeline_config()
+    pipeline = next((p for p in cfg.get("pipelines", []) if p["name"] == pipeline_id), None)
+    return {"id": pipeline_id, "available": pipeline is not None,
+            "production_ready": (pipeline or {}).get("production_ready", False)}
 from pipelines.batch_renderer import BatchRenderer
 
 APP_TITLE = "🎬 漫剧渲染服务 — Render Service"

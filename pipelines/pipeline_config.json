@@ -15,8 +15,8 @@
         "text_encoder": "~/myworkspace/ComfyUI_models/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors",
         "min_encoder_size_mb": 1000,
         "vae": "Wan2.2_VAE.safetensors",
-        "width": 832,
-        "height": 480,
+        "width": 480,
+        "height": 832,
         "frames": 49,
         "fps": 16,
         "steps": 20,
@@ -25,8 +25,8 @@
         "sampler_name": "uni_pc",
         "scheduler": "simple",
         "smoke": {
-          "width": 512,
-          "height": 288,
+          "width": 288,
+          "height": 512,
           "frames": 9,
           "fps": 8,
           "steps": 8,
@@ -50,8 +50,8 @@
         "text_encoder": "~/myworkspace/ComfyUI_models/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors",
         "min_encoder_size_mb": 1000,
         "vae": "Wan2.2_VAE.safetensors",
-        "width": 832,
-        "height": 480,
+        "width": 480,
+        "height": 832,
         "frames": 49,
         "fps": 16,
         "steps": 20,
@@ -60,8 +60,8 @@
         "sampler_name": "uni_pc",
         "scheduler": "simple",
         "smoke": {
-          "width": 512,
-          "height": 288,
+          "width": 288,
+          "height": 512,
           "frames": 9,
           "fps": 8,
           "steps": 8,
@@ -97,8 +97,8 @@
       "production_ready": false,
       "description": "ffmpeg 纯黑帧占位 | 最终兜底",
       "config": {
-        "width": 832,
-        "height": 480,
+        "width": 480,
+        "height": 832,
         "duration_sec": 3.0
       }
     }
