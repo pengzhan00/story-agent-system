@@ -629,10 +629,9 @@ def generate_shot_sfx(project_id: int, shot_id: int, output_dir: Path) -> list[d
 
 # ── 音乐生成（Ace-Step / ffmpeg）───────────────────
 
-# XL-SFT 最高质量；turbo 作回退（更小更快）
 _ACE_STEP_MODELS = {
-    "unet": "acestep_v1.5_xl_sft_bf16.safetensors",   # 9.3GB，最高质量
-    "unet_turbo": "acestep_v1.5_turbo.safetensors",    # 3.9GB，快速回退
+    "unet": "acestep_v1.5_xl_sft_bf16.safetensors",        # 9.3GB，最高质量
+    "unet_turbo": "acestep_v1.5_xl_turbo_bf16.safetensors", # 9.3GB，快速回退
     "clip1": "qwen_0.6b_ace15.safetensors",
     "clip2": "qwen_4b_ace15.safetensors",
     "vae": "ace_1.5_vae.safetensors",
