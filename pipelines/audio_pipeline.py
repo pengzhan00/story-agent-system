@@ -629,12 +629,17 @@ def generate_shot_sfx(project_id: int, shot_id: int, output_dir: Path) -> list[d
 
 # ── 音乐生成（Ace-Step / ffmpeg）───────────────────
 
+# XL-SFT 最高质量；turbo 作回退（更小更快）
 _ACE_STEP_MODELS = {
-    "unet": "acestep_v1.5_turbo.safetensors",
+    "unet": "acestep_v1.5_xl_sft_bf16.safetensors",   # 9.3GB，最高质量
+    "unet_turbo": "acestep_v1.5_turbo.safetensors",    # 3.9GB，快速回退
     "clip1": "qwen_0.6b_ace15.safetensors",
     "clip2": "qwen_4b_ace15.safetensors",
     "vae": "ace_1.5_vae.safetensors",
 }
+
+# 模型实际存放路径（通过 extra_model_paths.yaml 映射到 ComfyUI）
+_ACE_STEP_MODEL_BASE = Path(os.path.expanduser("~/myworkspace/ComfyUI_models"))
 
 
 def _check_acestep_music() -> bool:
@@ -651,16 +656,26 @@ def _check_acestep_music() -> bool:
         }
         if not required.issubset(data.keys()):
             return False
-        model_base = Path(os.path.expanduser("~/Documents/ComfyUI/models"))
-        paths = [
-            model_base / "diffusion_models" / _ACE_STEP_MODELS["unet"],
-            model_base / "text_encoders" / _ACE_STEP_MODELS["clip1"],
-            model_base / "text_encoders" / _ACE_STEP_MODELS["clip2"],
-            model_base / "vae" / _ACE_STEP_MODELS["vae"],
-        ]
-        return all(path.exists() for path in paths)
+        # 至少有一个 unet（XL 或 turbo）+ clip + vae
+        unet_ok = (
+            (_ACE_STEP_MODEL_BASE / "diffusion_models" / _ACE_STEP_MODELS["unet"]).exists()
+            or (_ACE_STEP_MODEL_BASE / "diffusion_models" / _ACE_STEP_MODELS["unet_turbo"]).exists()
+        )
+        other_ok = all([
+            (_ACE_STEP_MODEL_BASE / "text_encoders" / _ACE_STEP_MODELS["clip1"]).exists(),
+            (_ACE_STEP_MODEL_BASE / "text_encoders" / _ACE_STEP_MODELS["clip2"]).exists(),
+            (_ACE_STEP_MODEL_BASE / "vae" / _ACE_STEP_MODELS["vae"]).exists(),
+        ])
+        return unet_ok and other_ok
     except Exception:
         return False
+
+
+def _acestep_unet_name() -> str:
+    """返回当前可用的最优 ACE-Step UNet 名称（XL 优先，turbo 回退）。"""
+    if (_ACE_STEP_MODEL_BASE / "diffusion_models" / _ACE_STEP_MODELS["unet"]).exists():
+        return _ACE_STEP_MODELS["unet"]
+    return _ACE_STEP_MODELS["unet_turbo"]
 
 
 def generate_music_acestep(
@@ -676,8 +691,9 @@ def generate_music_acestep(
         from pipelines.render_pipeline import submit_workflow, wait_for_completion_result
         seed = int(time.time() * 1000) % (2 ** 31)
         tags = prompt.strip() or mood or "cinematic soundtrack, chinese fantasy, instrumental"
+        unet_name = _acestep_unet_name()
         workflow = {
-            "1": {"class_type": "UNETLoader", "inputs": {"unet_name": _ACE_STEP_MODELS["unet"], "weight_dtype": "default"}},
+            "1": {"class_type": "UNETLoader", "inputs": {"unet_name": unet_name, "weight_dtype": "default"}},
             "2": {"class_type": "DualCLIPLoader", "inputs": {
                 "clip_name1": _ACE_STEP_MODELS["clip1"],
                 "clip_name2": _ACE_STEP_MODELS["clip2"],
