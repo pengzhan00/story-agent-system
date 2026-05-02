@@ -9,6 +9,7 @@ import os
 import time
 import threading
 from datetime import datetime
+from typing import Optional
 
 from core.database import (
     init_db, list_tasks, get_task, claim_next_task, complete_task,
