@@ -631,7 +631,7 @@ def generate_shot_sfx(project_id: int, shot_id: int, output_dir: Path) -> list[d
 
 # NOTE: The installed ACE-Step-ComfyUI plugin (custom_nodes/ACE-Step-ComfyUI)
 # is a pure API/server plugin — it calls the ACE-Step REST API at
-# http://127.0.0.1:8002 and does NOT load local model weights itself.
+# http://127.0.0.1:8001 and does NOT load local model weights itself.
 # The plugin's NODE_CLASS_MAPPINGS contains only:
 #   AceStepText2MusicGenParams, AceStepSettings, AceStepText2MusicServer,
 #   AceStepAudioCodes, AceStepShowText
@@ -741,7 +741,7 @@ def generate_music_acestep(
                 "class_type": "AceStepText2MusicServer",
                 "inputs": {
                     "mode": "local",
-                    "server_url": "http://127.0.0.1:8002",
+                    "server_url": "http://127.0.0.1:8001",
                     "gen_params": ["1", 0],
                     "settings": ["2", 0],
                 },
