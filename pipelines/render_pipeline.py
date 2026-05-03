@@ -1106,45 +1106,378 @@ class Wan2TI2VPipeline(RenderPipeline):
         return output_path
 
 
+def _wan2_render_finish(
+    pipeline: "RenderPipeline",
+    wf: dict,
+    output_path: Path,
+) -> Path:
+    """提交 workflow → 等待完成 → 拷贝输出文件。供各 Wan2 管线复用。"""
+    prompt_id = submit_workflow(wf, pipeline.comfyui_url)
+    if not prompt_id:
+        raise RenderError("ComfyUI 拒绝提交 Wan2.2 工作流")
+    timeout = pipeline.config.get("timeout", 7200)
+    result = wait_for_completion_result(prompt_id, pipeline.comfyui_url, timeout=timeout)
+    if result["status"] != "completed":
+        raise RenderError(
+            f"Wan2.2 渲染失败 ({result['error_type']}, prompt_id={prompt_id[:8]}): "
+            f"{result['error_message']}"
+        )
+    files = get_video_output(result["outputs"])
+    if not files:
+        raise RenderError("Wan2.2 ComfyUI 输出中无视频文件")
+    vf = files[0]
+    subfolder = vf.get("subfolder", "")
+    src = (_COMFYUI_OUTPUT_DIR / subfolder / vf["filename"]
+           if subfolder else _COMFYUI_OUTPUT_DIR / vf["filename"])
+    if not src.exists():
+        raise RenderError(f"Wan2.2 输出视频不存在: {src}")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(src, output_path)
+    return output_path
+
+
+def _wan2_inject_common(
+    wf: dict,
+    bundle: dict,
+    config: dict,
+    encoder_name: str,
+    vae_name: str,
+    seed: int,
+) -> dict:
+    """注入 prompt / seed / encoder / VAE / sampler / CreateVideo 参数。"""
+    prompt = bundle["positive_prompt"]
+    negative = bundle.get("negative_prompt", NEGATIVE_PROMPT)
+
+    clip_ids = find_nodes_by_type(wf, "CLIPTextEncode")
+    if clip_ids:
+        wf[clip_ids[0]]["inputs"]["text"] = prompt
+        if len(clip_ids) > 1:
+            wf[clip_ids[1]]["inputs"]["text"] = negative
+    else:
+        wf = inject_prompt(wf, prompt, negative)
+
+    wf = inject_seed(wf, seed)
+
+    for node in wf.values():
+        ct = node.get("class_type")
+        if ct == "CLIPLoader" and encoder_name:
+            node["inputs"]["clip_name"] = encoder_name
+            node["inputs"]["type"] = "wan"
+        elif ct == "VAELoader":
+            node["inputs"]["vae_name"] = vae_name
+        elif ct == "ModelSamplingSD3":
+            node["inputs"]["shift"] = float(config.get("shift", 8.0))
+        elif ct == "KSampler":
+            node["inputs"]["steps"] = int(config.get("steps", 20))
+            node["inputs"]["cfg"] = float(config.get("cfg", 5.0))
+            node["inputs"]["sampler_name"] = config.get("sampler_name", "uni_pc")
+            node["inputs"]["scheduler"] = config.get("scheduler", "simple")
+            node["inputs"]["denoise"] = float(config.get("denoise", 1.0))
+        elif ct == "CreateVideo":
+            node["inputs"]["fps"] = float(bundle.get("fps") or config.get("fps", 16))
+        elif ct == "SaveVideo":
+            prefix = config.get("output_prefix") or "video/wan2_scene"
+            node["inputs"]["filename_prefix"] = prefix
+            node["inputs"]["format"] = "mp4"
+            node["inputs"]["codec"] = "h264"
+    return wf
+
+
+# ══════════════════════════════════════════════════════
+# Wan2T2VPipeline  — T2V GGUF（下载后自动解锁）
+# ══════════════════════════════════════════════════════
+
 class Wan2T2VPipeline(RenderPipeline):
-    """
-    Wan2.2 T2V-A14B GGUF — 纯文本→视频（无需参考图）。
-    需要模型: wan2.2_t2v_high_noise_14B_Q4_K_M.gguf
-    """
-    NAME = "wan2_t2v"
+    """Wan2.2 T2V GGUF 14B — 纯文本→视频（GGUF 快稿，无需参考图）。"""
+
+    name = "wan2_t2v"
+    required_nodes = ["UnetLoaderGGUF", "CLIPLoader", "ModelSamplingSD3",
+                      "Wan22ImageToVideoLatent", "CreateVideo", "SaveVideo"]
+
+    def validate(self, object_info: dict) -> list[str]:
+        missing = super().validate(object_info)
+        wf_file = _PIPELINES_DIR / self.config.get("workflow_file", "wan2_t2v_workflow.json")
+        if not wf_file.exists():
+            missing.append(f"workflow_file:{wf_file.name}")
+        gguf_raw = self.config.get("gguf_path", "")
+        if gguf_raw:
+            gguf_path = Path(os.path.expanduser(gguf_raw))
+            min_mb = self.config.get("min_gguf_size_mb", 7000)
+            if not gguf_path.exists():
+                missing.append(f"gguf:{gguf_path.name} (未下载)")
+            elif gguf_path.stat().st_size / (1024 * 1024) < min_mb:
+                missing.append(f"gguf:{gguf_path.name} (不完整)")
+        return missing
 
     def render(self, shot_payload: dict, output_path: Path) -> Path:
-        raise NotImplementedError(
-            "Wan2T2VPipeline: 模型 wan2.2_t2v_high_noise_14B_Q4_K_M.gguf 尚未下载。"
-            "请先运行: hf download bullerwins/Wan2.2-T2V-A14B-GGUF "
-            "wan2.2_t2v_high_noise_14B_Q4_K_M.gguf "
-            "--local-dir ~/myworkspace/ComfyUI_models/unet/"
-        )
+        wf_file = _PIPELINES_DIR / self.config.get("workflow_file", "wan2_t2v_workflow.json")
+        wf = json.loads(wf_file.read_text())
 
+        bundle = build_pipeline_prompt_bundle(shot_payload, self.name)
+        seed = int(time.time() * 1000) % (2 ** 31)
+        gguf_name = Path(os.path.expanduser(self.config.get("gguf_path", ""))).name
+        encoder_name = Path(os.path.expanduser(self.config.get("text_encoder", ""))).name
+
+        # 注入 GGUF 模型名
+        for node in wf.values():
+            if node.get("class_type") == "UnetLoaderGGUF":
+                node["inputs"]["unet_name"] = gguf_name
+            elif node.get("class_type") == "Wan22ImageToVideoLatent":
+                node["inputs"]["width"] = int(bundle.get("width") or self.config.get("width", 480))
+                node["inputs"]["height"] = int(bundle.get("height") or self.config.get("height", 832))
+                node["inputs"]["length"] = int(bundle.get("frames") or self.config.get("frames", 49))
+
+        wf = _wan2_inject_common(wf, bundle, self.config, encoder_name,
+                                  self.config.get("vae", "Wan2.2_VAE.safetensors"), seed)
+        return _wan2_render_finish(self, wf, output_path)
+
+
+# ══════════════════════════════════════════════════════
+# Wan2VACEPipeline  — VACE GGUF（下载后自动解锁）
+# ══════════════════════════════════════════════════════
 
 class Wan2VACEPipeline(RenderPipeline):
-    """
-    Wan2.2 VACE-Fun-A14B GGUF — 视频→视频 / 局部重绘。
-    需要模型: Wan2.2-VACE-Fun-A14B-high-noise-Q4_K_M.gguf
-    """
-    NAME = "wan2_vace"
+    """Wan2.2 VACE GGUF 14B — 参考图/视频→视频（GGUF 快稿）。"""
+
+    name = "wan2_vace"
+    required_nodes = ["UnetLoaderGGUF", "CLIPLoader", "ModelSamplingSD3",
+                      "WanVaceToVideo", "CreateVideo", "SaveVideo"]
+
+    def validate(self, object_info: dict) -> list[str]:
+        missing = super().validate(object_info)
+        wf_file = _PIPELINES_DIR / self.config.get("workflow_file", "wan2_vace_workflow.json")
+        if not wf_file.exists():
+            missing.append(f"workflow_file:{wf_file.name}")
+        gguf_raw = self.config.get("gguf_path", "")
+        if gguf_raw:
+            gguf_path = Path(os.path.expanduser(gguf_raw))
+            min_mb = self.config.get("min_gguf_size_mb", 7000)
+            if not gguf_path.exists():
+                missing.append(f"gguf:{gguf_path.name} (未下载)")
+            elif gguf_path.stat().st_size / (1024 * 1024) < min_mb:
+                missing.append(f"gguf:{gguf_path.name} (不完整)")
+        return missing
 
     def render(self, shot_payload: dict, output_path: Path) -> Path:
-        raise NotImplementedError(
-            "Wan2VACEPipeline: 模型 Wan2.2-VACE-Fun-A14B-high-noise-Q4_K_M.gguf 尚未下载。"
-            "请先运行: hf download QuantStack/Wan2.2-VACE-Fun-A14B-GGUF "
-            "'HighNoise/Wan2.2-VACE-Fun-A14B-high-noise-Q4_K_M.gguf' "
-            "--local-dir ~/myworkspace/ComfyUI_models/unet/"
-        )
+        wf_file = _PIPELINES_DIR / self.config.get("workflow_file", "wan2_vace_workflow.json")
+        wf = json.loads(wf_file.read_text())
+
+        bundle = build_pipeline_prompt_bundle(shot_payload, self.name)
+        seed = int(time.time() * 1000) % (2 ** 31)
+        gguf_name = Path(os.path.expanduser(self.config.get("gguf_path", ""))).name
+        encoder_name = Path(os.path.expanduser(self.config.get("text_encoder", ""))).name
+
+        # 注入可选参考图
+        ref_image = shot_payload.get("reference_image_path")
+        uploaded_name = None
+        if ref_image and Path(str(ref_image)).exists():
+            uploaded_name = self._upload_image(ref_image)
+
+        for node in wf.values():
+            ct = node.get("class_type")
+            if ct == "UnetLoaderGGUF":
+                node["inputs"]["unet_name"] = gguf_name
+            elif ct == "WanVaceToVideo":
+                node["inputs"]["width"] = int(bundle.get("width") or self.config.get("width", 480))
+                node["inputs"]["height"] = int(bundle.get("height") or self.config.get("height", 832))
+                node["inputs"]["length"] = int(bundle.get("frames") or self.config.get("frames", 49))
+                node["inputs"]["strength"] = float(self.config.get("vace_strength", 1.0))
+                if not uploaded_name and "reference_image" in node["inputs"]:
+                    del node["inputs"]["reference_image"]
+            elif ct == "LoadImage" and uploaded_name:
+                node["inputs"]["image"] = uploaded_name
+
+        wf = _wan2_inject_common(wf, bundle, self.config, encoder_name,
+                                  self.config.get("vae", "Wan2.2_VAE.safetensors"), seed)
+        return _wan2_render_finish(self, wf, output_path)
+
+
+# ══════════════════════════════════════════════════════
+# Wan2I2VFP16Pipeline  — I2V 全精度 fp16（已就绪）
+# ══════════════════════════════════════════════════════
+
+class Wan2I2VFP16Pipeline(RenderPipeline):
+    """Wan2.2 I2V fp16 14B — 图+文→视频（全精度交付）。"""
+
+    name = "wan2_i2v_fp16"
+    required_nodes = ["UNETLoader", "CLIPLoader", "ModelSamplingSD3",
+                      "WanImageToVideo", "CreateVideo", "SaveVideo"]
+
+    def validate(self, object_info: dict) -> list[str]:
+        missing = super().validate(object_info)
+        wf_file = _PIPELINES_DIR / self.config.get("workflow_file", "wan2_i2v_fp16_workflow.json")
+        if not wf_file.exists():
+            missing.append(f"workflow_file:{wf_file.name}")
+        model_name = self.config.get("model_name", "")
+        if model_name:
+            # 在 wan_i2v 目录下检查
+            model_path = Path(os.path.expanduser("~/myworkspace/ComfyUI_models/wan_i2v")) / model_name
+            if not model_path.exists():
+                missing.append(f"unet:{model_name} (未找到)")
+        return missing
+
+    def render(self, shot_payload: dict, output_path: Path) -> Path:
+        wf_file = _PIPELINES_DIR / self.config.get("workflow_file", "wan2_i2v_fp16_workflow.json")
+        wf = json.loads(wf_file.read_text())
+
+        bundle = build_pipeline_prompt_bundle(shot_payload, self.name)
+        seed = int(time.time() * 1000) % (2 ** 31)
+        model_name = self.config.get("model_name", "wan2.2_i2v_high_noise_14B_fp16.safetensors")
+        encoder_name = Path(os.path.expanduser(self.config.get("text_encoder", ""))).name
+
+        # 注入参考图（I2V 必须）
+        ref_image = shot_payload.get("reference_image_path")
+        if not ref_image or not Path(str(ref_image)).exists():
+            ref_image = str(generate_reference_keyframe_image(
+                shot_payload, comfyui_url=self.comfyui_url, config=self.config,
+            ))
+        uploaded_name = self._upload_image(ref_image)
+
+        for node in wf.values():
+            ct = node.get("class_type")
+            if ct == "UNETLoader":
+                node["inputs"]["unet_name"] = model_name
+            elif ct == "WanImageToVideo":
+                node["inputs"]["width"] = int(bundle.get("width") or self.config.get("width", 480))
+                node["inputs"]["height"] = int(bundle.get("height") or self.config.get("height", 832))
+                node["inputs"]["length"] = int(bundle.get("frames") or self.config.get("frames", 49))
+            elif ct == "LoadImage":
+                node["inputs"]["image"] = uploaded_name
+
+        wf = _wan2_inject_common(wf, bundle, self.config, encoder_name,
+                                  self.config.get("vae", "Wan2.2_VAE.safetensors"), seed)
+
+        # InstantID（可选）
+        ref_face = shot_payload.get("face_image")
+        if ref_face and Path(str(ref_face)).exists():
+            try:
+                wf = inject_instantid(
+                    wf, self._upload_image(str(ref_face)),
+                    ip_weight=self.config.get("instantid_ip_weight", 0.8),
+                    cn_strength=self.config.get("instantid_cn_strength", 0.8),
+                    comfyui_url=self.comfyui_url,
+                )
+            except Exception as e:
+                print(f"[InstantID] I2V 注入失败（{e}），继续无 InstantID 渲染")
+
+        return _wan2_render_finish(self, wf, output_path)
+
+
+# ══════════════════════════════════════════════════════
+# Wan2T2VFP16Pipeline  — T2V 全精度 fp16（已就绪）
+# ══════════════════════════════════════════════════════
+
+class Wan2T2VFP16Pipeline(RenderPipeline):
+    """Wan2.2 T2V fp16 14B — 纯文本→视频（全精度交付，无需参考图）。"""
+
+    name = "wan2_t2v_fp16"
+    required_nodes = ["UNETLoader", "CLIPLoader", "ModelSamplingSD3",
+                      "Wan22ImageToVideoLatent", "CreateVideo", "SaveVideo"]
+
+    def validate(self, object_info: dict) -> list[str]:
+        missing = super().validate(object_info)
+        wf_file = _PIPELINES_DIR / self.config.get("workflow_file", "wan2_t2v_fp16_workflow.json")
+        if not wf_file.exists():
+            missing.append(f"workflow_file:{wf_file.name}")
+        model_name = self.config.get("model_name", "")
+        if model_name:
+            model_path = Path(os.path.expanduser("~/myworkspace/ComfyUI_models/wan_t2v")) / model_name
+            if not model_path.exists():
+                missing.append(f"unet:{model_name} (未找到)")
+        return missing
+
+    def render(self, shot_payload: dict, output_path: Path) -> Path:
+        wf_file = _PIPELINES_DIR / self.config.get("workflow_file", "wan2_t2v_fp16_workflow.json")
+        wf = json.loads(wf_file.read_text())
+
+        bundle = build_pipeline_prompt_bundle(shot_payload, self.name)
+        seed = int(time.time() * 1000) % (2 ** 31)
+        model_name = self.config.get("model_name", "wan2.2_t2v_high_noise_14B_fp16.safetensors")
+        encoder_name = Path(os.path.expanduser(self.config.get("text_encoder", ""))).name
+
+        for node in wf.values():
+            ct = node.get("class_type")
+            if ct == "UNETLoader":
+                node["inputs"]["unet_name"] = model_name
+            elif ct == "Wan22ImageToVideoLatent":
+                node["inputs"]["width"] = int(bundle.get("width") or self.config.get("width", 480))
+                node["inputs"]["height"] = int(bundle.get("height") or self.config.get("height", 832))
+                node["inputs"]["length"] = int(bundle.get("frames") or self.config.get("frames", 49))
+
+        wf = _wan2_inject_common(wf, bundle, self.config, encoder_name,
+                                  self.config.get("vae", "Wan2.2_VAE.safetensors"), seed)
+        return _wan2_render_finish(self, wf, output_path)
+
+
+# ══════════════════════════════════════════════════════
+# Wan2VACEFp8Pipeline  — VACE fp8（已就绪）
+# ══════════════════════════════════════════════════════
+
+class Wan2VACEFp8Pipeline(RenderPipeline):
+    """Wan2.2 VACE fp8 14B — 参考图/视频→视频（全精度交付）。"""
+
+    name = "wan2_vace_fp8"
+    required_nodes = ["UNETLoader", "CLIPLoader", "ModelSamplingSD3",
+                      "WanVaceToVideo", "CreateVideo", "SaveVideo"]
+
+    def validate(self, object_info: dict) -> list[str]:
+        missing = super().validate(object_info)
+        wf_file = _PIPELINES_DIR / self.config.get("workflow_file", "wan2_vace_fp8_workflow.json")
+        if not wf_file.exists():
+            missing.append(f"workflow_file:{wf_file.name}")
+        model_name = self.config.get("model_name", "")
+        if model_name:
+            model_path = Path(os.path.expanduser("~/myworkspace/ComfyUI_models/wan_vace")) / model_name
+            if not model_path.exists():
+                missing.append(f"unet:{model_name} (未找到)")
+        return missing
+
+    def render(self, shot_payload: dict, output_path: Path) -> Path:
+        wf_file = _PIPELINES_DIR / self.config.get("workflow_file", "wan2_vace_fp8_workflow.json")
+        wf = json.loads(wf_file.read_text())
+
+        bundle = build_pipeline_prompt_bundle(shot_payload, self.name)
+        seed = int(time.time() * 1000) % (2 ** 31)
+        model_name = self.config.get("model_name",
+                                      "wan2.2_fun_vace_high_noise_14B_fp8_scaled.safetensors")
+        encoder_name = Path(os.path.expanduser(self.config.get("text_encoder", ""))).name
+
+        # 注入可选参考图
+        ref_image = shot_payload.get("reference_image_path")
+        uploaded_name = None
+        if ref_image and Path(str(ref_image)).exists():
+            uploaded_name = self._upload_image(ref_image)
+
+        for node in wf.values():
+            ct = node.get("class_type")
+            if ct == "UNETLoader":
+                node["inputs"]["unet_name"] = model_name
+            elif ct == "WanVaceToVideo":
+                node["inputs"]["width"] = int(bundle.get("width") or self.config.get("width", 480))
+                node["inputs"]["height"] = int(bundle.get("height") or self.config.get("height", 832))
+                node["inputs"]["length"] = int(bundle.get("frames") or self.config.get("frames", 49))
+                node["inputs"]["strength"] = float(self.config.get("vace_strength", 1.0))
+                if not uploaded_name and "reference_image" in node["inputs"]:
+                    del node["inputs"]["reference_image"]
+            elif ct == "LoadImage" and uploaded_name:
+                node["inputs"]["image"] = uploaded_name
+
+        wf = _wan2_inject_common(wf, bundle, self.config, encoder_name,
+                                  self.config.get("vae", "Wan2.2_VAE.safetensors"), seed)
+        return _wan2_render_finish(self, wf, output_path)
 
 
 _PIPELINE_CLASSES: dict[str, type[RenderPipeline]] = {
-    # Wan2.2 核心栈
-    "Wan2TI2VPipeline":       Wan2TI2VPipeline,
-    "Wan2T2VPipeline":        Wan2T2VPipeline,
-    "Wan2VACEPipeline":       Wan2VACEPipeline,
+    # Wan2.2 GGUF 快稿
+    "Wan2TI2VPipeline":    Wan2TI2VPipeline,
+    "Wan2T2VPipeline":     Wan2T2VPipeline,
+    "Wan2VACEPipeline":    Wan2VACEPipeline,
+    # Wan2.2 全精度交付
+    "Wan2I2VFP16Pipeline": Wan2I2VFP16Pipeline,
+    "Wan2T2VFP16Pipeline": Wan2T2VFP16Pipeline,
+    "Wan2VACEFp8Pipeline": Wan2VACEFp8Pipeline,
     # 兜底
-    "StubPipeline":           StubPipeline,
+    "StubPipeline":        StubPipeline,
 }
 
 
