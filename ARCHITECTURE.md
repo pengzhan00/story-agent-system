@@ -1,5 +1,6 @@
 # Story Agent System — 架构真相源
-> **版本**: 2026-05-02 | **环境**: macOS M5 Max 128GB | **目标**: 红果短剧 + 大电影工业化生产
+> **版本**: 2026-05-10 | **环境**: macOS M5 Max 128GB | **目标**: 红果短剧 + 大电影工业化生产
+> **渲染管线**: LTX 2.3 distilled 22B (720×1280 竖屏)
 
 ---
 
@@ -296,20 +297,15 @@ story-agent-system/
 │   └── render_scheduler/       # 分镜规划
 │
 ├── pipelines/
-│   ├── render_pipeline.py      # 渲染管线（ABC + 5 实现 + Dispatcher）
+│   ├── render_pipeline.py      # 渲染管线（ABC + LTX + Stub + Dispatcher）
 │   ├── pipeline_config.json    # 管线配置（真相源）
 │   ├── audio_pipeline.py       # 音频（TTS + ACE-Step + 混音）
 │   ├── batch_renderer.py       # 批量渲染调度
 │   ├── compositor.py           # 视频合成（shot → episode）
 │   ├── quality_gate.py         # 质量门控
-│   ├── output_manager.py       # 输出文件管理
+│   ├── quick_video.py          # 快速视频生成模块
 │   │
-│   ├── wan2_ti2v_workflow.json        ✅ Wan2.2 TI2V
-│   ├── flux_txt2img_workflow.json     ✅ Flux 9B txt2img
-│   ├── animatediff_workflow.json      ✅ AnimateDiff 回退
-│   ├── wan2_t2v_workflow.json         ❌ 待创建（纯文→视频）
-│   ├── wan2_vace_workflow.json        ❌ 待创建（视频→视频）
-│   └── img2img_workflow.json          ❌ 待创建（图→图）
+│   └── ltx_t2v_workflow.json           ✅ LTX 2.3 distilled T2V（主力）
 │
 └── ui/
     ├── app.py                  # 主 UI（创作 + 管理）
@@ -378,39 +374,35 @@ Stage 12 集数导出    → episode MP4                ⚠️ DeliveryPackage �
 
 ---
 
-## 9. 渲染管线（5 级 fallback）
+## 9. 渲染管线（LTX 2.3 生态）
 
 ```
 shot.render_payload → RenderDispatcher.render()
     │
-    ├─ [P3] Wan2TI2VPipeline        ★ production_ready=true, active
-    │        文+图→视频，16fps，角色一致性强
-    │        条件: Wan2.2 GGUF (1.4GB ✅) + UMT5 Encoder (11GB ✅) + VAE ✅
-    │        输出: 49帧 832×480 16fps → ⚠️ 需改竖屏 720×1280
+    ├─ [P0] LTXT2VOnlyPipeline    ★ production_ready=true, 快速试片
+    │        纯文本→视频，无 i2v，更快速
+    │        条件: LTX 2.3 distilled 22B ✅ + Gemma 3 12B encoder ✅ + LoRA ✅
+    │        输出: 720×1280 竖屏，16fps，49帧 (~3秒)
     │
-    ├─ [P2] FluxWan2TwoStagePipeline  production_ready=false
-    │        Flux Klein 4B → Wan2.2 TI2V 两阶段
-    │        条件: flux-2-klein-4b.safetensors (0B ❌ 空文件)
-    │        状态: 当前不可用，待 4B 下载完成
+    ├─ [P1] LTXT2VPipeline        ★ production_ready=true, 生产主力
+    │        纯文本→视频 + 空间上采样 x2
+    │        条件: LTX 2.3 distilled 22B ✅ + Gemma 3 12B encoder ✅ + LoRA ✅ + Upscaler ✅
+    │        输出: 720×1280 → 1440×2560 竖屏，16fps，49帧
     │
-    ├─ [P1] AnimateDiffPipeline (animagine)  production_ready=false
-    │        动漫风格 SDXL 动画
-    │        条件: animagine-xl-3.1 ✅ + hsxl motion ✅
-    │        输出: 16帧 1024×1024 8fps → ⚠️ 方屏，帧率低
-    │
-    ├─ [P1] AnimateDiffPipeline (sd_xl_base)  回退1
-    │
-    ├─ [P10] StaticFramePipeline  回退2（单帧延伸为视频）
-    │
-    └─ [P99] StubPipeline  最终兜底（黑帧）
+    └─ [P99] StubPipeline         最终兜底（ffmpeg 黑帧）
 
 ComfyUI 工作流文件:
-  ✅ wan2_ti2v_workflow.json     — Wan2TI2VPipeline
-  ✅ flux_txt2img_workflow.json  — FluxWan2 Stage1
-  ✅ animatediff_workflow.json   — AnimateDiffPipeline
-  ❌ wan2_t2v_workflow.json      — 纯文→视频（待创建）
-  ❌ wan2_vace_workflow.json     — 视频→视频（待创建）
-  ❌ img2img_workflow.json       — 图→图（待创建）
+  ✅ ltx_t2v_workflow.json     — LTX 2.3 distilled T2V（主力）
+
+模型依赖:
+  checkpoints/ltx-2.3-22b-distilled-1.1.safetensors     (46 GB) ✅
+  text_encoders/gemma_3_12B_it_fp4_mixed.safetensors   (待确认) ✅
+  loras/ltx-2.3-22b-distilled-lora-384.safetensors     ✅
+  latent_upscale_models/ltx-2.3-spatial-upscaler-x2-1.1.safetensors ✅
+
+分辨率配置（pipeline_config.json format_presets）:
+  short_drama: 720×1280, 16fps, 49帧（红果短剧标准）
+  movie: 1280×720, 16fps, 49帧（横屏电影）
 ```
 
 ---
@@ -531,20 +523,17 @@ extra_model_paths.yaml（ComfyUI 模型映射）:
 
 ## 13. 模型清单（完整）
 
-### 视频生成
+### 视频生成（LTX 2.3 生态）
 
 | 模型文件 | 大小 | 状态 | 用途 |
 |---|---|---|---|
-| checkpoints/animagine-xl-3.1/animagine-xl-3.1.safetensors | 6.5 GB | ✅ | AnimateDiff 动漫 |
-| checkpoints/sd_xl_base_1.0.safetensors | 6.5 GB | ✅ | AnimateDiff 通用 |
-| animatediff_models/hsxl_temporal_layers.f16.safetensors | 453 MB | ✅ | AnimateDiff 动作 |
-| checkpoints/flux_2_klein_9B/flux-2-klein-9b.safetensors | 17 GB | ✅ | txt2img 超高质量 |
-| diffusion_models/flux-2-klein-4b.safetensors | 0 B | ❌ 空 | FluxWan2 Stage1 |
-| unet/Wan2.2-TI2V-5B-Q4_K_M.gguf | 1.4 GB | ✅ | TI2V 主力 |
-| text_encoders/wan2.2_umt5/models_t5_umt5-xxl-enc-bf16.pth | 11 GB | ✅ | Wan2.2 编码器 |
-| text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors | 0 B | ❌ 空 | — |
-| vae/Wan2.2_VAE.safetensors | ~1 GB | ✅ | Wan2.2 VAE |
-| Wan2.2-T2V-14B-Q4_K_M.gguf | ~8.5 GB | ⬇️ 下载中 | T2V 主力 |
+| checkpoints/ltx-2.3-22b-distilled-1.1.safetensors | 46 GB | ✅ | LTX 2.3 distilled（主力）|
+| checkpoints/ltx-2.3-22b-distilled-fp8.safetensors | 29 GB | ✅ | LTX fp8（省显存）|
+| checkpoints/ltx-2.3-22b-dev.safetensors | 46 GB | ✅ | LTX dev（全精度）|
+| checkpoints/ltx-2.3-22b-dev-fp8.safetensors | 29 GB | ✅ | LTX dev fp8 |
+| text_encoders/gemma_3_12B_it_fp4_mixed.safetensors | — | ✅ | Gemma 3 12B text encoder |
+| loras/ltx-2.3-22b-distilled-lora-384.safetensors | — | ✅ | LTX distilled LoRA |
+| latent_upscale_models/ltx-2.3-spatial-upscaler-x2-1.1.safetensors | — | ✅ | 空间上采样 x2 |
 
 ### 音频
 
@@ -559,58 +548,50 @@ extra_model_paths.yaml（ComfyUI 模型映射）:
 | ChatTTS (全套) | ~1.5 GB | ✅ | 中文对话 TTS |
 | musicgen-small | 802 MB | ✅ | BGM 备用（低质） |
 
-### 角色一致性（InstantID）
-
-| 模型文件 | 大小 | 状态 |
-|---|---|---|
-| controlnet/InstantID-ControlNet.safetensors | 2.3 GB | ✅ |
-| instantid/ip-adapter.bin | 1.6 GB | ✅ |
-| insightface/models/antelopev2/ | ~265 MB | ✅ |
-| clip_vision/ | 3.7 GB | ✅ |
-
 ### LLM (Ollama)
 
 | 模型 | 大小 | 状态 | 建议用途 |
 |---|---|---|---|
-| qwen3:8b | ~5 GB | ✅ 当前默认 | 分析/分类/分镜 |
-| qwen2.5:72b 或 deepseek-r1:32b | ~45 GB | ❌ 建议下载 | 创作阶段 |
+| qwen3:8b | ~5 GB | ✅ | 分析/分类/分镜 |
+| qwen3.6:35b | ~24 GB | ✅ 当前主力 | 创作阶段 |
+| deepseek-r1:70b | ~45 GB | ✅ | 复杂推理/创作 |
 
 ---
 
 ## 14. 差距分析与路线图
 
-### P0 — 阻塞生产（立即修复）
+### ✅ 已解决（2026-05-09）
 
-| # | 问题 | 位置 | 修复 | 工时 |
-|---|---|---|---|---|
-| 1 | 竖屏分辨率 | `pipeline_config.json` | Wan2.2: 720×1280；AnimateDiff: 768×1344 | 1h |
-| 2 | ACE-Step 路径 Bug | `audio_pipeline.py:_check_acestep_music()` | 路径改为 `~/myworkspace/ComfyUI_models/` | 1h |
-| 3 | ACE-Step 工作流用 XL 模型 | `audio_pipeline.py:generate_music_acestep()` | 切换到 xl_sft 模型 + 修正节点 type | 2h |
-| 4 | InstantID 未激活 | `render_pipeline.py:AnimateDiffPipeline.render()` | reference_face_image 存在时调用 inject_instantid() | 4h |
+| # | 问题 | 解决方案 |
+|---|---|---|
+| 1 | 竖屏分辨率 | 已切换 LTX 2.3，默认 720×1280 ✅ |
+| 2 | 无 txt2video 管线 | LTX 2.3 T2V 已就绪 ✅ |
+| 10 | LLM 创作质量低 | 已下载 qwen3.6:35b ✅ |
+| 11 | 单集时长无约束 | orchestrator 增加 episode_count 参数 ✅ |
+
+### P0 — 阻塞生产（当前）
+
+| # | 问题 | 位置 | 修复 |
+|---|---|---|---|
+| 1 | 角色/场景一致性 | LTX 无 InstantID | 设计替代方案（LoRA/Reference） |
+| 2 | TTS 时长估算非实测 | audio_pipeline | TTS 先行 → ffprobe → 重建时间轴 |
 
 ### P1 — 严重影响质量
 
-| # | 问题 | 修复 | 工时 |
-|---|---|---|---|
-| 5 | TTS 时长估算非实测 | TTS 先行 → ffprobe → 重建时间轴 | 6h |
-| 6 | QC 失败不重试 | 自动降级到下一 tier 重试 | 4h |
-| 7 | 帧率 8/16fps → 24fps | 集成 RIFE 补帧节点 | 4h |
-| 8 | 无 txt2video 管线 | 下载 Wan2.2-T2V + 创建工作流 | 4h |
-| 9 | 无 vid2vid 管线 | WanVaceToVideo 节点已有，创建工作流 | 4h |
-| 10 | LLM 创作质量低 | 下载 qwen2.5:72b，更新 STAGE_MODEL_DEFAULTS | 1h |
+| # | 问题 | 修复 |
+|---|---|---|
+| 3 | QC 失败不重试 | 自动降级到下一 tier 重试 |
+| 4 | 帧率 16fps → 24fps | 集成 RIFE 补帧 |
+| 5 | DeliveryPackage 未连通 | orchestrator 末尾调用 |
 
 ### P2 — 工业化加分项
 
-| # | 问题 | 修复 | 工时 |
-|---|---|---|---|
-| 11 | 单集时长无约束 | target_shots 参数注入 Orchestrator | 3h |
-| 12 | DeliveryPackage 未连通 | orchestrator 末尾调用 create_delivery_package | 2h |
-| 13 | 多集角色漂移 | project 级 face bank + LoRA 版本锁定 | 8h |
-| 14 | LoRA 训练入口 | 集成 kohya-ss CLI | 16h |
-| 15 | img2img 无工作流 | 创建 Flux img2img workflow | 3h |
-| 16 | 两 ComfyUI 实例并行 | max_workers=2，端口 8188+8189 | 8h |
-| 17 | 字幕样式优化 | ffmpeg fontfile/fontsize/borderw | 1h |
-| 18 | EdgeTTS 安装 | pip install edge-tts | 30min |
+| # | 问题 | 修复 |
+|---|---|---|
+| 6 | 多集角色漂移 | project 级 face bank + LoRA 版本锁定 |
+| 7 | LoRA 训练入口 | 集成 kohya-ss CLI |
+| 8 | ACE-Step 节点路径 | service_ports.py 已处理端口发现 |
+| 9 | 字幕样式优化 | ffmpeg fontfile/fontsize/borderw |
 
 ---
 
@@ -640,5 +621,5 @@ for pct, msg in run_pipeline_generator(
 
 ---
 
-*真相源由 Claude Code 于 2026-05-02 根据代码库 + 模型扫描生成。*
-*下次更新请先检查: pipeline_config.json active_pipeline、capability_audit.json、模型文件实际大小。*
+*真相源更新于 2026-05-10，反映 LTX 2.3 管线切换。*
+*下次更新请先检查: pipeline_config.json active_pipeline、LTX 模型文件状态。*
