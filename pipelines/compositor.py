@@ -250,12 +250,17 @@ def dialogue_to_srt(dialogue_list: list, audio_files: list[dict]) -> str:
     """
     把对白列表 + 对应 TTS 音频信息转成 SRT 字幕字符串。
     audio_files: [{"line_idx": 0, "duration": 2.5, ...}]
+    
+    修复：使用有效行计数器匹配 TTS 的 line_idx，避免空行导致的索引偏移。
     """
     lines = []
     cursor = 0.0
     idx = 0
+    valid_line_idx = 0  # 有效行计数器
 
-    duration_map = {a["line_idx"]: a.get("duration", 2.0) for a in audio_files}
+    # 构建 duration_map：支持 line_idx 和 text 双重匹配
+    duration_map = {a["line_idx"]: a.get("duration", 0.0) for a in audio_files if "line_idx" in a}
+    text_duration_map = {a.get("text", ""): a.get("duration", 0.0) for a in audio_files if a.get("text")}
 
     for i, line in enumerate(dialogue_list):
         if not isinstance(line, dict):
@@ -265,7 +270,12 @@ def dialogue_to_srt(dialogue_list: list, audio_files: list[dict]) -> str:
         if not text:
             continue
 
-        dur = duration_map.get(i, max(len(text) * 0.12, 1.5))
+        # 优先使用有效行计数器匹配，再用 text 匹配
+        dur = duration_map.get(valid_line_idx, 0.0) or text_duration_map.get(text, 0.0)
+        if not dur or dur < 0.1:
+            dur = max(len(text) * 0.15, 1.5)  # 保守估算
+        
+        valid_line_idx += 1
         start = cursor
         end = cursor + dur
         cursor = end + 0.3  # 间隔
