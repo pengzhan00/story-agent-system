@@ -16,7 +16,7 @@ from core.database import (
     create_episode, create_shot, update_shot, delete_shots_by_project,
     add_prompt_log, list_characters,
     list_scene_assets, list_music, list_sfx, list_scripts, list_shots,
-    transaction,
+    transaction, create_delivery_package,
 )
 from core.ollama_client import DEFAULT_MODEL, resolve_model_profile
 
@@ -758,6 +758,15 @@ def run_pipeline_generator(
                 if exported and Path(exported).exists():
                     result["export"] = exported
                     size_mb = Path(exported).stat().st_size / 1024 / 1024
+                    # 创建交付包记录
+                    create_delivery_package({
+                        "project_id": pid,
+                        "episode_id": 0,
+                        "package_type": "hongguo_short_drama",
+                        "package_path": exported,
+                        "assets_json": {"episode_file": final_episode, "size_mb": size_mb},
+                        "manifest_json": {"exported_at": time.strftime("%Y-%m-%d %H:%M:%S")},
+                    })
                     yield from emit(0.96, f"✅ 导出完成: {exported} ({size_mb:.1f}MB)")
                 else:
                     result["export"] = final_episode
@@ -946,6 +955,15 @@ def run_render_export_generator(
                 if exported and Path(exported).exists():
                     result["export"] = exported
                     size_mb = Path(exported).stat().st_size / 1024 / 1024
+                    # 创建交付包记录
+                    create_delivery_package({
+                        "project_id": project_id,
+                        "episode_id": 0,
+                        "package_type": "hongguo_short_drama",
+                        "package_path": exported,
+                        "assets_json": {"episode_file": final_episode, "size_mb": size_mb},
+                        "manifest_json": {"exported_at": time.strftime("%Y-%m-%d %H:%M:%S")},
+                    })
                     yield emit(0.96, f"✅ 导出完成: {exported} ({size_mb:.1f}MB)")
                 else:
                     result["export"] = final_episode
