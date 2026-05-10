@@ -1113,10 +1113,15 @@ class LTXT2VPipeline(RenderPipeline):
         bundle = build_pipeline_prompt_bundle(shot_payload, self.name)
         smoke = self.config.get("smoke", {}) if shot_payload.get("preview_mode") else {}
 
-        width = int(shot_payload.get("width") or smoke.get("width") or bundle.get("width") or self.config.get("width", 720))
-        height = int(shot_payload.get("height") or smoke.get("height") or bundle.get("height") or self.config.get("height", 1280))
-        frames = int(shot_payload.get("frames") or smoke.get("frames") or bundle.get("frames") or self.config.get("frames", 49))
-        fps = int(shot_payload.get("fps") or smoke.get("fps") or bundle.get("fps") or self.config.get("fps", 16))
+        # ── 分辨率优先级：config（竖屏720×1280）> preset > payload旧值 ───────
+        fmt = shot_payload.get("project_format") or "short_drama"
+        preset = get_format_preset(fmt)
+        config_w = self.config.get("width", 720)
+        config_h = self.config.get("height", 1280)
+        width = int(smoke.get("width") or config_w or preset.get("width") or 720)
+        height = int(smoke.get("height") or config_h or preset.get("height") or 1280)
+        frames = int(smoke.get("frames") or self.config.get("frames") or preset.get("frames") or 49)
+        fps = int(smoke.get("fps") or self.config.get("fps") or preset.get("fps") or 16)
         cfg = float(shot_payload.get("cfg") or smoke.get("cfg") or self.config.get("cfg", 3.0))
         strength = float(shot_payload.get("lora_strength") or self.config.get("lora_strength", 0.35))
         positive_prompt = bundle["positive_prompt"]
@@ -1227,10 +1232,15 @@ class LTXT2VOnlyPipeline(LTXT2VPipeline):
         bundle = build_pipeline_prompt_bundle(shot_payload, self.name)
         smoke = self.config.get("smoke", {}) if shot_payload.get("preview_mode") else {}
 
-        width = int(shot_payload.get("width") or smoke.get("width") or bundle.get("width") or self.config.get("width", 720))
-        height = int(shot_payload.get("height") or smoke.get("height") or bundle.get("height") or self.config.get("height", 1280))
-        frames = int(shot_payload.get("frames") or smoke.get("frames") or bundle.get("frames") or self.config.get("frames", 49))
-        fps = int(shot_payload.get("fps") or smoke.get("fps") or bundle.get("fps") or self.config.get("fps", 16))
+        # ── 分辨率优先级：config（竖屏720×1280）> preset > payload旧值 ───────
+        fmt = shot_payload.get("project_format") or "short_drama"
+        preset = get_format_preset(fmt)
+        config_w = self.config.get("width", 720)
+        config_h = self.config.get("height", 1280)
+        width = int(smoke.get("width") or config_w or preset.get("width") or 720)
+        height = int(smoke.get("height") or config_h or preset.get("height") or 1280)
+        frames = int(smoke.get("frames") or self.config.get("frames") or preset.get("frames") or 49)
+        fps = int(smoke.get("fps") or self.config.get("fps") or preset.get("fps") or 16)
         cfg = float(shot_payload.get("cfg") or smoke.get("cfg") or self.config.get("cfg", 3.0))
         strength = float(shot_payload.get("lora_strength") or self.config.get("lora_strength", 0.35))
         positive_prompt = bundle["positive_prompt"]
