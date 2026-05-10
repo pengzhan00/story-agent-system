@@ -1213,20 +1213,9 @@ class LTXT2VPipeline(RenderPipeline):
         if not src.exists():
             raise RenderError(f"LTX 输出文件不存在: {src}")
 
-        # ── 移除 LTX Audio VAE 生成的噪声音频（质量差）────────────────
-        # LTX Audio VAE 输出的音频噪声底极高（-0.18 dB），使用 ffmpeg 移除
-        # 后续 compositor 会添加高质量 TTS + BGM 音轨
-        tmp_no_audio = src.parent / f"{src.stem}_no_audio{src.suffix}"
-        try:
-            subprocess.run(
-                ["ffmpeg", "-y", "-i", str(src), "-c:v", "copy", "-an", str(tmp_no_audio)],
-                capture_output=True, text=True, timeout=60, check=True
-            )
-            shutil.copy2(tmp_no_audio, output_path)
-            tmp_no_audio.unlink(missing_ok=True)
-        except Exception:
-            # ffmpeg 失败时直接复制原文件（compositor 会替换音频）
-            shutil.copy2(src, output_path)
+        # LTX Audio VAE 音频质量取决于 CFG/sigmas 参数
+        # 优化参数（CFG=1.0, sigmas=7步）后音频质量正常，无需移除
+        shutil.copy2(src, output_path)
         return output_path
 
 
@@ -1327,20 +1316,9 @@ class LTXT2VOnlyPipeline(LTXT2VPipeline):
         if not src.exists():
             raise RenderError(f"LTX 输出文件不存在: {src}")
 
-        # ── 移除 LTX Audio VAE 生成的噪声音频（质量差）────────────────
-        # LTX Audio VAE 输出的音频噪声底极高（-0.18 dB），使用 ffmpeg 移除
-        # 后续 compositor 会添加高质量 TTS + BGM 音轨
-        tmp_no_audio = src.parent / f"{src.stem}_no_audio{src.suffix}"
-        try:
-            subprocess.run(
-                ["ffmpeg", "-y", "-i", str(src), "-c:v", "copy", "-an", str(tmp_no_audio)],
-                capture_output=True, text=True, timeout=60, check=True
-            )
-            shutil.copy2(tmp_no_audio, output_path)
-            tmp_no_audio.unlink(missing_ok=True)
-        except Exception:
-            # ffmpeg 失败时直接复制原文件（compositor 会替换音频）
-            shutil.copy2(src, output_path)
+        # LTX Audio VAE 音频质量取决于 CFG/sigmas 参数
+        # 优化参数（CFG=1.0, sigmas=7步）后音频质量正常，无需移除
+        shutil.copy2(src, output_path)
         return output_path
 
 
@@ -1544,20 +1522,9 @@ class Wan2TI2VPipeline(RenderPipeline):
             raise RenderError(f"Wan2.2 输出视频不存在: {src}")
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        # ── 移除 LTX Audio VAE 生成的噪声音频（质量差）────────────────
-        # LTX Audio VAE 输出的音频噪声底极高（-0.18 dB），使用 ffmpeg 移除
-        # 后续 compositor 会添加高质量 TTS + BGM 音轨
-        tmp_no_audio = src.parent / f"{src.stem}_no_audio{src.suffix}"
-        try:
-            subprocess.run(
-                ["ffmpeg", "-y", "-i", str(src), "-c:v", "copy", "-an", str(tmp_no_audio)],
-                capture_output=True, text=True, timeout=60, check=True
-            )
-            shutil.copy2(tmp_no_audio, output_path)
-            tmp_no_audio.unlink(missing_ok=True)
-        except Exception:
-            # ffmpeg 失败时直接复制原文件（compositor 会替换音频）
-            shutil.copy2(src, output_path)
+        # LTX Audio VAE 音频质量取决于 CFG/sigmas 参数
+        # 优化参数（CFG=1.0, sigmas=7步）后音频质量正常，无需移除
+        shutil.copy2(src, output_path)
         return output_path
 
 
