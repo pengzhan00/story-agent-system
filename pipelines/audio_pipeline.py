@@ -639,28 +639,71 @@ def generate_shot_sfx(project_id: int, shot_id: int, output_dir: Path) -> list[d
 # If you switch to a local-inference variant in the future, restore the model
 # path constants below and update _check_acestep_music() / generate_music_acestep().
 
-
-def _check_acestep_music() -> bool:
-    """Check that ComfyUI is running and the ACE-Step server plugin is loaded.
-
-    The installed plugin (ACE-Step-ComfyUI) is a pure API/server plugin.
-    Its NODE_CLASS_MAPPINGS only contains:
-      AceStepText2MusicGenParams, AceStepSettings, AceStepText2MusicServer,
-      AceStepAudioCodes, AceStepShowText
-    There are NO local-model-loader nodes (UNETLoader, DualCLIPLoader, etc.)
-    in this plugin — those were from a different (local-inference) variant.
-    """
+def get_acestep_music_status() -> dict:
+    """Return ACE-Step readiness details for pipeline and UI checks."""
+    status = {
+        "comfyui_online": False,
+        "plugin_loaded": False,
+        "api_online": False,
+        "models_initialized": False,
+        "llm_initialized": False,
+        "loaded_model": "",
+        "loaded_lm_model": "",
+        "reason": "",
+    }
     try:
         import requests as req
-        r = req.get("http://127.0.0.1:8188/object_info", timeout=5)
+        from core.service_ports import get_comfyui_url, get_acestep_url
+
+        comfyui_base = get_comfyui_url(auto_launch=True)
+        r = req.get(f"{comfyui_base}/object_info", timeout=5)
         if r.status_code != 200:
-            return False
+            status["reason"] = f"ComfyUI object_info 返回 {r.status_code}"
+            return status
+
+        status["comfyui_online"] = True
         data = r.json()
-        # The ACE-Step ComfyUI plugin exposes server-mode nodes only.
         required = {"AceStepText2MusicGenParams", "AceStepSettings", "AceStepText2MusicServer"}
-        return required.issubset(data.keys())
-    except Exception:
-        return False
+        status["plugin_loaded"] = required.issubset(data.keys())
+        if not status["plugin_loaded"]:
+            status["reason"] = "ACE-Step ComfyUI 节点未加载"
+            return status
+
+        acestep_base = get_acestep_url(auto_launch=True)
+        health = req.get(f"{acestep_base}/health", timeout=5)
+        if health.status_code != 200:
+            status["reason"] = f"ACE-Step API /health 返回 {health.status_code}"
+            return status
+
+        payload = health.json().get("data", {})
+        status["api_online"] = True
+        status["models_initialized"] = bool(payload.get("models_initialized"))
+        status["llm_initialized"] = bool(payload.get("llm_initialized"))
+        status["loaded_model"] = payload.get("loaded_model") or ""
+        status["loaded_lm_model"] = payload.get("loaded_lm_model") or ""
+
+        if not status["models_initialized"]:
+            status["reason"] = "ACE-Step DiT 模型未初始化"
+        elif not status["llm_initialized"]:
+            status["reason"] = "ACE-Step LLM 未初始化"
+        else:
+            status["reason"] = "ready"
+        return status
+    except Exception as e:
+        status["reason"] = str(e)
+        return status
+
+
+def _check_acestep_music() -> bool:
+    """Check that ComfyUI nodes and ACE-Step API+LLM are truly ready."""
+    status = get_acestep_music_status()
+    return (
+        status["comfyui_online"]
+        and status["plugin_loaded"]
+        and status["api_online"]
+        and status["models_initialized"]
+        and status["llm_initialized"]
+    )
 
 
 def generate_music_acestep(
@@ -683,7 +726,9 @@ def generate_music_acestep(
     was written for a different local-inference variant of the plugin and does
     not match the installed plugin's node names at all.
     """
+    acestep_status = get_acestep_music_status()
     if not _check_acestep_music():
+        print(f"[AceStep] 未就绪: {acestep_status.get('reason', 'unknown')}")
         return False
     try:
         from pipelines.render_pipeline import submit_workflow, wait_for_completion_result
@@ -705,6 +750,10 @@ def generate_music_acestep(
         #   gen_params (ACESTEP_GEN_PARAMS), settings (ACESTEP_SETTINGS)
         # SaveAudio INPUT_TYPES (required fields):
         #   audio (AUDIO), filename_prefix (STRING)
+        from core.service_ports import get_comfyui_url, get_acestep_url
+        comfyui_base = get_comfyui_url()
+        acestep_base = get_acestep_url()
+
         workflow = {
             "1": {
                 "class_type": "AceStepText2MusicGenParams",
@@ -741,7 +790,7 @@ def generate_music_acestep(
                 "class_type": "AceStepText2MusicServer",
                 "inputs": {
                     "mode": "local",
-                    "server_url": "http://127.0.0.1:8001",
+                    "server_url": acestep_base,
                     "gen_params": ["1", 0],
                     "settings": ["2", 0],
                 },
@@ -754,10 +803,10 @@ def generate_music_acestep(
                 },
             },
         }
-        prompt_id = submit_workflow(workflow, "http://127.0.0.1:8188")
+        prompt_id = submit_workflow(workflow, comfyui_base)
         if not prompt_id:
             return False
-        result = wait_for_completion_result(prompt_id, "http://127.0.0.1:8188", timeout=max(600, duration * 20))
+        result = wait_for_completion_result(prompt_id, comfyui_base, timeout=max(600, duration * 20))
         if result["status"] != "completed":
             print(f"[AceStep] 失败: {result['error_type']} {result['error_message']}")
             return False
@@ -776,6 +825,147 @@ def generate_music_acestep(
     except Exception as e:
         print(f"[AceStep] 异常: {e}")
         return False
+
+
+def generate_music_acestep_direct(
+    prompt: str,
+    output_path: str,
+    duration: int = 30,
+    mood: str = "",
+    max_wait: int = 300,
+) -> bool:
+    """Generate music by calling the ACEStep REST API directly (no ComfyUI).
+
+    Flow: POST /release_task → poll /query_result → GET /v1/audio
+
+    This is the primary path; ``generate_music_acestep`` (ComfyUI workflow)
+    is the fallback.
+    """
+    import requests as req
+    import json as _json
+    from core.service_ports import get_acestep_url
+
+    acestep_base = get_acestep_url(auto_launch=False)
+    caption = prompt.strip() or mood or "cinematic soundtrack, chinese fantasy, instrumental"
+
+    try:
+        # ── 1. submit task ────────────────────────────────────────────────────
+        resp = req.post(
+            f"{acestep_base}/release_task",
+            json={
+                "prompt": caption,
+                "lyrics": "",
+                "audio_duration": float(duration),
+                "inference_steps": 8,
+                "guidance_scale": 7.0,
+                "thinking": True,
+                "vocal_language": "zh",
+                "use_random_seed": True,
+                "seed": -1,
+            },
+            timeout=30,
+        )
+        if resp.status_code != 200:
+            print(f"[AceStep-direct] /release_task 返回 {resp.status_code}: {resp.text[:200]}")
+            return False
+        body = resp.json()
+        task_id = (body.get("data") or {}).get("task_id") or ""
+        if not task_id:
+            print(f"[AceStep-direct] 无法获取 task_id: {body}")
+            return False
+        print(f"[AceStep-direct] 任务提交成功 task_id={task_id}")
+
+        # ── 2. poll for completion ─────────────────────────────────────────────
+        deadline = time.time() + max_wait
+        poll_interval = 5
+        audio_file_path = ""
+        while time.time() < deadline:
+            time.sleep(poll_interval)
+            qr = req.post(
+                f"{acestep_base}/query_result",
+                json={"task_id_list": _json.dumps([task_id])},
+                timeout=10,
+            )
+            if qr.status_code != 200:
+                continue
+            qdata = qr.json()
+            items = (qdata.get("data") or [])
+            if not items:
+                continue
+            item = items[0]
+            status_int = item.get("status", -1)
+            result_raw = item.get("result", "[]")
+            try:
+                rlist = _json.loads(result_raw) if isinstance(result_raw, str) else result_raw
+            except Exception:
+                rlist = []
+
+            # Detect completion: the inner result items have stage=="succeeded"
+            # (outer status_int may be 1=done or 0=running depending on server version)
+            first = rlist[0] if rlist else {}
+            inner_stage = first.get("stage", "")
+            inner_progress = float(first.get("progress", 0))
+
+            if inner_stage == "succeeded" or (status_int == 1 and inner_progress >= 1.0):
+                for r in rlist:
+                    f = r.get("file", "")
+                    if f:
+                        audio_file_path = f  # may be "/v1/audio?path=..." URL or raw path
+                        break
+                if audio_file_path:
+                    break
+                print(f"[AceStep-direct] 任务完成但无音频文件, raw={result_raw[:300]}")
+                return False
+
+            if inner_stage in ("failed", "error"):
+                err = first.get("error", "")
+                print(f"[AceStep-direct] 任务失败 stage={inner_stage}: {err}")
+                return False
+
+            # still running
+            progress_str = f" {inner_stage} {inner_progress:.0%}" if inner_stage else ""
+            progress_text = item.get("progress_text", "")
+            # extract last segment of progress_text for concise log
+            if progress_text:
+                import re as _re
+                m = _re.search(r'(Phase \d+[^|]+|\d+%)', progress_text)
+                if m:
+                    progress_str += f" | {m.group(1).strip()}"
+            print(f"[AceStep-direct] 等待...{progress_str}")
+
+        if not audio_file_path:
+            print(f"[AceStep-direct] 超时 ({max_wait}s)")
+            return False
+
+        # ── 3. download audio ────────────────────────────────────────────────
+        # audio_file_path may be:
+        #   - "/v1/audio?path=%2F..."  (URL already from server)
+        #   - "/absolute/path/to/file.mp3"  (raw file system path)
+        if audio_file_path.startswith("/v1/audio"):
+            dl_url = f"{acestep_base}{audio_file_path}"
+        elif audio_file_path.startswith("http"):
+            dl_url = audio_file_path
+        else:
+            # raw file path — URL-encode and call /v1/audio
+            import urllib.parse as _urlparse
+            encoded_path = _urlparse.quote(audio_file_path, safe="")
+            dl_url = f"{acestep_base}/v1/audio?path={encoded_path}"
+        print(f"[AceStep-direct] 下载: {dl_url}")
+        dl = req.get(dl_url, timeout=30)
+        if dl.status_code != 200:
+            print(f"[AceStep-direct] /v1/audio 返回 {dl.status_code}")
+            return False
+
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+        Path(output_path).write_bytes(dl.content)
+        valid = _audio_valid(output_path)
+        print(f"[AceStep-direct] {'✅ 成功' if valid else '❌ 文件无效'}: {output_path}")
+        return valid
+
+    except Exception as e:
+        print(f"[AceStep-direct] 异常: {e}")
+        return False
+
 
 # 情绪 → 和弦频率(Hz) + 混响参数 + AM 调制速率
 _MOOD_PROFILES: dict[str, dict] = {
@@ -938,21 +1128,39 @@ def generate_music(
     music_id: int = 0,
     mood: str = "",
 ) -> bool:
-    """统一音乐生成接口，按优先级尝试各后端。每个后端都验证输出文件非空。"""
+    """统一音乐生成接口，按优先级尝试各后端。每个后端都验证输出文件非空。
+
+    优先级:
+      1. ACEStep 直连 REST API（最快，不依赖 ComfyUI）
+      2. ACEStep via ComfyUI 节点（备用）
+      3. ffmpeg 合成（兜底）
+    """
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
 
+    # ── 1. ACEStep REST API 直连（最快，必要时自动拉起）──────────────────────
+    from core.service_ports import get_acestep_url
+    acestep_base = get_acestep_url(auto_launch=True)
+    if acestep_base:
+        if generate_music_acestep_direct(prompt, output_path, duration, mood=mood) and _audio_valid(output_path):
+            print(f"[AudioPipeline] ✅ ACE-Step 直连生成 BGM（mood={mood or '默认'}）")
+            _register_audio(project_id, 0, "music", output_path, music_id)
+            return True
+        print("[AudioPipeline] ACE-Step 直连失败，尝试 ComfyUI 节点路径…")
+
+    # ── 2. ACEStep via ComfyUI workflow node ──────────────────────────────────
     if generate_music_acestep(prompt, output_path, duration, mood=mood) and _audio_valid(output_path):
-        print(f"[AudioPipeline] Ace-Step 生成 BGM（mood={mood or '默认'}）")
+        print(f"[AudioPipeline] ✅ ACE-Step (ComfyUI 节点) 生成 BGM（mood={mood or '默认'}）")
         _register_audio(project_id, 0, "music", output_path, music_id)
         return True
 
+    # ── 3. ffmpeg fallback ────────────────────────────────────────────────────
     if generate_music_ffmpeg(prompt, output_path, duration, mood=mood) and _audio_valid(output_path):
-        print(f"[AudioPipeline] ffmpeg 合成 BGM（mood={mood or '默认'}）")
+        print(f"[AudioPipeline] ⚠️  ffmpeg 合成 BGM（mood={mood or '默认'}）")
         _register_audio(project_id, 0, "music", output_path, music_id)
         return True
 
     Path(output_path).unlink(missing_ok=True)
-    print(f"[AudioPipeline] 音乐生成失败（所有后端均无有效输出）: {prompt[:60]}")
+    print(f"[AudioPipeline] ❌ 音乐生成失败（所有后端均无有效输出）: {prompt[:60]}")
     return False
 
 

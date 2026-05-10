@@ -205,6 +205,7 @@ def resume_pipeline(
                         "narration": shot.narration,
                         "shot_id": shot.id,
                         "episode_number": 1,
+                        "project_format": proj.format,  # 传递项目格式给管线路由
                         **rp,
                     }
                     scene_id = f"shot_{shot.id:04d}"

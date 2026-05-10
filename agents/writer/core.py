@@ -17,9 +17,9 @@ def generate_storyline(
     premise: str,
     genre: str = "玄幻",
     tone: str = "热血",
-    acts: int = 5,
-    scenes_per_act: int = 4,
-    shots_per_scene: int = 3,
+    acts: int = 4,
+    scenes_per_act: int = 3,   # 3×acts = 12 scenes  (was 4 → 16 scenes)
+    shots_per_scene: int = 2,   # 2 shots/scene        (was 3 → 24→36 shots)
     project_id: int = 0,
     model: str = DEFAULT_MODEL,
 ) -> dict:
@@ -28,74 +28,52 @@ def generate_storyline(
     Each scene includes shot-level breakdown for short drama production.
     Returns the script data ready to save to DB.
     """
-    prompt = f"""You are generating a {genre} short drama (短剧) outline.
+    # Shot schema: NO per-shot dialogue/narration (those are generated in TTS pass).
+    # Only camera_angle + characters_present + mood per shot → ~40 tokens/shot.
+    # Total estimate: synopsis(300) + acts(4×(50 + 3×(120 + 2×40))) = ~2600 tokens.
+    shot_schema = ', '.join(
+        f'{{{{"shot_number": {i+1}, "camera_angle": "中景/特写/远景", "characters_present": ["角色名"], "mood": "情绪关键词"}}}}'
+        for i in range(shots_per_scene)
+    )
+    scene_schema = (
+        f'{{{{"number": N, "location": "具体地点", "time_of_day": "白天/傍晚/夜晚", '
+        f'"weather": "晴/雨/雪", "characters": ["角色A"], "mood": "情绪", '
+        f'"narration": "场景旁白（30字内）", "bgm_mood": "音乐情绪", '
+        f'"shots": [{shot_schema}]}}}}'
+    )
 
-CONSTRAINTS (MUST follow exactly):
-- {acts} acts total (acts 1 through {acts})
-- EXACTLY {scenes_per_act} scenes per act (scene 1, 2, 3, {scenes_per_act})
-- EXACTLY {shots_per_scene} shots per scene (shot 1, 2, {shots_per_scene})
-- Each scene MUST have a "shots" array with {shots_per_scene} items
-- Every shot MUST have "dialogue" array with 2-4 lines
+    prompt = f"""为{genre}短剧生成{acts}幕剧本大纲。
 
-Premise: {premise}
-Tone: {tone}
+创作构想：{premise}
+基调：{tone}
+风格：快节奏、强反转、密集冲突、短剧爽点。
 
-Short drama style: fast pacing, strong plot twists, dense dialogue, quick scene transitions.
+规则：
+- 共{acts}幕，每幕恰好{scenes_per_act}个场景，每场景恰好{shots_per_scene}个镜头
+- synopsis 控制在100字以内
+- 镜头只需 camera_angle / characters_present / mood，无需台词
 
-Output JSON format (fill in the values, KEEP the exact array sizes):
+输出纯 JSON，结构如下：
 {{{{
-    "title": "story title",
-    "synopsis": "200-word synopsis",
-    "acts": [
-        {{{{
-            "number": 1,
-            "title": "...",
-            "summary": "...",
-            "scenes": [
-                {{{{"number": 1, "location": "...", "time_of_day": "白天/傍晚/夜晚", "weather": "晴/雨/雪", "characters": ["角色A"], "mood": "...", "narration": "...", "bgm_mood": "...",
-                    "shots": [
-                        {{{{"shot_number": 1, "camera_angle": "中景", "characters_present": ["角色A"], "dialogue": [{{{{"character": "角色A", "line": "...", "emotion": "..."}}}}], "narration": "...", "mood": "..."}}}},
-                        {{{{"shot_number": 2, "camera_angle": "特写", "characters_present": ["角色A"], "dialogue": [{{{{"character": "角色A", "line": "...", "emotion": "..."}}}}], "narration": "...", "mood": "..."}}}},
-                        {{{{"shot_number": 3, "camera_angle": "远景", "characters_present": ["角色A"], "dialogue": [{{{{"character": "角色A", "line": "...", "emotion": "..."}}}}], "narration": "...", "mood": "..."}}}}
-                    ]
-                }}}},
-                {{{{"number": 2, "location": "...", "time_of_day": "...", "weather": "...", "characters": ["角色A", "角色B"], "mood": "...", "narration": "...", "bgm_mood": "...",
-                    "shots": [
-                        {{{{"shot_number": 1, "camera_angle": "...", "characters_present": ["..."], "dialogue": [{{{{"character": "...", "line": "...", "emotion": "..."}}}}], "narration": "...", "mood": "..."}}}},
-                        {{{{"shot_number": 2, "camera_angle": "...", "characters_present": ["..."], "dialogue": [{{{{"character": "...", "line": "...", "emotion": "..."}}}}], "narration": "...", "mood": "..."}}}},
-                        {{{{"shot_number": 3, "camera_angle": "...", "characters_present": ["..."], "dialogue": [{{{{"character": "...", "line": "...", "emotion": "..."}}}}], "narration": "...", "mood": "..."}}}}
-                    ]
-                }}}},
-                {{{{"number": 3, "location": "...", "time_of_day": "...", "weather": "...", "characters": [...], "mood": "...", "narration": "...", "bgm_mood": "...",
-                    "shots": [
-                        {{{{"shot_number": 1, ...}}}},
-                        {{{{"shot_number": 2, ...}}}},
-                        {{{{"shot_number": 3, ...}}}}
-                    ]
-                }}}},
-                {{{{"number": 4, "location": "...", "time_of_day": "...", "weather": "...", "characters": [...], "mood": "...", "narration": "...", "bgm_mood": "...",
-                    "shots": [
-                        {{{{"shot_number": 1, ...}}}},
-                        {{{{"shot_number": 2, ...}}}},
-                        {{{{"shot_number": 3, ...}}}}
-                    ]
-                }}}}
-            ]
-        }}}},
-        {{{{"number": 2, "title": "...", "summary": "...", "scenes": [same structure: {scenes_per_act} scenes with {shots_per_scene} shots each]}}}},
-        {{{{"number": 3, "title": "...", "summary": "...", "scenes": [same: {scenes_per_act} scenes, {shots_per_scene} shots each]}}}},
-        {{{{"number": 4, "title": "...", "summary": "...", "scenes": [same: {scenes_per_act} scenes, {shots_per_scene} shots each]}}}},
-        {{{{"number": 5, "title": "...", "summary": "...", "scenes": [same: {scenes_per_act} scenes, {shots_per_scene} shots each]}}}}
-    ]
-}}}}
-"""
+  "title": "剧名",
+  "synopsis": "剧情梗概（100字内）",
+  "acts": [
+    {{{{
+      "number": 1, "title": "幕标题", "summary": "本幕要点（30字）",
+      "scenes": [{scene_schema}, {scene_schema}, ...]
+    }}}},
+    {{{{ "number": 2, ... }}}},
+    ... 共{acts}幕
+  ]
+}}}}"""
 
     result = generate_json(
         prompt=prompt,
         system=SCREENWRITER_SYSTEM,
         model=model,
         temperature=0.3,
-        max_tokens=16384,
+        max_tokens=8000,   # ~2600 expected; 8000 = 3× headroom
+        num_ctx=16384,     # input prompt ~800 tok + output ~2600 tok → well within 16K
         project_id=project_id,
         agent_type="screenwriter",
     )
@@ -188,7 +166,7 @@ Output as JSON (no markdown):
         system=SCREENWRITER_SYSTEM,
         model=model,
         temperature=0.8,
-        max_tokens=8192,
+        max_tokens=3000,
         project_id=project_id,
         agent_type="screenwriter",
     )

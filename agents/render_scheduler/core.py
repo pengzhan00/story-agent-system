@@ -9,7 +9,10 @@ from core.ollama_client import generate_json, DEFAULT_MODEL
 from core.database import add_prompt_log, log_generation, create_task
 from core.task_queue import dispatch_task
 
-COMFYUI_URL = "http://127.0.0.1:8188"
+def _comfyui_url() -> str:
+    from core.service_ports import get_comfyui_url
+    return get_comfyui_url()
+
 
 RENDER_SCHEDULER_SYSTEM = """You are a Render Scheduler (渲染调度员) for an animation pipeline.
 You plan and organize ComfyUI rendering tasks efficiently.
@@ -22,12 +25,12 @@ def _check_comfyui_health() -> dict:
     Returns dict with status, running_count, pending_count."""
     try:
         # Check /system_stats endpoint
-        req = urllib.request.Request(f"{COMFYUI_URL}/system_stats", method="GET")
+        req = urllib.request.Request(f"{_comfyui_url()}/system_stats", method="GET")
         with urllib.request.urlopen(req, timeout=5) as resp:
             stats = json.loads(resp.read().decode())
 
         # Also check queue
-        req_q = urllib.request.Request(f"{COMFYUI_URL}/queue", method="GET")
+        req_q = urllib.request.Request(f"{_comfyui_url()}/queue", method="GET")
         with urllib.request.urlopen(req_q, timeout=5) as resp_q:
             queue = json.loads(resp_q.read().decode())
 
@@ -43,7 +46,7 @@ def _check_comfyui_health() -> dict:
             "status": "offline",
             "running_count": 0,
             "pending_count": 0,
-            "error": f"Cannot connect to ComfyUI at {COMFYUI_URL}: {e.reason}",
+            "error": f"Cannot connect to ComfyUI at {_comfyui_url()}: {e.reason}",
             "message": "ComfyUI is not reachable",
         }
     except json.JSONDecodeError as e:
@@ -134,7 +137,7 @@ def schedule_render(
                 "1. Load ComfyUI workflow via pipelines/render_pipeline.py (get_dispatcher().render())",
                 "2. Inject prompt text into the positive CLIPTextEncode node",
                 "3. Set seed to random value",
-                "4. POST workflow to http://127.0.0.1:8188/prompt",
+                "4. POST workflow to http://127.0.0.1:8000/prompt",
                 "5. Monitor completion via /queue endpoint",
                 "6. Copy output video to project output directory",
             ],

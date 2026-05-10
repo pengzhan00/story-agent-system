@@ -23,15 +23,24 @@ def get_pipeline_config() -> dict:
     return _json.loads(_cfg_path.read_text())
 
 def get_active_pipeline() -> str:
-    return get_pipeline_config().get("active_pipeline", "wan2_ti2v")
+    return get_pipeline_config().get("active_pipeline", "ltx_t2v")
 
 def list_pipelines_with_capabilities() -> list:
     cfg = get_pipeline_config()
-    return [
-        {"id": p["name"], "name": p["name"], "description": p.get("description", ""),
-         "production_ready": p.get("production_ready", False)}
-        for p in cfg.get("pipelines", [])
-    ]
+    from pipelines.render_pipeline import RenderDispatcher
+    matrix = RenderDispatcher.from_config().probe(force=True)
+    rows = []
+    for p in cfg.get("pipelines", []):
+        status = matrix.get(p["name"])
+        rows.append({
+            "id": p["name"],
+            "name": p["name"],
+            "description": p.get("description", ""),
+            "production_ready": p.get("production_ready", False),
+            "available": bool(status and status.available),
+            "missing": status.missing if status else [],
+        })
+    return rows
 
 def set_active_pipeline(pipeline_id: str) -> dict:
     _cfg_path = Path(__file__).parent.parent / "pipelines" / "pipeline_config.json"
@@ -43,8 +52,14 @@ def set_active_pipeline(pipeline_id: str) -> dict:
 def inspect_pipeline_capability(pipeline_id: str) -> dict:
     cfg = get_pipeline_config()
     pipeline = next((p for p in cfg.get("pipelines", []) if p["name"] == pipeline_id), None)
-    return {"id": pipeline_id, "available": pipeline is not None,
-            "production_ready": (pipeline or {}).get("production_ready", False)}
+    from pipelines.render_pipeline import RenderDispatcher
+    status = RenderDispatcher.from_config().probe(force=True).get(pipeline_id)
+    return {
+        "id": pipeline_id,
+        "available": bool(status and status.available),
+        "missing": status.missing if status else [],
+        "production_ready": (pipeline or {}).get("production_ready", False),
+    }
 from pipelines.batch_renderer import BatchRenderer
 
 APP_TITLE = "🎬 漫剧渲染服务 — Render Service"
@@ -56,14 +71,20 @@ footer {display:none !important}
 .status-err {color: #ef4444; font-weight: bold}
 """
 
-COMFYUI_URL = os.getenv("COMFYUI_URL", "http://127.0.0.1:8188")
+def _comfyui_url() -> str:
+    _env = os.getenv("COMFYUI_URL", "").strip()
+    if _env:
+        return _env
+    from core.service_ports import get_comfyui_url
+    return get_comfyui_url(auto_launch=False)
+
 
 # ─── ComfyUI 状态检查 ─────────────────────────
 
 def _comfyui_status() -> str:
     import requests as req
     try:
-        r = req.get(f"{COMFYUI_URL}/object_info", timeout=3)
+        r = req.get(f"{_comfyui_url()}/object_info", timeout=3)
         if r.status_code == 200:
             return "✅ 在线"
         return "⚠️ 异常"
@@ -74,18 +95,19 @@ def _refresh_comfyui_info() -> str:
     """返回 ComfyUI 状态的详细 Markdown"""
     import requests as req
     try:
-        r = req.get(f"{COMFYUI_URL}/object_info", timeout=3)
+        url = _comfyui_url()
+        r = req.get(f"{url}/object_info", timeout=3)
         if r.status_code == 200:
             info = r.json()
             node_count = len(info)
             return (
                 f"✅ **ComfyUI 在线**\n"
-                f"- 地址: {COMFYUI_URL}\n"
+                f"- 地址: {url}\n"
                 f"- 节点数: {node_count}\n"
             )
         return "⚠️ ComfyUI 响应异常"
     except Exception as e:
-        return f"❌ **ComfyUI 离线**\n- 地址: {COMFYUI_URL}\n- 错误: {e}\n\n请先在终端启动 ComfyUI:\n```\ncd ~/Documents/ComfyUI\nsource .venv/bin/activate\npython main.py --listen 127.0.0.1 --port 8188\n```"
+        return f"❌ **ComfyUI 离线**\n- 地址: {_comfyui_url()}\n- 错误: {e}\n\n请先在终端启动 ComfyUI:\n```\ncd ~/Documents/ComfyUI\nsource .venv/bin/activate\npython main.py --listen 127.0.0.1 --port 8188\n```"
 
 # ─── 任务操作 ─────────────────────────────────
 
@@ -131,7 +153,7 @@ def _claim_and_run_next_task() -> str:
         # 检查 ComfyUI 是否在线
         import requests as req
         try:
-            r = req.get(f"{COMFYUI_URL}/object_info", timeout=3)
+            r = req.get(f"{_comfyui_url()}/object_info", timeout=3)
             if r.status_code != 200:
                 raise Exception(f"ComfyUI 返回错误: {r.status_code}")
         except Exception as e:
@@ -182,31 +204,32 @@ def _render_pipeline_info() -> str:
     """返回当前激活管线详情"""
     try:
         cfg = get_pipeline_config()
-        active = cfg.get("active", "—")
-        pipes = cfg.get("options", {})
-        active_pipe = pipes.get(active, {})
+        active = cfg.get("active_pipeline", "—")
+        pipes = {p.get("name"): p for p in cfg.get("pipelines", [])}
+        active_pipe = (pipes.get(active) or {}).get("config", {})
+        active_meta = pipes.get(active) or {}
         active_report = inspect_pipeline_capability(active)
         lines = [
-            f"**当前管线**: {active}. {active_pipe.get('name', '?')}",
-            f"**状态**: {active_report.get('status_text', '未知')}",
-            f"**生产级别**: {active_report.get('production_tier', 'unknown')}",
-            f"**模型**: {active_pipe.get('base_model', '?')}",
+            f"**当前管线**: {active} · {active_meta.get('description', '?')}",
+            f"**状态**: {'✅ 可用' if active_report.get('available') else '⚠️ 未就绪'}",
+            f"**生产级别**: {'production' if active_meta.get('production_ready') else 'experimental'}",
+            f"**模型**: {active_pipe.get('checkpoint_name') or active_pipe.get('model_name') or active_pipe.get('gguf_path') or '?'}",
             f"**Workflow**: {active_pipe.get('workflow_file', '?')}",
             f"**分辨率**: {active_pipe.get('width', '?')} × {active_pipe.get('height', '?')}",
-            f"**帧率**: {active_pipe.get('frame_rate', '?')}fps",
+            f"**帧率**: {active_pipe.get('fps', '?')}fps",
             "",
             "**可用管线**:",
         ]
-        if active_report.get("errors"):
+        if active_report.get("missing"):
             lines.append("")
             lines.append("**阻塞项**:")
-            for item in active_report["errors"][:5]:
+            for item in active_report["missing"][:5]:
                 lines.append(f"- {item}")
         for pipe in list_pipelines_with_capabilities():
             pid = pipe["id"]
             marker = "👉 " if pid == active else "   "
             lines.append(
-                f"{marker}{pipe.get('status_text', '未知')} **{pid}**: {pipe.get('name', '?')}"
+                f"{marker}{'✅' if pipe.get('available', True) else '⚠️'} **{pid}**: {pipe.get('description', '')}"
             )
         return "\n".join(lines)
     except Exception as e:
@@ -215,19 +238,38 @@ def _render_pipeline_info() -> str:
 
 def _pipeline_choices() -> list[str]:
     cfg = get_pipeline_config()
-    return [
-        f"{pid} · {pipe.get('name', pid)}"
-        for pid, pipe in cfg.get("options", {}).items()
-    ]
+    active = cfg.get("active_pipeline", "")
+    choices = []
+    for p in sorted(cfg.get("pipelines", []), key=lambda x: x.get("priority", 99)):
+        name = p["name"]
+        desc = p.get("description", "")
+        steps = p.get("config", {}).get("steps", "?")
+        prod = p.get("production_ready", False)
+        # 层级标签
+        if "【快·短剧】" in desc:
+            tier = "⚡短剧"
+        elif "【质·电影】" in desc:
+            tier = "🎬电影"
+        elif "【兜底】" in desc:
+            tier = "🔧兜底"
+        else:
+            tier = "？"
+        # 可用状态图标
+        icon = "🟢" if prod else "🟡"
+        core_desc = desc.replace("【快·短剧】", "").replace("【质·电影】", "").replace("【兜底】", "").strip()
+        label = f"{icon} [{tier} {steps}步] {name} · {core_desc}"
+        choices.append(label)
+    return choices
 
 
 def _current_pipeline_choice() -> Optional[str]:
     cfg = get_pipeline_config()
-    active = cfg.get("active", "")
-    if active and active in cfg.get("options", {}):
-        pipe = cfg["options"][active]
-        return f"{active} · {pipe.get('name', active)}"
+    active = cfg.get("active_pipeline", "")
     choices = _pipeline_choices()
+    # 找到 active 对应的 label
+    for label in choices:
+        if f"] {active} " in label or label.endswith(f" {active}"):
+            return label
     return choices[0] if choices else None
 
 
@@ -241,16 +283,14 @@ def _refresh_pipeline_ui() -> tuple[str, gr.update, str]:
 def _switch_pipeline(pipeline_id: str) -> tuple[str, str]:
     """切换管线"""
     try:
-        cfg = set_active_pipeline(pipeline_id)
-        active = cfg.get("active", "")
-        pipe = cfg.get("options", {}).get(active, {})
-        report = inspect_pipeline_capability(active)
+        set_active_pipeline(pipeline_id)
+        cfg = get_pipeline_config()
+        entry = next((p for p in cfg.get("pipelines", []) if p["name"] == pipeline_id), None)
+        desc = entry.get("description", pipeline_id) if entry else pipeline_id
+        steps = entry.get("config", {}).get("steps", "?") if entry else "?"
         return (
-            f"✅ 已切换到 **{active}. {pipe.get('name', '?')}**\n"
-            f"模型: {pipe.get('base_model', '?')}\n"
-            f"Workflow: {pipe.get('workflow_file', '?')}\n"
-            f"状态: {report.get('status_text', '未知')}",
-            f"✅ 管线已切换为 **{active}** — 下次渲染将使用 {pipe.get('name', '?')}"
+            _render_pipeline_info(),
+            f"✅ 已切换到 **{pipeline_id}** ({steps}步) — {desc}"
         )
     except Exception as e:
         info = _render_pipeline_info()
@@ -258,7 +298,15 @@ def _switch_pipeline(pipeline_id: str) -> tuple[str, str]:
 
 
 def _switch_pipeline_from_choice(choice: str) -> tuple[str, str]:
-    pipeline_id = choice.split("·", 1)[0].strip() if choice else ""
+    # 新格式: "🟢 [⚡短剧 10步] wan2_t2v · ..."  → 提取 ] 和 · 之间的管线名
+    import re
+    pipeline_id = ""
+    if choice:
+        m = re.search(r'\]\s*(\S+)\s*·', choice)
+        if m:
+            pipeline_id = m.group(1)
+        else:
+            pipeline_id = choice.split("·", 1)[0].strip()
     return _switch_pipeline(pipeline_id)
 
 def _download_status() -> str:
@@ -298,12 +346,12 @@ def build_ui():
         
         # ── 状态栏 ──────────────────────────
         with gr.Row():
-            comfy_status = gr.Markdown(f"**ComfyUI**: {_comfyui_status()} | **地址**: {COMFYUI_URL}")
+            comfy_status = gr.Markdown(f"**ComfyUI**: {_comfyui_status()} | **地址**: {_comfyui_url()}")
             stop_all_btn = gr.Button("🛑 停止所有渲染", variant="stop", size="sm")
             refresh_status_btn = gr.Button("🔄 刷新状态", variant="secondary", size="sm")
-        
+
         def _update_status():
-            return f"**ComfyUI**: {_comfyui_status()} | **地址**: {COMFYUI_URL}"
+            return f"**ComfyUI**: {_comfyui_status()} | **地址**: {_comfyui_url()}"
         refresh_status_btn.click(fn=_update_status, outputs=comfy_status)
         
         def _stop_all_renders():
@@ -311,7 +359,7 @@ def build_ui():
             msgs = []
             # 1. 中断 ComfyUI 当前任务
             try:
-                r = req.post(f"{COMFYUI_URL}/interrupt", timeout=5)
+                r = req.post(f"{_comfyui_url()}/interrupt", timeout=5)
                 if r.status_code == 200:
                     msgs.append("✅ ComfyUI 已中断")
                 else:
@@ -320,7 +368,7 @@ def build_ui():
                 msgs.append(f"⚠️ ComfyUI 不可达: {e}")
             # 2. 清空 ComfyUI 队列
             try:
-                r = req.post(f"{COMFYUI_URL}/queue", json={"clear": True}, timeout=5)
+                r = req.post(f"{_comfyui_url()}/queue", json={"clear": True}, timeout=5)
                 msgs.append("✅ ComfyUI 队列已清空")
             except Exception as e:
                 msgs.append(f"⚠️ 清空队列: {e}")
@@ -378,7 +426,7 @@ def build_ui():
    ```
 2. **使用「任务队列」Tab** 查看和管理渲染任务
 3. 点击「执行下一个任务」自动提交到 ComfyUI
-4. ComfyUI 的 Web 界面在 http://127.0.0.1:8188
+4. ComfyUI 的 Web 界面在 http://127.0.0.1:8000
 """)
             
             # ══════ Tab 4: 管线配置 ════════════════════

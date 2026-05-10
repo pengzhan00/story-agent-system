@@ -30,6 +30,27 @@ class Project:
     status: str = "draft"           # draft | active | completed | archived
     created_at: str = field(default_factory=_now)
     updated_at: str = field(default_factory=_now)
+    genre_tags: str = "[]"          # JSON list, e.g. ["都市言情","穿越重生"]
+    tone_tags: str = "[]"           # JSON list, e.g. ["甜宠","虐恋"]
+    emotion_arc: str = ""           # 先甜后虐 | 先虐后甜 | 全程爽 | 全程虐
+    episode_count: int = 80         # 总集数
+    act_count: int = 4              # 幕数 1-5
+    format: str = "short_drama"     # short_drama | movie
+    aspect_ratio: str = "9:16"      # 9:16 竖屏 | 16:9 横屏
+
+    def get_genre_tags(self) -> list[str]:
+        try:
+            tags = json.loads(self.genre_tags) if self.genre_tags else []
+            return tags if isinstance(tags, list) else []
+        except Exception:
+            return []
+
+    def get_tone_tags(self) -> list[str]:
+        try:
+            tags = json.loads(self.tone_tags) if self.tone_tags else []
+            return tags if isinstance(tags, list) else []
+        except Exception:
+            return []
 
 
 # ────────────────────────────────
@@ -256,8 +277,11 @@ class Shot:
     camera_notes: str = ""
     visual_prompt: str = ""
     render_payload: str = "{}"      # JSON dict
-    status: str = "draft"           # draft | ready | rendering | rendered | approved | rejected
+    status: str = "draft"           # draft | ready | rendering | rendered | approved | rejected | qc_failed | failed
     locked: int = 0
+    error: str = ""
+    video_path: str = ""
+    audio_path: str = ""
     created_at: str = field(default_factory=_now)
     updated_at: str = field(default_factory=_now)
 

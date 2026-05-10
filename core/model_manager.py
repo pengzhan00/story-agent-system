@@ -13,8 +13,12 @@ import time
 from pathlib import Path
 from typing import Callable, Optional
 
-COMFYUI_URL = "http://127.0.0.1:8188"
 COMFYUI_BASE_DIR = Path(os.path.expanduser("~/Documents/ComfyUI"))
+
+
+def _comfyui_url() -> str:
+    from core.service_ports import comfyui_api_base
+    return comfyui_api_base()
 
 # ComfyUI node → (class_type, input_field)
 _NODE_FIELD = {
@@ -52,7 +56,7 @@ def _get_object_info(force: bool = False) -> dict:
         return _cache
     import requests
     try:
-        r = requests.get(f"{COMFYUI_URL}/object_info", timeout=10)
+        r = requests.get(f"{_comfyui_url()}/object_info", timeout=10)
         if r.status_code == 200:
             _cache = r.json()
             _cache_time = time.time()
@@ -65,7 +69,7 @@ def _get_object_info(force: bool = False) -> dict:
 def comfyui_online() -> bool:
     import requests
     try:
-        return requests.get(f"{COMFYUI_URL}/queue", timeout=4).status_code == 200
+        return requests.get(f"{_comfyui_url()}/queue", timeout=4).status_code == 200
     except Exception:
         return False
 

@@ -7,6 +7,7 @@
 Usage:
   python main.py               # 启动故事创作 Gradio Web UI (7860)
   python main.py --render      # 启动独立渲染服务 (7861)
+  python main.py --workshop    # 独立启动分镜工坊 UI (7861)
   python main.py --cli         # 命令行模式
   python main.py --demo        # 演示模式
   python main.py --check       # 环境检查
@@ -14,8 +15,28 @@ Usage:
 import sys
 import os
 import socket
+from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+
+def _load_local_env() -> None:
+    """Load repo-local .env without requiring python-dotenv."""
+    env_path = Path(__file__).with_name(".env")
+    if not env_path.exists():
+        return
+    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip("'").strip('"')
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
+_load_local_env()
 
 from core.database import init_db, list_projects, get_project
 from core.ollama_client import refresh_models, DEFAULT_MODEL
@@ -188,6 +209,22 @@ def main():
         )
         return
 
+    if "--workshop" in sys.argv:
+        init_db()
+        port = _resolve_launch_port(7861)
+        print(f"🎬 启动分镜工坊 (端口 {port})...")
+        from ui.workshop import build_workshop_demo
+        app = build_workshop_demo()
+        print(f"  🌐 http://127.0.0.1:{port}")
+        print("  💡 按 Ctrl+C 退出\n")
+        app.launch(
+            server_name="127.0.0.1",
+            server_port=port,
+            share=False,
+            show_error=True,
+        )
+        return
+
     # 默认：启动 Web UI
     init_db()
     refresh_models()
@@ -195,7 +232,7 @@ def main():
     print(BANNER)
     print("🎬 漫剧故事工坊 — Starting Web UI...")
 
-    from ui.app import build_ui
+    from ui.app import build_ui, CUSTOM_CSS, _STUDIO_THEME
     app = build_ui()
     port = _resolve_launch_port(7860)
 
@@ -208,6 +245,8 @@ def main():
         server_port=port,
         share=False,
         show_error=True,
+        theme=_STUDIO_THEME,
+        css=CUSTOM_CSS,
     )
 
 

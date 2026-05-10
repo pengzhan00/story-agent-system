@@ -26,6 +26,10 @@ nohup.out
 
 # ── AI Agent 缓存 ──
 .claude/
+.hermes/
+
+# ── 备份文件 ──
+*.bak
 
 # ── 模型/资产文件（不提交大文件） ──
 asset/

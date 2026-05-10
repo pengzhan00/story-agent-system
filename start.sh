@@ -160,8 +160,22 @@ start_comfyui() {
         rm -f "$COMFYUI_PIDFILE"
     fi
 
+    # 杀死用错 Python 的残留进程
+    for stale_pid in $(pgrep -f "python.*main.py.*port 8188" 2>/dev/null); do
+        py_path=$(ps -o pid=,command= -p "$stale_pid" 2>/dev/null | grep -o "/[^ ]*python[^ ]*" || echo "")
+        if [ "$py_path" != "$COMFYUI_PY" ]; then
+            info "清理用错 Python 的残留 ComfyUI 进程 (PID $stale_pid): $py_path"
+            kill "$stale_pid" 2>/dev/null || true
+        fi
+    done
+    sleep 2
+
     cd "$COMFYUI_DIR"
-    nohup "$COMFYUI_PY" main.py --listen 127.0.0.1 --port 8188 > /tmp/comfyui.log 2>&1 &
+    nohup "$COMFYUI_PY" main.py \
+        --listen 127.0.0.1 \
+        --port 8188 \
+        --database-url "sqlite:///$COMFYUI_DIR/user/comfyui_cli.db" \
+        > /tmp/comfyui.log 2>&1 &
     local PID=$!
     echo $PID > "$COMFYUI_PIDFILE"
     cd "$PROJECT_DIR"
@@ -187,6 +201,75 @@ start_comfyui() {
     return 1
 }
 
+# ── 渲染管线 & 模型状态检查 ───────────────────────
+check_pipelines() {
+    local VENV_PY
+    VENV_PY="$PROJECT_DIR/.venv/bin/python3"
+    [ -f "$VENV_PY" ] || VENV_PY="$(command -v python3)"
+
+    echo ""
+    info "=== 渲染管线 & 模型状态 ==="
+    "$VENV_PY" - << 'PYEOF' 2>/dev/null || warn "管线检查失败（ComfyUI 可能未运行）"
+import sys
+sys.path.insert(0, '.')
+GREEN = '\033[0;32m'; RED = '\033[0;31m'; YELLOW = '\033[1;33m'; CYAN = '\033[0;36m'; NC = '\033[0m'
+
+# ── 管线状态 ─────────────────────────────────────
+try:
+    from pipelines.render_pipeline import RenderDispatcher
+    d = RenderDispatcher.from_config()
+    d.probe()
+    print(f"\n  {CYAN}渲染管线:{NC}")
+    for name, info in d._status.items():
+        ok = info.available
+        icon = f"{GREEN}✅{NC}" if ok else f"{RED}❌{NC}"
+        reasons = getattr(info, 'reasons', [])
+        reason_str = f"  → {', '.join(reasons)}" if not ok and reasons else ""
+        print(f"    {icon} {name}{reason_str}")
+    active = d.active_pipeline or "（未设置）"
+    avail_count = sum(1 for i in d._status.values() if i.available)
+    print(f"\n  激活管线: {CYAN}{active}{NC}  可用: {GREEN}{avail_count}/{len(d._status)}{NC}")
+except Exception as e:
+    print(f"  {YELLOW}[!] 管线检查出错: {e}{NC}")
+
+# ── 关键模型文件（LTX 2.3 主链） ──────────────────
+import os
+MODEL_BASE = os.path.expanduser("~/myworkspace/ComfyUI_models")
+KEY_MODELS = [
+    ("checkpoints",        "ltx-2.3-22b-distilled-1.1.safetensors",        "LTX 2.3 distilled 1.1 [生产主力]"),
+    ("checkpoints",        "ltx-2.3-22b-distilled-fp8.safetensors",        "LTX 2.3 distilled fp8 [省显存]"),
+    ("text_encoders",      "gemma_3_12B_it_fp4_mixed.safetensors",          "Gemma 3 12B text encoder [fp4]"),
+    ("loras",              "ltx-2.3-22b-distilled-lora-384.safetensors",    "LTX distilled LoRA 384"),
+    ("latent_upscale_models", "ltx-2.3-spatial-upscaler-x2-1.1.safetensors", "LTX spatial upscaler x2"),
+]
+print(f"\n  {CYAN}关键模型:{NC}")
+for subdir, fname, label in KEY_MODELS:
+    path = os.path.join(MODEL_BASE, subdir, fname)
+    exists = os.path.exists(path)
+    icon = f"{GREEN}✅{NC}" if exists else f"{RED}❌{NC}"
+    size_str = ""
+    if exists:
+        try:
+            sz = os.path.getsize(path) / (1024**3)
+            size_str = f" · {sz:.1f} GiB"
+        except Exception:
+            pass
+    print(f"    {icon} {label}{size_str}")
+
+# ── ACEStep ───────────────────────────────────────
+try:
+    from core.service_ports import acestep_status_dict
+    s = acestep_status_dict()
+    icon = f"{GREEN}✅{NC}" if s["online"] else f"{YELLOW}⬜{NC}"
+    status = s["url"] if s["online"] else "离线（首次生成音乐时自动启动）"
+    print(f"\n  {CYAN}ACEStep 音乐:{NC} {icon} {status}")
+except Exception:
+    pass
+
+print()
+PYEOF
+}
+
 # ── 启动 Gradio UI ──────────────────────────────
 start_gradio() {
     if check_gradio >/dev/null 2>&1; then
@@ -194,14 +277,21 @@ start_gradio() {
         return 0
     fi
     info "启动 Gradio UI (端口 ${UI_PORT:-7860})..."
-    nohup .venv/bin/python3 main.py > /tmp/storyagent_ui.log 2>&1 &
+    PYTHONUNBUFFERED=1 nohup .venv/bin/python3 main.py > /tmp/storyagent_ui.log 2>&1 &
     echo $! > "$GRADIO_PIDFILE"
-    sleep 3
-    if check_gradio >/dev/null 2>&1; then
-        ok "Gradio UI 启动成功 → http://127.0.0.1:${UI_PORT:-7860}"
-    else
-        warn "Gradio UI 可能还在启动，查看: tail -f /tmp/storyagent_ui.log"
-    fi
+    for i in $(seq 1 20); do
+        sleep 1
+        if check_gradio >/dev/null 2>&1; then
+            ok "Gradio UI 启动成功 → http://127.0.0.1:${UI_PORT:-7860}"
+            return 0
+        fi
+        if ! kill -0 "$(cat "$GRADIO_PIDFILE" 2>/dev/null)" 2>/dev/null; then
+            err "Gradio UI 启动失败，进程已退出"
+            tail -20 /tmp/storyagent_ui.log 2>/dev/null || true
+            return 1
+        fi
+    done
+    warn "Gradio UI 可能还在启动，查看: tail -f /tmp/storyagent_ui.log"
 }
 
 stop_all() {
@@ -214,8 +304,11 @@ stop_all() {
         kill "$(cat "$GRADIO_PIDFILE")" 2>/dev/null && ok "Gradio UI 已停止" || true
         rm -f "$GRADIO_PIDFILE"
     fi
-    # 兜底：杀所有残余 ComfyUI 进程
+    # 兜底：杀残余 ComfyUI CLI 进程（仅源码版 main.py，不误伤 App / Docker）
     lsof -ti :8188 2>/dev/null | xargs kill -9 2>/dev/null || true
+    pkill -f "$HOME/Documents/ComfyUI/.venv/bin/python3 main.py" 2>/dev/null || true
+    # 兜底：杀占用 UI 端口的残余旧进程，避免一直看到老页面
+    lsof -ti :"${UI_PORT:-7860}" 2>/dev/null | xargs kill -9 2>/dev/null || true
 }
 
 # ═══════════════════════════════════════════════════
@@ -252,8 +345,14 @@ check_gradio || true
 
 # --check 模式
 if [ "$MODE" = "--check" ]; then
+    check_pipelines
     echo ""
     info "检查完成（--check 模式，未启动服务）"
+    echo ""
+    echo -e "${CYAN}  📋 实时监控渲染进度:${NC}"
+    echo -e "${CYAN}    tail -f /tmp/comfyui_auto.log   # ☢️ 强杀后重启的 ComfyUI${NC}"
+    echo -e "${CYAN}    tail -f /tmp/comfyui.log         # start.sh 启动的 ComfyUI${NC}"
+    echo -e "${YELLOW}  ⚠️  空间上采样阶段（0/3→3/3，约7分钟）请勿按 ☢️ 强杀！${NC}"
     exit 0
 fi
 
@@ -275,13 +374,20 @@ info "=== 启动服务 ==="
 start_comfyui || warn "ComfyUI 启动失败，请手动启动"
 start_gradio
 
+check_pipelines
+
 echo ""
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${GREEN}  ✅ 系统就绪！${NC}"
 echo -e "${GREEN}  🌐 UI: http://127.0.0.1:${UI_PORT:-7860}${NC}"
 echo -e "${GREEN}  停止: ./start.sh --restart${NC}"
 print_env
+echo -e "${CYAN}  📋 实时监控渲染进度:${NC}"
+echo -e "${CYAN}    tail -f /tmp/comfyui_auto.log   # ☢️ 强杀后重启的 ComfyUI${NC}"
+echo -e "${CYAN}    tail -f /tmp/comfyui.log         # start.sh 启动的 ComfyUI${NC}"
+echo -e "${CYAN}    tail -f /tmp/storyagent_ui.log   # Story Agent 日志${NC}"
+echo -e "${YELLOW}  ⚠️  空间上采样阶段（0/3→3/3，约7分钟）请勿按 ☢️ 强杀！${NC}"
+echo -e "${YELLOW}     看到 '0 models unloaded' 后等 3/3 完成再操作。${NC}"
 echo -e "${CYAN}  如遇渲染失败，先运行:${NC}"
 echo -e "${CYAN}    ./start.sh --check${NC}"
-echo -e "${CYAN}    tail -50 /tmp/comfyui.log${NC}"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"

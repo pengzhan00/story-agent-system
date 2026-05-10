@@ -121,7 +121,12 @@ def _mean_volume_db(path: str) -> float:
     return -120.0
 
 
-def validate_render_output(path: str, min_duration: float = 1.0) -> QualityCheckResult:
+def validate_render_output(
+    path: str,
+    min_duration: float = 1.0,
+    min_width: int = 320,
+    min_height: int = 180,
+) -> QualityCheckResult:
     checks: list[str] = []
     errors: list[str] = []
     p = Path(path)
@@ -141,7 +146,7 @@ def validate_render_output(path: str, min_duration: float = 1.0) -> QualityCheck
         errors.append(f"视频时长过短: {dur:.2f}s")
     else:
         checks.append("duration_ok")
-    if video["width"] < 320 or video["height"] < 180:
+    if video["width"] < min_width or video["height"] < min_height:
         errors.append(f"视频分辨率过低: {video['width']}x{video['height']}")
     else:
         checks.append("resolution_ok")

@@ -27,8 +27,12 @@ from pipelines.output_manager import (
 )
 
 RENDER_TIMEOUT = 7200  # 2小时超时
-COMFYUI_URL = "http://127.0.0.1:8188"
 OUTPUT_DIR = PROJECT_ROOT / "output"
+
+
+def _comfyui_url() -> str:
+    from core.service_ports import get_comfyui_url
+    return get_comfyui_url()
 COMFYUI_OUTPUT_DIR = Path(os.path.expanduser("~/Documents/ComfyUI/output"))
 
 
@@ -53,7 +57,7 @@ class BatchRenderer:
         """检查 ComfyUI 是否可访问"""
         import requests
         try:
-            r = requests.get(f"{COMFYUI_URL}/queue", timeout=5)
+            r = requests.get(f"{_comfyui_url()}/queue", timeout=5)
             return r.status_code == 200
         except:
             return False
@@ -64,7 +68,7 @@ class BatchRenderer:
         start = time.time()
         while time.time() - start < timeout:
             try:
-                r = requests.get(f"{COMFYUI_URL}/queue", timeout=5)
+                r = requests.get(f"{_comfyui_url()}/queue", timeout=5)
                 q = r.json()
                 if not q.get("queue_running") and not q.get("queue_pending"):
                     return True

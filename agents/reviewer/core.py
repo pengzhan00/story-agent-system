@@ -129,7 +129,7 @@ Output as JSON (no markdown):
         system=REVIEWER_SYSTEM,
         model=DETAIL_MODEL,
         temperature=0.4,
-        max_tokens=4096,
+        max_tokens=2048,
         project_id=project_id,
         agent_type="reviewer",
     )
@@ -515,7 +515,7 @@ Output as JSON (no markdown):
         system=REVIEWER_SYSTEM,
         model=DETAIL_MODEL,
         temperature=0.4,
-        max_tokens=8192,
+        max_tokens=3000,
         project_id=project_id,
         agent_type="reviewer",
     )

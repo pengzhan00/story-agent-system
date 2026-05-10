@@ -284,6 +284,9 @@ def init_db():
                 render_payload TEXT NOT NULL DEFAULT '{}',
                 status TEXT NOT NULL DEFAULT 'draft',
                 locked INTEGER NOT NULL DEFAULT 0,
+                error TEXT NOT NULL DEFAULT '',
+                video_path TEXT NOT NULL DEFAULT '',
+                audio_path TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );
@@ -477,6 +480,17 @@ def init_db():
         _ensure_column(c, "render_jobs", "fallback_from", "TEXT NOT NULL DEFAULT ''")
         _ensure_column(c, "render_jobs", "render_tier", "TEXT NOT NULL DEFAULT 'production'")
         _ensure_column(c, "render_jobs", "output_meta", "TEXT NOT NULL DEFAULT '{}'")
+        _ensure_column(c, "projects", "genre_tags",    "TEXT NOT NULL DEFAULT '[]'")
+        _ensure_column(c, "projects", "tone_tags",     "TEXT NOT NULL DEFAULT '[]'")
+        _ensure_column(c, "projects", "emotion_arc",   "TEXT NOT NULL DEFAULT ''")
+        _ensure_column(c, "projects", "episode_count", "INTEGER NOT NULL DEFAULT 80")
+        _ensure_column(c, "projects", "act_count",     "INTEGER NOT NULL DEFAULT 4")
+        _ensure_column(c, "projects", "format",        "TEXT NOT NULL DEFAULT 'short_drama'")
+        _ensure_column(c, "projects", "aspect_ratio",  "TEXT NOT NULL DEFAULT '9:16'")
+        # shots: render-result fields added in v2
+        _ensure_column(c, "shots", "error",            "TEXT NOT NULL DEFAULT ''")
+        _ensure_column(c, "shots", "video_path",       "TEXT NOT NULL DEFAULT ''")
+        _ensure_column(c, "shots", "audio_path",       "TEXT NOT NULL DEFAULT ''")
         c.commit()
 
 
@@ -1002,13 +1016,22 @@ def cancel_running_tasks(agent_type: str = "") -> int:
     return count
 
 
-def cancel_running_render_jobs() -> int:
-    count_row = _fetchone("SELECT COUNT(*) AS n FROM render_jobs WHERE status='running'", ())
+def cancel_running_render_jobs(project_id: int = 0) -> int:
+    where = ["status='running'"]
+    params: list[object] = []
+    if project_id:
+        where.append("project_id=?")
+        params.append(int(project_id))
+    where_sql = " AND ".join(where)
+    count_row = _fetchone(
+        f"SELECT COUNT(*) AS n FROM render_jobs WHERE {where_sql}",
+        tuple(params),
+    )
     count = int(count_row["n"]) if count_row else 0
     if count:
         _execute(
-            "UPDATE render_jobs SET status='failed', error=? WHERE status='running'",
-            ("cancelled by operator",),
+            f"UPDATE render_jobs SET status='failed', error=? WHERE {where_sql}",
+            ("cancelled by operator", *params),
         )
     return count
 

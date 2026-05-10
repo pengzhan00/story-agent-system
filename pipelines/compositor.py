@@ -1,9 +1,10 @@
 """
-Compositor — Shot 级音视频合成 + 字幕 + 剧集合成
-依赖: ffmpeg（系统级）
+Compositor — Shot 级音视频合成 + 字幕 + 剧集合成 + RIFE补帧
+依赖: ffmpeg（系统级） + RIFE（可选，用于帧率提升）
 """
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -17,6 +18,191 @@ import core.database as db
 from pipelines.quality_gate import validate_composite_output
 
 OUTPUT_DIR = PROJECT_ROOT / "output"
+
+# ── RIFE 补帧 ───────────────────────────────────────────────
+
+RIFE_REPO_PATH = Path("~/myworkspace/RIFE_repo").expanduser()
+RIFE_MODEL_PATH = Path("~/myworkspace/RIFE_repo/train_log/flownet.pkl").expanduser()
+# 模型下载指引：从 Google Drive 下载
+# https://drive.google.com/file/d/1h42aGYPNJn2q8j_GVkS_yDu__G_UZ2GX/view
+# 解压后放到 ~/myworkspace/RIFE_repo/train_log/
+
+
+def _check_rife_available() -> bool:
+    """检查 RIFE 是否可用（需要仓库 + 模型权重）。"""
+    # 检查本地 RIFE 仓库 + 模型权重 (>1MB)
+    if RIFE_REPO_PATH.exists() and RIFE_MODEL_PATH.exists():
+        if RIFE_MODEL_PATH.stat().st_size > 1_000_000:
+            inference_dir = RIFE_REPO_PATH / "inference"
+            if inference_dir.exists() and (inference_dir / "RIFE.py").exists():
+                return True
+    # 检查 ComfyUI RIFE 节点
+    try:
+        from pipelines.render_pipeline import get_object_info
+        object_info = get_object_info()
+        if "RIFE" in object_info or "RIFEInterpolation" in object_info:
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def interpolate_fps_rife(
+    input_path: str,
+    output_path: str,
+    target_fps: float = 24.0,
+) -> bool:
+    """
+    使用 RIFE 将视频帧率提升到 target_fps。
+    返回 True 表示成功。
+    """
+    if not Path(input_path).exists():
+        print(f"[RIFE] 输入文件不存在: {input_path}")
+        return False
+
+    # 获取原始帧率
+    try:
+        result = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "v",
+             "-show_entries", "stream=r_frame_rate", "-of", "csv=p=0", input_path],
+            capture_output=True, text=True, timeout=10
+        )
+        fps_str = result.stdout.strip()
+        if "/" in fps_str:
+            num, den = fps_str.split("/")
+            src_fps = float(num) / max(float(den), 1.0)
+        else:
+            src_fps = float(fps_str) or 16.0
+    except Exception:
+        src_fps = 16.0
+
+    if src_fps >= target_fps:
+        print(f"[RIFE] 源帧率 {src_fps:.1f}fps 已达标，跳过补帧")
+        shutil.copy2(input_path, output_path)
+        return True
+
+    multiplier = int(round(target_fps / src_fps))
+    print(f"[RIFE] 补帧: {src_fps:.1f}fps → {target_fps:.1f}fps (×{multiplier})")
+
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+
+    # ── 优先使用本地 RIFE 仓库 ─────────────────────────────────────
+    if RIFE_REPO_PATH.exists():
+        try:
+            # 提取帧 → RIFE 补帧 → 合成视频
+            with tempfile.TemporaryDirectory() as tmpdir:
+                tmp = Path(tmpdir)
+
+                # 1. 提取原始帧
+                frames_dir = tmp / "frames"
+                frames_dir.mkdir()
+                subprocess.run(
+                    ["ffmpeg", "-i", input_path, "-vsync", "0",
+                     str(frames_dir / "frame_%08d.png")],
+                    capture_output=True, timeout=120
+                )
+                frame_files = sorted(frames_dir.glob("frame_*.png"))
+                if not frame_files:
+                    print("[RIFE] 帧提取失败")
+                    return False
+
+                # 2. 用 RIFE Python 脚本补帧
+                interp_dir = tmp / "interp"
+                interp_dir.mkdir()
+
+                # 调用 RIFE inference 脚本
+                rife_script = RIFE_REPO_PATH / "inference" / "interpolate_video.py"
+                if rife_script.exists():
+                    subprocess.run(
+                        [sys.executable, str(rife_script),
+                         "--input", str(frames_dir),
+                         "--output", str(interp_dir),
+                         "--multi", str(multiplier)],
+                        capture_output=True, timeout=600
+                    )
+                else:
+                    # 直接调用 RIFE 模块
+                    _run_rife_inference(frames_dir, interp_dir, multiplier)
+
+                interp_files = sorted(interp_dir.glob("*.png"))
+                if not interp_files:
+                    print("[RIFE] 补帧失败，回退 ffmpeg minterpolate")
+                    return _fallback_ffmpeg_minterpolate(input_path, output_path, target_fps)
+
+                # 3. 合成视频（保持原音频）
+                subprocess.run(
+                    ["ffmpeg", "-y", "-framerate", str(target_fps),
+                     "-i", str(interp_dir / "frame_%08d.png"),
+                     "-i", input_path, "-map", "0:v", "-map", "1:a?",
+                     "-c:v", "libx264", "-preset", "medium", "-pix_fmt", "yuv420p",
+                     "-c:a", "aac", "-shortest",
+                     output_path],
+                    capture_output=True, timeout=120
+                )
+
+                if Path(output_path).exists():
+                    print(f"[RIFE] ✅ 补帧成功: {output_path}")
+                    return True
+
+        except Exception as e:
+            print(f"[RIFE] 异常: {e}")
+
+    # ── 回退 ffmpeg minterpolate ─────────────────────────────────────
+    return _fallback_ffmpeg_minterpolate(input_path, output_path, target_fps)
+
+
+def _run_rife_inference(frames_dir: Path, output_dir: Path, multiplier: int) -> bool:
+    """直接调用 RIFE 模块进行帧插值。"""
+    try:
+        # 动态导入 RIFE
+        import importlib.util
+        rife_path = RIFE_REPO_PATH / "inference" / "RIFE.py"
+        if not rife_path.exists():
+            return False
+
+        spec = importlib.util.spec_from_file_location("RIFE", str(rife_path))
+        rife_mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(rife_mod)
+
+        # 加载模型
+        model = rife_mod.RIFE()
+        model.load_model(RIFE_REPO_PATH / "inference")
+
+        # 执行插值
+        frame_files = sorted(frames_dir.glob("*.png"))
+        for i in range(len(frame_files) - 1):
+            img0 = rife_mod.read_image(str(frame_files[i]))
+            img1 = rife_mod.read_image(str(frame_files[i + 1]))
+            for j in range(multiplier - 1):
+                mid = model.inference(img0, img1, (j + 1) / multiplier)
+                rife_mod.write_image(str(output_dir / f"interp_{i * multiplier + j:08d}.png"), mid)
+            rife_mod.write_image(str(output_dir / f"interp_{i * multiplier:08d}.png"), img0)
+        # 最后一帧
+        rife_mod.write_image(str(output_dir / f"interp_{(len(frame_files) - 1) * multiplier:08d}.png"),
+                              rife_mod.read_image(str(frame_files[-1])))
+        return True
+    except Exception as e:
+        print(f"[RIFE-inference] 失败: {e}")
+        return False
+
+
+def _fallback_ffmpeg_minterpolate(input_path: str, output_path: str, target_fps: float) -> bool:
+    """使用 ffmpeg minterpolate 滤镜补帧（效果一般，作为兜底）。"""
+    try:
+        subprocess.run(
+            ["ffmpeg", "-y", "-i", input_path,
+             "-vf", f"minterpolate=fps={target_fps}:mi_mode=mci",
+             "-c:v", "libx264", "-preset", "medium", "-pix_fmt", "yuv420p",
+             "-c:a", "copy",
+             output_path],
+            capture_output=True, timeout=300
+        )
+        if Path(output_path).exists():
+            print(f"[ffmpeg-minterpolate] 补帧成功: {output_path}")
+            return True
+    except Exception as e:
+        print(f"[ffmpeg-minterpolate] 异常: {e}")
+    return False
 
 
 # ── 工具函数 ──────────────────────────────────────────────

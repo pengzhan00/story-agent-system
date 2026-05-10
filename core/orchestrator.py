@@ -20,6 +20,20 @@ from core.database import (
 )
 from core.ollama_client import DEFAULT_MODEL, resolve_model_profile
 
+_RENDER_STOP = {"requested": False}
+
+
+def request_render_stop() -> None:
+    _RENDER_STOP["requested"] = True
+
+
+def clear_render_stop() -> None:
+    _RENDER_STOP["requested"] = False
+
+
+def render_stop_requested() -> bool:
+    return bool(_RENDER_STOP.get("requested"))
+
 # ─── 管线阶段定义 ──────────────────────────────────────
 
 STAGES = [
@@ -41,33 +55,10 @@ STAGES = [
 # ─── 工具函数 ──────────────────────────────────────────
 
 def _ensure_comfyui() -> bool:
-    """检查 ComfyUI，如果离线则尝试启动。返回是否在线。"""
-    import requests
-    try:
-        r = requests.get("http://127.0.0.1:8188/queue", timeout=5)
-        return r.status_code == 200
-    except:
-        pass
-
-    # 尝试启动
-    comfy_dir = COMFYUI_DIR
-    venv_python = resolve_comfyui_python()
-    main_py = comfyui_main_py()
-    if venv_python.exists() and main_py.exists():
-        import subprocess
-        logfile = "/tmp/comfyui_auto.log"
-        cmd = f"cd {comfy_dir} && nohup {venv_python} main.py --listen 127.0.0.1 > {logfile} 2>&1 &"
-        subprocess.run(cmd, shell=True, timeout=10)
-        # 等待启动
-        for _ in range(30):
-            time.sleep(2)
-            try:
-                r = requests.get("http://127.0.0.1:8188/queue", timeout=3)
-                if r.status_code == 200:
-                    return True
-            except:
-                pass
-    return False
+    """扫描所有常用端口找 ComfyUI；离线则自动拉起。返回是否在线。"""
+    from core.service_ports import get_comfyui_url, comfyui_online
+    get_comfyui_url()          # 扫描 + 自动拉起（结果已缓存）
+    return comfyui_online()
 
 
 def _format_log(entries: list[str]) -> str:
@@ -242,17 +233,19 @@ def _build_style_guide(result: dict) -> str:
     return " | ".join(p for p in parts if p)
 
 
-def _create_shot_plan(project_id: int, script_id: int, acts_list: list, result: dict) -> list[dict]:
+def _create_shot_plan(project_id: int, script_id: int, acts_list: list, result: dict, ep_num: int = 1) -> list[dict]:
     with transaction():
-        return _create_shot_plan_txn(project_id, script_id, acts_list, result)
+        return _create_shot_plan_txn(project_id, script_id, acts_list, result, ep_num=ep_num)
 
 
-def _create_shot_plan_txn(project_id: int, script_id: int, acts_list: list, result: dict, shots_per_scene_default: int = 3) -> list[dict]:
-    delete_shots_by_project(project_id)
+def _create_shot_plan_txn(project_id: int, script_id: int, acts_list: list, result: dict, shots_per_scene_default: int = 3, ep_num: int = 1) -> list[dict]:
+    # 仅在第一集时清空旧分镜；第二集起追加写入
+    if ep_num == 1:
+        delete_shots_by_project(project_id)
     episode_id = create_episode({
         "project_id": project_id,
-        "number": 1,
-        "title": "第1集",
+        "number": ep_num,
+        "title": f"第{ep_num}集",
         "summary": result.get("script_synopsis", ""),
         "status": "planned",
     })
@@ -374,6 +367,13 @@ def run_pipeline_generator(
     model_profile: Optional[dict] = None,
     enable_render: bool = False,
     total_episodes: int = 5,
+    genre_tags: list = None,
+    tone_tags: list = None,
+    emotion_arc: str = "",
+    episode_count: int = 80,
+    act_count: int = 4,
+    project_format: str = "short_drama",
+    aspect_ratio: str = "9:16",
 ) -> Generator[tuple[float, str, Optional[dict]], None, dict]:
     """
     Generator 版本的一键全流程管线，支持多集循环。
@@ -424,11 +424,20 @@ def run_pipeline_generator(
         yield from emit(0.05, f"✅ 导演分析完成 → {project_name} ({genre}/{tone})")
 
         # ── 2. 创建项目 ─────────────────────────
+        # act_count wins over acts if non-zero
+        effective_acts = act_count if act_count else acts
         pid = create_project({
             "name": project_name,
             "description": f"{premise[:200]}...",
             "genre": genre,
             "status": "active",
+            "genre_tags":    json.dumps(genre_tags or [], ensure_ascii=False),
+            "tone_tags":     json.dumps(tone_tags or [], ensure_ascii=False),
+            "emotion_arc":   emotion_arc,
+            "episode_count": episode_count,
+            "act_count":     effective_acts,
+            "format":        project_format,
+            "aspect_ratio":  aspect_ratio,
         })
         result["project_id"] = pid
         yield from emit(0.08, f"📁 项目已创建: {project_name} (ID:{pid})")
@@ -456,11 +465,11 @@ def run_pipeline_generator(
 
             script_data = generate_storyline(
                 premise=episode_premise, genre=genre, tone=tone,
-                acts=acts, project_id=pid, model=resolved_model_profile["writer"],
+                acts=effective_acts, project_id=pid, model=resolved_model_profile["writer"],
             )
             if script_data and "title" in script_data:
-                if ep_idx == 0:
-                    result["script_id"] = script_data.get("id", 0)
+                # 每集更新 script_id，让分镜引用本集剧本
+                result["script_id"] = script_data.get("id", 0)
                 result["script_synopsis"] = script_data.get("synopsis", "")
                 title = script_data.get("title", "")
                 yield from emit(ep_pct_base + 0.04,
@@ -639,6 +648,7 @@ def run_pipeline_generator(
                 script_id=result["script_id"],
                 acts_list=acts_list,
                 result=result,
+                ep_num=ep_num,
             )
             all_shots.extend(ep_shots)
             yield from emit(ep_pct_base + 0.24,
@@ -723,20 +733,21 @@ def run_pipeline_generator(
         else:
             yield from emit(0.72, "⏭️ 渲染未启用（可勾选「启用渲染」重新运行）")
 
-        # ── 11. 音频 / 合成 / 导出 ──────────────────
-        if enable_render and result.get("render"):
-            from pipelines.audio_pipeline import run_audio_pipeline
-            from pipelines.compositor import run_compositor_pipeline
+        # ── 11. 音频（独立于视频渲染是否成功）──────────
+        from pipelines.audio_pipeline import run_audio_pipeline
+        yield from emit(0.86, "🎤 运行统一音频管线（TTS / BGM / SFX）...")
+        audio_result = run_audio_pipeline(pid)
+        if audio_result.get("success"):
+            tts_done = len(audio_result.get("tts", []))
+            music_done = len(audio_result.get("music", []))
+            sfx_done = len(audio_result.get("sfx", []))
+            yield from emit(0.89, f"✅ 音频完成: TTS {tts_done} / BGM {music_done} / SFX {sfx_done}")
+        else:
+            yield from emit(0.88, f"⚠️ 音频管线失败: {audio_result.get('error', 'unknown error')}")
 
-            yield from emit(0.86, "🎤 运行统一音频管线...")
-            audio_result = run_audio_pipeline(pid)
-            if audio_result.get("success"):
-                tts_done = len(audio_result.get("tts", []))
-                music_done = len(audio_result.get("music", []))
-                sfx_done = len(audio_result.get("sfx", []))
-                yield from emit(0.89, f"✅ 音频完成: TTS {tts_done} / BGM {music_done} / SFX {sfx_done}")
-            else:
-                yield from emit(0.88, f"⚠️ 音频管线失败: {audio_result.get('error', 'unknown error')}")
+        # ── 12. 合成 / 导出（需要视频渲染成功）────────
+        if enable_render and result.get("render"):
+            from pipelines.compositor import run_compositor_pipeline
 
             yield from emit(0.90, "🎞️ 运行统一合成管线...")
             composite_result = run_compositor_pipeline(pid, episode=1, burn_subs=True, crossfade=0.5)
@@ -754,7 +765,7 @@ def run_pipeline_generator(
             else:
                 yield from emit(0.92, f"⚠️ 合成失败: {composite_result.get('error', 'unknown error')}")
         else:
-            yield from emit(0.86, "⏭️ 跳过音频/合成/导出（需要渲染完成）")
+            yield from emit(0.90, "⏭️ 跳过合成/导出（视频渲染未成功或未启用）")
 
         # ── 完成 ────────────────────────────────
         update_project(pid, {"status": "completed"})
@@ -762,11 +773,13 @@ def run_pipeline_generator(
 
     except Exception as e:
         import traceback
-        tb = traceback.format_exc()[:2000]
+        tb = traceback.format_exc()
         log_entries.append(f"[{time.strftime('%H:%M:%S')}] ❌ 管线出错: {e}")
-        log_entries.append(tb)
+        log_entries.append(tb[:3000])
         _pipeline_status["running"] = False
         result["error"] = str(e)
+        # Also write to stderr so it shows in the log file
+        print(f"\n[PIPELINE ERROR] {e}\n{tb}", flush=True)
         yield (0.0, _format_log(log_entries), result)
 
     return result
@@ -790,6 +803,7 @@ def run_render_export_generator(
         return (pct, _format_log(log_entries), result)
 
     try:
+        clear_render_stop()
         # ── 1. 从 DB 读取最新数据 ────────────────
         proj = get_project(project_id)
         if not proj:
@@ -831,6 +845,10 @@ def run_render_export_generator(
         render_results = []
         total = len(shots)
         for idx, shot in enumerate(shots):
+            if render_stop_requested():
+                yield emit(0.24 + 0.55 * (idx / max(total, 1)), "🛑 已停止剩余渲染任务")
+                result["stopped"] = True
+                break
             progress = 0.25 + 0.55 * (idx / max(total, 1))
             payload = shot.render_payload
             if isinstance(payload, str):
@@ -857,6 +875,10 @@ def run_render_export_generator(
                         success = True
                 except Exception as re:
                     error_msg = str(re)
+                    if render_stop_requested():
+                        yield emit(progress + 0.005, "🛑 当前渲染已中断，停止继续处理后续镜头")
+                        result["stopped"] = True
+                        break
                     yield emit(progress + 0.01, f"    ⚠️ RenderDispatcher 失败: {error_msg[:60]}")
 
             # ── fallback: BatchRenderer ──
@@ -871,6 +893,10 @@ def run_render_export_generator(
                         yield emit(progress + 0.01, f"    ✅ BatchRenderer fallback shot {shot.id} 成功")
                 except Exception as fe:
                     error_msg = str(fe)
+                    if render_stop_requested():
+                        yield emit(progress + 0.005, "🛑 当前渲染已中断，停止继续处理后续镜头")
+                        result["stopped"] = True
+                        break
                     yield emit(progress + 0.01, f"    ❌ 所有管线失败: {error_msg[:60]}")
 
             if not success:
@@ -881,14 +907,21 @@ def run_render_export_generator(
             result["render"] = render_results
             yield emit(0.80, f"✅ 渲染完成: {len(render_results)}/{total} 个镜头")
         else:
-            yield emit(0.70, "⚠️ 所有镜头渲染失败")
+            if result.get("stopped"):
+                yield emit(0.70, "🛑 渲染已停止")
+            else:
+                yield emit(0.70, "⚠️ 所有镜头渲染失败")
 
-        # ── 5. 音频 / 合成 / 导出 ──────────────────
-        if result.get("render"):
+        # ── 5. 音频（独立于视频渲染成功与否）─────────
+        # 音频后端（ffmpeg / TTS）不依赖 ComfyUI，
+        # 即使视频渲染全部失败也应生成 BGM + TTS + SFX。
+        # 但若操作员手动停止当前渲染，则整个 Phase 2 应尽快结束，
+        # 不再继续跑长耗时的音频链。
+        if result.get("stopped"):
+            yield emit(0.83, "⏭️ 已按操作员请求停止，跳过音频 / 合成 / 导出")
+        else:
             from pipelines.audio_pipeline import run_audio_pipeline
-            from pipelines.compositor import run_compositor_pipeline
-
-            yield emit(0.84, "🎤 运行统一音频管线...")
+            yield emit(0.84, "🎤 运行统一音频管线（TTS / BGM / SFX）...")
             audio_result = run_audio_pipeline(project_id)
             if audio_result.get("success"):
                 yield emit(
@@ -900,6 +933,10 @@ def run_render_export_generator(
                 )
             else:
                 yield emit(0.87, f"⚠️ 音频管线失败: {audio_result.get('error', 'unknown error')}")
+
+        # ── 6. 合成 / 导出（需要视频渲染成功）────────
+        if result.get("render") and not result.get("stopped"):
+            from pipelines.compositor import run_compositor_pipeline
 
             yield emit(0.90, "🎞️ 运行统一合成管线...")
             composite_result = run_compositor_pipeline(project_id, episode=1, burn_subs=True, crossfade=0.5)
@@ -916,7 +953,8 @@ def run_render_export_generator(
             else:
                 yield emit(0.92, f"⚠️ 合成失败: {composite_result.get('error', 'unknown error')}")
         else:
-            yield emit(0.82, "⏭️ 跳过导出（无渲染结果）")
+            reason = "渲染已手动停止" if result.get("stopped") else "无渲染结果"
+            yield emit(0.82, f"⏭️ 跳过导出（{reason}）")
 
         # ── 完成 ────────────────────────────────
         update_project(project_id, {"status": "rendered"})
@@ -929,6 +967,8 @@ def run_render_export_generator(
         log_entries.append(tb)
         result["error"] = str(e)
         yield (0.0, _format_log(log_entries), result)
+    finally:
+        clear_render_stop()
 
     return result
 

@@ -18,7 +18,7 @@ from core.database import (
     create_shot_review, list_shot_reviews, create_export_manifest, list_export_manifests,
     create_asset_version, create_subtitle_revision, create_delivery_package,
 )
-from core.ollama_client import list_models, refresh_models, resolve_model_profile
+from core.ollama_client import list_models, refresh_models, resolve_model_profile, STAGE_MODEL_DEFAULTS
 from core.model_manager import (
     list_models as cm_list, search_models as cm_search,
     comfyui_online, is_installed, get_model_dir,
@@ -37,35 +37,505 @@ from ui.edit_panel import (
 # ─── 主题 ───────────────────────────────────────────
 
 CUSTOM_CSS = """
+/* ══════════════════════════════════════════
+   漫剧故事工坊 — Clean Studio Theme
+   ══════════════════════════════════════════ */
 :root {
-  --bg-primary: #0f1117; --bg-secondary: #1a1d27; --bg-tertiary: #272b3b;
-  --text-primary: #e8eaed; --text-secondary: #9aa0b0;
-  --accent: #6366f1; --accent-hover: #818cf8;
-  --success: #22c55e; --warning: #f59e0b; --border: #2d3147;
-  --radius: 12px;
+  --bg-base:    #f5f6fa;
+  --bg-card:    #ffffff;
+  --bg-raised:  #f0f2f8;
+  --bg-input:   #ffffff;
+  --bg-hover:   #eef0f8;
+  --bg-sidebar: #f8f9fc;
+
+  --text-primary:   #1a1d2e;
+  --text-secondary: #4a5068;
+  --text-muted:     #8a90a8;
+  --text-label:     #3a3f58;
+
+  --accent:       #6366f1;
+  --accent-dim:   #4f52cc;
+  --accent-light: #eef0ff;
+  --accent-glow:  rgba(99,102,241,.15);
+
+  --amber:        #f59e0b;
+  --amber-light:  #fef3c7;
+  --amber-dim:    #d97706;
+
+  --success:      #10b981;
+  --success-light:#d1fae5;
+  --warning:      #f59e0b;
+  --danger:       #ef4444;
+  --danger-light: #fee2e2;
+
+  --border:       #e2e5f0;
+  --border-dark:  #c8cce0;
+
+  --radius:    10px;
+  --radius-sm: 6px;
+  --shadow-sm: 0 1px 4px rgba(30,35,80,.08);
+  --shadow-md: 0 4px 16px rgba(30,35,80,.10);
+  --shadow-lg: 0 8px 32px rgba(30,35,80,.12);
 }
-.gradio-container { background: var(--bg-primary) !important; color: var(--text-primary); }
-.gr-box { border-radius: var(--radius) !important; border-color: var(--border) !important; }
-textarea, input, select { background: var(--bg-tertiary) !important; color: var(--text-primary) !important; border-color: var(--border) !important; border-radius: 8px !important; }
-.gr-button-primary { background: linear-gradient(135deg, #6366f1, #8b5cf6) !important; border: none !important; color: white !important; font-weight: 700 !important; border-radius: 12px !important; padding: 12px 32px !important; }
-.gr-button-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(99,102,241,.4); }
-.gr-button-secondary { background: linear-gradient(135deg, #22c55e, #16a34a) !important; border: none !important; color: white !important; font-weight: 700 !important; border-radius: 12px !important; padding: 12px 32px !important; }
-.gr-button-secondary:hover { box-shadow: 0 4px 20px rgba(34,197,94,.4); }
-.gr-progress { height: 6px !important; border-radius: 3px !important; background: var(--bg-tertiary) !important; }
-.gr-progress > div { background: linear-gradient(90deg, #6366f1, #22c55e) !important; }
-.save-btn { background: #22c55e !important; color: white !important; }
-.save-btn:hover { background: #16a34a !important; }
-.tab-nav { border-bottom: 1px solid var(--border) !important; }
-.tab-nav button { color: var(--text-secondary) !important; }
-.tab-nav button.selected { color: var(--accent) !important; border-bottom-color: var(--accent) !important; }
+
+/* ── Base ── */
+body, .gradio-container {
+  background: var(--bg-base) !important;
+  color: var(--text-primary) !important;
+  font-family: "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", system-ui, sans-serif !important;
+}
+
+/* ── Text contrast safety net ── */
+.gradio-container,
+.gradio-container p,
+.gradio-container span,
+.gradio-container div,
+.gradio-container label,
+.gradio-container h1,
+.gradio-container h2,
+.gradio-container h3,
+.gradio-container h4,
+.gradio-container h5,
+.gradio-container h6,
+.gradio-container li,
+.gradio-container td,
+.gradio-container th,
+.gradio-container .prose,
+.gradio-container .prose p,
+.gradio-container .prose li,
+.gradio-container .prose strong,
+.gradio-container .prose em,
+.gradio-container .prose code {
+  color: var(--text-primary);
+}
+
+.gradio-container .prose a,
+.gradio-container a {
+  color: var(--accent) !important;
+}
+
+/* ── Cards / panels ── */
+.block, .gr-box, .gr-panel, .gr-form, .gr-group,
+.gradio-container > .main > .wrap,
+.gap.compact, .gap {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+/* ── Inputs ── */
+textarea, input[type="text"], input[type="number"], input[type="search"],
+.gr-text-input input, .gr-text-area textarea, .gr-number input {
+  background: var(--bg-input) !important;
+  color: var(--text-primary) !important;
+  border: 1.5px solid var(--border-dark) !important;
+  border-radius: var(--radius-sm) !important;
+  caret-color: var(--accent) !important;
+  transition: border-color .2s, box-shadow .2s;
+}
+textarea:focus, input:focus {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px var(--accent-glow) !important;
+  outline: none !important;
+}
+
+/* ── Select / Dropdown ── */
+select, .wrap .wrap-inner select, .gr-dropdown select {
+  background: var(--bg-input) !important;
+  color: var(--text-primary) !important;
+  border: 1.5px solid var(--border-dark) !important;
+  border-radius: var(--radius-sm) !important;
+}
+
+/* ── Labels ── */
+label, .block > label {
+  color: var(--text-label) !important;
+  font-size: 0.82rem !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.02em !important;
+}
+
+/* ── Buttons — Primary (indigo) ── */
+button.primary, .gr-button.primary,
+button[class*="primary"], .btn-primary {
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%) !important;
+  border: none !important;
+  color: #fff !important;
+  font-weight: 600 !important;
+  border-radius: var(--radius-sm) !important;
+  letter-spacing: 0.01em !important;
+  box-shadow: 0 2px 8px rgba(99,102,241,.30) !important;
+  transition: transform .15s, box-shadow .15s !important;
+}
+button.primary:hover, .gr-button.primary:hover,
+button[class*="primary"]:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 16px rgba(99,102,241,.40) !important;
+}
+
+/* ── Buttons — Secondary (amber) ── */
+button.secondary, .gr-button.secondary,
+button[class*="secondary"], .btn-secondary {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+  border: none !important;
+  color: #fff !important;
+  font-weight: 600 !important;
+  border-radius: var(--radius-sm) !important;
+  box-shadow: 0 2px 8px rgba(245,158,11,.25) !important;
+  transition: transform .15s, box-shadow .15s !important;
+}
+button.secondary:hover, .gr-button.secondary:hover,
+button[class*="secondary"]:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 14px rgba(245,158,11,.38) !important;
+}
+
+/* ── Buttons — Default (neutral) ── */
+button.lg, button.sm, .gr-button:not([class*="primary"]):not([class*="secondary"]) {
+  background: var(--bg-raised) !important;
+  color: var(--text-secondary) !important;
+  border: 1.5px solid var(--border-dark) !important;
+  border-radius: var(--radius-sm) !important;
+  transition: background .15s, border-color .15s, color .15s !important;
+}
+button.lg:hover, button.sm:hover {
+  background: var(--accent-light) !important;
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
+}
+
+/* ── Save button override ── */
+.save-btn {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+  border: none !important;
+  color: #fff !important;
+  font-weight: 600 !important;
+}
+.save-btn:hover {
+  box-shadow: 0 4px 14px rgba(16,185,129,.35) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* ── Tabs ── */
+.tab-nav, .tabs > .tab-nav {
+  background: var(--bg-sidebar) !important;
+  border-bottom: 1.5px solid var(--border) !important;
+  gap: 2px !important;
+  padding: 0 8px !important;
+}
+.tab-nav button {
+  color: var(--text-secondary) !important;
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 2px solid transparent !important;
+  border-radius: 0 !important;
+  padding: 10px 18px !important;
+  font-size: 0.88rem !important;
+  font-weight: 500 !important;
+  transition: color .15s, border-color .15s !important;
+}
+.tab-nav button:hover {
+  color: var(--accent) !important;
+  background: var(--accent-light) !important;
+}
+.tab-nav button.selected {
+  color: var(--accent) !important;
+  background: transparent !important;
+  border-bottom: 2.5px solid var(--accent) !important;
+  font-weight: 700 !important;
+}
+
+/* ── Accordion ── */
+.accordion {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+  overflow: hidden !important;
+}
+.accordion > .label-wrap {
+  background: var(--bg-raised) !important;
+  padding: 10px 16px !important;
+  border-bottom: 1px solid var(--border) !important;
+}
+.accordion > .label-wrap span {
+  color: var(--text-label) !important;
+  font-weight: 600 !important;
+}
+
+/* ── Section cards ── */
+.section-shell {
+  background: linear-gradient(180deg, #ffffff 0%, #fbfbfe 100%) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 14px !important;
+  box-shadow: var(--shadow-md) !important;
+  padding: 16px 18px !important;
+  margin-bottom: 14px !important;
+}
+.section-title {
+  margin: 0 0 6px 0 !important;
+  font-size: 1.15rem !important;
+  font-weight: 700 !important;
+  color: var(--text-primary) !important;
+}
+.section-kicker {
+  color: var(--text-muted) !important;
+  font-size: 0.82rem !important;
+  letter-spacing: .08em !important;
+  text-transform: uppercase !important;
+  margin-bottom: 6px !important;
+}
+.choice-card {
+  background: #fbfcff !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 12px !important;
+  padding: 12px !important;
+}
+.workspace-shell {
+  background: linear-gradient(180deg, #f9faff 0%, #f3f6ff 100%) !important;
+  border: 1px solid #d7ddf2 !important;
+  border-radius: 18px !important;
+  box-shadow: 0 10px 28px rgba(54, 76, 128, 0.08) !important;
+  padding: 18px !important;
+  margin: 18px 0 !important;
+}
+.workspace-tabs {
+  background: #ffffff !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 16px !important;
+  padding: 10px !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.8), var(--shadow-md) !important;
+}
+.workspace-intro {
+  margin-bottom: 10px !important;
+  color: var(--text-secondary) !important;
+}
+.tab-shell {
+  background: linear-gradient(180deg, #ffffff 0%, #fdfdff 100%) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 14px !important;
+  padding: 14px 16px !important;
+  margin-bottom: 14px !important;
+}
+.tab-shell h3,
+.tab-shell h4,
+.tab-shell .md h3,
+.tab-shell .md h4 {
+  border-bottom: none !important;
+  padding-bottom: 0 !important;
+  margin-bottom: 6px !important;
+}
+.dashboard-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 14px !important;
+}
+.dashboard-card {
+  background: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 14px !important;
+  padding: 14px !important;
+  box-shadow: var(--shadow-md) !important;
+}
+.dashboard-card .md h3,
+.dashboard-card .md h4,
+.dashboard-card h3,
+.dashboard-card h4 {
+  border-bottom: none !important;
+  padding-bottom: 0 !important;
+}
+.workbench-note {
+  color: var(--text-secondary) !important;
+  font-size: 0.92rem !important;
+  margin-bottom: 10px !important;
+}
+@media (max-width: 980px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ── Markdown ── */
+.prose, .md, .markdown {
+  color: var(--text-primary) !important;
+}
+.prose h1, .prose h2, .prose h3,
+.md h1, .md h2, .md h3 {
+  color: var(--text-primary) !important;
+  border-bottom: 1.5px solid var(--border) !important;
+  padding-bottom: 4px;
+}
+.prose code, .md code {
+  background: var(--accent-light) !important;
+  color: var(--accent-dim) !important;
+  border-radius: 4px !important;
+  padding: 1px 5px !important;
+  font-size: 0.85em !important;
+}
+.prose pre, .md pre {
+  background: #f8f9fc !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-sm) !important;
+}
+
+/* ── Dataframe / Table ── */
+.gr-samples-table, table {
+  background: var(--bg-card) !important;
+  border-color: var(--border) !important;
+}
+thead tr th {
+  background: var(--bg-raised) !important;
+  color: var(--text-secondary) !important;
+  border-color: var(--border) !important;
+  font-size: 0.78rem !important;
+  letter-spacing: 0.05em !important;
+  text-transform: uppercase !important;
+  font-weight: 700 !important;
+}
+tbody tr td {
+  background: var(--bg-card) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border) !important;
+  font-size: 0.88rem !important;
+}
+tbody tr:hover td {
+  background: var(--bg-raised) !important;
+}
+
+/* ── JSON output ── */
+.json-holder {
+  background: #f8f9fc !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-sm) !important;
+  color: var(--text-primary) !important;
+}
+
+/* ── Progress bar ── */
+.gr-progress {
+  height: 5px !important;
+  border-radius: 3px !important;
+  background: var(--bg-raised) !important;
+}
+.gr-progress > div {
+  background: linear-gradient(90deg, #6366f1, #f59e0b) !important;
+  border-radius: 3px !important;
+}
+
+/* ── Custom progress cards ── */
+#overall-progress-bar {
+  background: var(--accent-light) !important;
+  border: 1.5px solid var(--accent) !important;
+  border-radius: var(--radius-sm) !important;
+  padding: 10px 14px !important;
+  font-family: "JetBrains Mono", "Fira Code", monospace !important;
+  font-size: 0.88rem !important;
+  color: var(--text-primary) !important;
+}
+#shot-progress-bar {
+  background: var(--amber-light) !important;
+  border: 1.5px solid var(--amber) !important;
+  border-radius: var(--radius-sm) !important;
+  padding: 10px 14px !important;
+  font-size: 0.88rem !important;
+  color: var(--text-primary) !important;
+}
+
+/* ── Slider ── */
+input[type="range"] {
+  accent-color: var(--accent) !important;
+}
+
+/* ── Checkbox & Radio ── */
+input[type="checkbox"], input[type="radio"] {
+  accent-color: var(--accent) !important;
+}
+
+/* ── Video / Audio preview ── */
+video, audio {
+  border-radius: var(--radius-sm) !important;
+  border: 1px solid var(--border) !important;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-raised); }
+::-webkit-scrollbar-thumb { background: var(--border-dark); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ── Dropdown popup ── */
+.choices__list--dropdown, ul[role="listbox"] {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border-dark) !important;
+  border-radius: var(--radius-sm) !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+.choices__item, li[role="option"] {
+  color: var(--text-primary) !important;
+  padding: 8px 12px !important;
+}
+.choices__item--highlighted, li[role="option"]:hover,
+li[role="option"][aria-selected="true"] {
+  background: var(--accent-light) !important;
+  color: var(--accent) !important;
+}
+
+/* ── Gradio title h1 ── */
+.gradio-container h1 {
+  background: linear-gradient(90deg, #6366f1, #a855f7);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-size: 1.7rem !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.02em !important;
+}
 """
+
+# Module-level theme (shared between build_ui and launch)
+_STUDIO_THEME = gr.themes.Base(
+    primary_hue=gr.themes.colors.indigo,
+    secondary_hue=gr.themes.colors.yellow,
+    neutral_hue=gr.themes.colors.slate,
+).set(
+    body_background_fill="#f5f6fa",
+    body_text_color="#1a1d2e",
+    block_background_fill="#ffffff",
+    block_border_color="#e2e5f0",
+    block_shadow="0 1px 4px rgba(30,35,80,.08)",
+    button_primary_background_fill="linear-gradient(135deg, #6366f1, #4f46e5)",
+    button_primary_text_color="#ffffff",
+    button_secondary_background_fill="linear-gradient(135deg, #f59e0b, #d97706)",
+    button_secondary_text_color="#ffffff",
+    input_background_fill="#ffffff",
+    input_border_color="#c8cce0",
+    checkbox_background_color="#ffffff",
+    slider_color="#6366f1",
+    table_even_background_fill="#f5f6fa",
+    table_odd_background_fill="#ffffff",
+)
 
 
 def get_ollama_models():
     try:
         refresh_models()
-        models = list_models()
-        return [m for m in models if "embed" not in m.lower()]
+        models = [m for m in list_models() if "embed" not in m.lower()]
+        preferred = [
+            "qwen3.6:35b",
+            "qwen3.5:27b",
+            "qwen3:8b",
+            "qwen2.5-coder:7b",
+            "deepseek-r1:70b",
+            "deepseek-r1:8b",
+            "qwen2.5:7b",
+        ]
+        ordered = []
+        for name in preferred:
+            if name in models and name not in ordered:
+                ordered.append(name)
+        for name in models:
+            if name not in ordered:
+                ordered.append(name)
+        return ordered
     except Exception:
         return []
 
@@ -205,9 +675,16 @@ def load_edit_data(pid: int) -> dict:
     return data
 
 
-def format_model_profile(model_selection: str) -> str:
-    profile = resolve_model_profile(model_selection)
-    lines = ["### 🤖 阶段模型分配"]
+def _default_stage_model_profile() -> dict[str, str]:
+    return dict(STAGE_MODEL_DEFAULTS)
+
+
+def format_model_profile(model_selection: str = "") -> str:
+    profile = _default_stage_model_profile()
+    lines = [
+        "### 🤖 阶段模型分配",
+        "- 后台默认按固定分工运行；只有你手动指定某个阶段模型时，才会覆盖这一默认配置。",
+    ]
     lines.extend([f"- `{stage}` → `{name}`" for stage, name in profile.items()])
     return "\n".join(lines)
 
@@ -888,16 +1365,16 @@ def _relay_stage(stage_gen, log_lines: list, result_ref: dict):
         yield log_md, result_ref, result_ref.get("project_id", 0)
 
 
-def _resolve_model(stage_model: str, fallback: str, global_model_var) -> str:
-    """返回阶段模型，空则回退到全局模型组件值（由调用方传入）。"""
-    return (stage_model or "").strip() or (fallback or "").strip() or "qwen2.5:7b"
+def _resolve_model(stage_model: str, stage_default: str, global_model_var) -> str:
+    """返回阶段模型；默认走固定阶段分工，仅在手动指定时覆盖。"""
+    return (stage_model or "").strip() or (stage_default or "").strip() or "qwen3:8b"
 
 
 def story_stage_flow(pid, premise, pname, genre, tone, acts, stage_m, global_m, progress=gr.Progress()):
     """步骤1: 剧本生成。"""
     if not premise or not premise.strip():
         yield "### ⚠️ 请输入创作构想", None, int(pid or 0); return
-    model = _resolve_model(stage_m, global_m, None)
+    model = _resolve_model(stage_m, _default_stage_model_profile()["director"], None)
     result = {}
     for pct, log_md, partial in run_stage_story(
         project_id=int(pid or 0), premise=premise.strip(),
@@ -914,7 +1391,7 @@ def chars_stage_flow(pid, stage_m, global_m, progress=gr.Progress()):
     """步骤2: 角色设计。"""
     if not pid:
         yield "### ⚠️ 请先运行步骤1生成剧本", None, 0; return
-    model = _resolve_model(stage_m, global_m, None)
+    model = _resolve_model(stage_m, _default_stage_model_profile()["character"], None)
     for pct, log_md, partial in run_stage_characters(int(pid), model=model):
         progress(pct)
         yield log_md, partial, int(pid)
@@ -924,7 +1401,7 @@ def scenes_stage_flow(pid, stage_m, global_m, progress=gr.Progress()):
     """步骤3: 场景设计。"""
     if not pid:
         yield "### ⚠️ 请先运行步骤1生成剧本", None, 0; return
-    model = _resolve_model(stage_m, global_m, None)
+    model = _resolve_model(stage_m, _default_stage_model_profile()["scene"], None)
     for pct, log_md, partial in run_stage_scenes(int(pid), model=model):
         progress(pct)
         yield log_md, partial, int(pid)
@@ -934,7 +1411,7 @@ def art_music_stage_flow(pid, stage_m, global_m, progress=gr.Progress()):
     """步骤4: 美术/音乐/音效。"""
     if not pid:
         yield "### ⚠️ 请先运行步骤1生成剧本", None, 0; return
-    model = _resolve_model(stage_m, global_m, None)
+    model = _resolve_model(stage_m, _default_stage_model_profile()["art"], None)
     for pct, log_md, partial in run_stage_art_music_sfx(int(pid), model=model):
         progress(pct)
         yield log_md, partial, int(pid)
@@ -973,24 +1450,29 @@ def get_stage_status(pid) -> str:
 
 def full_pipeline_flow(premise, project_name, genre, tone, acts, model,
                        story_model, char_model, scene_model, art_model,
+                       genre_tags=None, tone_tags=None, emotion_arc="",
+                       episode_count=80, project_format="short_drama",
                        progress=gr.Progress()):
     """yield (gen_log, gen_result, view_md, edit_data..., pid)"""
     if not premise or not premise.strip():
         yield ("### ⚠️ 请先输入创作构想", None, "", "", "", "", "", "", "", [], "", "", "", 0)
         return
 
-    # 构建 per-stage 模型配置，未填则回退到全局 model
-    base = model or "qwen2.5:7b"
-    stage_models = {
-        "director": story_model or base,
-        "writer":   story_model or base,
-        "character": char_model or base,
-        "scene":     scene_model or base,
-        "art":       art_model or base,
-        "music":     art_model or base,
-        "sound":     art_model or base,
-        "review":    base,
-    }
+    # 构建 per-stage 模型配置：默认固定阶段分工，仅在手动指定阶段模型时覆盖
+    base = model or "qwen3.6:35b"
+    project_format = _normalize_project_format(project_format)
+    stage_models = _default_stage_model_profile()
+    if story_model:
+        stage_models["director"] = story_model
+        stage_models["writer"] = story_model
+    if char_model:
+        stage_models["character"] = char_model
+    if scene_model:
+        stage_models["scene"] = scene_model
+    if art_model:
+        stage_models["art"] = art_model
+        stage_models["music"] = art_model
+        stage_models["sound"] = art_model
 
     result = None
     pid = 0
@@ -999,10 +1481,16 @@ def full_pipeline_flow(premise, project_name, genre, tone, acts, model,
             premise=premise.strip(),
             project_name=_sanitize_project_name(project_name) if project_name else "",
             genre=genre or "玄幻", tone=tone or "热血",
-            acts=int(acts) if acts else 3,
+            acts=int(acts) if acts else 4,
             model=base,
             model_profile=stage_models,
             enable_render=False,
+            genre_tags=genre_tags or [],
+            tone_tags=tone_tags or [],
+            emotion_arc=emotion_arc or "",
+            episode_count=int(episode_count) if episode_count else 80,
+            act_count=int(acts) if acts else 4,
+            project_format=project_format or "short_drama",
         ):
             progress(pct)
             result = partial
@@ -1048,12 +1536,205 @@ def full_pipeline_flow(premise, project_name, genre, tone, acts, model,
     )
 
 
+# ─── 概念发现 ─────────────────────────────────────
+
+def concept_generate_flow(keywords, requirements, n, use_web, model_name, progress=gr.Progress()):
+    """生成 N 个故事梗概卡片，更新 DataFrame + CheckboxGroup + State."""
+    if not keywords or not keywords.strip():
+        return (
+            [],                          # concept_data_state
+            [],                          # dataframe rows
+            gr.update(choices=[], value=[]),  # concept_select
+            "⚠️ 请先输入关键词",
+        )
+    progress(0.1, desc="AI 生成梗概中...")
+    try:
+        from agents.concept_finder.core import generate_concepts
+        concepts = generate_concepts(
+            keywords=keywords.strip(),
+            requirements=(requirements or "").strip(),
+            n=int(n or 6),
+            use_web=bool(use_web),
+            model=model_name or "qwen3.6:35b",
+        )
+    except Exception as e:
+        return ([], [], gr.update(choices=[], value=[]), f"❌ 生成失败: {e}")
+
+    progress(0.9, desc="整理结果...")
+    rows = [
+        [c["id"], c["title"], c["genre"], c["tone"], c["synopsis"], c["hook"]]
+        for c in concepts
+    ]
+    choices = [f"{c['id']} | {c['title']} ({c['genre']} / {c['tone']})" for c in concepts]
+    return (
+        concepts,                                    # concept_data_state
+        rows,                                        # dataframe
+        gr.update(choices=choices, value=[]),        # concept_select
+        f"✅ 生成 {len(concepts)} 个梗概，请勾选后「加入队列」",
+    )
+
+
+def concept_add_to_queue(selected_labels, concept_data, queue_data):
+    """把勾选的概念加入队列，返回新队列 state + 队列展示 MD."""
+    if not selected_labels:
+        return queue_data, _concept_queue_md(queue_data), gr.update(choices=_concept_queue_choices(queue_data), value=[]), "⚠️ 请先勾选梗概"
+    # 从 label 中提取 id (格式 "id | title ...")
+    selected_ids = {lbl.split(" | ")[0].strip() for lbl in selected_labels}
+    new_items = [c for c in concept_data if c["id"] in selected_ids
+                 and c["id"] not in {q["id"] for q in queue_data}]
+    new_queue = queue_data + new_items
+    return (
+        new_queue,
+        _concept_queue_md(new_queue),
+        gr.update(choices=_concept_queue_choices(new_queue), value=[]),
+        f"✅ 已加入 {len(new_items)} 个，队列共 {len(new_queue)} 个",
+    )
+
+
+def concept_clear_queue(_queue):
+    _QUEUE_CONTROL["stop"] = False
+    return [], "**队列为空**", gr.update(choices=[], value=[]), ""
+
+
+_QUEUE_CONTROL = {"stop": False}
+FORMAT_CHOICE_MAP = {
+    "竖屏 9:16（短剧默认）": "short_drama",
+    "横屏 16:9（短剧 / 电影都可用）": "movie",
+    "short_drama": "short_drama",
+    "movie": "movie",
+}
+
+
+def _normalize_project_format(value: str) -> str:
+    return FORMAT_CHOICE_MAP.get(value or "", "short_drama")
+
+
+def _concept_queue_md(queue: list) -> str:
+    if not queue:
+        return "**队列为空**"
+    rows = ["| # | 剧名 | 类型 | 基调 | 爽点 |", "|---|---|---|---|---|"]
+    for i, c in enumerate(queue, 1):
+        rows.append(f"| {i} | {c['title']} | {c['genre']} | {c['tone']} | {c['hook']} |")
+    return "\n".join(rows)
+
+
+def _concept_queue_choices(queue: list) -> list[str]:
+    return [f"{c['id']} | {c['title']} ({c['genre']} / {c['tone']})" for c in queue]
+
+
+def concept_remove_from_queue(selected_labels, queue_data):
+    if not selected_labels:
+        return queue_data, _concept_queue_md(queue_data), gr.update(choices=_concept_queue_choices(queue_data), value=[]), "⚠️ 请先勾选队列项"
+    selected_ids = {lbl.split(" | ")[0].strip() for lbl in selected_labels}
+    new_queue = [q for q in queue_data if q["id"] not in selected_ids]
+    removed = len(queue_data) - len(new_queue)
+    return (
+        new_queue,
+        _concept_queue_md(new_queue),
+        gr.update(choices=_concept_queue_choices(new_queue), value=[]),
+        f"✅ 已移除 {removed} 个待执行项，剩余 {len(new_queue)} 个",
+    )
+
+
+def concept_stop_remaining_queue():
+    _QUEUE_CONTROL["stop"] = True
+    return "🛑 已请求停止剩余队列。当前正在处理的项目会在下一个安全点结束后停止继续。"
+
+
+def concept_fill_premise(selected_labels, concept_data):
+    """把第一个选中的概念填入 premise 文本框."""
+    if not selected_labels or not concept_data:
+        return gr.update()
+    first_id = selected_labels[0].split(" | ")[0].strip()
+    concept = next((c for c in concept_data if c["id"] == first_id), None)
+    if not concept:
+        return gr.update()
+    text = f"{concept['synopsis']}\n\n【类型】{concept['genre']}  【基调】{concept['tone']}\n【爽点】{concept['hook']}"
+    return gr.update(value=text)
+
+
+def concept_run_queue_flow(
+    queue_data, project_name_base, genre_val, tone_val, acts_val,
+    model_val, story_model_val, char_model_val, scene_model_val, art_model_val,
+    genre_tags_val, tone_tags_val, emotion_arc_val, episode_count_val, project_format_val,
+    progress=gr.Progress(),
+):
+    """依次对队列中每个概念跑完整管线，yield 日志."""
+    if not queue_data:
+        yield "⚠️ 队列为空，请先加入梗概", {}
+        return
+    _QUEUE_CONTROL["stop"] = False
+    project_format_internal = _normalize_project_format(project_format_val)
+
+    all_logs = []
+    for i, concept in enumerate(queue_data, 1):
+        if _QUEUE_CONTROL.get("stop"):
+            all_logs.append(f"\n\n🛑 队列已停止，剩余 {len(queue_data) - i + 1} 个项目未继续执行")
+            yield "\n".join(all_logs), {}
+            return
+        header = f"\n\n---\n### 🎬 队列 [{i}/{len(queue_data)}]: {concept['title']}\n"
+        all_logs.append(header)
+        yield "\n".join(all_logs), {}
+
+        premise_text = (
+            f"{concept['synopsis']}\n"
+            f"类型：{concept['genre']}  基调：{concept['tone']}\n"
+            f"爽点：{concept['hook']}"
+        )
+        pname = f"{project_name_base or concept['title']}_{i}" if len(queue_data) > 1 else (project_name_base or "")
+
+        try:
+            from core.orchestrator import run_pipeline_generator
+            base = model_val or "qwen3.6:35b"
+            stage_models = _default_stage_model_profile()
+            if story_model_val: stage_models["director"] = story_model_val; stage_models["writer"] = story_model_val
+            if char_model_val:  stage_models["character"] = char_model_val
+            if scene_model_val: stage_models["scene"] = scene_model_val
+            if art_model_val:   stage_models["art"] = art_model_val; stage_models["music"] = art_model_val; stage_models["sound"] = art_model_val
+            for pct, log_md, partial in run_pipeline_generator(
+                premise=premise_text,
+                project_name=_sanitize_project_name(pname) if pname else "",
+                genre=concept.get("genre", genre_val or "玄幻"),
+                tone=concept.get("tone", tone_val or "热血"),
+                acts=int(acts_val or 4),
+                model=base,
+                model_profile=stage_models,
+                enable_render=False,
+                genre_tags=genre_tags_val or [],
+                tone_tags=tone_tags_val or [],
+                emotion_arc=emotion_arc_val or "",
+                episode_count=int(episode_count_val or 80),
+                act_count=int(acts_val or 4),
+                project_format=project_format_internal,
+            ):
+                progress(((i - 1) / len(queue_data)) + pct / len(queue_data))
+                combined = "\n".join(all_logs) + "\n" + log_md
+                yield combined, partial or {}
+                if _QUEUE_CONTROL.get("stop"):
+                    all_logs.append("\n🛑 当前项目已到安全点，停止继续执行后续队列项")
+                    yield "\n".join(all_logs), partial or {}
+                    return
+                last_partial = partial
+        except Exception as e:
+            import traceback
+            all_logs.append(f"❌ 第{i}个失败: {e}\n{traceback.format_exc()[:500]}")
+            yield "\n".join(all_logs), {}
+
+    all_logs.append(f"\n\n✅ 队列全部完成，共 {len(queue_data)} 个项目")
+    yield "\n".join(all_logs), {}
+
+
 # ─── Phase 2: 渲染导出 ─────────────────────────────
 
 def render_export_flow(pid, project_name, render_cfg, progress=gr.Progress()):
     """yield (render_log, render_result, render_pid)"""
     if not pid:
         yield ("### ⚠️ 请先生成内容", None, 0)
+        return
+
+    preflight_ok, preflight_md = _render_preflight_markdown(auto_launch=True)
+    if not preflight_ok:
+        yield (preflight_md + "\n\n### ⛔ 渲染已阻止\n请先修复上述阻塞项后再启动渲染。", None, pid)
         return
 
     proj = get_project(pid)
@@ -1073,14 +1754,342 @@ def render_export_flow(pid, project_name, render_cfg, progress=gr.Progress()):
                result, pid)
 
 
-def resume_pipeline_flow(pid, progress=gr.Progress()):
-    """续跑管线：跳过已完成阶段/shot，只处理未完成的。yield (log, state_md)"""
-    if not pid:
-        yield "### ⚠️ 请先生成内容（需要项目 ID）", "无项目"
+def _quick_video_template_defaults(template: str) -> tuple[str, str, str]:
+    template = (template or "").strip()
+    if template == "全自动":
+        return (
+            "快速试片（更快）",
+            "ACE-Step 优先，失败回退（推荐）",
+            "### ⚙️ 当前模板：全自动\n直接偏向更快出样片，默认做小样验证，适合先看方向。",
+        )
+    if template == "严格分阶段":
+        return (
+            "质量优先（严格）",
+            "只用 ACE-Step",
+            "### ⚙️ 当前模板：严格分阶段\n优先质量与稳定性，不做静默回退。",
+        )
+    return (
+        "稳妥模式（推荐）",
+        "ACE-Step 优先，失败回退（推荐）",
+        "### ⚙️ 当前模板：轻审一次\n默认走最稳的生产路径，先做阶段预检，再继续生成。",
+    )
+
+
+def _quick_video_product_defaults(target: str) -> tuple[float, str, str]:
+    target = (target or "").strip()
+    if target == "做电影":
+        return (
+            60,
+            "横屏 16:9",
+            "### 🎬 当前目标：做电影\n默认按横屏长段落规划，优先让系统先出分镜图，再做镜头运镜与音频合成。",
+        )
+    if target == "做短剧":
+        return (
+            30,
+            "竖屏 9:16",
+            "### 📺 当前目标：做短剧\n默认按竖屏短剧节奏走，适合连续做 15~60 秒段落并逐段拼成长片。",
+        )
+    return (
+        15,
+        "竖屏 9:16",
+        "### 🎞️ 当前目标：做短视频\n默认先做短段样片，确认人物、画风、音乐方向后再拉长。",
+    )
+
+
+def stop_rendering_now(project_id: int = 0) -> tuple[str, str]:
+    from core.orchestrator import request_render_stop
+    from core.database import cancel_running_render_jobs
+    import requests as _req
+    from core.service_ports import comfyui_api_base
+
+    request_render_stop()
+    msgs = ["### 🛑 停止渲染请求已发送"]
+    try:
+        api = comfyui_api_base()
+        try:
+            r = _req.post(f"{api}/interrupt", timeout=5)
+            msgs.append(f"- {'✅' if r.status_code == 200 else '⚠️'} 已请求中断当前 ComfyUI 任务")
+        except Exception as e:
+            msgs.append(f"- ⚠️ 中断当前任务失败: {e}")
+        try:
+            _req.post(f"{api}/queue", json={"clear": True}, timeout=5)
+            msgs.append("- ✅ 已清空 ComfyUI 等待队列")
+        except Exception as e:
+            msgs.append(f"- ⚠️ 清空 ComfyUI 队列失败: {e}")
+    except Exception as e:
+        msgs.append(f"- ⚠️ ComfyUI 地址不可用: {e}")
+
+    cancelled = cancel_running_render_jobs(int(project_id or 0))
+    msgs.append(f"- ✅ 已标记 {cancelled} 个运行中渲染作业为取消")
+    if project_id:
+        msgs.append(f"- 项目 `{project_id}` 的后续镜头会在安全点停止继续执行")
+    status_md = "\n".join(msgs)
+    return status_md, status_md
+
+
+def force_kill_comfyui() -> str:
+    """强制 SIGKILL ComfyUI 进程（UN 状态软中断无效时使用），然后自动重启。"""
+    import subprocess, signal, time
+    import requests as _req
+
+    msgs = ["### ☢️ 强制终止 ComfyUI"]
+
+    # 1. 软中断尝试
+    try:
+        from core.service_ports import comfyui_api_base
+        api = comfyui_api_base()
+        _req.post(f"{api}/interrupt", timeout=3)
+        _req.post(f"{api}/queue", json={"clear": True}, timeout=3)
+        msgs.append("- ✅ 软中断信号已发送")
+    except Exception:
+        msgs.append("- ⚠️ 软中断跳过（ComfyUI 未响应）")
+
+    # 2. 找 ComfyUI 进程 PID（匹配 port 8188）
+    try:
+        result = subprocess.run(
+            ["ps", "aux"], capture_output=True, text=True
+        )
+        pids = []
+        for line in result.stdout.splitlines():
+            if "port 8188" in line and "grep" not in line:
+                pid = int(line.split()[1])
+                pids.append(pid)
+
+        if not pids:
+            msgs.append("- ℹ️ 未找到 ComfyUI 进程（可能已停止）")
+        else:
+            for pid in pids:
+                try:
+                    import os
+                    os.kill(pid, signal.SIGKILL)
+                    msgs.append(f"- ✅ SIGKILL → PID {pid}")
+                except ProcessLookupError:
+                    msgs.append(f"- ℹ️ PID {pid} 已不存在")
+                except Exception as e:
+                    msgs.append(f"- ⚠️ kill PID {pid} 失败: {e}")
+    except Exception as e:
+        msgs.append(f"- ⚠️ 查找进程失败: {e}")
+
+    time.sleep(2)
+
+    # 3. 重启 ComfyUI
+    try:
+        comfyui_dir = Path.home() / "Documents" / "ComfyUI"
+        python_bin = comfyui_dir / ".venv" / "bin" / "python3"
+        log_file = open("/tmp/comfyui_auto.log", "w")
+        subprocess.Popen(
+            [str(python_bin), "main.py", "--listen", "127.0.0.1", "--port", "8188"],
+            cwd=str(comfyui_dir),
+            stdout=log_file,
+            stderr=log_file,
+            start_new_session=True,
+        )
+        msgs.append("- 🔄 ComfyUI 已重启（后台启动，约 30 秒后可用）")
+    except Exception as e:
+        msgs.append(f"- ⚠️ ComfyUI 重启失败: {e}")
+
+    # 4. 标记编排器停止
+    try:
+        from core.orchestrator import request_render_stop
+        request_render_stop()
+        msgs.append("- ✅ 编排器渲染任务已取消")
+    except Exception:
+        pass
+
+    return "\n".join(msgs)
+
+
+def quick_video_flow(prompt, bgm_prompt, duration_sec, aspect_ratio, product_target, execution_route,
+                     cloud_api_key, cloud_api_base, cloud_model,
+                     pipeline_choice, reference_image_path, crossfade,
+                     workflow_template, render_strategy, audio_strategy,
+                     quality: str = "标准",
+                     progress=gr.Progress()):
+    """指定时长短视频一键生成。"""
+    prompt = (prompt or "").strip()
+    if not prompt:
+        yield "请输入视频主题描述。", gr.update(value=None, visible=False), "### ⚠️ 请先输入视频主题"
         return
 
+    execution_route = (execution_route or "").strip()
+    cloud_api_key = (cloud_api_key or "").strip()
+    cloud_api_base = (cloud_api_base or "").strip()
+    cloud_model = (cloud_model or "").strip()
+    if cloud_api_key:
+        os.environ["QWEN_VIDEO_API_KEY"] = cloud_api_key
+        os.environ["DASHSCOPE_API_KEY"] = cloud_api_key
+    if cloud_api_base:
+        os.environ["QWEN_VIDEO_API_BASE"] = cloud_api_base
+    if cloud_model:
+        os.environ["QWEN_VIDEO_MODEL"] = cloud_model
+    if execution_route == "Qwen 云端重视频（API）":
+        readiness = collect_backend_readiness(auto_launch_comfyui=False, auto_launch_acestep=False)
+        preflight_ok = bool(readiness["ollama"]["ready"])
+        preflight_md = format_backend_readiness_markdown(readiness)
+    else:
+        preflight_ok, preflight_md = _quick_video_preflight_markdown(auto_launch=True)
+    if not preflight_ok:
+        yield (
+            preflight_md,
+            gr.update(value=None, visible=False),
+            "### ⛔ 快速视频已阻止\n请先修复上述阻塞项后再试。",
+        )
+        return
+
+    pipeline_map = {
+        "auto（自动）": "",
+        "本机友好成片（AI 分镜图 → 运镜合成）": "local_storyboard_reel",
+        "Qwen 云端重视频（API）": "qwen_wan_cloud",
+        "LTX 本机直出视频": "ltx_t2v",
+    }
+    # 直接传中文别名（get_preset 能识别所有选项）
+    aspect_map = {
+        "竖屏 9:16": "竖屏 9:16",
+        "横屏 16:9": "横屏 16:9",
+        "横屏 4:3":  "横屏 4:3",
+        "竖屏 3:4":  "竖屏 3:4",
+        "方形 1:1":  "方形 1:1",
+        "portrait":  "竖屏 9:16",
+        "landscape": "横屏 16:9",
+        "square":    "方形 1:1",
+    }
+
+    chosen_pipeline = pipeline_map.get(pipeline_choice or "", "")
+    reference_image_path = (reference_image_path or "").strip()
+    has_reference = bool(reference_image_path and Path(reference_image_path).exists())
+    allow_fallback = True
+    audio_mode = "auto"
+    strict_production = False
+
+    render_strategy = (render_strategy or "").strip()
+    if render_strategy == "快速试片（更快）":
+        if not chosen_pipeline:
+            if execution_route == "Qwen 云端重视频（API）":
+                chosen_pipeline = "qwen_wan_cloud"
+            elif execution_route == "LTX 本机直出视频":
+                chosen_pipeline = "ltx_t2v"
+            else:
+                chosen_pipeline = "local_storyboard_reel"
+        allow_fallback = True
+    elif render_strategy == "质量优先（严格）":
+        if not chosen_pipeline:
+            if execution_route == "Qwen 云端重视频（API）":
+                chosen_pipeline = "qwen_wan_cloud"
+            elif execution_route == "LTX 本机直出视频":
+                chosen_pipeline = "ltx_t2v"
+            else:
+                chosen_pipeline = "local_storyboard_reel"
+        allow_fallback = False
+        strict_production = execution_route != "Qwen 云端重视频（API）"
+    else:
+        if not chosen_pipeline:
+            if execution_route == "Qwen 云端重视频（API）":
+                chosen_pipeline = "qwen_wan_cloud"
+            elif execution_route == "LTX 本机直出视频":
+                chosen_pipeline = "ltx_t2v"
+            else:
+                chosen_pipeline = "local_storyboard_reel"
+        allow_fallback = True
+        strict_production = execution_route != "Qwen 云端重视频（API）"
+
+    audio_strategy = (audio_strategy or "").strip()
+    if audio_strategy == "只用 ACE-Step":
+        audio_mode = "acestep_only"
+    elif audio_strategy == "只用基础 BGM":
+        audio_mode = "ffmpeg_only"
+
+    log_lines: list[str] = []
+    if strict_production and not chosen_pipeline:
+        yield (
+            "当前没有参考图，且你选择的是生产/严格路线。",
+            gr.update(value=None, visible=False),
+            "### ⛔ 快速视频已阻止\n当前系统的稳态生产路径需要参考图。若要继续无参考图纯文本生成，请手动切到实验链。",
+        )
+        return
+
+    template_note = (
+        f"🎯 目标：{product_target or '做短视频'} | 🧭 模板：{workflow_template or '轻审一次'}"
+        f" | 🚦 路线：{execution_route or '本机友好成片（AI 分镜图 → 运镜合成）'}"
+        f" | 🔊 音频：{audio_strategy or 'ACE-Step 优先，失败回退（推荐）'}"
+    )
+    log_lines.append(template_note)
+    if execution_route == "Qwen 云端重视频（API）":
+        api_base = cloud_api_base or os.getenv("QWEN_VIDEO_API_BASE") or "https://dashscope.aliyuncs.com/api/v1"
+        model_name = cloud_model or os.getenv("QWEN_VIDEO_MODEL") or "qwen-vl-max"
+        key_hint = "已填写" if cloud_api_key else ("已读取环境变量" if (os.getenv("QWEN_VIDEO_API_KEY") or os.getenv("DASHSCOPE_API_KEY")) else "未提供")
+        log_lines.append(f"☁️ 云端配置：base=`{api_base}` · model=`{model_name}` · key=`{key_hint}`")
+    if chosen_pipeline == "local_storyboard_reel":
+        log_lines.append("🏠 当前走本机友好主路：AI 分镜图 → 运镜成片 → 音频合成。")
+    elif chosen_pipeline == "qwen_wan_cloud":
+        log_lines.append("☁️ 当前走 Qwen 云端重视频：适合偶尔做重视频，不占本机视频引擎。")
+    elif has_reference:
+        log_lines.append("🖼️ 已检测到参考图：本机路线会把它当角色/画面锚点优先利用。")
+    else:
+        log_lines.append("🧪 当前走实验链：仅用于摸底验证，不作为本机默认生产。")
+
+    from pipelines.quick_video import QuickVideoGenerator
+
+    generator = QuickVideoGenerator()
+    final_path = None
+    preview_mode = render_strategy == "快速试片（更快）"
+
+    for update in generator.generate(
+        prompt=prompt,
+        duration_sec=float(duration_sec or 15),
+        pipeline_name=chosen_pipeline,
+        aspect_ratio=aspect_map.get(aspect_ratio or "", "竖屏 9:16"),
+        reference_image_path=reference_image_path,
+        bgm_prompt=(bgm_prompt or "").strip(),
+        crossfade=float(crossfade or 0.0),
+        allow_fallback=allow_fallback,
+        audio_mode=audio_mode,
+        preview_mode=preview_mode,
+        quality=quality or "标准",
+    ):
+        pct = float(update.get("progress", 0.0))
+        progress(pct)
+        msg = update.get("msg", "")
+        if msg:
+            log_lines.append(msg)
+        final_path = update.get("output_path") or final_path
+        if update.get("error"):
+            yield (
+                "\n".join(log_lines[-20:]),
+                gr.update(value=None, visible=False),
+                f"### ❌ 快速视频失败\n`{update['error']}`",
+            )
+            return
+
+        video_update = gr.update(value=final_path, visible=bool(final_path and Path(final_path).exists()))
+        status_md = (
+            f"### ⏳ {update.get('step', 'running')}\n{msg}"
+            if not final_path
+            else f"### ✅ 快速视频完成\n{msg}"
+        )
+        yield ("\n".join(log_lines[-20:]), video_update, status_md)
+
+def resume_pipeline_flow(pid, progress=gr.Progress()):
+    """续跑管线：yield (log, overall_progress_md)"""
+    if not pid:
+        yield "### ⚠️ 请先生成内容（需要项目 ID）", "**整体进度** — 无项目"
+        return
+
+    import core.database as _db
     from core.pipeline_state import resume_pipeline, describe_state
+
+    # 计算总 shot 数
+    all_shots = _db.list_shots(project_id=int(pid))
+    total = len(all_shots)
+
+    def _overall_md(done: int, total: int, stage: str = "") -> str:
+        pct = done / max(total, 1) * 100
+        bar_filled = int(pct / 5)   # 20 格
+        bar = "█" * bar_filled + "░" * (20 - bar_filled)
+        eta = ""
+        return f"**整体进度** `[{bar}]` {done}/{total} shots ({pct:.1f}%) {stage}"
+
     log_lines = []
+    done_shots = 0
     try:
         gen = resume_pipeline(int(pid), max_retries=2)
         while True:
@@ -1088,22 +2097,33 @@ def resume_pipeline_flow(pid, progress=gr.Progress()):
                 msg, pct = next(gen)
                 log_lines.append(msg)
                 progress(pct)
-                yield "### 🔄 续跑中...\n" + "\n".join(f"- {l}" for l in log_lines[-20:]), gr.update()
+                # 实时统计已完成 shots
+                done_shots = sum(1 for s in _db.list_shots(project_id=int(pid))
+                                 if s.status in ("rendered", "approved"))
+                stage_hint = msg[:30] if msg else ""
+                yield (
+                    "### 🔄 续跑中...\n" + "\n".join(f"- {l}" for l in log_lines[-20:]),
+                    _overall_md(done_shots, total, stage_hint),
+                )
             except StopIteration as e:
                 result = e.value
                 break
     except Exception as e:
         import traceback
-        yield (f"### ❌ 续跑出错\n```\n{e}\n{traceback.format_exc()[-2000:]}\n```",
-               gr.update())
+        yield (
+            f"### ❌ 续跑出错\n```\n{e}\n{traceback.format_exc()[-2000:]}\n```",
+            _overall_md(done_shots, total, "❌ 出错"),
+        )
         return
 
-    state_md = describe_state(int(pid))
+    done_shots = sum(1 for s in _db.list_shots(project_id=int(pid))
+                     if s.status in ("rendered", "approved"))
     done_stages = result.get("stages", {}) if result else {}
-    summary = "  ".join(
-        f"{s}: {v.get('done', 0)}" for s, v in done_stages.items()
+    summary = "  ".join(f"{s}: {v.get('done', 0)}" for s, v in done_stages.items())
+    yield (
+        f"### ✅ 续跑完成\n{summary}\n\n" + "\n".join(f"- {l}" for l in log_lines[-30:]),
+        _overall_md(done_shots, total, "✅ 完成"),
     )
-    yield f"### ✅ 续跑完成\n{summary}\n\n" + "\n".join(f"- {l}" for l in log_lines[-30:]), state_md
 
 
 def get_pipeline_state(pid):
@@ -1115,6 +2135,50 @@ def get_pipeline_state(pid):
         return describe_state(int(pid))
     except Exception as e:
         return f"❌ 获取状态失败: {e}"
+
+
+def _poll_current_shot_status() -> str:
+    """
+    轮询 ComfyUI 当前 shot 渲染状态（每 4 秒自动调用）。
+    返回 Markdown 字符串，显示在「当前 Shot」进度栏。
+    """
+    try:
+        import requests as _req
+        from core.service_ports import comfyui_api_base
+        api = comfyui_api_base()
+        r = _req.get(f"{api}/queue", timeout=2)
+        q = r.json()
+        running = q.get("queue_running", [])
+        pending = q.get("queue_pending", [])
+
+        if not running and not pending:
+            return "**当前 Shot** — ⏸ ComfyUI 空闲"
+
+        parts = ["**当前 Shot**"]
+        if running:
+            job = running[0]
+            nodes = job[2] if len(job) > 2 else {}
+            model = next(
+                (v["inputs"].get("unet_name", "?") for v in nodes.values()
+                 if v.get("class_type") in ("UnetLoaderGGUF", "UNETLoader")),
+                "?"
+            )
+            steps = next(
+                (v["inputs"].get("steps", "?") for v in nodes.values()
+                 if v.get("class_type") == "KSampler"),
+                "?"
+            )
+            # 截短模型名
+            model_short = model.split("/")[-1][:35] if model != "?" else "?"
+            parts.append(f"🎬 渲染中 | `{model_short}` · {steps}步")
+            if pending:
+                parts.append(f"队列: +{len(pending)} 待渲染")
+        elif pending:
+            parts.append(f"⏳ 等待队列 ({len(pending)} 个)")
+
+        return "  \n".join(parts)
+    except Exception as e:
+        return f"**当前 Shot** — ⚠ {e}"
 
 
 # ─── 管线选择器 ─────────────────────────────────────────
@@ -1134,19 +2198,37 @@ def _pipeline_choices():
     active_name = cfg.get("active_pipeline", "")
     for entry in sorted(entries, key=lambda e: e.get("priority", 99)):
         name = entry["name"]
-        desc = entry.get("description", "无描述")[:45]
+        desc = entry.get("description", "无描述")
         prod = entry.get("production_ready", True)
+        ecfg = entry.get("config", {})
+        steps = ecfg.get("steps", "?")
         s = matrix.get(name, {})
         avail = s.get("available", False)
         if avail and prod:
-            icon = "🟢"
+            status_icon = "🟢"
         elif avail and not prod:
-            icon = "🟡"
+            status_icon = "🟡"
         elif not avail and prod:
-            icon = "🔴"
+            status_icon = "🔴"
         else:
-            icon = "⚪"
-        choices.append((f"{icon} {name} · {desc}", name))
+            status_icon = "⚪"
+        # 提取层级标签：生产主链 / 实验链 / 兜底
+        tier_tag = ""
+        if "【生产主力】" in desc:
+            tier_tag = "🏭生产"
+        elif "【实验链】" in desc:
+            tier_tag = "🧪实验"
+        elif "【兜底】" in desc:
+            tier_tag = "🔧兜底"
+        # 去掉描述中的中文标签，只保留核心说明
+        core_desc = (
+            desc.replace("【生产主力】", "")
+            .replace("【实验链】", "")
+            .replace("【兜底】", "")
+            .strip()
+        )
+        label = f"{status_icon} [{tier_tag} {steps}步] {name} · {core_desc}"
+        choices.append((label, name))
     return choices, active_name
 
 
@@ -1177,6 +2259,10 @@ def _pipeline_status_card(pipeline_name):
     h = ecfg.get("height", "?")
     fps = ecfg.get("fps", "?")
     frames = ecfg.get("frames", "?")
+    vae_name = ecfg.get("vae", "未设置")
+    model_name = ecfg.get("model_name") or ecfg.get("gguf_path", "")
+    if model_name:
+        model_name = Path(str(model_name)).name
 
     lines = []
     if avail and prod:
@@ -1193,6 +2279,9 @@ def _pipeline_status_card(pipeline_name):
         if fps != "?":
             res_str += f" · {fps}fps"
         lines.append(res_str + "*")
+    if model_name:
+        lines.append(f"- 模型: `{model_name}`")
+    lines.append(f"- VAE: `{vae_name}`")
 
     if missing:
         sk, st = classify_pipeline_missing(missing)
@@ -1306,14 +2395,16 @@ def _auto_download_missing(_pid=None):
         "flux_checkpoint", "flux_text_encoder", "flux_vae",
     ]
 
-    # ── 已知 ModelScope 下载源 ──
+    # ── 已知 ModelScope / HuggingFace 下载源 ──
     KNOWN_SOURCES = {
-        "Wan2.2_VAE.safetensors":
-            ("modelscope", "AI-ModelScope/Wan2.1-ComfyUI", "Wan2.2_VAE.safetensors"),
-        "umt5_xxl_fp8_e4m3fn_scaled.safetensors":
-            ("modelscope", "Kijai/umt5-xxl-fp8-e4m3fn-scaled", "umt5_xxl_fp8_e4m3fn_scaled.safetensors"),
-        "Wan2.2-TI2V-5B-Q4_K_M.gguf":
-            ("modelscope", "Kijai/Wan2.2-TI2V-5B-gguf", "Wan2.2-TI2V-5B-Q4_K_M.gguf"),
+        "ltx-2.3-22b-distilled-1.1.safetensors":
+            ("hf", "Lightricks/LTX-Video", "ltx-2.3-22b-distilled-1.1.safetensors"),
+        "gemma_3_12B_it_fp4_mixed.safetensors":
+            ("hf", "Lightricks/LTX-Video", "gemma_3_12B_it_fp4_mixed.safetensors"),
+        "ltx-2.3-22b-distilled-lora-384.safetensors":
+            ("hf", "Lightricks/LTX-Video", "ltx-2.3-22b-distilled-lora-384.safetensors"),
+        "ltx-2.3-spatial-upscaler-x2-1.1.safetensors":
+            ("hf", "Lightricks/LTX-Video", "ltx-2.3-spatial-upscaler-x2-1.1.safetensors"),
         "hsxl_temporal_layers.f16.safetensors":
             ("hf", "Kijai/hsxl_temporal_layers_fp16", "hsxl_temporal_layers.f16.safetensors"),
     }
@@ -1653,12 +2744,16 @@ def get_system_status() -> str:
     """返回整个渲染/音频管线的后端状态 Markdown。"""
     from pathlib import Path as _Path
     lines = ["### 🖥️ 系统状态"]
+    readiness = collect_backend_readiness(auto_launch_comfyui=False, auto_launch_acestep=False)
 
     # ComfyUI
-    online = comfyui_online()
+    online = readiness["comfyui"]["ready"]
     lines.append(f"**ComfyUI**: {'🟢 在线' if online else '🔴 离线'}")
+    lines.append(f"  *详情*: {readiness['comfyui']['detail']}")
 
-    lines.append("**视频生成**: Wan2.2 TI2V 5B ✅")
+    lines.append("**视频生成**: LTX 2.3 distilled ✅")
+    lines.append(f"**Active Pipeline**: {'✅' if readiness['pipeline']['ready'] else '❌'} {readiness['pipeline']['detail']}")
+    lines.append(f"**Ollama**: {'✅' if readiness['ollama']['ready'] else '❌'} {readiness['ollama']['detail']}")
 
     # TTS
     try:
@@ -1685,15 +2780,133 @@ def get_system_status() -> str:
 
     # BGM
     try:
-        from pipelines.audio_pipeline import _check_acestep_music
-        if _check_acestep_music():
-            lines.append("**BGM 生成**: ✅ Ace-Step 1.5（ComfyUI）→ ffmpeg 合成兜底")
+        from pipelines.audio_pipeline import get_acestep_music_status
+        ace = get_acestep_music_status()
+        if ace["reason"] == "ready":
+            lines.append("**BGM 生成**: ✅ Ace-Step 1.5（ComfyUI + API + LLM）→ ffmpeg 合成兜底")
+            model_bits = [bit for bit in [ace.get("loaded_model"), ace.get("loaded_lm_model")] if bit]
+            if model_bits:
+                lines.append(f"  *已加载*: {', '.join(model_bits)}")
         else:
-            lines.append("**BGM 生成**: ⚠️ ffmpeg 合成（Ace-Step 未就绪或缺模型）")
+            lines.append(f"**BGM 生成**: ⚠️ ffmpeg 合成兜底（Ace-Step 未就绪：{ace.get('reason') or 'unknown'}）")
     except Exception:
         lines.append("**BGM 生成**: ffmpeg 合成（内置保底）")
 
     return "\n\n".join(lines)
+
+
+def collect_backend_readiness(auto_launch_comfyui: bool = False, auto_launch_acestep: bool = False) -> dict:
+    """Collect backend readiness for production gating and UI display."""
+    readiness = {
+        "ollama": {"ready": False, "detail": "Ollama 未连接"},
+        "comfyui": {"ready": False, "detail": "ComfyUI 未启动"},
+        "pipeline": {"ready": False, "detail": "渲染管线未就绪"},
+        "acestep": {"ready": False, "detail": "ACE-Step 未就绪"},
+    }
+
+    try:
+        models = refresh_models()
+        readiness["ollama"] = {
+            "ready": bool(models),
+            "detail": f"{len(models)} 个模型可用" if models else "未获取到 Ollama 模型列表",
+        }
+    except Exception as e:
+        readiness["ollama"] = {"ready": False, "detail": str(e)}
+
+    try:
+        from core.service_ports import (
+            get_comfyui_url, comfyui_status_dict, invalidate_cache,
+            get_acestep_url, acestep_status_dict,
+        )
+        if auto_launch_comfyui:
+            invalidate_cache()
+            get_comfyui_url(auto_launch=True)
+        comfy = comfyui_status_dict()
+        readiness["comfyui"] = {
+            "ready": bool(comfy.get("online")),
+            "detail": comfy.get("api_base") or comfy.get("url") or "ComfyUI 未启动",
+        }
+
+        if auto_launch_acestep:
+            get_acestep_url(auto_launch=True)
+        ace = acestep_status_dict()
+        readiness["acestep"] = {
+            "ready": bool(ace.get("online")),
+            "detail": ace.get("url") or "ACE-Step 未启动",
+        }
+    except Exception as e:
+        readiness["comfyui"] = {"ready": False, "detail": str(e)}
+
+    try:
+        from pipelines.render_pipeline import get_dispatcher
+        dispatcher = get_dispatcher()
+        matrix = dispatcher.probe(force=True)
+        active = dispatcher.active_pipeline or "未设置"
+        active_status = matrix.get(active)
+        if active_status and active_status.available:
+            readiness["pipeline"] = {"ready": True, "detail": f"{active} 已就绪"}
+        elif active_status:
+            blocked = "; ".join(active_status.missing[:4]) or "未知阻塞项"
+            readiness["pipeline"] = {"ready": False, "detail": f"{active} 未就绪: {blocked}"}
+        else:
+            available = [name for name, info in matrix.items() if info.available]
+            readiness["pipeline"] = {
+                "ready": bool(available),
+                "detail": f"active={active}；可用={', '.join(available[:4]) or '无'}",
+            }
+    except Exception as e:
+        readiness["pipeline"] = {"ready": False, "detail": str(e)}
+
+    try:
+        from pipelines.audio_pipeline import get_acestep_music_status
+        ace_music = get_acestep_music_status() if auto_launch_acestep else None
+        if ace_music:
+            readiness["acestep"] = {
+                "ready": ace_music.get("reason") == "ready",
+                "detail": (
+                    f"DiT={ace_music.get('loaded_model')} / LLM={ace_music.get('loaded_lm_model')}"
+                    if ace_music.get("reason") == "ready"
+                    else ace_music.get("reason") or "ACE-Step 未就绪"
+                ),
+            }
+    except Exception:
+        pass
+
+    return readiness
+
+
+def format_backend_readiness_markdown(readiness: dict) -> str:
+    labels = {
+        "ollama": "Ollama",
+        "comfyui": "ComfyUI",
+        "pipeline": "Active Pipeline",
+        "acestep": "ACE-Step",
+    }
+    lines = ["### 🧪 生产前自检"]
+    for key in ("ollama", "comfyui", "pipeline", "acestep"):
+        item = readiness.get(key, {})
+        icon = "✅" if item.get("ready") else "❌"
+        lines.append(f"- {icon} `{labels[key]}`: {item.get('detail', '')}")
+    return "\n".join(lines)
+
+
+def _render_preflight_markdown(auto_launch: bool = True) -> tuple[bool, str]:
+    readiness = collect_backend_readiness(auto_launch_comfyui=auto_launch, auto_launch_acestep=False)
+    blocking = [
+        readiness["comfyui"]["detail"] if not readiness["comfyui"]["ready"] else "",
+        readiness["pipeline"]["detail"] if not readiness["pipeline"]["ready"] else "",
+    ]
+    blocking = [item for item in blocking if item]
+    return (len(blocking) == 0, format_backend_readiness_markdown(readiness))
+
+
+def _quick_video_preflight_markdown(auto_launch: bool = True) -> tuple[bool, str]:
+    readiness = collect_backend_readiness(auto_launch_comfyui=auto_launch, auto_launch_acestep=False)
+    blocking = []
+    for key in ("ollama", "comfyui", "pipeline"):
+        if not readiness[key]["ready"]:
+            blocking.append(readiness[key]["detail"])
+    return (len(blocking) == 0, format_backend_readiness_markdown(readiness))
 
 
 def test_tts_preview(text: str, voice_type: str) -> tuple[str, str]:
@@ -1725,12 +2938,27 @@ def test_tts_preview(text: str, voice_type: str) -> tuple[str, str]:
 def test_bgm_preview(mood: str, duration: int = 10) -> tuple[str, str]:
     """生成一段 BGM 试听，返回 (audio_path, log)。"""
     import tempfile
-    from pipelines.audio_pipeline import generate_music
+    from pipelines.audio_pipeline import (
+        generate_music_acestep,
+        generate_music_ffmpeg,
+        get_acestep_music_status,
+    )
     out = tempfile.mktemp(suffix=".mp3")
     try:
-        ok = generate_music("preview", out, duration=duration, mood=mood)
-        if ok:
-            return out, f"✅ BGM 生成成功（mood={mood}）"
+        ace = get_acestep_music_status()
+        if ace.get("reason") == "ready":
+            if generate_music_acestep("preview", out, duration=duration, mood=mood):
+                return out, (
+                    f"✅ BGM 生成成功（ACE-Step，mood={mood}）\n\n"
+                    f"- DiT: `{ace.get('loaded_model')}`\n"
+                    f"- LLM: `{ace.get('loaded_lm_model')}`"
+                )
+        if generate_music_ffmpeg("preview", out, duration=duration, mood=mood):
+            fallback_reason = ace.get("reason") if ace else "Ace-Step 状态未知"
+            return out, (
+                f"✅ BGM 生成成功（ffmpeg 兜底，mood={mood}）\n\n"
+                f"- 未走 ACE-Step 的原因: `{fallback_reason}`"
+            )
         return None, "❌ BGM 生成失败"
     except Exception as e:
         return None, f"❌ {e}"
@@ -1864,74 +3092,64 @@ def load_existing_project(proj_choice: str):
 
 
 MODEL_AUDIT_SPECS = [
+    # ── LTX 2.3 视频主线 ─────────────────────────────────────────────────────
     {
-        "group": "Wan 2.2 视频主线",
-        "name": "Wan2.2-TI2V-5B GGUF",
+        "group": "LTX 2.3 视频主线",
+        "name": "LTX 2.3-22B distilled 1.1 (bf16)  ← 生产主力",
         "kind": "file",
-        "path": "~/myworkspace/ComfyUI_models/unet/Wan2.2-TI2V-5B-Q4_K_M.gguf",
-        "min_size_mb": 1200,
+        "path": "~/myworkspace/ComfyUI_models/checkpoints/ltx-2.3-22b-distilled-1.1.safetensors",
+        "min_size_mb": 10000,
         "critical": True,
     },
     {
-        "group": "Wan 2.2 视频主线",
-        "name": "Wan2.2-T2V 14B/T2V A14B",
-        "kind": "any",
-        "paths": [
-            "~/myworkspace/ComfyUI_models/unet/Wan2.2-T2V-14B-Q4_K_M.gguf",
-            "~/myworkspace/ComfyUI_models/unet/Wan2.2-T2V-A14B-Q4_K_M.gguf",
-            "~/myworkspace/ComfyUI_models/wan_t2v/Wan2.2-T2V-A14B",
-        ],
-        "patterns": ["*.gguf", "*.safetensors", "*.bin", "*.pt"],
-        "critical": False,
-    },
-    {
-        "group": "Wan 2.2 视频主线",
-        "name": "Wan2.2-I2V A14B",
-        "kind": "dir",
-        "path": "~/myworkspace/ComfyUI_models/wan_i2v/Wan2.2-I2V-A14B",
-        "patterns": ["*.gguf", "*.safetensors", "*.bin", "*.pt"],
-        "critical": False,
-    },
-    {
-        "group": "Wan 编辑 / 动画",
-        "name": "Wan2.1-VACE-1.3B",
-        "kind": "dir",
-        "path": "~/myworkspace/ComfyUI_models/wan_vace/Wan2.1-VACE-1.3B",
-        "patterns": ["*.safetensors", "*.bin", "*.pt", "*.gguf"],
-        "critical": False,
-    },
-    {
-        "group": "Wan 编辑 / 动画",
-        "name": "Wan2.2-Animate-14B",
-        "kind": "dir",
-        "path": "~/myworkspace/ComfyUI_models/wan_animate/Wan2.2-Animate-14B",
-        "patterns": ["*.safetensors", "*.bin", "*.pt", "*.gguf"],
-        "critical": False,
-    },
-    {
-        "group": "Wan 编码器 / VAE",
-        "name": "Wan UMT5 FP8",
+        "group": "LTX 2.3 视频主线",
+        "name": "LTX 2.3-22B distilled fp8（可选，省显存）",
         "kind": "file",
-        "path": "~/myworkspace/ComfyUI_models/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors",
-        "min_size_mb": 1000,
+        "path": "~/myworkspace/ComfyUI_models/checkpoints/ltx-2.3-22b-distilled-fp8.safetensors",
+        "min_size_mb": 10000,
+        "critical": False,
+    },
+    {
+        "group": "LTX 2.3 视频主线",
+        "name": "Gemma 3 12B text encoder (fp4_mixed)",
+        "kind": "file",
+        "path": "~/myworkspace/ComfyUI_models/text_encoders/gemma_3_12B_it_fp4_mixed.safetensors",
+        "min_size_mb": 5000,
         "critical": True,
     },
     {
-        "group": "Wan 编码器 / VAE",
-        "name": "Wan UMT5 BF16",
+        "group": "LTX 2.3 视频主线",
+        "name": "LTX distilled LoRA 384",
         "kind": "file",
-        "path": "~/myworkspace/ComfyUI_models/text_encoders/wan2.2_umt5/models_t5_umt5-xxl-enc-bf16.pth",
-        "min_size_mb": 1000,
+        "path": "~/myworkspace/ComfyUI_models/loras/ltx-2.3-22b-distilled-lora-384.safetensors",
+        "min_size_mb": 100,
         "critical": True,
     },
     {
-        "group": "Wan 编码器 / VAE",
-        "name": "Wan2.2 VAE",
+        "group": "LTX 2.3 视频主线",
+        "name": "LTX spatial upscaler x2 1.1",
         "kind": "file",
-        "path": "~/myworkspace/ComfyUI_models/vae/Wan2.2_VAE.safetensors",
-        "min_size_mb": 500,
+        "path": "~/myworkspace/ComfyUI_models/latent_upscale_models/ltx-2.3-spatial-upscaler-x2-1.1.safetensors",
+        "min_size_mb": 100,
         "critical": True,
     },
+    {
+        "group": "LTX 2.3 视频主线",
+        "name": "LTX 2.3-22B dev bf16（可选，最高画质）",
+        "kind": "file",
+        "path": "~/myworkspace/ComfyUI_models/checkpoints/ltx-2.3-22b-dev.safetensors",
+        "min_size_mb": 10000,
+        "critical": False,
+    },
+    {
+        "group": "LTX 2.3 视频主线",
+        "name": "LTX 2.3-22B dev fp8（可选，省显存高质量）",
+        "kind": "file",
+        "path": "~/myworkspace/ComfyUI_models/checkpoints/ltx-2.3-22b-dev-fp8.safetensors",
+        "min_size_mb": 10000,
+        "critical": False,
+    },
+    # ── FLUX 图像 ──────────────────────────────────────────────────────────────
     {
         "group": "FLUX",
         "name": "FLUX.2-klein-4B",
@@ -1939,9 +3157,8 @@ MODEL_AUDIT_SPECS = [
         "paths": [
             "~/myworkspace/ComfyUI_models/checkpoints/flux-2-klein-4b.safetensors",
             "~/myworkspace/ComfyUI_models/diffusion_models/flux-2-klein-4b.safetensors",
-            "~/myworkspace/ComfyUI_models/checkpoints/flux_2_klein_4B",
         ],
-        "patterns": ["*flux*4b*.safetensors"],
+        "patterns": ["*.safetensors"],
         "critical": False,
     },
     {
@@ -1952,9 +3169,10 @@ MODEL_AUDIT_SPECS = [
         "min_size_mb": 100,
         "critical": False,
     },
+    # ── ACE-Step 音乐 ──────────────────────────────────────────────────────────
     {
         "group": "ACE-Step 音乐",
-        "name": "ACE-Step XL SFT",
+        "name": "ACE-Step v1.5 XL SFT bf16（高质量）",
         "kind": "file",
         "path": "~/myworkspace/ComfyUI_models/diffusion_models/acestep_v1.5_xl_sft_bf16.safetensors",
         "min_size_mb": 3000,
@@ -1962,7 +3180,7 @@ MODEL_AUDIT_SPECS = [
     },
     {
         "group": "ACE-Step 音乐",
-        "name": "ACE-Step XL Turbo",
+        "name": "ACE-Step v1.5 XL Turbo bf16（快速）",
         "kind": "file",
         "path": "~/myworkspace/ComfyUI_models/diffusion_models/acestep_v1.5_xl_turbo_bf16.safetensors",
         "min_size_mb": 3000,
@@ -1970,15 +3188,7 @@ MODEL_AUDIT_SPECS = [
     },
     {
         "group": "ACE-Step 音乐",
-        "name": "ACE-Step Turbo AIO",
-        "kind": "file",
-        "path": "~/myworkspace/ComfyUI_models/diffusion_models/acestep_v1.5_turbo.safetensors",
-        "min_size_mb": 1000,
-        "critical": False,
-    },
-    {
-        "group": "ACE-Step 音乐",
-        "name": "ACE-Step Qwen 0.6B",
+        "name": "ACE-Step Qwen 0.6B LM",
         "kind": "file",
         "path": "~/myworkspace/ComfyUI_models/text_encoders/qwen_0.6b_ace15.safetensors",
         "min_size_mb": 500,
@@ -1986,11 +3196,11 @@ MODEL_AUDIT_SPECS = [
     },
     {
         "group": "ACE-Step 音乐",
-        "name": "ACE-Step Qwen 4B",
+        "name": "ACE-Step Qwen 4B LM",
         "kind": "file",
         "path": "~/myworkspace/ComfyUI_models/text_encoders/qwen_4b_ace15.safetensors",
         "min_size_mb": 1000,
-        "critical": True,
+        "critical": False,
     },
     {
         "group": "ACE-Step 音乐",
@@ -1998,38 +3208,6 @@ MODEL_AUDIT_SPECS = [
         "kind": "file",
         "path": "~/myworkspace/ComfyUI_models/vae/ace_1.5_vae.safetensors",
         "min_size_mb": 100,
-        "critical": True,
-    },
-    {
-        "group": "角色一致性",
-        "name": "InstantID ControlNet",
-        "kind": "file",
-        "path": "~/myworkspace/ComfyUI_models/controlnet/InstantID-ControlNet.safetensors",
-        "min_size_mb": 500,
-        "critical": True,
-    },
-    {
-        "group": "角色一致性",
-        "name": "InstantID IP-Adapter",
-        "kind": "file",
-        "path": "~/myworkspace/ComfyUI_models/instantid/ip-adapter.bin",
-        "min_size_mb": 500,
-        "critical": True,
-    },
-    {
-        "group": "角色一致性",
-        "name": "CLIP Vision H14",
-        "kind": "file",
-        "path": "~/myworkspace/ComfyUI_models/clip_vision/CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors",
-        "min_size_mb": 1000,
-        "critical": True,
-    },
-    {
-        "group": "角色一致性",
-        "name": "InsightFace antelopev2",
-        "kind": "dir",
-        "path": "~/myworkspace/ComfyUI_models/insightface/models/antelopev2",
-        "patterns": ["*.onnx"],
         "critical": True,
     },
 ]
@@ -2174,6 +3352,7 @@ def format_model_audit_markdown() -> str:
         f"- 下载中: {summary['downloading']}",
         f"- 空壳目录: {summary['metadata']}",
         f"- 真缺失: {summary['missing']}",
+        "- 说明: `[关键]` 表示当前主生产链强依赖；非关键项更多是扩展能力。",
         "",
     ]
     groups: dict[str, list[dict]] = {}
@@ -2193,7 +3372,7 @@ def format_model_audit_markdown() -> str:
 def format_industrial_sop_markdown() -> str:
     return "\n".join([
         "### 🏭 工业化 SOP",
-        "1. 模型资产审计：先保证 `Wan2.2-TI2V`、Wan 编码器、ACE-Step、InstantID 四组关键资产可用。",
+        "1. 模型资产审计：先保证 `LTX`、`Gemma`、ACE-Step 和图像侧基础模型四组关键资产可用。",
         "2. 内容生成：优先用 `🔥 一键全流程生成` 生成剧本、角色、场景、音乐、音效和分镜。",
         "3. 分镜审校：在 `🎞️ 分镜` Tab 按 shot 审核，通过后自动锁定，退回的 shot 直接重跑。",
         "4. 批量渲染：优先使用 `🚀 全量渲染+导出`，中途中断时改用 `♻️ 断点续跑`。",
@@ -2206,6 +3385,12 @@ def format_industrial_console(pid: int) -> tuple[str, str, str]:
     entries = collect_model_audit()
     critical_missing = [e for e in entries if e["critical"] and e["status"] != "ready"]
     critical_ready = [e for e in entries if e["critical"] and e["status"] == "ready"]
+    ace_status = None
+    try:
+        from pipelines.audio_pipeline import get_acestep_music_status
+        ace_status = get_acestep_music_status()
+    except Exception:
+        ace_status = None
 
     try:
         from pipelines.render_pipeline import get_dispatcher, load_pipeline_config
@@ -2258,6 +3443,15 @@ def format_industrial_console(pid: int) -> tuple[str, str, str]:
         project_text,
         pipeline_text.rstrip(),
         f"- 关键模型就绪: {len(critical_ready)}/{len(critical_ready) + len(critical_missing)}",
+        (
+            f"- ACE-Step 状态: {'已就绪' if ace_status and ace_status.get('reason') == 'ready' else '未就绪'}"
+            + (
+                f"（DiT: `{ace_status.get('loaded_model')}` / LLM: `{ace_status.get('loaded_lm_model')}`）"
+                if ace_status and ace_status.get('reason') == 'ready'
+                else f"（{ace_status.get('reason')}）" if ace_status and ace_status.get('reason')
+                else ""
+            )
+        ),
         f"- 当前建议: {next_action}",
         "",
         "#### 快捷入口",
@@ -2271,8 +3465,11 @@ def format_industrial_console(pid: int) -> tuple[str, str, str]:
     if critical_missing:
         for item in critical_missing:
             missing_lines.append(f"- `{item['name']}`: {item['detail']}")
+    if ace_status and ace_status.get("reason") != "ready":
+        missing_lines.append(f"- `ACE-Step 服务`: {ace_status.get('reason')}")
     else:
-        missing_lines.append("- 关键生产模型已就绪，当前可按工业化流程推进。")
+        if not critical_missing:
+            missing_lines.append("- 关键生产模型已就绪，当前可按工业化流程推进。")
     return ops_md, "\n".join(missing_lines), format_industrial_sop_markdown()
 
 
@@ -2293,29 +3490,14 @@ def _comfyui_status_text() -> str:
 
 
 def launch_comfyui() -> str:
-    global _comfyui_proc
-    if comfyui_online():
-        return "✅ ComfyUI 已在运行"
-    main_py = comfyui_main_py()
-    if not main_py.exists():
-        return f"❌ 未找到 {main_py}"
-    python_exe = resolve_comfyui_python()
-    if not python_exe.exists():
-        return f"❌ 未找到 ComfyUI 专用 Python: {python_exe}"
     try:
-        import subprocess
-        _comfyui_proc = subprocess.Popen(
-            [str(python_exe), str(main_py), "--listen", "127.0.0.1", "--port", "8188"],
-            cwd=str(COMFYUI_DIR),
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        import time
-        for _ in range(12):
-            time.sleep(2.5)
-            if comfyui_online():
-                return "✅ ComfyUI 启动成功（PID: %d）" % _comfyui_proc.pid
-        return "⏳ ComfyUI 正在启动，请稍后刷新状态..."
+        from core.service_ports import get_comfyui_url, comfyui_api_base, invalidate_cache
+
+        invalidate_cache()
+        base = get_comfyui_url(auto_launch=True)
+        api = comfyui_api_base()
+        mode = "App /api" if api.endswith("/api") else "CLI"
+        return f"✅ ComfyUI 已就绪：{base}（{mode}）"
     except Exception as e:
         return f"❌ 启动失败: {e}"
 
@@ -2325,15 +3507,20 @@ def launch_comfyui() -> str:
 def build_ui():
     init_db()
     models = get_ollama_models()
-    default_model = models[0] if models else "qwen2.5:7b"
+    preferred_default = next(
+        (name for name in ["qwen3.6:35b", "qwen3.5:27b", "qwen3:8b", "qwen2.5-coder:7b", "deepseek-r1:70b"] if name in models),
+        None,
+    )
+    default_model = preferred_default or (models[0] if models else "qwen3:8b")
 
     with gr.Blocks(title="🎬 漫剧故事工坊") as app:
         app.queue(default_concurrency_limit=5)
 
+        # ─── 标题 ────────────────────────────────────────────────────────────
         gr.Markdown("# 🎬 漫剧故事工坊")
-        gr.Markdown("**两步走**: ① 生成全部内容（可编辑） → ② 渲染导出成片")
+        gr.Markdown("**统一生产工作台**：写梗概 → 快速做视频 → 完整管线 → 工作站审计，全程不离开这个页面。")
 
-        # ══════ 已有项目选择 ═══════════════════════
+        # ─── 项目选择（始终可见）──────────────────────────────────────────────
         with gr.Row():
             proj_dropdown = gr.Dropdown(
                 label="📂 加载已有项目",
@@ -2347,586 +3534,840 @@ def build_ui():
             proj_delete_btn = gr.Button("🗑️ 删除项目", variant="stop", scale=1, min_width=100)
         proj_action_status = gr.Markdown("")
 
-        # ══════ Phase 1: 内容生成 ═══════════════════
-        gr.Markdown("## 📝 Phase 1: 内容生成")
+        # ─── 梗概输入（始终可见，所有 Tab 共用）─────────────────────────────
+        premise = gr.Textbox(
+            label="✏️ 梗概 / 热词 / 创作构想",
+            lines=3,
+            placeholder="例如：失忆白月光回国，豪门前夫追妻火葬场。也可以只写热词：霸总 失忆 追妻 火葬场。",
+        )
 
-        premise = gr.Textbox(label="创作构想", lines=6, placeholder="输入故事创意...")
-
-        with gr.Row():
-            project_name = gr.Textbox(label="项目名称", placeholder="留空自动生成", scale=1)
-            genre = gr.Dropdown(label="类型",
-                choices=["玄幻","仙侠","都市","科幻","奇幻","武侠","历史","悬疑","恐怖","言情","校园","末日"],
-                value="玄幻", scale=1)
-            tone = gr.Dropdown(label="基调",
-                choices=["热血","温馨","黑暗","搞笑","治愈","悬疑","史诗","浪漫","轻松","沉重"],
-                value="热血", scale=1)
-            acts = gr.Slider(label="幕数", minimum=1, maximum=5, value=3, step=1, scale=1)
-
-        # 全局默认模型 + 各阶段独立模型
-        with gr.Row():
-            model = gr.Dropdown(label="全局默认模型", choices=models or ["qwen2.5:7b"],
-                value=default_model, allow_custom_value=True, scale=2)
-        model_profile_md = gr.Markdown(format_model_profile(default_model))
-        model.change(fn=format_model_profile, inputs=[model], outputs=[model_profile_md])
-
-        with gr.Accordion("🎭 各阶段独立模型 & 分步运行", open=False):
-            gr.Markdown("各阶段留空则使用全局模型。可对已有项目单独运行某一步骤（填入项目 ID）。")
-            with gr.Row():
-                story_model = gr.Dropdown(label="📝 步骤1 剧本", choices=models or [default_model],
-                    value="", allow_custom_value=True, scale=1)
-                char_model = gr.Dropdown(label="👤 步骤2 角色", choices=models or [default_model],
-                    value="", allow_custom_value=True, scale=1)
-                scene_model = gr.Dropdown(label="🏞️ 步骤3 场景", choices=models or [default_model],
-                    value="", allow_custom_value=True, scale=1)
-                art_model = gr.Dropdown(label="🎨 步骤4 美术/音乐", choices=models or [default_model],
-                    value="", allow_custom_value=True, scale=1)
-
-            with gr.Row():
-                step1_btn = gr.Button("📝 步骤1: 剧本", scale=1)
-                step2_btn = gr.Button("👤 步骤2: 角色", scale=1)
-                step3_btn = gr.Button("🏞️ 步骤3: 场景", scale=1)
-                step4_btn = gr.Button("🎨 步骤4: 美术/音乐/音效", scale=1)
-                step5_btn = gr.Button("🎞️ 步骤5: 分镜", scale=1)
-
-            with gr.Row():
-                stage_status_btn = gr.Button("🔍 查看阶段状态", size="sm", scale=1)
-            stage_status_md = gr.Markdown("", label="阶段状态")
-
-        with gr.Row():
-            gen_btn = gr.Button("🔥 一键全流程生成", variant="primary", size="lg", scale=2)
-            clear_btn = gr.Button("🗑️ 清空", size="lg", scale=1)
-
-        gen_log = gr.Markdown("### 📋 管线日志\n等待启动...")
-        gen_results = gr.JSON(value=None, label="生成结果摘要")
-
-        # ══════ Phase 2: 渲染导出 ═══════════════════
-        gr.Markdown("---")
-        gr.Markdown("## 🎬 Phase 2: 渲染 + 导出")
-        gr.Markdown("用数据库中最新内容渲染视频。可先编辑内容再执行。")
-
-        # ── ComfyUI 状态行 ──
-        with gr.Row():
-            comfyui_status_md = gr.Markdown(_comfyui_status_text())
-            comfyui_launch_btn = gr.Button("🚀 启动 ComfyUI", scale=1, size="sm")
-            comfyui_refresh_btn = gr.Button("🔄 刷新状态", scale=1, size="sm")
-        comfyui_launch_log = gr.Markdown("", visible=False)
-
-        # ── 管线选择 & 状态 ──
-        pipeline_choices, active_pipeline_name = _pipeline_choices()
-        with gr.Accordion("🔧 渲染管线控制", open=True):
-            with gr.Row():
-                pipeline_selector_dd = gr.Dropdown(
-                    choices=pipeline_choices, value=active_pipeline_name,
-                    label="活跃管线", scale=3, interactive=True,
-                )
-                pipeline_detect_btn = gr.Button("🔍 检测缺失", size="sm", scale=1, min_width=80)
-                pipeline_download_btn = gr.Button("⬇️ 一键下载", size="sm", scale=1, min_width=80,
-                                                  variant="primary")
-            pipeline_status_card_md = gr.Markdown(
-                _pipeline_status_card(active_pipeline_name)
-            )
-            pipeline_detect_log = gr.Markdown("", visible=False)
-
-        # ── 渲染操作按钮 ──
-        with gr.Row():
-            render_btn = gr.Button("🚀 全量渲染+导出", variant="secondary", size="lg",
-                                   elem_classes="gr-button-secondary", scale=2)
-            resume_btn = gr.Button("♻️ 断点续跑", variant="primary", size="lg", scale=2)
-            pipeline_state_btn = gr.Button("📊 查看状态", size="lg", scale=1)
-
-        gr.Markdown("`全量渲染+导出`：从头检查并执行完整 Phase 2。`断点续跑`：跳过已完成 shot，仅补未完成阶段。`渲染工作站`：只跑指定 shot。")
-        render_log = gr.Markdown("点击「全量渲染+导出」开始，或点击「断点续跑」从断点续跑...")
-        render_results = gr.JSON(value=None, label="渲染结果")
-        pipeline_state_md = gr.Markdown("", label="管线状态")
-
-        # ══════ 状态变量 ════════════════════════════
+        # ─── 状态变量 ─────────────────────────────────────────────────────────
         project_id_state = gr.State(0)
-        render_config_state = gr.State({})   # {checkpoint, loras, width, height, steps, cfg}
+        render_config_state = gr.State({})
 
-        # ══════ 查看 + 编辑区（各步骤工作站）════════════
-        gr.Markdown("---")
-        gr.Markdown("## ✏️ 各步骤工作站  *每个 Tab 可独立编辑 & 单步执行*")
-        production_overview = gr.Markdown("运行管线后自动展示生产指标。")
-        industrial_ops_default = "### 🎛️ 工业化总控\n先加载项目或生成内容。"
-        industrial_bottleneck_default = "### 🚨 当前瓶颈\n等待审计。"
-        industrial_model_audit_default = format_model_audit_markdown()
-        industrial_sop_default = format_industrial_sop_markdown()
+        # ─── 顶级 Tab 导航 ────────────────────────────────────────────────────
+        with gr.Tabs(elem_classes=["main-tabs"]):
 
-        with gr.Tabs():
-            with gr.TabItem("🏭 工业化控制台"):
-                gr.Markdown("### 面向批量生产的总控面板\n把模型资产、阶段状态、推荐动作和快捷入口放到一个界面。")
-                with gr.Row():
-                    industrial_refresh_btn = gr.Button("🔄 刷新控制台", variant="primary", scale=1)
-                    industrial_refresh_models_btn = gr.Button("🧱 只刷新模型审计", scale=1)
-                with gr.Row():
-                    with gr.Column(scale=1):
-                        industrial_ops_card = gr.Markdown(value=industrial_ops_default)
-                        industrial_bottleneck_card = gr.Markdown(value=industrial_bottleneck_default)
-                    with gr.Column(scale=1):
-                        industrial_model_audit_card = gr.Markdown(value=industrial_model_audit_default)
-                        industrial_sop_card = gr.Markdown(value=industrial_sop_default)
+            # ════════════════════════════════════════════════════════════════════
+            #  Tab 1 · 快速做视频
+            # ════════════════════════════════════════════════════════════════════
+            with gr.TabItem("🚀 快速做视频"):
+                gr.Markdown("从上面「梗概框」输入创意，选好类型和路线，直接做视频。", elem_classes=["workbench-note"])
 
-            # ─── 概览 ──────────────────────────────
-            with gr.TabItem("📺 概览"):
-                view_md = gr.Markdown(value="运行管线后自动展示可读内容。")
-
-            # ─── 分镜 ──────────────────────────────
-            with gr.TabItem("🎞️ 分镜"):
-                shot_table = gr.Dataframe(
-                    headers=["ID", "Act", "Scene", "Shot", "场景", "镜头", "情绪", "角色", "状态", "管线", "回退", "音频", "锁定"],
-                    value=[], interactive=False, label="分镜列表",
-                )
                 with gr.Row():
-                    shot_action_id = gr.Textbox(label="Shot ID", placeholder="例如 12", scale=1)
-                    shot_review_note = gr.Textbox(label="审核备注", placeholder="例如：镜头节奏通过 / 角色口型不对", scale=3)
-                with gr.Row():
-                    shot_load_btn = gr.Button("📥 载入 Shot", scale=1)
-                    shot_approve_btn = gr.Button("✅ 通过", scale=1)
-                    shot_reject_btn = gr.Button("↩️ 退回", scale=1)
-                    shot_lock_btn = gr.Button("🔒 锁定", scale=1)
-                    shot_unlock_btn = gr.Button("🔓 解锁", scale=1)
-                shot_auto_lock_on_approve = gr.Checkbox(label="审核通过后自动锁定", value=True)
-                gr.Markdown("##### 结构化分镜工位")
-                shot_form_status_md = gr.Markdown("输入 Shot ID 后点击“载入 Shot”进行结构化编辑。")
-                shot_form_id = gr.Number(label="Shot 内部 ID", value=0, precision=0, visible=False)
-                with gr.Row():
-                    shot_form_act = gr.Number(label="Act", value=1, precision=0, scale=1)
-                    shot_form_scene = gr.Number(label="Scene", value=1, precision=0, scale=1)
-                    shot_form_number = gr.Number(label="Shot", value=1, precision=0, scale=1)
-                    shot_form_status = gr.Dropdown(
-                        label="状态",
-                        choices=["ready", "rendered", "approved", "rejected"],
-                        value="ready",
-                        scale=1,
+                    home_content_type = gr.Radio(
+                        choices=["📱 短剧（竖屏/红果风格）", "🎬 短视频（广告/Vlog）", "🎥 电影（横屏/长片）"],
+                        value="📱 短剧（竖屏/红果风格）",
+                        label="① 内容类型",
+                        interactive=True,
                     )
-                    shot_form_locked = gr.Checkbox(label="锁定", value=False, scale=1)
-                with gr.Row():
-                    shot_form_location = gr.Textbox(label="场景地点", scale=2)
-                    shot_form_type = gr.Dropdown(
-                        label="镜头类型",
-                        choices=["特写", "近景", "中景", "全景", "远景", "俯拍", "仰拍", "跟拍"],
-                        value="中景",
-                        scale=1,
+                    home_execution_route = gr.Radio(
+                        label="② 执行路线",
+                        choices=["LTX 本机直出视频", "本机友好成片（AI 分镜 → 运镜）", "Qwen 云端（API）"],
+                        value="LTX 本机直出视频",
+                        interactive=True,
                     )
-                    shot_form_mood = gr.Textbox(label="情绪", scale=1)
+
+                home_type_note = gr.Markdown(
+                    "**短剧**：竖屏 9:16，每集 3–5 分钟，节奏快、爽点密集，典型红果/抖音短剧风格。"
+                )
+
                 with gr.Row():
-                    shot_form_time = gr.Dropdown(
-                        label="时间",
-                        choices=["清晨", "白天", "黄昏", "夜晚"],
-                        value="白天",
-                        scale=1,
+                    home_duration = gr.Slider(
+                        label="③ 目标时长（秒）", minimum=6, maximum=300, value=15, step=3, scale=3,
                     )
-                    shot_form_weather = gr.Dropdown(
-                        label="天气",
-                        choices=["晴", "阴", "雨", "雪", "雾"],
-                        value="晴",
-                        scale=1,
+
+                with gr.Row():
+                    home_aspect = gr.Radio(
+                        label="④ 画面比例",
+                        choices=["竖屏 9:16", "横屏 16:9", "横屏 4:3", "竖屏 3:4", "方形 1:1"],
+                        value="竖屏 9:16",
+                        interactive=True,
+                        scale=3,
                     )
-                shot_form_characters = gr.Textbox(
-                    label="角色列表 JSON",
-                    lines=2,
-                    placeholder='["主角", "反派"]',
-                )
-                shot_form_narration = gr.Textbox(label="旁白 / 镜头描述", lines=3)
-                shot_form_camera_notes = gr.Textbox(label="机位 / 运镜备注", lines=2)
-                shot_form_payload = gr.Textbox(
-                    label="Render Payload JSON",
-                    lines=8,
-                    placeholder="高级模式：需要时再编辑底层 render payload",
-                )
-                with gr.Row():
-                    shot_form_save_btn = gr.Button("💾 保存结构化分镜", elem_classes="save-btn", scale=1)
-                    shot_rerender_btn = gr.Button("🎬 重渲染当前 Shot", variant="primary", scale=1)
-                    shot_rework_btn = gr.Button("🔁 退回并重跑", scale=1)
-                shot_edit = gr.Textbox(
-                    label="分镜 JSON（高级模式）",
-                    lines=14,
-                )
-                with gr.Row():
-                    shot_reload_btn = gr.Button("🔄 载入分镜 JSON", scale=1)
-                    save_shot_btn = gr.Button("💾 保存分镜", elem_classes="save-btn", scale=1)
-                    shot_status = gr.Markdown("")
-                shot_render_log = gr.Markdown("")
-                shot_render_preview = gr.Video(
-                    label="当前 Shot 渲染预览", interactive=False,
-                )
-                shot_review_history_md = gr.Markdown("输入 Shot ID 查看审核历史。")
-
-            # ─── 剧本工作站 ───────────────────────────
-            with gr.TabItem("📖 剧本"):
-                with gr.Row():
-                    gr.Markdown("##### 状态")
-                    script_step_refresh_btn = gr.Button("🔄", size="sm", scale=0, min_width=40)
-                script_step_status = gr.Markdown("加载项目后显示状态")
-                script_edit = gr.Textbox(label="剧本 JSON（可直接编辑）", lines=15)
-                with gr.Accordion("🤖 AI 辅助", open=False):
-                    with gr.Row():
-                        script_ai_instr = gr.Textbox(
-                            label="优化指令（留空用默认）",
-                            placeholder="例如：加强第二幕的冲突感，让主角更有深度",
-                            lines=2, scale=3,
-                        )
-                        script_ai_model = gr.Dropdown(
-                            label="AI 模型", choices=models or [default_model],
-                            value="", allow_custom_value=True, scale=1,
-                        )
-                    script_ai_btn = gr.Button("🤖 AI 优化剧本", variant="secondary")
-                    script_ai_status = gr.Markdown("")
-                with gr.Row():
-                    save_script_btn = gr.Button("💾 保存剧本", elem_classes="save-btn", scale=1)
-                    step1_run_btn = gr.Button("▶️ 重新生成剧本", scale=1)
-                    script_status = gr.Markdown("")
-
-            # ─── 角色工作站 ───────────────────────────
-            with gr.TabItem("👤 角色"):
-                char_edit = gr.Textbox(label="角色列表 JSON（可直接编辑）", lines=12)
-                with gr.Accordion("🤖 AI 辅助", open=False):
-                    with gr.Row():
-                        char_ai_instr = gr.Textbox(
-                            label="优化指令",
-                            placeholder="例如：让反派角色更有魅力，丰富支线角色背景",
-                            lines=2, scale=3,
-                        )
-                        char_ai_model = gr.Dropdown(
-                            label="AI 模型", choices=models or [default_model],
-                            value="", allow_custom_value=True, scale=1,
-                        )
-                    char_ai_btn = gr.Button("🤖 AI 优化角色", variant="secondary")
-                    char_ai_status = gr.Markdown("")
-                with gr.Row():
-                    save_char_btn = gr.Button("💾 保存角色", elem_classes="save-btn", scale=1)
-                    step2_run_btn = gr.Button("▶️ 重新生成角色", scale=1)
-                    char_status = gr.Markdown("")
-
-            # ─── 场景工作站 ───────────────────────────
-            with gr.TabItem("🏞️ 场景"):
-                scene_edit = gr.Textbox(label="场景列表 JSON（可直接编辑）", lines=12)
-                with gr.Accordion("🤖 AI 辅助", open=False):
-                    with gr.Row():
-                        scene_ai_instr = gr.Textbox(
-                            label="优化指令",
-                            placeholder="例如：增强视觉冲击力，让场景描述更适合动漫风格渲染",
-                            lines=2, scale=3,
-                        )
-                        scene_ai_model = gr.Dropdown(
-                            label="AI 模型", choices=models or [default_model],
-                            value="", allow_custom_value=True, scale=1,
-                        )
-                    scene_ai_btn = gr.Button("🤖 AI 优化场景", variant="secondary")
-                    scene_ai_status = gr.Markdown("")
-                with gr.Row():
-                    save_scene_btn = gr.Button("💾 保存场景", elem_classes="save-btn", scale=1)
-                    step3_run_btn = gr.Button("▶️ 重新生成场景", scale=1)
-                    scene_status = gr.Markdown("")
-
-            # ─── 配乐工作站 ───────────────────────────
-            with gr.TabItem("🎵 配乐"):
-                with gr.Row():
-                    music_step_status = gr.Markdown(load_music_status(0))
-                    music_status_refresh_btn = gr.Button("🔄 刷新", size="sm", scale=0, min_width=50)
-                gr.Markdown("##### 编辑配乐数据（JSON）")
-                gr.Markdown(
-                    "每条记录包含 `name`、`mood`、`tempo`、`instruments`、`description`、`prompt_for_gen`。\n"
-                    "`prompt_for_gen` 是实际传给 MusicGen 的英文描述，对音乐质量影响最大。",
-                    elem_classes="gr-text-small",
-                )
-                music_edit = gr.Textbox(
-                    label="配乐 JSON（可直接编辑 prompt_for_gen 字段）",
-                    lines=12,
-                )
-                with gr.Accordion("🤖 AI 辅助优化配乐描述", open=False):
-                    with gr.Row():
-                        music_ai_instr = gr.Textbox(
-                            label="优化指令（留空则自动优化 prompt_for_gen）",
-                            placeholder="例如：让配乐更有史诗感，加入东方乐器元素",
-                            lines=2, scale=3,
-                        )
-                        music_ai_model = gr.Dropdown(
-                            label="AI 模型", choices=models or [default_model],
-                            value="", allow_custom_value=True, scale=1,
-                        )
-                    music_ai_btn = gr.Button("🤖 AI 优化配乐描述", variant="secondary")
-                    music_ai_status = gr.Markdown("")
-                with gr.Row():
-                    save_music_btn = gr.Button("💾 保存配乐数据", elem_classes="save-btn", scale=1)
-                    music_run_btn = gr.Button("▶️ 单步生成配乐", variant="primary", scale=1)
-                    music_status = gr.Markdown("")
-                music_run_log = gr.Markdown("")
-                music_preview_out = gr.Audio(
-                    label="配乐预览（生成后自动显示首曲）",
-                    type="filepath", interactive=False,
-                )
-
-            # ─── 音效工作站 ───────────────────────────
-            with gr.TabItem("🔊 音效"):
-                sfx_edit = gr.Textbox(label="音效数据 JSON（可直接编辑）", lines=10)
-                with gr.Accordion("🤖 AI 辅助优化音效描述", open=False):
-                    with gr.Row():
-                        sfx_ai_instr = gr.Textbox(
-                            label="优化指令",
-                            placeholder="例如：让音效描述更具体，区分环境音和动作音",
-                            lines=2, scale=3,
-                        )
-                        sfx_ai_model = gr.Dropdown(
-                            label="AI 模型", choices=models or [default_model],
-                            value="", allow_custom_value=True, scale=1,
-                        )
-                    sfx_ai_btn = gr.Button("🤖 AI 优化音效描述", variant="secondary")
-                    sfx_ai_status = gr.Markdown("")
-                with gr.Row():
-                    save_sfx_btn = gr.Button("💾 保存音效数据", elem_classes="save-btn", scale=1)
-                    sfx_run_btn = gr.Button("▶️ 单步生成音效", variant="primary", scale=1)
-                    sfx_status = gr.Markdown("")
-                sfx_run_log = gr.Markdown("")
-                sfx_preview_out = gr.Audio(
-                    label="音效预览（生成后自动显示）",
-                    type="filepath", interactive=False,
-                )
-
-            # ─── TTS 工作站 ──────────────────────────
-            with gr.TabItem("🎤 TTS 配音"):
-                with gr.Row():
-                    tts_step_status_md = gr.Markdown(load_tts_status(0))
-                    tts_status_refresh_btn = gr.Button("🔄 刷新", size="sm", scale=0, min_width=50)
-                gr.Markdown(
-                    "可选择单个 Shot 查看/编辑对白，或直接批量生成全部 Shot 的 TTS。",
-                    elem_classes="gr-text-small",
-                )
-                with gr.Row():
-                    tts_shot_id_input = gr.Textbox(
-                        label="Shot ID（留空 = 全部）",
-                        placeholder="例如: 3  或  1,2,5",
+                    home_quality = gr.Radio(
+                        label="⑤ 画质档位",
+                        choices=["标准（540p）", "高清（720p）", "全高清（1080p）"],
+                        value="标准（540p）",
+                        interactive=True,
                         scale=2,
                     )
-                    tts_load_shot_btn = gr.Button("📖 查看此 Shot 对白", scale=1)
-                tts_shot_status_md = gr.Markdown("")
-                tts_dialogue_edit = gr.Textbox(
-                    label="对白 JSON（可编辑 character / line / voice_preset 字段）",
-                    lines=10, placeholder="点击「查看此 Shot 对白」加载...",
-                )
-                gr.Markdown(
-                    "TTS 使用 **ChatTTS**（中文优先）→ Bark → Edge-TTS 自动降级。\n"
-                    "在模型管理 → TTS 试听 可以预先试听各音色。",
-                    elem_classes="gr-text-small",
-                )
-                with gr.Row():
-                    tts_run_shot_btn = gr.Button("▶️ 生成此 Shot TTS", scale=1)
-                    tts_run_all_btn = gr.Button("▶️ 生成全部 TTS", variant="primary", scale=1)
-                tts_run_log = gr.Markdown("")
-                tts_preview_out = gr.Audio(
-                    label="TTS 预览（生成后自动显示首条）",
-                    type="filepath", interactive=False,
+
+                home_target_note = gr.Markdown(
+                    "> **短剧模式**：竖屏 9:16，节奏快，适合红果/抖音风格。  \n"
+                    "> ⚡ **标准 540p**：本机 Apple Silicon 推荐，每镜头约 5-15 分钟。  \n"
+                    "> ⚠️ **720p/1080p**：需要 NVIDIA 24GB+ 显卡，Apple MPS 上可能耗时数小时。"
                 )
 
-            # ─── 渲染工作站 ──────────────────────────
-            with gr.TabItem("🎬 渲染"):
                 with gr.Row():
-                    render_step_status_md = gr.Markdown(load_render_status(0))
-                    render_status_refresh_btn = gr.Button("🔄 刷新", size="sm", scale=0, min_width=50)
-                gr.Markdown(
-                    "渲染使用 ComfyUI（Wan2.2 TI2V）。已渲染的 Shot 自动跳过。",
-                    elem_classes="gr-text-small",
-                )
-                with gr.Row():
-                    render_shot_id_input = gr.Textbox(
-                        label="Shot ID（留空 = 全部未渲染）",
-                        placeholder="例如: 3  或  1,2,5",
-                        scale=2,
+                    home_bgm_prompt = gr.Textbox(
+                        label="BGM 描述（可选）",
+                        placeholder="如：轻快电子+鼓点，适合追妻爽剧",
+                        lines=1, scale=3,
                     )
-                    render_run_btn = gr.Button("▶️ 渲染指定/全部", variant="primary", scale=1)
-                render_run_log = gr.Markdown("")
-                render_video_preview = gr.Video(
-                    label="渲染预览（完成后自动显示）", interactive=False,
-                )
-
-            # ─── 合成工作站 ──────────────────────────
-            with gr.TabItem("🎞️ 合成导出"):
-                gr.Markdown(
-                    "将所有已渲染视频 + TTS + BGM 合成为最终集数视频。\n"
-                    "需要完成渲染和音频生成后再执行。",
-                    elem_classes="gr-text-small",
-                )
-                with gr.Row():
-                    composite_run_btn = gr.Button("▶️ 执行合成", variant="primary", scale=1)
-                    episode_video_path = gr.Textbox(
-                        label="输出视频路径", interactive=False, scale=2,
+                    home_crossfade = gr.Slider(
+                        label="转场（秒）", minimum=0.0, maximum=1.0, value=0.3, step=0.1, scale=1,
                     )
-                composite_run_log = gr.Markdown("")
-                export_manifest_md = gr.Markdown("")
-                composite_video_preview = gr.Video(
-                    label="最终视频预览", interactive=False,
-                )
 
-            # ─── 字幕工作站 ──────────────────────────
-            with gr.TabItem("💬 字幕"):
-                gr.Markdown("输入 Shot ID 生成/读取字幕，可直接编辑 `.srt` 文本后保存。")
-                with gr.Row():
-                    subtitle_shot_id = gr.Textbox(label="Shot ID", placeholder="例如 12", scale=1)
-                    subtitle_load_btn = gr.Button("📖 加载字幕", scale=1)
-                    subtitle_save_btn = gr.Button("💾 保存字幕", elem_classes="save-btn", scale=1)
-                subtitle_path_md = gr.Markdown("")
-                subtitle_text = gr.Textbox(label="字幕 SRT 文本", lines=16)
-                subtitle_status = gr.Markdown("")
-
-            # ─── 视频预览 ─────────────────────────────
-            with gr.TabItem("▶️ 视频预览"):
-                gr.Markdown("### Shot 视频预览")
-                with gr.Row():
-                    shot_preview_id = gr.Number(label="Shot ID", value=0, precision=0, scale=1)
-                    load_video_btn = gr.Button("▶️ 加载视频", scale=1)
-                shot_video_player = gr.Video(label="Shot 视频", interactive=False)
-                shot_video_status = gr.Markdown("")
-
-            # ─── AI 联动编辑 ──────────────────────────
-            with gr.TabItem("🤖 AI 编辑"):
-                gr.Markdown("### AI 联动编辑\n输入自然语言指令，AI 扫描所有受影响字段并预览变更。")
-                with gr.Row():
-                    ai_edit_instruction = gr.Textbox(
-                        label="编辑指令",
-                        placeholder="例如: 把张三改名为李四，性格改为冷漠",
-                        lines=2, scale=3,
-                    )
-                    ai_scan_btn = gr.Button("🔍 AI 扫描预览", variant="primary", scale=1)
-                ai_edit_preview_md = gr.Markdown("输入指令后点击「AI 扫描预览」")
-                ai_manifest_json = gr.Textbox(
-                    label="变更清单 JSON（可手动调整后执行）",
-                    lines=8, visible=False,
-                )
-                with gr.Row():
-                    ai_exec_btn = gr.Button("✅ 确认执行变更", variant="secondary", scale=1)
-                    ai_rollback_btn = gr.Button("↩️ 回滚最近编辑", scale=1)
-                    show_manifest_btn = gr.Button("📋 显示/隐藏 JSON", scale=1)
-                ai_exec_status = gr.Markdown("")
-                gr.Markdown("#### 编辑历史")
-                edit_history_table = gr.Dataframe(
-                    headers=["ID", "时间", "指令", "表", "字段", "旧值", "新值", "置信度"],
-                    value=[], interactive=False, label="近 30 条编辑记录",
-                )
-                refresh_history_btn = gr.Button("🔄 刷新历史", size="sm")
-
-            with gr.TabItem("🗂️ 模型管理"):
-                gr.Markdown("### ComfyUI 模型管理\n查看已安装模型 / 搜索 / 下载缺失模型。")
-
-                # ── 系统状态总览 ─────────────────────────
-                with gr.Accordion("🖥️ 系统状态总览", open=True):
-                    sys_status_md = gr.Markdown(get_system_status())
-                    sys_refresh_btn = gr.Button("🔄 刷新状态", size="sm")
-
-                # ── 渲染参数配置 ─────────────────────────
-                with gr.Accordion("⚙️ 渲染参数（Steps / CFG / 尺寸）", open=False):
-                    gr.Markdown("调整后点「应用」将参数合并到渲染配置。")
-                    with gr.Row():
-                        rp_steps = gr.Slider(label="Steps", minimum=10, maximum=50, value=20, step=1, scale=2)
-                        rp_cfg   = gr.Slider(label="CFG Scale", minimum=3.0, maximum=15.0, value=7.0, step=0.5, scale=2)
-                    with gr.Row():
-                        rp_width  = gr.Dropdown(label="宽度", choices=[512, 768, 832, 896, 1024, 1152], value=896, scale=1)
-                        rp_height = gr.Dropdown(label="高度", choices=[512, 768, 832, 896, 1024, 1152], value=1152, scale=1)
-                        rp_apply_btn = gr.Button("✅ 应用参数", variant="secondary", scale=1)
-                    rp_status_md = gr.Markdown("")
-
-                # ── TTS / 音频配置 ───────────────────────
-                with gr.Accordion("🎤 TTS 配置 & 试听", open=False):
-                    gr.Markdown(
-                        "TTS 后端优先级：**ChatTTS**（本地，中文主力）"
-                        " → Edge-TTS → Bark → Kokoro → pyttsx3。\n\n"
-                        "ChatTTS 使用本机独立 venv 与本地模型目录；失败时才会自动回退。"
+                with gr.Accordion("☁️ Qwen 云端配置（仅选云端路线时填）", open=False):
+                    home_cloud_api_key = gr.Textbox(
+                        label="API Key", type="password",
+                        placeholder="留空 = 读取环境变量 QWEN_VIDEO_API_KEY",
                     )
                     with gr.Row():
-                        tts_test_text  = gr.Textbox(
-                            label="试听文本",
-                            value="仙剑问情，一梦千年，何处是归途？",
-                            scale=3,
+                        home_cloud_api_base = gr.Textbox(
+                            label="API Base",
+                            value=os.getenv("QWEN_VIDEO_API_BASE", "https://dashscope.aliyuncs.com/api/v1"),
                         )
-                        tts_voice_type = gr.Dropdown(
-                            label="音色类型",
-                            choices=["男", "女", "男孩", "女孩", "旁白"],
-                            value="旁白", scale=1,
+                        home_cloud_model = gr.Textbox(
+                            label="云端模型",
+                            value=os.getenv("QWEN_VIDEO_MODEL", "qwen-vl-max"),
                         )
-                        tts_preview_btn = gr.Button("▶️ 试听", variant="primary", scale=1)
-                    tts_audio_out = gr.Audio(label="TTS 试听", type="filepath", interactive=False)
-                    tts_preview_log = gr.Markdown("")
 
-                # ── BGM 配置 & 试听 ──────────────────────
-                with gr.Accordion("🎵 BGM 配置 & 试听", open=False):
-                    gr.Markdown(
-                        "BGM 后端优先级：**Ace-Step 1.5**（ComfyUI，模型就绪时）→ ffmpeg 合成兜底。\n\n"
-                        "如果本机未安装 Ace-Step 音频模型，系统会自动改用本地 ffmpeg 合成，不会把整条音频链跑死。"
+                with gr.Row():
+                    home_qv_btn       = gr.Button("🎬 做视频", variant="primary", size="lg", scale=3)
+                    home_stop_btn     = gr.Button("🛑 停止", variant="stop", size="lg", scale=1)
+                    home_kill_btn     = gr.Button("☢️ 强杀", variant="stop", size="lg", scale=1)
+                home_kill_note = gr.Markdown(
+                    "_🛑 停止：软中断，当前镜头完成后停。 ☢️ 强杀：SIGKILL ComfyUI 进程并重启，卡死时使用。_",
+                    visible=True,
+                )
+                home_qv_log   = gr.Textbox(label="生成日志", lines=6, interactive=False)
+                home_qv_video = gr.Video(label="视频结果", interactive=False, visible=False)
+                home_qv_status = gr.Markdown("")
+
+            # ════════════════════════════════════════════════════════════════════
+            #  Tab 2 · 完整管线
+            # ════════════════════════════════════════════════════════════════════
+            with gr.TabItem("🏭 完整管线"):
+
+                # ── AI 批量生成梗概 ──────────────────────────────────────────────
+                with gr.Accordion("💡 AI 批量生成梗概（可选）", open=False):
+                    gr.Markdown("输入关键词让 AI 批量生成故事梗概 → 勾选 → 点「填入梗概框」→ 批量跑管线。")
+                    with gr.Row():
+                        concept_keywords = gr.Textbox(
+                            label="关键词", placeholder="如：兵王 赘婿 豪门 / 重生 复仇 商战", scale=3,
+                        )
+                        concept_requirements = gr.Textbox(
+                            label="定制需求（可选）", placeholder="如：女主要强势、结局大团圆、无脑爽", scale=3,
+                        )
+                    with gr.Row():
+                        concept_n = gr.Slider(label="生成数量", minimum=3, maximum=10, value=6, step=1, scale=1)
+                        concept_use_web = gr.Checkbox(label="🌐 联网搜索参考", value=False, scale=1)
+                        concept_model = gr.Dropdown(
+                            label="模型", choices=models or ["qwen3.6:35b"],
+                            value=default_model, allow_custom_value=True, scale=2,
+                        )
+                        concept_gen_btn = gr.Button("🔍 生成梗概", variant="primary", scale=1)
+                    concept_table = gr.Dataframe(
+                        headers=["ID", "剧名", "类型", "基调", "梗概", "爽点"],
+                        datatype=["str", "str", "str", "str", "str", "str"],
+                        interactive=False, wrap=True,
+                        label="生成的故事梗概", row_count=(6, "dynamic"),
+                    )
+                    concept_data_state = gr.State([])
+                    with gr.Row():
+                        concept_select = gr.CheckboxGroup(
+                            label="勾选要加入队列的梗概（按编号选）", choices=[], value=[], scale=4,
+                        )
+                        with gr.Column(scale=1):
+                            concept_add_btn = gr.Button("➕ 加入队列", variant="secondary")
+                            concept_clear_queue_btn = gr.Button("🗑️ 清空队列")
+                    concept_queue_state = gr.State([])
+                    concept_queue_md = gr.Markdown("**队列为空**")
+                    concept_queue_select = gr.CheckboxGroup(
+                        label="待执行队列（可在开跑前移除某几项）", choices=[], value=[],
                     )
                     with gr.Row():
-                        bgm_mood_sel = gr.Dropdown(
-                            label="情绪",
-                            choices=["热血", "史诗", "神秘", "温馨", "黑暗", "浪漫", "悬疑", "epic", "warm", "dark"],
-                            value="热血", scale=2,
-                        )
-                        bgm_dur_sel = gr.Slider(label="时长(秒)", minimum=5, maximum=60, value=15, step=5, scale=2)
-                        bgm_preview_btn = gr.Button("▶️ 试听 BGM", variant="primary", scale=1)
-                    bgm_audio_out = gr.Audio(label="BGM 试听", type="filepath", interactive=False)
-                    bgm_preview_log = gr.Markdown("")
+                        concept_run_queue_btn = gr.Button("🚀 启动队列生成", variant="primary", scale=2)
+                        concept_fill_btn = gr.Button("✏️ 填入梗概框（单选）", variant="secondary", scale=1)
+                        concept_remove_btn = gr.Button("➖ 移除选中项", scale=1)
+                        concept_stop_btn = gr.Button("🛑 停止", variant="stop", scale=1)
+                        concept_kill_btn = gr.Button("☢️ 强杀", variant="stop", scale=1)
+                    concept_queue_log = gr.Markdown("")
 
-                # ── 已安装模型浏览 ──────────────────────
-                with gr.Accordion("🔍 已安装模型浏览", open=False):
-                    cm_status_md = gr.Markdown("点击「加载」查询 ComfyUI 已安装模型。")
+                gr.Markdown("---")
+
+                # ── 项目设置 ─────────────────────────────────────────────────────
+                with gr.Row():
+                    project_name = gr.Textbox(label="项目名称", placeholder="留空自动生成", scale=1)
+                    genre = gr.Dropdown(
+                        label="主类型",
+                        choices=["玄幻","仙侠","都市","科幻","奇幻","武侠","历史","悬疑","恐怖","言情","校园","末日"],
+                        value="玄幻", scale=1,
+                    )
+                    tone = gr.Dropdown(
+                        label="主基调",
+                        choices=["热血","温馨","黑暗","搞笑","治愈","悬疑","史诗","浪漫","轻松","沉重"],
+                        value="热血", scale=1,
+                    )
+                    acts = gr.Slider(label="幕数", minimum=1, maximum=5, value=4, step=1, scale=1)
+
+                with gr.Accordion("🎭 细化设置（可选）", open=False):
                     with gr.Row():
-                        cm_load_btn = gr.Button("🔄 加载全部模型", variant="primary", scale=2)
-                        cm_type_filter = gr.Dropdown(
-                            label="类型筛选",
-                            choices=list(MODEL_TYPE_LABELS.keys()),
-                            value="checkpoint", scale=1,
+                        genre_tags = gr.CheckboxGroup(
+                            label="复合类型",
+                            choices=["都市言情","古装宫斗","穿越重生","豪门总裁","悬疑推理","灵异惊悚","热血战争","青春校园"],
+                            value=[], scale=3,
                         )
-                        cm_search_input = gr.Textbox(
-                            label="搜索关键词", placeholder="输入关键词过滤...",
+                        tone_tags = gr.CheckboxGroup(
+                            label="复合基调",
+                            choices=["甜宠","虐恋","爽文复仇","权谋暗黑","轻喜搞笑","热血燃向","治愈温情"],
+                            value=[], scale=3,
+                        )
+                        emotion_arc = gr.Dropdown(
+                            label="情绪弧度",
+                            choices=["先甜后虐","先虐后甜","全程爽","全程虐","高开低走","低开高走"],
+                            value="先甜后虐", scale=2,
+                        )
+                    with gr.Row():
+                        episode_count = gr.Slider(
+                            label="总集数", minimum=10, maximum=300, value=80, step=10, scale=2,
+                        )
+                        project_format = gr.Radio(
+                            label="输出画幅",
+                            choices=["竖屏 9:16（短剧默认）", "横屏 16:9（短剧 / 电影都可用）"],
+                            value="竖屏 9:16（短剧默认）",
                             scale=2,
                         )
-                        cm_search_btn = gr.Button("🔍 搜索", scale=1)
 
+                gr.Markdown("---")
+
+                # ── 模型设置 ─────────────────────────────────────────────────────
+                with gr.Accordion("🤖 模型设置（展开修改）", open=False):
                     with gr.Row():
-                        cm_ckpt_list  = gr.Dropdown(label="Checkpoint", choices=[], allow_custom_value=True, scale=1)
-                        cm_lora_list  = gr.Dropdown(label="LoRA",        choices=[], allow_custom_value=True, scale=1)
-                        cm_vae_list   = gr.Dropdown(label="VAE",         choices=[], allow_custom_value=True, scale=1)
-                        cm_cn_list    = gr.Dropdown(label="ControlNet",  choices=[], allow_custom_value=True, scale=1)
+                        model = gr.Dropdown(label="全局备用模型", choices=models or ["qwen3.6:35b"],
+                            value=default_model, allow_custom_value=True, scale=2)
+                    model_profile_md = gr.Markdown(format_model_profile(default_model))
+                    with gr.Row():
+                        story_model = gr.Dropdown(label="📝 步骤1 剧本", choices=models or [default_model],
+                            value="", allow_custom_value=True, scale=1)
+                        char_model = gr.Dropdown(label="👤 步骤2 角色", choices=models or [default_model],
+                            value="", allow_custom_value=True, scale=1)
+                        scene_model = gr.Dropdown(label="🏞️ 步骤3 场景", choices=models or [default_model],
+                            value="", allow_custom_value=True, scale=1)
+                        art_model = gr.Dropdown(label="🎨 步骤4 美术/音乐", choices=models or [default_model],
+                            value="", allow_custom_value=True, scale=1)
 
-                    cm_search_result = gr.Dropdown(
-                        label="搜索结果（选择后可应用）", choices=[], interactive=True,
+                # ── 分步运行 ─────────────────────────────────────────────────────
+                with gr.Group():
+                    gr.Markdown("### ▶️ 分步运行")
+                    with gr.Row():
+                        step1_btn = gr.Button("📝 步骤1: 剧本", scale=1)
+                        step2_btn = gr.Button("👤 步骤2: 角色", scale=1)
+                        step3_btn = gr.Button("🏞️ 步骤3: 场景", scale=1)
+                        step4_btn = gr.Button("🎨 步骤4: 美术/音乐/音效", scale=1)
+                        step5_btn = gr.Button("🎞️ 步骤5: 分镜", scale=1)
+                    with gr.Row():
+                        stage_status_btn = gr.Button("🔍 查看阶段状态", size="sm", scale=1)
+                    stage_status_md = gr.Markdown("")
+
+                with gr.Row():
+                    gen_btn = gr.Button("🔥 一键全流程生成", variant="primary", size="lg", scale=2)
+                    clear_btn = gr.Button("🗑️ 清空", size="lg", scale=1)
+
+                gen_log = gr.Markdown("### 📋 管线日志\n等待启动...")
+                gen_results = gr.JSON(value=None, label="生成结果摘要")
+
+                gr.Markdown("---")
+
+                # ── 渲染导出 ─────────────────────────────────────────────────────
+                gr.Markdown("## 🎬 渲染 + 导出")
+                with gr.Row():
+                    comfyui_status_md = gr.Markdown(_comfyui_status_text())
+                    comfyui_launch_btn = gr.Button("🚀 启动 ComfyUI", scale=1, size="sm")
+                    comfyui_refresh_btn = gr.Button("🔄 刷新状态", scale=1, size="sm")
+                comfyui_launch_log = gr.Markdown("", visible=False)
+
+                pipeline_choices, active_pipeline_name = _pipeline_choices()
+                with gr.Row():
+                    pipeline_selector_dd = gr.Dropdown(
+                        choices=pipeline_choices, value=active_pipeline_name,
+                        label="活跃管线", scale=3, interactive=True,
                     )
+                    pipeline_detect_btn = gr.Button("🔍 检测缺失", size="sm", scale=1, min_width=80)
+                    pipeline_download_btn = gr.Button("⬇️ 一键下载", size="sm", scale=1, min_width=80, variant="primary")
+                pipeline_status_card_md = gr.Markdown(_pipeline_status_card(active_pipeline_name))
+                pipeline_detect_log = gr.Markdown("", visible=False)
 
-                    # LoRA 强度 + 应用配置
-                    with gr.Row():
-                        cm_lora_strength = gr.Slider(label="LoRA 强度", minimum=0.0, maximum=1.5,
-                                                      value=0.7, step=0.05, scale=2)
+                with gr.Row():
+                    render_btn = gr.Button("🚀 全量渲染+导出", variant="secondary", size="lg",
+                                           elem_classes="gr-button-secondary", scale=2)
+                    resume_btn = gr.Button("♻️ 断点续跑", variant="primary", size="lg", scale=2)
+                    render_stop_btn = gr.Button("🛑 停止", variant="stop", size="lg", scale=1)
+                    render_kill_btn = gr.Button("☢️ 强杀", variant="stop", size="lg", scale=1)
+                    pipeline_state_btn = gr.Button("📊 查看状态", size="lg", scale=1)
+
+                gr.Markdown("`全量渲染+导出`：从头检查并执行完整 Phase 2。`断点续跑`：跳过已完成 shot。")
+
+                with gr.Row(equal_height=True):
+                    overall_progress_md = gr.Markdown(
+                        "**整体进度** — 等待开始", elem_id="overall-progress-bar",
+                    )
+                    shot_progress_md = gr.Markdown(
+                        "**当前 Shot** — 等待开始",
+                        elem_id="shot-progress-bar",
+                        every=4,
+                        value=lambda: _poll_current_shot_status(),
+                    )
+                render_log = gr.Markdown("点击「全量渲染+导出」开始，或点击「断点续跑」从断点续跑...")
+                render_results = gr.JSON(value=None, label="渲染结果")
+                pipeline_state_md = gr.Markdown("", label="管线状态")
+
+            # ════════════════════════════════════════════════════════════════════
+            #  Tab 3 · 工作站
+            # ════════════════════════════════════════════════════════════════════
+            with gr.TabItem("🔧 工作站"):
+                production_overview = gr.Markdown("运行管线后自动展示生产指标。")
+                industrial_ops_default = "### 🎛️ 工业化总控\n先加载项目或生成内容。"
+                industrial_bottleneck_default = "### 🚨 当前瓶颈\n等待审计。"
+                industrial_model_audit_default = format_model_audit_markdown()
+                industrial_sop_default = format_industrial_sop_markdown()
+                with gr.Tabs(elem_classes=["workspace-tabs"]):
+                    with gr.TabItem("🏭 工业化控制台"):
+                        with gr.Group(elem_classes=["tab-shell"]):
+                            gr.Markdown("### 🏭 面向批量生产的总控面板")
+                            gr.Markdown("把模型资产、阶段状态、推荐动作和快捷入口放到一个界面，不再分散在几个小区域里。", elem_classes=["workbench-note"])
+                            with gr.Row():
+                                industrial_refresh_btn = gr.Button("🔄 刷新控制台", variant="primary", scale=1)
+                                industrial_refresh_models_btn = gr.Button("🧱 只刷新模型审计", scale=1)
+                        with gr.Group(elem_classes=["dashboard-grid"]):
+                            with gr.Group(elem_classes=["dashboard-card"]):
+                                industrial_ops_card = gr.Markdown(value=industrial_ops_default)
+                            with gr.Group(elem_classes=["dashboard-card"]):
+                                industrial_bottleneck_card = gr.Markdown(value=industrial_bottleneck_default)
+                            with gr.Group(elem_classes=["dashboard-card"]):
+                                industrial_model_audit_card = gr.Markdown(value=industrial_model_audit_default)
+                            with gr.Group(elem_classes=["dashboard-card"]):
+                                industrial_sop_card = gr.Markdown(value=industrial_sop_default)
+
+                    # ─── 概览 ──────────────────────────────
+                    with gr.TabItem("📺 概览"):
+                        with gr.Group(elem_classes=["tab-shell"]):
+                            gr.Markdown("### 📺 项目概览")
+                            gr.Markdown("这里集中看当前项目的可读内容与产出摘要，不再只是裸文本。", elem_classes=["workbench-note"])
+                            view_md = gr.Markdown(value="运行管线后自动展示可读内容。")
+
+                    # ─── 分镜 ──────────────────────────────
+                    with gr.TabItem("🎞️ 分镜"):
+                        with gr.Group(elem_classes=["tab-shell"]):
+                            gr.Markdown("### 🎞️ 分镜审核台")
+                            gr.Markdown("这里做审核、锁定、结构化修改和重渲染，不需要在多个小抽屉之间跳来跳去。", elem_classes=["workbench-note"])
+                        shot_table = gr.Dataframe(
+                            headers=["ID", "Act", "Scene", "Shot", "场景", "镜头", "情绪", "角色", "状态", "管线", "回退", "音频", "锁定"],
+                            value=[], interactive=False, label="分镜列表",
+                        )
+                        with gr.Row():
+                            shot_action_id = gr.Textbox(label="Shot ID", placeholder="例如 12", scale=1)
+                            shot_review_note = gr.Textbox(label="审核备注", placeholder="例如：镜头节奏通过 / 角色口型不对", scale=3)
+                        with gr.Row():
+                            shot_load_btn = gr.Button("📥 载入 Shot", scale=1)
+                            shot_approve_btn = gr.Button("✅ 通过", scale=1)
+                            shot_reject_btn = gr.Button("↩️ 退回", scale=1)
+                            shot_lock_btn = gr.Button("🔒 锁定", scale=1)
+                            shot_unlock_btn = gr.Button("🔓 解锁", scale=1)
+                        shot_auto_lock_on_approve = gr.Checkbox(label="审核通过后自动锁定", value=True)
+                        gr.Markdown("##### 结构化分镜工位")
+                        shot_form_status_md = gr.Markdown("输入 Shot ID 后点击“载入 Shot”进行结构化编辑。")
+                        shot_form_id = gr.Number(label="Shot 内部 ID", value=0, precision=0, visible=False)
+                        with gr.Row():
+                            shot_form_act = gr.Number(label="Act", value=1, precision=0, scale=1)
+                            shot_form_scene = gr.Number(label="Scene", value=1, precision=0, scale=1)
+                            shot_form_number = gr.Number(label="Shot", value=1, precision=0, scale=1)
+                            shot_form_status = gr.Dropdown(
+                                label="状态",
+                                choices=["ready", "rendered", "approved", "rejected"],
+                                value="ready",
+                                scale=1,
+                            )
+                            shot_form_locked = gr.Checkbox(label="锁定", value=False, scale=1)
+                        with gr.Row():
+                            shot_form_location = gr.Textbox(label="场景地点", scale=2)
+                            shot_form_type = gr.Dropdown(
+                                label="镜头类型",
+                                choices=["特写", "近景", "中景", "全景", "远景", "俯拍", "仰拍", "跟拍"],
+                                value="中景",
+                                scale=1,
+                            )
+                            shot_form_mood = gr.Textbox(label="情绪", scale=1)
+                        with gr.Row():
+                            shot_form_time = gr.Dropdown(
+                                label="时间",
+                                choices=["清晨", "白天", "黄昏", "夜晚"],
+                                value="白天",
+                                scale=1,
+                            )
+                            shot_form_weather = gr.Dropdown(
+                                label="天气",
+                                choices=["晴", "阴", "雨", "雪", "雾"],
+                                value="晴",
+                                scale=1,
+                            )
+                        shot_form_characters = gr.Textbox(
+                            label="角色列表 JSON",
+                            lines=2,
+                            placeholder='["主角", "反派"]',
+                        )
+                        shot_form_narration = gr.Textbox(label="旁白 / 镜头描述", lines=3)
+                        shot_form_camera_notes = gr.Textbox(label="机位 / 运镜备注", lines=2)
+                        shot_form_payload = gr.Textbox(
+                            label="Render Payload JSON",
+                            lines=8,
+                            placeholder="高级模式：需要时再编辑底层 render payload",
+                        )
+                        with gr.Row():
+                            shot_form_save_btn = gr.Button("💾 保存结构化分镜", elem_classes="save-btn", scale=1)
+                            shot_rerender_btn = gr.Button("🎬 重渲染当前 Shot", variant="primary", scale=1)
+                            shot_rework_btn = gr.Button("🔁 退回并重跑", scale=1)
+                        shot_edit = gr.Textbox(
+                            label="分镜 JSON（高级模式）",
+                            lines=14,
+                        )
+                        with gr.Row():
+                            shot_reload_btn = gr.Button("🔄 载入分镜 JSON", scale=1)
+                            save_shot_btn = gr.Button("💾 保存分镜", elem_classes="save-btn", scale=1)
+                            shot_status = gr.Markdown("")
+                        shot_render_log = gr.Markdown("")
+                        shot_render_preview = gr.Video(
+                            label="当前 Shot 渲染预览", interactive=False,
+                        )
+                        shot_review_history_md = gr.Markdown("输入 Shot ID 查看审核历史。")
+
+                    # ─── 分镜工坊（新 UI）─────────────────────
+                    with gr.TabItem("🎬 分镜工坊"):
+                        with gr.Group(elem_classes=["tab-shell"]):
+                            gr.Markdown("### 🎬 分镜工坊")
+                            gr.Markdown("更适合集中处理镜头编排和镜头资产。", elem_classes=["workbench-note"])
+                        from ui.workshop import build_workshop_tab
+                        build_workshop_tab(app)
+
+                    # ─── 剧本工作站 ───────────────────────────
+                    with gr.TabItem("📖 剧本"):
+                        with gr.Group(elem_classes=["tab-shell"]):
+                            gr.Markdown("### 📖 剧本工作站")
+                            gr.Markdown("先看状态，再编辑，再决定要不要让 AI 辅助或重跑当前阶段。", elem_classes=["workbench-note"])
+                        with gr.Row():
+                            gr.Markdown("##### 状态")
+                            script_step_refresh_btn = gr.Button("🔄", size="sm", scale=0, min_width=40)
+                        script_step_status = gr.Markdown("加载项目后显示状态")
+                        script_edit = gr.Textbox(label="剧本 JSON（可直接编辑）", lines=15)
+                        with gr.Group(elem_classes=["choice-card"]):
+                            gr.Markdown("### 🤖 AI 辅助")
+                            with gr.Row():
+                                script_ai_instr = gr.Textbox(
+                                    label="优化指令（留空用默认）",
+                                    placeholder="例如：加强第二幕的冲突感，让主角更有深度",
+                                    lines=2, scale=3,
+                                )
+                                script_ai_model = gr.Dropdown(
+                                    label="AI 模型", choices=models or [default_model],
+                                    value="", allow_custom_value=True, scale=1,
+                                )
+                            script_ai_btn = gr.Button("🤖 AI 优化剧本", variant="secondary")
+                            script_ai_status = gr.Markdown("")
+                        with gr.Row():
+                            save_script_btn = gr.Button("💾 保存剧本", elem_classes="save-btn", scale=1)
+                            step1_run_btn = gr.Button("▶️ 重新生成剧本", scale=1)
+                            script_status = gr.Markdown("")
+
+                    # ─── 角色工作站 ───────────────────────────
+                    with gr.TabItem("👤 角色"):
+                        with gr.Group(elem_classes=["tab-shell"]):
+                            gr.Markdown("### 👤 角色工作站")
+                            gr.Markdown("角色设定、AI 辅助和单步重跑放在同一个面板里。", elem_classes=["workbench-note"])
+                        char_edit = gr.Textbox(label="角色列表 JSON（可直接编辑）", lines=12)
+                        with gr.Group(elem_classes=["choice-card"]):
+                            gr.Markdown("### 🤖 AI 辅助")
+                            with gr.Row():
+                                char_ai_instr = gr.Textbox(
+                                    label="优化指令",
+                                    placeholder="例如：让反派角色更有魅力，丰富支线角色背景",
+                                    lines=2, scale=3,
+                                )
+                                char_ai_model = gr.Dropdown(
+                                    label="AI 模型", choices=models or [default_model],
+                                    value="", allow_custom_value=True, scale=1,
+                                )
+                            char_ai_btn = gr.Button("🤖 AI 优化角色", variant="secondary")
+                            char_ai_status = gr.Markdown("")
+                        with gr.Row():
+                            save_char_btn = gr.Button("💾 保存角色", elem_classes="save-btn", scale=1)
+                            step2_run_btn = gr.Button("▶️ 重新生成角色", scale=1)
+                            char_status = gr.Markdown("")
+
+                    # ─── 场景工作站 ───────────────────────────
+                    with gr.TabItem("🏞️ 场景"):
+                        with gr.Group(elem_classes=["tab-shell"]):
+                            gr.Markdown("### 🏞️ 场景工作站")
+                            gr.Markdown("场景描述、视觉优化和场景重跑收在同一层级。", elem_classes=["workbench-note"])
+                        scene_edit = gr.Textbox(label="场景列表 JSON（可直接编辑）", lines=12)
+                        with gr.Group(elem_classes=["choice-card"]):
+                            gr.Markdown("### 🤖 AI 辅助")
+                            with gr.Row():
+                                scene_ai_instr = gr.Textbox(
+                                    label="优化指令",
+                                    placeholder="例如：增强视觉冲击力，让场景描述更适合动漫风格渲染",
+                                    lines=2, scale=3,
+                                )
+                                scene_ai_model = gr.Dropdown(
+                                    label="AI 模型", choices=models or [default_model],
+                                    value="", allow_custom_value=True, scale=1,
+                                )
+                            scene_ai_btn = gr.Button("🤖 AI 优化场景", variant="secondary")
+                            scene_ai_status = gr.Markdown("")
+                        with gr.Row():
+                            save_scene_btn = gr.Button("💾 保存场景", elem_classes="save-btn", scale=1)
+                            step3_run_btn = gr.Button("▶️ 重新生成场景", scale=1)
+                            scene_status = gr.Markdown("")
+
+                    # ─── 配乐工作站 ───────────────────────────
+                    with gr.TabItem("🎵 配乐"):
+                        with gr.Group(elem_classes=["tab-shell"]):
+                            gr.Markdown("### 🎵 配乐工作站")
+                            gr.Markdown("先看配乐状态，再编辑 prompt，再试听和单步生成。", elem_classes=["workbench-note"])
+                        with gr.Row():
+                            music_step_status = gr.Markdown(load_music_status(0))
+                            music_status_refresh_btn = gr.Button("🔄 刷新", size="sm", scale=0, min_width=50)
+                        gr.Markdown("##### 编辑配乐数据（JSON）")
+                        gr.Markdown(
+                            "每条记录包含 `name`、`mood`、`tempo`、`instruments`、`description`、`prompt_for_gen`。\n"
+                            "`prompt_for_gen` 是实际传给 MusicGen 的英文描述，对音乐质量影响最大。",
+                            elem_classes="gr-text-small",
+                        )
+                        music_edit = gr.Textbox(
+                            label="配乐 JSON（可直接编辑 prompt_for_gen 字段）",
+                            lines=12,
+                        )
+                        with gr.Group(elem_classes=["choice-card"]):
+                            gr.Markdown("### 🤖 AI 辅助优化配乐描述")
+                            with gr.Row():
+                                music_ai_instr = gr.Textbox(
+                                    label="优化指令（留空则自动优化 prompt_for_gen）",
+                                    placeholder="例如：让配乐更有史诗感，加入东方乐器元素",
+                                    lines=2, scale=3,
+                                )
+                                music_ai_model = gr.Dropdown(
+                                    label="AI 模型", choices=models or [default_model],
+                                    value="", allow_custom_value=True, scale=1,
+                                )
+                            music_ai_btn = gr.Button("🤖 AI 优化配乐描述", variant="secondary")
+                            music_ai_status = gr.Markdown("")
+                        with gr.Row():
+                            save_music_btn = gr.Button("💾 保存配乐数据", elem_classes="save-btn", scale=1)
+                            music_run_btn = gr.Button("▶️ 单步生成配乐", variant="primary", scale=1)
+                            music_status = gr.Markdown("")
+                        music_run_log = gr.Markdown("")
+                        music_preview_out = gr.Audio(
+                            label="配乐预览（生成后自动显示首曲）",
+                            type="filepath", interactive=False,
+                        )
+
+                    # ─── 音效工作站 ───────────────────────────
+                    with gr.TabItem("🔊 音效"):
+                        with gr.Group(elem_classes=["tab-shell"]):
+                            gr.Markdown("### 🔊 音效工作站")
+                            gr.Markdown("音效描述、AI 优化和单步生成集中处理。", elem_classes=["workbench-note"])
+                        sfx_edit = gr.Textbox(label="音效数据 JSON（可直接编辑）", lines=10)
+                        with gr.Group(elem_classes=["choice-card"]):
+                            gr.Markdown("### 🤖 AI 辅助优化音效描述")
+                            with gr.Row():
+                                sfx_ai_instr = gr.Textbox(
+                                    label="优化指令",
+                                    placeholder="例如：让音效描述更具体，区分环境音和动作音",
+                                    lines=2, scale=3,
+                                )
+                                sfx_ai_model = gr.Dropdown(
+                                    label="AI 模型", choices=models or [default_model],
+                                    value="", allow_custom_value=True, scale=1,
+                                )
+                            sfx_ai_btn = gr.Button("🤖 AI 优化音效描述", variant="secondary")
+                            sfx_ai_status = gr.Markdown("")
+                        with gr.Row():
+                            save_sfx_btn = gr.Button("💾 保存音效数据", elem_classes="save-btn", scale=1)
+                            sfx_run_btn = gr.Button("▶️ 单步生成音效", variant="primary", scale=1)
+                            sfx_status = gr.Markdown("")
+                        sfx_run_log = gr.Markdown("")
+                        sfx_preview_out = gr.Audio(
+                            label="音效预览（生成后自动显示）",
+                            type="filepath", interactive=False,
+                        )
+
+                    # ─── TTS 工作站 ──────────────────────────
+                    with gr.TabItem("🎤 TTS 配音"):
+                        with gr.Group(elem_classes=["tab-shell"]):
+                            gr.Markdown("### 🎤 TTS 工作站")
+                            gr.Markdown("对白查看、单 Shot 生成和全量生成统一在这里。", elem_classes=["workbench-note"])
+                        with gr.Row():
+                            tts_step_status_md = gr.Markdown(load_tts_status(0))
+                            tts_status_refresh_btn = gr.Button("🔄 刷新", size="sm", scale=0, min_width=50)
+                        gr.Markdown(
+                            "可选择单个 Shot 查看/编辑对白，或直接批量生成全部 Shot 的 TTS。",
+                            elem_classes="gr-text-small",
+                        )
+                        with gr.Row():
+                            tts_shot_id_input = gr.Textbox(
+                                label="Shot ID（留空 = 全部）",
+                                placeholder="例如: 3  或  1,2,5",
+                                scale=2,
+                            )
+                            tts_load_shot_btn = gr.Button("📖 查看此 Shot 对白", scale=1)
+                        tts_shot_status_md = gr.Markdown("")
+                        tts_dialogue_edit = gr.Textbox(
+                            label="对白 JSON（可编辑 character / line / voice_preset 字段）",
+                            lines=10, placeholder="点击「查看此 Shot 对白」加载...",
+                        )
+                        gr.Markdown(
+                            "TTS 使用 **ChatTTS**（中文优先）→ Bark → Edge-TTS 自动降级。\n"
+                            "在模型管理 → TTS 试听 可以预先试听各音色。",
+                            elem_classes="gr-text-small",
+                        )
+                        with gr.Row():
+                            tts_run_shot_btn = gr.Button("▶️ 生成此 Shot TTS", scale=1)
+                            tts_run_all_btn = gr.Button("▶️ 生成全部 TTS", variant="primary", scale=1)
+                        tts_run_log = gr.Markdown("")
+                        tts_preview_out = gr.Audio(
+                            label="TTS 预览（生成后自动显示首条）",
+                            type="filepath", interactive=False,
+                        )
+
+                    # ─── 渲染工作站 ──────────────────────────
+                    with gr.TabItem("🎬 渲染"):
+                        with gr.Group(elem_classes=["tab-shell"]):
+                            gr.Markdown("### 🎬 渲染工作站")
+                            gr.Markdown("这里处理指定 Shot 或批量渲染，和上面的总渲染入口保持同一种结构。", elem_classes=["workbench-note"])
+                        with gr.Row():
+                            render_step_status_md = gr.Markdown(load_render_status(0))
+                            render_status_refresh_btn = gr.Button("🔄 刷新", size="sm", scale=0, min_width=50)
+                        gr.Markdown(
+                            "渲染使用 ComfyUI + LTX 2.3 主链。已渲染的 Shot 自动跳过。",
+                            elem_classes="gr-text-small",
+                        )
+                        with gr.Row():
+                            render_shot_id_input = gr.Textbox(
+                                label="Shot ID（留空 = 全部未渲染）",
+                                placeholder="例如: 3  或  1,2,5",
+                                scale=2,
+                            )
+                            render_run_btn = gr.Button("▶️ 渲染指定/全部", variant="primary", scale=1)
+                        render_run_log = gr.Markdown("")
+                        render_video_preview = gr.Video(
+                            label="渲染预览（完成后自动显示）", interactive=False,
+                        )
+
+                    # ─── 合成工作站 ──────────────────────────
+                    with gr.TabItem("🎞️ 合成导出"):
+                        with gr.Group(elem_classes=["tab-shell"]):
+                            gr.Markdown("### 🎞️ 合成导出")
+                            gr.Markdown("成片输出、路径记录和导出清单统一看这里。", elem_classes=["workbench-note"])
+                        gr.Markdown(
+                            "将所有已渲染视频 + TTS + BGM 合成为最终集数视频。\n"
+                            "需要完成渲染和音频生成后再执行。",
+                            elem_classes="gr-text-small",
+                        )
+                        with gr.Row():
+                            composite_run_btn = gr.Button("▶️ 执行合成", variant="primary", scale=1)
+                            episode_video_path = gr.Textbox(
+                                label="输出视频路径", interactive=False, scale=2,
+                            )
+                        composite_run_log = gr.Markdown("")
+                        export_manifest_md = gr.Markdown("")
+                        composite_video_preview = gr.Video(
+                            label="最终视频预览", interactive=False,
+                        )
+
+                    # ─── 字幕工作站 ──────────────────────────
+                    with gr.TabItem("💬 字幕"):
+                        with gr.Group(elem_classes=["tab-shell"]):
+                            gr.Markdown("### 💬 字幕工作站")
+                            gr.Markdown("字幕加载、编辑和保存不再散在其他地方。", elem_classes=["workbench-note"])
+                        gr.Markdown("输入 Shot ID 生成/读取字幕，可直接编辑 `.srt` 文本后保存。")
+                        with gr.Row():
+                            subtitle_shot_id = gr.Textbox(label="Shot ID", placeholder="例如 12", scale=1)
+                            subtitle_load_btn = gr.Button("📖 加载字幕", scale=1)
+                            subtitle_save_btn = gr.Button("💾 保存字幕", elem_classes="save-btn", scale=1)
+                        subtitle_path_md = gr.Markdown("")
+                        subtitle_text = gr.Textbox(label="字幕 SRT 文本", lines=16)
+                        subtitle_status = gr.Markdown("")
+
+                    # ─── 视频预览 ─────────────────────────────
+                    with gr.TabItem("▶️ 视频预览"):
+                        with gr.Group(elem_classes=["tab-shell"]):
+                            gr.Markdown("### ▶️ 视频预览")
+                            gr.Markdown("快速抽查某个 Shot 的落盘视频。", elem_classes=["workbench-note"])
+                        with gr.Row():
+                            shot_preview_id = gr.Number(label="Shot ID", value=0, precision=0, scale=1)
+                            load_video_btn = gr.Button("▶️ 加载视频", scale=1)
+                        shot_video_player = gr.Video(label="Shot 视频", interactive=False)
+                        shot_video_status = gr.Markdown("")
+
+                    # ─── 快速视频 ──────────────────────────────
+                    with gr.TabItem("🤖 AI 编辑"):
+                        with gr.Group(elem_classes=["tab-shell"]):
+                            gr.Markdown("### 🤖 AI 联动编辑")
+                            gr.Markdown("输入自然语言指令，AI 扫描所有受影响字段并预览变更。", elem_classes=["workbench-note"])
+                        with gr.Row():
+                            ai_edit_instruction = gr.Textbox(
+                                label="编辑指令",
+                                placeholder="例如: 把张三改名为李四，性格改为冷漠",
+                                lines=2, scale=3,
+                            )
+                            ai_scan_btn = gr.Button("🔍 AI 扫描预览", variant="primary", scale=1)
+                        ai_edit_preview_md = gr.Markdown("输入指令后点击「AI 扫描预览」")
+                        ai_manifest_json = gr.Textbox(
+                            label="变更清单 JSON（可手动调整后执行）",
+                            lines=8, visible=False,
+                        )
+                        with gr.Row():
+                            ai_exec_btn = gr.Button("✅ 确认执行变更", variant="secondary", scale=1)
+                            ai_rollback_btn = gr.Button("↩️ 回滚最近编辑", scale=1)
+                            show_manifest_btn = gr.Button("📋 显示/隐藏 JSON", scale=1)
+                        ai_exec_status = gr.Markdown("")
+                        gr.Markdown("#### 编辑历史")
+                        edit_history_table = gr.Dataframe(
+                            headers=["ID", "时间", "指令", "表", "字段", "旧值", "新值", "置信度"],
+                            value=[], interactive=False, label="近 30 条编辑记录",
+                        )
+                        refresh_history_btn = gr.Button("🔄 刷新历史", size="sm")
+
+            # end 工作站 sub-tabs
+
+            # ════════════════════════════════════════════════════════════════════
+            #  Tab 4 · 系统
+            # ════════════════════════════════════════════════════════════════════
+            with gr.TabItem("⚙️ 系统"):
+                with gr.Group(elem_classes=["tab-shell"]):
+                    gr.Markdown("### ⚙️ 系统 · 模型管理")
+                    gr.Markdown("系统状态、渲染参数、音频试听、模型浏览和下载。", elem_classes=["workbench-note"])
+
+                    # ── 系统状态总览 ─────────────────────────
+                    with gr.Group(elem_classes=["section-shell"]):
+                        gr.Markdown("### 🖥️ 系统状态总览", elem_classes=["section-title"])
+                        sys_status_md = gr.Markdown(get_system_status())
+                        sys_refresh_btn = gr.Button("🔄 刷新状态", size="sm")
+
+                    # ── 渲染参数配置 ─────────────────────────
+                    with gr.Group(elem_classes=["section-shell"]):
+                        gr.Markdown("### ⚙️ 渲染参数（Steps / CFG / 尺寸）", elem_classes=["section-title"])
+                        gr.Markdown("调整后点「应用」将参数合并到渲染配置。")
+                        with gr.Row():
+                            rp_steps = gr.Slider(label="Steps", minimum=10, maximum=50, value=20, step=1, scale=2)
+                            rp_cfg   = gr.Slider(label="CFG Scale", minimum=3.0, maximum=15.0, value=7.0, step=0.5, scale=2)
+                        with gr.Row():
+                            rp_width  = gr.Dropdown(label="宽度", choices=[512, 768, 832, 896, 1024, 1152], value=896, scale=1)
+                            rp_height = gr.Dropdown(label="高度", choices=[512, 768, 832, 896, 1024, 1152], value=1152, scale=1)
+                            rp_apply_btn = gr.Button("✅ 应用参数", variant="secondary", scale=1)
+                        rp_status_md = gr.Markdown("")
+
+                    # ── TTS / 音频配置 ───────────────────────
+                    with gr.Group(elem_classes=["section-shell"]):
+                        gr.Markdown("### 🎤 TTS 配置 & 试听", elem_classes=["section-title"])
+                        gr.Markdown(
+                            "TTS 后端优先级：**ChatTTS**（本地，中文主力）"
+                            " → Edge-TTS → Bark → Kokoro → pyttsx3。\n\n"
+                            "ChatTTS 使用本机独立 venv 与本地模型目录；失败时才会自动回退。"
+                        )
+                        with gr.Row():
+                            tts_test_text  = gr.Textbox(
+                                label="试听文本",
+                                value="仙剑问情，一梦千年，何处是归途？",
+                                scale=3,
+                            )
+                            tts_voice_type = gr.Dropdown(
+                                label="音色类型",
+                                choices=["男", "女", "男孩", "女孩", "旁白"],
+                                value="旁白", scale=1,
+                            )
+                            tts_preview_btn = gr.Button("▶️ 试听", variant="primary", scale=1)
+                        tts_audio_out = gr.Audio(label="TTS 试听", type="filepath", interactive=False)
+                        tts_preview_log = gr.Markdown("")
+
+                    # ── BGM 配置 & 试听 ──────────────────────
+                    with gr.Group(elem_classes=["section-shell"]):
+                        gr.Markdown("### 🎵 BGM 配置 & 试听", elem_classes=["section-title"])
+                        gr.Markdown(
+                            "BGM 后端优先级：**Ace-Step 1.5**（ComfyUI，模型就绪时）→ ffmpeg 合成兜底。\n\n"
+                            "如果本机未安装 Ace-Step 音频模型，系统会自动改用本地 ffmpeg 合成，不会把整条音频链跑死。"
+                        )
+                        with gr.Row():
+                            bgm_mood_sel = gr.Dropdown(
+                                label="情绪",
+                                choices=["热血", "史诗", "神秘", "温馨", "黑暗", "浪漫", "悬疑", "epic", "warm", "dark"],
+                                value="热血", scale=2,
+                            )
+                            bgm_dur_sel = gr.Slider(label="时长(秒)", minimum=5, maximum=60, value=15, step=5, scale=2)
+                            bgm_preview_btn = gr.Button("▶️ 试听 BGM", variant="primary", scale=1)
+                        bgm_audio_out = gr.Audio(label="BGM 试听", type="filepath", interactive=False)
+                        bgm_preview_log = gr.Markdown("")
+
+                    # ── 已安装模型浏览 ──────────────────────
+                    with gr.Group(elem_classes=["section-shell"]):
+                        gr.Markdown("### 🔍 已安装模型浏览", elem_classes=["section-title"])
+                        cm_status_md = gr.Markdown("点击「加载」查询 ComfyUI 已安装模型。")
+                        with gr.Row():
+                            cm_load_btn = gr.Button("🔄 加载全部模型", variant="primary", scale=2)
+                            cm_type_filter = gr.Dropdown(
+                                label="类型筛选",
+                                choices=list(MODEL_TYPE_LABELS.keys()),
+                                value="checkpoint", scale=1,
+                            )
+                            cm_search_input = gr.Textbox(
+                                label="搜索关键词", placeholder="输入关键词过滤...",
+                                scale=2,
+                            )
+                            cm_search_btn = gr.Button("🔍 搜索", scale=1)
+
+                        with gr.Row():
+                            cm_ckpt_list  = gr.Dropdown(label="Checkpoint", choices=[], allow_custom_value=True, scale=1)
+                            cm_lora_list  = gr.Dropdown(label="LoRA",        choices=[], allow_custom_value=True, scale=1)
+                            cm_vae_list   = gr.Dropdown(label="VAE",         choices=[], allow_custom_value=True, scale=1)
+                            cm_cn_list    = gr.Dropdown(label="ControlNet",  choices=[], allow_custom_value=True, scale=1)
+
+                        cm_search_result = gr.Dropdown(
+                            label="搜索结果（选择后可应用）", choices=[], interactive=True,
+                        )
+
+                        # LoRA 强度 + 应用配置
+                        with gr.Row():
+                            cm_lora_strength = gr.Slider(label="LoRA 强度", minimum=0.0, maximum=1.5,
+                                                          value=0.7, step=0.05, scale=2)
                         cm_apply_btn = gr.Button("✅ 应用到渲染配置", variant="secondary", scale=1)
-                    cm_active_config_md = gr.Markdown("当前渲染配置：使用默认值")
+                        cm_active_config_md = gr.Markdown("当前渲染配置：使用默认值")
 
-                # ── 下载缺失模型 ────────────────────────
-                with gr.Accordion("📥 下载缺失模型", open=False):
-                    gr.Markdown(
-                        "支持以下格式：\n"
-                        "- **直链 URL**: `https://huggingface.co/.../resolve/main/xxx.safetensors`\n"
-                        "- **HuggingFace 路径**: `username/repo-name/path/to/file.safetensors`\n"
-                        "- **HF 简写**: `hf:username/repo@filename.safetensors`\n\n"
-                        "下载完成后需要**重启 ComfyUI** 才能在工作流中使用。"
-                    )
-                    with gr.Row():
-                        dl_source = gr.Textbox(
-                            label="来源 URL / HuggingFace 路径",
-                            placeholder="如: stabilityai/stable-diffusion-xl-base-1.0/sd_xl_base_1.0.safetensors",
-                            scale=3,
+                    # ── 下载缺失模型 ────────────────────────
+                    with gr.Group(elem_classes=["section-shell"]):
+                        gr.Markdown("### 📥 下载缺失模型", elem_classes=["section-title"])
+                        gr.Markdown(
+                            "支持以下格式：\n"
+                            "- **直链 URL**: `https://huggingface.co/.../resolve/main/xxx.safetensors`\n"
+                            "- **HuggingFace 路径**: `username/repo-name/path/to/file.safetensors`\n"
+                            "- **HF 简写**: `hf:username/repo@filename.safetensors`\n\n"
+                            "下载完成后需要**重启 ComfyUI** 才能在工作流中使用。"
                         )
-                        dl_type = gr.Dropdown(
-                            label="模型类型",
-                            choices=list(MODEL_TYPE_LABELS.keys()),
-                            value="lora", scale=1,
+                        with gr.Row():
+                            dl_source = gr.Textbox(
+                                label="来源 URL / HuggingFace 路径",
+                                placeholder="如: stabilityai/stable-diffusion-xl-base-1.0/sd_xl_base_1.0.safetensors",
+                                scale=3,
+                            )
+                            dl_type = gr.Dropdown(
+                                label="模型类型",
+                                choices=list(MODEL_TYPE_LABELS.keys()),
+                                value="lora", scale=1,
+                            )
+                        with gr.Row():
+                            dl_filename = gr.Textbox(
+                                label="保存文件名（留空从 URL 自动提取）",
+                                placeholder="my_lora.safetensors", scale=2,
+                            )
+                            dl_check_btn = gr.Button("🔎 检查是否已存在", scale=1)
+                            dl_btn = gr.Button("⬇️ 开始下载", variant="primary", scale=1)
+                        dl_check_status = gr.Markdown("")
+                        dl_log = gr.Textbox(
+                            label="下载日志", lines=6, interactive=False,
                         )
-                    with gr.Row():
-                        dl_filename = gr.Textbox(
-                            label="保存文件名（留空从 URL 自动提取）",
-                            placeholder="my_lora.safetensors", scale=2,
-                        )
-                        dl_check_btn = gr.Button("🔎 检查是否已存在", scale=1)
-                        dl_btn = gr.Button("⬇️ 开始下载", variant="primary", scale=1)
-                    dl_check_status = gr.Markdown("")
-                    dl_log = gr.Textbox(
-                        label="下载日志", lines=6, interactive=False,
-                    )
+
+
+        # ═════════ end main tabs ═════════════════════════════════════════════
 
         # ══════ 事件绑定 ═════════════════════════════
 
@@ -2991,10 +4432,70 @@ def build_ui():
             shot_edit, subtitle_text, subtitle_path_md,
             project_id_state,
         ]
+        # ── 概念发现事件绑定 ────────────────────────
+        concept_gen_btn.click(
+            fn=concept_generate_flow,
+            inputs=[concept_keywords, concept_requirements, concept_n,
+                    concept_use_web, concept_model],
+            outputs=[concept_data_state, concept_table, concept_select, concept_queue_log],
+            concurrency_limit=2,
+        )
+        concept_add_btn.click(
+            fn=concept_add_to_queue,
+            inputs=[concept_select, concept_data_state, concept_queue_state],
+            outputs=[concept_queue_state, concept_queue_md, concept_queue_select, concept_queue_log],
+            queue=False,
+        )
+        concept_clear_queue_btn.click(
+            fn=concept_clear_queue,
+            inputs=[concept_queue_state],
+            outputs=[concept_queue_state, concept_queue_md, concept_queue_select, concept_queue_log],
+            queue=False,
+        )
+        concept_remove_btn.click(
+            fn=concept_remove_from_queue,
+            inputs=[concept_queue_select, concept_queue_state],
+            outputs=[concept_queue_state, concept_queue_md, concept_queue_select, concept_queue_log],
+            queue=False,
+        )
+        concept_fill_btn.click(
+            fn=concept_fill_premise,
+            inputs=[concept_select, concept_data_state],
+            outputs=[premise],
+            queue=False,
+        )
+        _concept_gen_event = concept_run_queue_btn.click(
+            fn=concept_run_queue_flow,
+            inputs=[
+                concept_queue_state, project_name, genre, tone, acts, model,
+                story_model, char_model, scene_model, art_model,
+                genre_tags, tone_tags, emotion_arc, episode_count, project_format,
+            ],
+            outputs=[concept_queue_log, gen_results],
+            concurrency_limit=1,
+        )
+        # stop/kill 必须在 gen_event 定义之后挂 cancels
+        concept_stop_btn.click(
+            fn=concept_stop_remaining_queue,
+            inputs=[],
+            outputs=[concept_queue_log],
+            queue=False,
+            cancels=[_concept_gen_event],
+        )
+        concept_kill_btn.click(
+            fn=force_kill_comfyui,
+            inputs=[],
+            outputs=[concept_queue_log],
+            queue=False,
+            cancels=[_concept_gen_event],
+        )
+
+        # ── 主生成按钮 ───────────────────────────────
         gen_btn.click(
             fn=full_pipeline_flow,
             inputs=[premise, project_name, genre, tone, acts, model,
-                    story_model, char_model, scene_model, art_model],
+                    story_model, char_model, scene_model, art_model,
+                    genre_tags, tone_tags, emotion_arc, episode_count, project_format],
             outputs=gen_outputs,
             concurrency_limit=2,
         ).then(
@@ -3206,12 +4707,13 @@ def build_ui():
         )
 
         # Phase 2: 渲染导出（生成器，需要 queue 流式输出）
-        render_btn.click(
+        _render_gen_event = render_btn.click(
             fn=render_export_flow,
             inputs=[project_id_state, project_name, render_config_state],
             outputs=[render_log, render_results, project_id_state],
             concurrency_limit=2,
-        ).then(
+        )
+        _render_gen_event.then(
             fn=load_industrial_dashboard,
             inputs=[project_id_state],
             outputs=[industrial_ops_card, industrial_bottleneck_card, industrial_model_audit_card, industrial_sop_card],
@@ -3222,12 +4724,37 @@ def build_ui():
         resume_btn.click(
             fn=resume_pipeline_flow,
             inputs=[project_id_state],
-            outputs=[render_log, pipeline_state_md],
+            outputs=[render_log, overall_progress_md],   # 一个日志 + 一个整体进度
+        ).then(
+            fn=get_pipeline_state,
+            inputs=[project_id_state],
+            outputs=[pipeline_state_md],
+            queue=False,
         ).then(
             fn=load_industrial_dashboard,
             inputs=[project_id_state],
             outputs=[industrial_ops_card, industrial_bottleneck_card, industrial_model_audit_card, industrial_sop_card],
             queue=False,
+        )
+
+        render_stop_btn.click(
+            fn=stop_rendering_now,
+            inputs=[project_id_state],
+            outputs=[render_log, pipeline_state_md],
+            queue=False,
+            cancels=[_render_gen_event],
+        ).then(
+            fn=load_industrial_dashboard,
+            inputs=[project_id_state],
+            outputs=[industrial_ops_card, industrial_bottleneck_card, industrial_model_audit_card, industrial_sop_card],
+            queue=False,
+        )
+        render_kill_btn.click(
+            fn=force_kill_comfyui,
+            inputs=[],
+            outputs=[render_log],
+            queue=False,
+            cancels=[_render_gen_event],
         )
 
         industrial_refresh_btn.click(
@@ -3667,6 +5194,125 @@ def build_ui():
             outputs=[bgm_audio_out, bgm_preview_log],
         )
 
+        # ── 首页 Step 1: 类型切换 ────────────────────────
+        def _home_type_defaults(content_type: str):
+            """根据内容类型更新首页视频默认值和说明文字。"""
+            if "短剧" in content_type:
+                return (
+                    gr.update(value=15, minimum=6, maximum=60),
+                    gr.update(value="竖屏 9:16"),
+                    "> **短剧模式**：竖屏 9:16，每集 3–5 分钟，节奏快、爽点密集，典型红果/抖音短剧风格。",
+                )
+            elif "电影" in content_type:
+                return (
+                    gr.update(value=90, minimum=30, maximum=300),
+                    gr.update(value="横屏 16:9"),
+                    "> **电影模式**：横屏 16:9，叙事完整，场面调度丰富，适合长片/微电影。",
+                )
+            else:  # 短视频
+                return (
+                    gr.update(value=30, minimum=10, maximum=180),
+                    gr.update(value="竖屏 9:16"),
+                    "> **短视频模式**：广告/Vlog/带货/10-15 分钟内容，竖屏为主，节奏适中。",
+                )
+
+        def _home_type_note(content_type: str):
+            if "短剧" in content_type:
+                return "**短剧**：竖屏 9:16，每集 3–5 分钟，节奏快、爽点密集，典型红果/抖音短剧风格。"
+            elif "电影" in content_type:
+                return "**电影**：横屏 16:9，叙事完整，场面调度丰富，适合长片/微电影创作。"
+            else:
+                return "**短视频**：广告/Vlog/带货/10-15 分钟以内，竖屏为主，平台适配性强。"
+
+        home_content_type.change(
+            fn=_home_type_defaults,
+            inputs=[home_content_type],
+            outputs=[home_duration, home_aspect, home_target_note],
+            queue=False,
+        )
+        home_content_type.change(
+            fn=_home_type_note,
+            inputs=[home_content_type],
+            outputs=[home_type_note],
+            queue=False,
+        )
+
+        # ── 首页 Step 3: 做视频按钮 ──────────────────────
+        def _home_content_type_to_product(content_type: str) -> str:
+            if "短剧" in content_type:
+                return "做短剧"
+            elif "电影" in content_type:
+                return "做电影"
+            return "做短视频"
+
+        _QUALITY_MAP = {
+            "标准（540p）":    "标准",
+            "高清（720p）":    "720p",
+            "全高清（1080p）": "1080p",
+        }
+
+        def _home_qv_flow(premise_text, content_type, execution_route, duration,
+                          aspect, quality_label, bgm_prompt, crossfade,
+                          cloud_api_key, cloud_api_base, cloud_model):
+            product_target = _home_content_type_to_product(content_type)
+            if not (premise_text or "").strip():
+                yield "⚠️ 请先在上方「梗概 / 热词」框里输入内容再做视频。", gr.update(visible=False), ""
+                return
+            quality = _QUALITY_MAP.get(quality_label or "", "720p")
+            yield from quick_video_flow(
+                premise_text, bgm_prompt, duration, aspect,
+                product_target, execution_route,
+                cloud_api_key, cloud_api_base, cloud_model,
+                "",    # pipeline (auto)
+                None,  # reference_image
+                crossfade,
+                "",    # workflow_template (auto)
+                "",    # render_strategy (auto)
+                "",    # audio_strategy (auto)
+                quality,
+            )
+
+        _home_gen_event = home_qv_btn.click(
+            fn=_home_qv_flow,
+            inputs=[
+                premise,
+                home_content_type, home_execution_route,
+                home_duration, home_aspect, home_quality,
+                home_bgm_prompt, home_crossfade,
+                home_cloud_api_key, home_cloud_api_base, home_cloud_model,
+            ],
+            outputs=[home_qv_log, home_qv_video, home_qv_status],
+            concurrency_limit=1,
+        )
+        _home_gen_event.then(
+            fn=lambda v: gr.update(visible=bool(v)),
+            inputs=[home_qv_video],
+            outputs=[home_qv_video],
+            queue=False,
+        )
+
+        def _home_soft_stop():
+            msg, _ = stop_rendering_now(0)
+            return msg, ""
+
+        # 🛑 软停止：取消 Gradio generator + 发 ComfyUI interrupt
+        home_stop_btn.click(
+            fn=_home_soft_stop,
+            inputs=[],
+            outputs=[home_qv_log, home_qv_status],
+            queue=False,
+            cancels=[_home_gen_event],
+        )
+
+        # ☢️ 强杀：取消 Gradio generator + SIGKILL ComfyUI + 重启
+        home_kill_btn.click(
+            fn=force_kill_comfyui,
+            inputs=[],
+            outputs=[home_qv_log],
+            queue=False,
+            cancels=[_home_gen_event],
+        )
+
         # ── 模型管理 ─────────────────────────────────────
 
         def _load_all_models():
@@ -3747,4 +5393,5 @@ def build_ui():
 
 if __name__ == "__main__":
     app = build_ui()
-    app.launch(server_name="127.0.0.1", server_port=7860, share=False, show_error=True, css=CUSTOM_CSS)
+    app.launch(server_name="127.0.0.1", server_port=7860, share=False, show_error=True,
+               theme=_STUDIO_THEME, css=CUSTOM_CSS)
