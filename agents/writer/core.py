@@ -25,14 +25,14 @@ def generate_storyline(
 ) -> dict:
     """
     Generate a full storyline with acts and scene breakdown.
-    Each scene includes shot-level breakdown for short drama production.
+    Each scene includes shot-level breakdown with dialogue for TTS production.
     Returns the script data ready to save to DB.
     """
-    # Shot schema: NO per-shot dialogue/narration (those are generated in TTS pass).
-    # Only camera_angle + characters_present + mood per shot → ~40 tokens/shot.
-    # Total estimate: synopsis(300) + acts(4×(50 + 3×(120 + 2×40))) = ~2600 tokens.
+    # Shot schema: 包含 dialogue 字段，一步到位生成对白
+    # 每个 shot 包含：camera_angle + characters + mood + dialogue（角色台词）
+    # Token estimate: synopsis(300) + acts(4×(50 + 3×(120 + 2×80))) ≈ 4000 tokens
     shot_schema = ', '.join(
-        f'{{{{"shot_number": {i+1}, "camera_angle": "中景/特写/远景", "characters_present": ["角色名"], "mood": "情绪关键词"}}}}'
+        f'{{{{"shot_number": {i+1}, "camera_angle": "中景/特写/远景", "characters_present": ["角色名"], "mood": "情绪关键词", "dialogue": [{{"character": "角色名", "line": "台词内容（20字内）", "emotion": "情绪"}}]}}}}'
         for i in range(shots_per_scene)
     )
     scene_schema = (
@@ -42,16 +42,18 @@ def generate_storyline(
         f'"shots": [{shot_schema}]}}}}'
     )
 
-    prompt = f"""为{genre}短剧生成{acts}幕剧本大纲。
+    prompt = f"""为{genre}短剧生成{acts}幕完整剧本。
 
 创作构想：{premise}
 基调：{tone}
-风格：快节奏、强反转、密集冲突、短剧爽点。
+风格：快节奏、强反转、密集冲突、短剧爽点、角色台词生动有力。
 
 规则：
 - 共{acts}幕，每幕恰好{scenes_per_act}个场景，每场景恰好{shots_per_scene}个镜头
 - synopsis 控制在100字以内
-- 镜头只需 camera_angle / characters_present / mood，无需台词
+- 每个镜头必须有 dialogue 数组，包含角色台词（1-3句）
+- 台词要短小精悍、符合角色性格、推动剧情发展
+- 情绪词要具体（如：愤怒、嘲讽、绝望、坚定）
 
 输出纯 JSON，结构如下：
 {{{{
@@ -71,9 +73,9 @@ def generate_storyline(
         prompt=prompt,
         system=SCREENWRITER_SYSTEM,
         model=model,
-        temperature=0.3,
-        max_tokens=8000,   # ~2600 expected; 8000 = 3× headroom
-        num_ctx=16384,     # input prompt ~800 tok + output ~2600 tok → well within 16K
+        temperature=0.7,   # 提高温度让台词更生动
+        max_tokens=12000,  # 增加容量：对白占用更多 token
+        num_ctx=16384,     # 16K context 足够
         project_id=project_id,
         agent_type="screenwriter",
     )

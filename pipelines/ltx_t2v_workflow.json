@@ -87,7 +87,7 @@
         0
       ],
       "lora_name": "ltx-2.3-22b-distilled-lora-384.safetensors",
-      "strength_model": 0.2
+      "strength_model": 0.1
     }
   },
   "100": {
@@ -111,7 +111,7 @@
         "103",
         1
       ],
-      "cfg": 1.0
+      "cfg": 2.5
     }
   },
   "126": {
@@ -123,13 +123,13 @@
   "176": {
     "class_type": "ManualSigmas",
     "inputs": {
-      "sigmas": "0.85, 0.4219, 0.0"
+      "sigmas": "0.85, 0.6, 0.4, 0.2, 0.0"
     }
   },
   "117": {
     "class_type": "ManualSigmas",
     "inputs": {
-      "sigmas": "1.0, 0.725, 0.421875, 0.0"
+      "sigmas": "1.0, 0.8, 0.6, 0.4, 0.2, 0.0"
     }
   },
   "129": {
@@ -153,7 +153,7 @@
         "103",
         1
       ],
-      "cfg": 1.0
+      "cfg": 2.5
     }
   },
   "118": {
@@ -233,9 +233,9 @@
         2
       ],
       "tile_size": 512,
-      "overlap": 64,
+      "overlap": 128,
       "temporal_size": 64,
-      "temporal_overlap": 8
+      "temporal_overlap": 16
     }
   },
   "120": {

@@ -1370,16 +1370,19 @@ def _resolve_model(stage_model: str, stage_default: str, global_model_var) -> st
     return (stage_model or "").strip() or (stage_default or "").strip() or "qwen3:8b"
 
 
-def story_stage_flow(pid, premise, pname, genre, tone, acts, stage_m, global_m, progress=gr.Progress()):
+def story_stage_flow(pid, premise, pname, genre, genre_custom, tone, tone_custom, acts, stage_m, global_m, progress=gr.Progress()):
     """步骤1: 剧本生成。"""
     if not premise or not premise.strip():
         yield "### ⚠️ 请输入创作构想", None, int(pid or 0); return
+    # 合并选择和自定义值
+    genre_val = ", ".join(genre) + (f", {genre_custom}" if genre_custom else "") if genre else genre_custom or "玄幻"
+    tone_val = ", ".join(tone) + (f", {tone_custom}" if tone_custom else "") if tone else tone_custom or "热血"
     model = _resolve_model(stage_m, _default_stage_model_profile()["director"], None)
     result = {}
     for pct, log_md, partial in run_stage_story(
         project_id=int(pid or 0), premise=premise.strip(),
         project_name=_sanitize_project_name(pname) if pname else "",
-        genre=genre or "玄幻", tone=tone or "热血",
+        genre=genre_val, tone=tone_val,
         acts=int(acts or 3), model=model,
     ):
         result = partial
@@ -1448,7 +1451,7 @@ def get_stage_status(pid) -> str:
 
 # ─── Phase 1: 全流程生成 ────────────────────────────
 
-def full_pipeline_flow(premise, project_name, genre, tone, acts, model,
+def full_pipeline_flow(premise, project_name, genre, genre_custom, tone, tone_custom, acts, model,
                        story_model, char_model, scene_model, art_model,
                        genre_tags=None, tone_tags=None, emotion_arc="",
                        episode_count=80, project_format="short_drama",
@@ -1480,7 +1483,8 @@ def full_pipeline_flow(premise, project_name, genre, tone, acts, model,
         for pct, log_md, partial in run_pipeline_generator(
             premise=premise.strip(),
             project_name=_sanitize_project_name(project_name) if project_name else "",
-            genre=genre or "玄幻", tone=tone or "热血",
+            genre=", ".join(genre) + (f", {genre_custom}" if genre_custom else "") if genre else genre_custom or "玄幻",
+            tone=", ".join(tone) + (f", {tone_custom}" if tone_custom else "") if tone else tone_custom or "热血",
             acts=int(acts) if acts else 4,
             model=base,
             model_profile=stage_models,
@@ -3690,18 +3694,36 @@ def build_ui():
 
                 # ── 项目设置 ─────────────────────────────────────────────────────
                 with gr.Row():
-                    project_name = gr.Textbox(label="项目名称", placeholder="留空自动生成", scale=1)
-                    genre = gr.Dropdown(
-                        label="主类型",
-                        choices=["玄幻","仙侠","都市","科幻","奇幻","武侠","历史","悬疑","恐怖","言情","校园","末日"],
-                        value="玄幻", scale=1,
-                    )
-                    tone = gr.Dropdown(
-                        label="主基调",
-                        choices=["热血","温馨","黑暗","搞笑","治愈","悬疑","史诗","浪漫","轻松","沉重"],
-                        value="热血", scale=1,
-                    )
+                    project_name = gr.Textbox(label="项目名称", placeholder="留空自动生成", scale=2)
                     acts = gr.Slider(label="幕数", minimum=1, maximum=5, value=4, step=1, scale=1)
+                
+                with gr.Row():
+                    genre = gr.CheckboxGroup(
+                        label="主类型（可多选）",
+                        choices=["玄幻","仙侠","都市","科幻","奇幻","武侠","历史","悬疑","恐怖","言情","校园","末日","广告","纪录片","电影"],
+                        value=["玄幻"],
+                        scale=2,
+                    )
+                    genre_custom = gr.Textbox(
+                        label="自定义类型",
+                        placeholder="如：公益广告、品牌宣传片...",
+                        value="",
+                        scale=1,
+                    )
+                
+                with gr.Row():
+                    tone = gr.CheckboxGroup(
+                        label="主基调（可多选）",
+                        choices=["热血","温馨","黑暗","搞笑","治愈","悬疑","史诗","浪漫","轻松","沉重","科技","高端","自信","商业","温情"],
+                        value=["热血"],
+                        scale=2,
+                    )
+                    tone_custom = gr.Textbox(
+                        label="自定义基调",
+                        placeholder="如：科技感、高端大气...",
+                        value="",
+                        scale=1,
+                    )
 
                 with gr.Accordion("🎭 细化设置（可选）", open=False):
                     with gr.Row():
@@ -4493,7 +4515,7 @@ def build_ui():
         # ── 主生成按钮 ───────────────────────────────
         gen_btn.click(
             fn=full_pipeline_flow,
-            inputs=[premise, project_name, genre, tone, acts, model,
+            inputs=[premise, project_name, genre, genre_custom, tone, tone_custom, acts, model,
                     story_model, char_model, scene_model, art_model,
                     genre_tags, tone_tags, emotion_arc, episode_count, project_format],
             outputs=gen_outputs,
@@ -4510,7 +4532,7 @@ def build_ui():
 
         step1_btn.click(
             fn=story_stage_flow,
-            inputs=[project_id_state, premise, project_name, genre, tone, acts,
+            inputs=[project_id_state, premise, project_name, genre, genre_custom, tone, tone_custom, acts,
                     story_model, model],
             outputs=_step_outputs,
             concurrency_limit=2,
