@@ -14,7 +14,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-ui = ["gradio>=4.0"]
 dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.10", "types-requests", "httpx>=0.27"]
 
 [project.scripts]
@@ -28,7 +27,7 @@ storyagent = ["db/migrations/*.sql", "config/defaults/*.toml", "agents/specs/*.t
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-norecursedirs = ["legacy", ".venv", "data"]
+norecursedirs = [".venv", "data", "web"]
 addopts = "-q -m 'not live'"
 filterwarnings = ["ignore:Using .httpx. with .starlette.testclient"]
 markers = [
@@ -38,7 +37,6 @@ markers = [
 [tool.ruff]
 line-length = 120
 target-version = "py311"
-extend-exclude = ["core", "agents", "pipelines", "ui", "main.py", "tests/legacy", "test_render_6s.py", "test_vae_fix.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]

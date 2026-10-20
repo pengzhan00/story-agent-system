@@ -62,7 +62,8 @@ class AgentRunner:
         try:
             data = self.router.json(
                 spec.role, prompt, system=system, schema=spec.schema, project_id=project_id, attempts=spec.attempts,
-                temperature=spec.temperature, max_tokens=spec.max_tokens, **({"model": spec.model} if spec.model else {}),
+                temperature=spec.temperature, max_tokens=spec.max_tokens,
+                **({"model": spec.model} if spec.model else {}),
             )
         except LLMError as exc:
             exc.params.setdefault("agent", name)

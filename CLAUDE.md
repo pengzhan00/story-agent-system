@@ -4,72 +4,48 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Local, offline "idea → short-drama MP4" system (漫剧故事工坊 / Story Agent System). Ollama LLM agents write the script, then ComfyUI (LTX 2.3 video, ACE-Step music) + TTS + ffmpeg render and compose it. Persistence is SQLite; UI is Gradio. Target is vertical 720×1280 short dramas. macOS / Apple Silicon only in practice. Docs and most comments are in Chinese.
+Local, offline "idea → short-drama MP4" system (漫剧故事工坊 / Story Agent System), v2. LLM agents write the story; media adapters (FLUX/mflux images, CosyVoice/Seed-VC voices, ACE-Step music, Phosphene/h3/LongCat video, ffmpeg assembly) turn editable *specs* into assets; the episode is composed with ffmpeg, QC'd and exported with AIGC marking and provenance. SQLite persistence, FastAPI + SSE API, React/Vite web client. Target is vertical 720×1280 dramas on macOS / Apple Silicon. Docs and many comments are in Chinese. The v1 implementation (Gradio, ComfyUI-centred) is gone from the tree; it lives in git tag `v1-final`, and `docs/PARITY_MATRIX.md` says where each old feature went.
 
-## Rewrite in progress (v2)
-
-The legacy code (`core/ agents/ pipelines/ ui/ main.py`, described below) is frozen and being replaced by the new `storyagent/` package, built milestone by milestone (R0–R7; plan and review in `docs/reviews/`, feature-by-feature tracking in `docs/PARITY_MATRIX.md`). Do not extend legacy code; new work goes in `storyagent/`. R0 (done) provides: `config/` (settings from packaged TOML defaults < `$STORY_AGENT_HOME/config/*.toml` < env; no hard-coded paths/ports), `i18n/` (all user-visible text via `t(key)` with `locales/{zh-CN,en}.json`), `db/` (versioned SQL migrations, automatic pre-upgrade snapshot, read-only `legacy_import`), `domain/enums.py` (`MediaKind` as `<domain>.<operation>`, `JobStatus`, `QualityTier`), `cli.py`. R1 (done) adds the media core in `media/`: `contracts.py` (MediaJob/Adapter protocol), `ledger.py` (jobs + versioned assets, leases, idempotency), `specs.py` (editable, versioned creative specs → regenerate), `broker.py` + `worker.py` (heavy/light arbitration, lease/heartbeat, reattach), `healthcheck.py`, `compliance.py`, `params.py` (layered params); config now also covers `compliance/recipes/llm.toml`. R3 (in progress) adds `llm/` (multi-backend router, JSON recovery), `agents/` (agents as TOML data), `story.py` (story store), `workflow/` (staged resumable pipeline + run queue + progress; see `docs/WORKFLOW.md`). R4a (done) adds the React/Vite/TypeScript client in `web/` (react-query, react-router; types generated from the API's OpenAPI; text comes from the shared `locales/*.json` via `/api/i18n`; `storyagent serve` hosts `web/dist`). R1.5 (done) adds `api/` (FastAPI: jobs, assets, specs, projects, meta/health/i18n, SSE; `storyagent serve`; routes in `routes_*.py`, one error envelope in `errors.py`) and `projects.py`. R2 (in progress) adds real adapters in `media/adapters/` (acestep, phosphene, cosyvoice, whisper, mflux, lora_train, seedvc; subprocess ones share `_subprocess.py`), asset references (`asset:<id>` / `library:<role>/<name>` resolved by the worker, `media/assetrefs.py`) and the cross-project library + uploads (`media/library.py`). See `docs/MEDIA_CONTRACT.md`, `docs/CONFIGURATION.md`, `docs/RUNBOOK.md`, `docs/API.md`.
+## Commands
 
 ```bash
 uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python -e '.[dev]'   # first time
-.venv/bin/pytest                      # unit/contract tests (live tests need `-m live`)
+.venv/bin/pytest                                   # unit/contract tests (live tests need `-m live`)
 .venv/bin/pytest tests/test_config.py::test_defaults   # single test
-.venv/bin/ruff check storyagent tests --exclude tests/legacy && .venv/bin/mypy
+.venv/bin/ruff check storyagent tests && .venv/bin/mypy
+(cd web && pnpm install && pnpm typecheck && pnpm lint && pnpm test && pnpm build)   # web client
+.venv/bin/python -m storyagent api openapi --out web/openapi.json && (cd web && pnpm gen:api)   # after changing API schemas
+scripts/start.sh                                   # worker + server (Ctrl-C stops only these two)
+
 .venv/bin/python -m storyagent db migrate | status | import-legacy --from <v1 db> ; config show ; i18n check
-.venv/bin/python -m storyagent media healthcheck | submit | jobs | show | cancel | retry | adopt ; asset import ; library add|list|show|remove ; spec create|show|edit|diff|revert|lock|unlock|regenerate ; worker [--once] ; workflow run|status|watch ; llm check ; serve [--host --port] ; ops llm-unload
-cd web && pnpm install && pnpm test && pnpm lint && pnpm build   # web client; `pnpm dev` proxies /api to $STORY_AGENT_API
-.venv/bin/python -m storyagent api openapi --out web/openapi.json && (cd web && pnpm gen:api)   # regenerate TS types after API changes
+.venv/bin/python -m storyagent project create|list [--trashed]|trash ID [--restore]
+.venv/bin/python -m storyagent media healthcheck | submit | jobs | show | cancel | retry | adopt ; asset import ; library add|list|show|remove ; spec create|show|edit|diff|revert|lock|unlock|regenerate
+.venv/bin/python -m storyagent worker [--once] ; serve [--host --port] ; llm check ; ops llm-unload
+.venv/bin/python -m storyagent workflow run [--stage S] [--param k=v] [--inline] | status | watch | review ; export episode --project N --out DIR
 STORY_AGENT_ENABLE_FAKE=1 registers the fake adapter for local end-to-end runs (see tests/test_cli_media.py)
 ```
 
-Rules enforced by `tests/test_guards.py`: no `/Users/`, `~/myworkspace`, `127.0.0.1`/`localhost` literals, `pkill`/`shell=True`, or CJK string literals inside `storyagent/`. Services/tools/models come from `Settings` (`storyagent/config/defaults/*.toml`). `tests/legacy/` holds the old run-at-import scripts (excluded from pytest, deleted in R7).
+Python code changes are picked up only after restarting the worker and the server (long-lived processes).
 
-## Legacy system (frozen)
+## Architecture (read across files)
 
-### Commands
+Two processes share SQLite (WAL) and never call each other: `storyagent serve` (API + built web client) and `storyagent worker` (executes media jobs *and* workflow runs). Full picture in `ARCHITECTURE.md`; per-area docs in `docs/` (`WORKFLOW`, `MEDIA_CONTRACT`, `CONFIGURATION`, `API`, `RUNBOOK`).
 
-The legacy code has no test runner or linter. Its old scripts (now in `tests/legacy/`) are **standalone scripts**, not a pytest suite: they run at import time, hit live ComfyUI/Ollama/ffmpeg, and read pre-existing DB rows and `output/` assets at hardcoded `/Users/pengzhan/...` paths. Run one with `python3 tests/legacy/test_e2e_quick.py`; expect them to fail without the local services and models. Cheap sanity check after editing: `python3 -m py_compile <file>`.
+- **Spec → job → asset** (`media/`): specs are editable, append-only, lockable (`specs.py`); a job is a frozen snapshot of a spec version (`ledger.py`, idempotent, leased, re-attachable); an asset is a verified file with provenance, at most one `current` per (project, shot, kind, slot) (`SpecStore.job_slot` gives non-shot subjects their own slot). `asset:<id>` / `library:<role>/<name>` references anywhere in job inputs are resolved by the worker. "Completed" = output exists and ffprobe reads it.
+- **Adapters** (`media/adapters/`, registered in `media/registry.py`): subprocess ones share `_subprocess.py`; heavy jobs are serialised by `broker.py`. Missing model/tool → `missing_*` error, never a silent fallback.
+- **Workflow** (`workflow/`): stages `analyze, cast, script, scenes, music, shotplan, specs, produce, compose`; a plain resume runs the first seven (`DEFAULT_STAGES`); `DOWNSTREAM` marks stale stages; one active run per project, run by the worker's workflow pool. `RunProgress` (percent never regresses, ETA) is written ~1/s; stage messages may be `<i18n key>|<detail>`. Re-planning shots updates unlocked shots in place so ids/specs/assets survive.
+- **Compose** (`compose/`): `timeline.py` is a pure EDL builder (speech measured first), `media/runners/assemble_episode.py` (stdlib only) renders with ffmpeg, `qc.py` measures the result, `export.py` builds the delivery package. A visible AIGC label needs ffmpeg with libass (ffmpeg-full) or the job is refused.
+- **API/Web**: routes in `api/routes_*.py`, one error envelope (`errors.py`, codes → `api.error.<code>` keys), SSE feed; `web/` types are generated from OpenAPI and its i18n catalog is fetched from `/api/i18n/{locale}`.
 
-```bash
-./setup.sh                  # create .venv, install requirements.txt, write .env
-./start.sh                  # start Ollama check + ComfyUI + Gradio (--check / --restart / --comfyui / --env)
-python3 main.py             # Gradio main UI (7860; auto-increments if busy, GRADIO_SERVER_PORT overrides)
-python3 main.py --render    # standalone render UI (ui/render_app.py, 7861)
-python3 main.py --workshop  # storyboard workshop UI (ui/workshop.py, 7861)
-python3 main.py --check     # environment check (Ollama, DB, output dir)
-python3 main.py --cli       # list projects + env; --demo summarizes projects
+Config layers (low → high): packaged `storyagent/config/defaults/*.toml` < `$STORY_AGENT_HOME/config/*.toml` < env < `projects.settings` < job/spec params. Compliance (labels, consent, licence gates) defaults on and can be switched off globally, by `STORY_AGENT_COMPLIANCE`, or per project; provenance is always recorded.
 
-# every agent is its own CLI
-python3 agents/writer/main.py --action generate_storyline --input '{"premise":"..."}' --project-id 1
-python3 agents/<name>/main.py --task-mode --action <action>   # run as task-queue worker instead
-```
+## Rules enforced by tests
 
-`.env` (git-ignored, loaded by `main.py:_load_local_env` without overriding real env vars) supplies `COMFYUI_URL`, `COMFYUI_DIR`, `COMFYUI_PYTHON`, `UI_PORT` (read by `start.sh` only; `main.py` uses `GRADIO_SERVER_PORT`), `ACESTEP_*`, etc. ComfyUI must run with **its own** venv (`$COMFYUI_DIR/.venv`, has torch); using the project venv yields confusing node-registration errors. `./start.sh --env` diagnoses this.
-
-## Architecture
-
-Three layers; read across them to understand a feature:
-
-- **`core/`** — infrastructure. `database.py` (single shared SQLite connection behind an `RLock`, WAL; dataclass models in `models.py` mapped through `_table_map`/`_json_fields`, JSON columns auto-(de)serialized), `ollama_client.py` (`generate`/`generate_json` with heavy JSON-repair helpers for flaky LLM output; per-stage model profile), `orchestrator.py` (the pipeline), `task_queue.py` (DB-backed queue + `TaskWorker` for agent processes), `pipeline_state.py` (resume state is **derived from DB + files on disk**, not a separate state file), `asset_registry.py`, `service_ports.py` (ComfyUI/ACE-Step URL discovery and auto-launch), `comfyui_env.py`.
-- **`agents/<name>/`** — one folder per agent, each with `core.py` (prompts + business logic, exposes `run_action(action, input, project_id, task_id)`) and `main.py` (argparse CLI + optional task-queue worker). Agents call `core.ollama_client` and write results via `core.database`. `concept_finder` is the exception: just a `core.py` helper, no CLI and no `run_action`.
-- **`pipelines/`** — media generation. `render_pipeline.py` (ComfyUI workflow builders), `audio_pipeline.py` (TTS chain + ACE-Step music + SFX), `compositor.py` (ffmpeg shot→episode mixing/subtitles), `quality_gate.py`, `batch_renderer.py`, `quick_video.py` (the "快速做视频" shortcut flow), `output_manager.py`.
-- **`ui/app.py`** (~5.4k lines) is the main Gradio app and calls the orchestrator and pipelines directly; `render_app.py`/`workshop.py` are the 7861 apps.
-
-### Orchestrator flow
-
-`core/orchestrator.py:run_pipeline_generator` is a **generator yielding `(percent, message)`** that the UI streams. Stages: director analysis → script → characters → scenes → art/music/SFX → shot plan (`_create_shot_plan_txn` builds each shot's `render_payload`) → render → TTS/BGM → compose → export (`DeliveryPackage`). `run_stage_*` functions run single stages; `resume_pipeline` and `request_render_stop` support continuation/cancel.
-
-### Render dispatch
-
-`pipelines/pipeline_config.json` is the source of truth. `RenderDispatcher.from_config` instantiates the classes listed there (looked up in `_PIPELINE_CLASSES`), sorts by `priority`, and `active_pipeline` picks the requested one (currently `ltx_i2v`). Workflow JSONs (`pipelines/ltx_*_workflow*.json`) are loaded and patched per shot. After each render, `quality_gate.validate_render_output` runs; fallback to the next pipeline (up to 2 retries, ending at `stub`) happens **only if** the payload sets `allow_fallback=true` or `STORY_AGENT_ALLOW_RENDER_FALLBACK=1` — by default a production-pipeline failure raises. The Wan2.* pipeline classes still exist in `render_pipeline.py` but are not in the config.
-
-### Audio
-
-TTS tries backends in ranked order (`_ranked_tts_backends`: ChatTTS in a separate venv at `~/chattts` → edge_tts → bark → kokoro → pyttsx3). Music goes through ACE-Step via ComfyUI using `pipelines/audio_ace_step1_5_xl_{sft,turbo}.json`. LTX's own audio track was dropped from render output (Audio VAE noise, commit e00c490); `compositor.compose_shot` mixes TTS + BGM + SFX over the video instead.
+`tests/test_guards.py`: inside `storyagent/` no `/Users/`, `~/myworkspace`, `127.0.0.1`/`localhost` literals, `pkill`/`shell=True`, or CJK string literals. Services/tools/models come from `Settings`; prompts live in TOML/JSON; every user-visible string is an i18n key in `locales/{zh-CN,en}.json` (`storyagent i18n check` must stay green; the web has `react/jsx-no-literals`). Never add code that kills or starts processes belonging to someone else.
 
 ## Gotchas
 
-- **Hardcoded paths.** `core/database.py:DB_PATH` is `~/myworkspace/projects/story-agent-system/data/story_agents.db` (the *main checkout*, not the cwd), so any worktree or clone shares that DB. `main.py:check_environment` and most tests hardcode the same root. Models live in `~/myworkspace/ComfyUI_models/` (mapped into ComfyUI via `extra_model_paths.yaml`), not in this repo.
-- **Docs drift.** `ARCHITECTURE.md` is labelled the source of truth but is partly stale: it says port 8188 and `active_pipeline: wan2_ti2v`, and the README lists the same 8188/gemma setup. Actual code: ComfyUI is auto-launched on **13201** and ACE-Step on **13200** (`core/service_ports.py`, URL override via `STORY_AGENT_COMFYUI_URL`/`COMFYUI_URL`), while `start.sh` still probes 8188. Trust the code and `pipeline_config.json` over the prose; update `ARCHITECTURE.md` when changing pipeline behavior.
-- `capability_audit.json` is a manually refreshed snapshot of local models, not read at runtime.
-- `.gitignore` excludes `*.db`, `output/`, `.env`, `.claude/`, and model/asset dirs — never expect these in commits.
+- `data/` and `$STORY_AGENT_HOME` hold the live database and media; never commit them (`.gitignore` covers `*.db`, `data/`, `.env`, `.claude/`).
+- ffmpeg on `PATH` may lack `subtitles`/`ass`; `[tools.ffmpeg] binary` points at ffmpeg-full for burn-in and labels.
+- Tests that need real ffmpeg skip when it is missing; adapter tests use stub tools plus tiny real media made with ffmpeg.
+- A change to a schema-bearing response model needs `Strict` (see `api/schemas.py`) so the generated TypeScript has required fields.

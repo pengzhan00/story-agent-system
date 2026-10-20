@@ -1,6 +1,7 @@
 # Runbook
 
 ```bash
+scripts/start.sh                      # worker + web server together; Ctrl-C stops only these two
 storyagent db migrate                 # idempotent; snapshots *.bak-v<N> before upgrading
 storyagent media healthcheck          # one screen; exit 0 = every required entry ok, 1 = not, 2 = bad config
 storyagent media healthcheck --json --require tool.h3     # cron-friendly
@@ -8,6 +9,10 @@ storyagent serve                      # HTTP API (+ /api/docs); run next to the 
 storyagent worker                     # long-running; SIGTERM/SIGINT release leases cleanly
 storyagent worker --once              # drain the queue and exit
 storyagent media jobs [--status running]   |  media show <id>  |  media cancel <id>  |  media retry <id> [--new-seed]
+storyagent workflow run --project 1 [--stage produce] [--param tier=draft]   # needs a worker (or --inline for story stages)
+storyagent workflow status --project 1 | watch   # progress bars, ETA
+storyagent export episode --project 1 --out DIR  # delivery package; exit 6 when a blocking QC check failed
+storyagent project list [--trashed] | trash ID [--restore]
 storyagent ops llm-unload             # unload resident LLMs (when a heavy job waits on `llm_resident`)
 ```
 
@@ -24,6 +29,11 @@ storyagent ops llm-unload             # unload resident LLMs (when a heavy job w
 | Seed-VC job runs for minutes at 0 % CPU | The tool is stuck in the hub downloader: v2 looks up its AR/CFM checkpoints on the hub unless they are passed explicitly (the model entry does, from `checkpoints/`). Keep `[tools.seedvc] offline = true` |
 | `separate_vocals` job fails in Demucs | `~/venvs/seedvc/bin/demucs` needs the `sphn` package (missing on 2026-10-21); install it in that venv |
 | `train.lora` ends `output_missing` | mflux-train writes `<output>_<timestamp>/checkpoints/*_checkpoint.zip`; check the job log for a crash before the first checkpoint (`save_frequency`) |
+| `produce` finishes with "skipped: no usable model" | Nothing is configured for that kind (e.g. no sound-effect model) or its service is down (`media healthcheck`); the rest of the stage is kept |
+| `produce` skips dialogue (`no_voice`) | The speaking character has no voice sample: upload one on the character (Web "故事" page) or set `[workflow] default_voice` |
+| `compose` fails with `missing_tool` mentioning libass | A visible AIGC label is required but the ffmpeg in use cannot burn it; point `[tools.ffmpeg] binary` at ffmpeg-full or set `explicit_label = "off"` |
+| Run says `running` but nothing moves | Start the worker (`storyagent worker`): only it executes runs and media jobs. After a crash the lease expires and the run is requeued |
+| A code change had no effect on a live setup | Restart the worker and the server: they load code once |
 | Output exists but job failed `output_invalid` | Zero-byte or unreadable by ffprobe; see `media show <id>` events |
 
 ## Recovery verified

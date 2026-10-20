@@ -1,4 +1,0 @@
-gradio>=4.0.0
-requests>=2.25.0
-jsonpath-ng>=1.6.0
-edge-tts>=6.1.0

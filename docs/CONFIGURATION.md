@@ -18,12 +18,12 @@ Nothing is hard-wired: pipelines differ, so defaults are layered and every layer
 |---|---|
 | `services.toml` | `[services.<name>]` url/health_path/enabled/probe_only (comfy 8188, acestep 8001, ollama, llamacpp (off), fastvideo, nodus probe-only); `[tools.<name>]` binaries and model dirs (h3, longcat, cosyvoice, fastvideo, lora_train, mflux, whisper, seedvc, ffmpeg); `[runtime]` worker knobs; `[healthcheck]` required + min_free_gib |
 | `models.toml` | `[models.<ref>]`: kind, provider, family, version, heavy, est_memory_gib, license_tag, commercial_ok, attribution, prompt_profile, timeout_sec, `params`, `tiers.draft/preview/final`, extra (e.g. `train_template`); `[defaults]` kind -> default model |
-| `recipes.toml` | `[recipes.<name>]` ordered `[[steps]]` (kind, model, tier, slot, params, when). Validated at load; executed from R3 |
+| `recipes.toml` | `[recipes.<name>]` ordered `[[steps]]` (kind, model, tier, slot, params, when). Validated at load and listed in `/api/meta`; the workflow does **not** execute them (`produce` derives its steps from the specs) |
 | `compliance.toml` | `enabled`, `implicit_metadata`, `explicit_label` (`off|overlay|both`), `require_voice_consent`, `require_likeness_consent`, `require_restricted_license_ack` |
 | `llm.toml` | `[llm.backends.*]` (`ollama`, `llamacpp`, `openai_compat`; url comes from a service or `url`) and `[llm.roles.*]` (backend + model + params per agent role, `default` is the fallback) |
-| `delivery.toml` | Delivery profiles and QC thresholds |
+| `delivery.toml` | Delivery profiles (`[profiles.*]`: size, fps, codec, episode length range), `[mix]` (gains, loudnorm, slow-down limit), `[subtitles]`, `[qc]` thresholds |
 
-`services.toml` also holds `[api]` for `storyagent serve`: `host`, `port`, `cors_origins` (browser origins allowed to call it; the Vite dev server by default), `sse_poll_seconds`, `sse_keepalive_seconds`, `max_upload_mb` (largest accepted upload, default 2048). See [API.md](API.md).
+`services.toml` also holds `[workflow]` (`tier`, `default_voice`, `poll_seconds`, `takes`) and `[api]` for `storyagent serve`: `host`, `port`, `cors_origins` (browser origins allowed to call it; the Vite dev server by default), `sse_poll_seconds`, `sse_keepalive_seconds`, `max_upload_mb` (largest accepted upload, default 2048), `web_dir` (built web client; empty = `web/dist`). See [API.md](API.md).
 
 ## Environment variables
 
@@ -49,4 +49,4 @@ A project can switch compliance off or on regardless of the global value; unspec
 
 ## Exit codes (CLI)
 
-0 ok · 1 not found / health failing · 2 configuration · 3 migration · 4 legacy import · 5 spec locked.
+0 ok · 1 not found / health failing · 2 configuration · 3 migration · 4 legacy import · 5 spec locked · 6 export: a blocking QC check failed.
