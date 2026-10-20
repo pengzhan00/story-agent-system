@@ -55,7 +55,7 @@
   "error.service_rejected.remediation": "Check that the service supports these parameters/models, adjust and retry.",
   "error.workflow_failed": "Generation workflow failed: {detail}",
   "error.workflow_failed.remediation": "Check the job event log for the failing node; adjust prompt or parameters and retry.",
-  "error.tool_failed": "External tool failed (exit code {code})",
+  "error.tool_failed": "External tool failed (exit code {exit_code})",
   "error.tool_failed.remediation": "Read the tool output at the end of the job log; check model files and free memory, then retry.",
   "error.timeout": "Job did not finish within {seconds}s",
   "error.timeout.remediation": "Lower resolution/frames/tier, or raise timeout_sec for this model in config, then retry.",

@@ -17,7 +17,9 @@ def test_defaults(tmp_path: Path) -> None:
     assert s.db_path == tmp_path / "home" / "storyagent.db"
     assert s.service("comfy").url == "http://127.0.0.1:8188"
     assert s.service("acestep").health_url == "http://127.0.0.1:8001/v1/models"
-    assert s.default_model("video.generate").ref == "ltx-2.3-22b-distilled"
+    assert s.default_model("video.generate").ref == "ltx-2.5-video"
+    assert s.default_model("video.av").ref == "ltx-2.5-av"
+    assert s.default_model("video.lipsync").ref == "ltx-2.5-lipsync"
     assert s.llm_unload_policy == "never"
     assert s.locale == "zh-CN"
 

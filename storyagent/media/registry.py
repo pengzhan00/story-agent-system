@@ -28,7 +28,24 @@ class AdapterRegistry:
 
 
 # Real adapters are appended here as they are implemented (R2+): each entry builds one adapter.
-_BUILTIN: list[Callable[[Settings], Adapter]] = []
+def _acestep(settings: Settings) -> Adapter:
+    from .adapters._http import ServiceClient
+    from .adapters.acestep import AceStepAdapter
+
+    api_models = {
+        ref: str(m.extra.get("api_model", "")) for ref, m in settings.models.items() if m.provider == "acestep"
+    }
+    return AceStepAdapter(ServiceClient(settings.service("acestep")), api_models)
+
+
+def _phosphene(settings: Settings) -> Adapter:
+    from .adapters._http import ServiceClient
+    from .adapters.phosphene import PhospheneAdapter
+
+    return PhospheneAdapter(ServiceClient(settings.service("phosphene")))
+
+
+_BUILTIN: list[Callable[[Settings], Adapter]] = [_acestep, _phosphene]
 
 
 def default_registry(settings: Settings) -> AdapterRegistry:

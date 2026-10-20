@@ -2,7 +2,7 @@
 #
 #   kind     : a MediaKind value (storyagent/domain/enums.py), e.g. "video.generate"
 #   provider : the runtime/adapter that executes it:
-#              comfy | acestep | cosyvoice | h3 | longcat | fastvideo | lora_train | ffmpeg
+#              comfy | phosphene | acestep | cosyvoice | h3 | longcat | fastvideo | lora_train | ffmpeg
 #   family   : the underlying model family — the same weights may have several runtimes
 #              (MiniMax H3 runs via h3.c or FastVideo-MLX); licence applies per family
 #   heavy    : true => the broker runs at most one heavy job at a time
@@ -18,8 +18,9 @@
 
 [defaults]
 "image.generate" = "flux2-klein-4b"
-"video.generate" = "ltx-2.3-22b-distilled"
-"video.av" = "minimax-h3"
+"video.generate" = "ltx-2.5-video"
+"video.av" = "ltx-2.5-av"
+"video.lipsync" = "ltx-2.5-lipsync"
 "video.avatar" = "longcat-avatar-1.5-q4"
 "audio.tts" = "cosyvoice2-0.5b"
 "audio.music" = "acestep-1.5-turbo"
@@ -36,6 +37,105 @@ license_tag = "flux2-klein"
 commercial_ok = true
 prompt_profile = "natural_en"
 timeout_sec = 1800
+
+# LTX-2.5 through the Phosphene panel (Pinokio app). One model, three kinds: picture+sound, picture only
+# (sound stripped) and audio-driven lip-sync. Values are the operator's measured best recipe (see the notes in
+# Obsidian "本机模型能力矩阵"); the panel silently clamps oversized resolutions, so jobs verify the rendered size.
+#   draft   = balanced 1024x576, 5 s: 108 s measured
+#   preview = high 1280x704 12+4 steps, no upscale: not measured on its own
+#   final   = high 1536x832 16+5 steps + fit_1080p/pipersr: ~590 s measured
+# frames must satisfy frames % 8 == 1 (121 = 5 s at 24 fps); above 121 frames only quality=high keeps identity.
+[models."ltx-2.5-av"]
+kind = "video.av"
+provider = "phosphene"
+version = "ltx-2.5"
+family = "ltx-2.5"
+heavy = true
+est_memory_gib = 64   # estimate (peak 40-62 GiB public numbers); adjust after measuring
+license_tag = "ltx-community"   # LTX-2.x Community License + AUP: free commercial use below the revenue threshold
+commercial_ok = true
+prompt_profile = "ltx_av"
+timeout_sec = 3600
+[models."ltx-2.5-av".params]
+width = 1536
+height = 832
+frames = 121
+frame_rate = 24
+quality = "high"
+stage1_steps = 16
+stage2_steps = 5
+cfg_scale = 3.0
+upscale = "fit_1080p"
+upscale_method = "pipersr"
+enhance = false
+negative_prompt = "extra swords, duplicate weapons, multiple blades, deformed hands, extra fingers, fused fingers, blurry, soft focus, low detail, underexposed, dark, heavy fog, plastic skin, text, watermark, subtitles, logo"
+[models."ltx-2.5-av".tiers.draft]
+width = 1024
+height = 576
+quality = "balanced"
+upscale = "off"
+[models."ltx-2.5-av".tiers.preview]
+width = 1280
+height = 704
+stage1_steps = 12
+stage2_steps = 4
+upscale = "off"
+
+[models."ltx-2.5-video"]
+kind = "video.generate"
+provider = "phosphene"
+version = "ltx-2.5"
+family = "ltx-2.5"
+heavy = true
+est_memory_gib = 64
+license_tag = "ltx-community"
+commercial_ok = true
+prompt_profile = "ltx_av"
+timeout_sec = 3600
+[models."ltx-2.5-video".params]
+width = 1536
+height = 832
+frames = 121
+frame_rate = 24
+quality = "high"
+stage1_steps = 16
+stage2_steps = 5
+cfg_scale = 3.0
+upscale = "fit_1080p"
+upscale_method = "pipersr"
+enhance = false
+negative_prompt = "extra swords, duplicate weapons, multiple blades, deformed hands, extra fingers, fused fingers, blurry, soft focus, low detail, underexposed, dark, heavy fog, plastic skin, text, watermark, subtitles, logo"
+[models."ltx-2.5-video".tiers.draft]
+width = 1024
+height = 576
+quality = "balanced"
+upscale = "off"
+[models."ltx-2.5-video".tiers.preview]
+width = 1280
+height = 704
+stage1_steps = 12
+stage2_steps = 4
+upscale = "off"
+
+# Lip-sync: a portrait image + a speech audio file (refs); the mouth follows the audio. Limited to ~5 s per clip.
+[models."ltx-2.5-lipsync"]
+kind = "video.lipsync"
+provider = "phosphene"
+version = "ltx-2.5"
+family = "ltx-2.5"
+heavy = true
+est_memory_gib = 64
+license_tag = "ltx-community"
+commercial_ok = true
+prompt_profile = "ltx_av"
+timeout_sec = 3600
+[models."ltx-2.5-lipsync".params]
+width = 1024
+height = 576
+frames = 121
+frame_rate = 24
+quality = "high"
+enhance = false
 
 [models."ltx-2.3-22b-distilled"]
 kind = "video.generate"
@@ -77,6 +177,7 @@ license_tag = "acestep"
 commercial_ok = true
 prompt_profile = "music_tags"
 timeout_sec = 900
+api_model = "acestep-v15-turbo"   # name on the standalone ACE-Step server (GET /v1/model_inventory)
 [models."acestep-1.5-turbo".params]
 duration = 30
 steps = 8
@@ -95,6 +196,17 @@ license_tag = "acestep"
 commercial_ok = true
 prompt_profile = "music_tags"
 timeout_sec = 1800
+# Not in the standalone server's checkpoints yet (only the turbo DiT is): jobs fail validation with
+# `missing_model` until it is installed there. Recipe from the operator's notes (guofeng with vocals):
+# steps 50, cfg 2.0, bpm 65, E minor; keep a single clip <= 240 s. They are starting points, not rules.
+api_model = "acestep-v15-xl-sft"
+[models."acestep-1.5-xl-sft".params]
+duration = 30
+steps = 50
+guidance_scale = 2.0
+bpm = 65
+key_scale = "E minor"
+vocal_language = "zh"
 
 [models."cosyvoice2-0.5b"]
 kind = "audio.tts"

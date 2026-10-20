@@ -26,7 +26,24 @@ def _h3_structured(prompt: str, structured: Mapping[str, Any] | None) -> str:
     return "\n".join(lines)
 
 
+def _ltx_av(prompt: str, structured: Mapping[str, Any] | None) -> str:
+    """LTX-2.5 makes picture and sound in one pass: the picture text first, then ``AUDIO:`` (sound design) and
+    ``DIALOGUE in <language>:`` (the spoken line, kept verbatim). Keep the prompt well-lit and crisp; fog/dawn
+    wording makes the model render dark and soft."""
+    parts = [prompt.strip()] if prompt.strip() else []
+    s = structured or {}
+    for key in ("scene", "action", "camera", "look"):
+        if s.get(key):
+            parts.append(str(s[key]).strip())
+    if s.get("audio"):
+        parts.append(f"AUDIO: {str(s['audio']).strip()}")
+    if s.get("dialogue"):
+        parts.append(f"DIALOGUE in {s.get('dialogue_language', 'Mandarin')}: {str(s['dialogue']).strip()}")
+    return " ".join(p for p in parts if p)
+
+
 PROFILES: dict[str, Callable[[str, Mapping[str, Any] | None], str]] = {
+    "ltx_av": _ltx_av,
     "plain": _plain,
     "natural_en": _plain,
     "cinematic_en": _plain,

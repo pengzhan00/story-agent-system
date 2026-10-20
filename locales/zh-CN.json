@@ -55,7 +55,7 @@
   "error.service_rejected.remediation": "检查参数与模型是否被该服务支持,修改后重试。",
   "error.workflow_failed": "生成流程执行失败:{detail}",
   "error.workflow_failed.remediation": "查看作业事件日志定位失败节点;调整提示词或参数后重试。",
-  "error.tool_failed": "外部工具运行失败(退出码 {code})",
+  "error.tool_failed": "外部工具运行失败(退出码 {exit_code})",
   "error.tool_failed.remediation": "查看作业日志末尾的工具输出;确认模型文件与内存充足后重试。",
   "error.timeout": "作业超过 {seconds} 秒仍未完成",
   "error.timeout.remediation": "降低分辨率/帧数/档位,或在配置里调大该模型的 timeout_sec 后重试。",
