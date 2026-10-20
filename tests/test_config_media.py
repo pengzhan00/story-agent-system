@@ -96,7 +96,7 @@ def test_default_recipes(tmp_path: Path) -> None:
     ('[recipes.r]\n[[recipes.r.steps]]\nkind = "video.generate"\nmodel = "cosyvoice2-0.5b"\n', "not 'video.generate'"),
     ('[recipes.r]\n[[recipes.r.steps]]\nkind = "video.generate"\ntier = "ultra"\n', "unknown tier"),
     ('[recipes.r]\nlabel_key = "x"\n', "no steps"),
-    ('[recipes.r]\n[[recipes.r.steps]]\nkind = "image.edit"\n', "no default model"),
+    ('[recipes.r]\n[[recipes.r.steps]]\nkind = "video.enhance"\n', "no default model"),
 ])
 def test_recipe_validation(tmp_path: Path, toml: str, msg: str) -> None:
     with pytest.raises(ConfigError, match=msg):

@@ -2,7 +2,7 @@
 #
 #   kind     : a MediaKind value (storyagent/domain/enums.py), e.g. "video.generate"
 #   provider : the runtime/adapter that executes it:
-#              comfy | phosphene | acestep | cosyvoice | h3 | longcat | fastvideo | lora_train | ffmpeg
+#              mflux | comfy | phosphene | acestep | cosyvoice | h3 | longcat | fastvideo | lora_train | ffmpeg
 #   family   : the underlying model family — the same weights may have several runtimes
 #              (MiniMax H3 runs via h3.c or FastVideo-MLX); licence applies per family
 #   heavy    : true => the broker runs at most one heavy job at a time
@@ -17,7 +17,8 @@
 # anything unknown is left to the adapter. They are starting points, not rules.
 
 [defaults]
-"image.generate" = "flux2-klein-4b"
+"image.generate" = "flux2-klein-base-4b"
+"image.edit" = "flux2-klein-base-4b-edit"
 "video.generate" = "ltx-2.5-video"
 "video.av" = "ltx-2.5-av"
 "video.lipsync" = "ltx-2.5-lipsync"
@@ -28,16 +29,38 @@
 "compose.assemble" = "ffmpeg-assemble"
 "train.lora" = "flux2-klein-4b-lora-trainer"
 
-[models."flux2-klein-4b"]
+# FLUX.2 klein through the mflux CLI (MLX). `weights` is a LOCAL directory (nothing is downloaded at run time);
+# `base_model` names the built-in mflux model it is. klein 4B is Apache-2.0; klein 9B is non-commercial and a LoRA
+# keeps the licence of its base model. Unset sampling parameters fall back to the tool's own defaults.
+[models."flux2-klein-base-4b"]
 kind = "image.generate"
-provider = "comfy"
-version = "klein-4b"
+provider = "mflux"
+version = "klein-base-4b"
+family = "flux2-klein"
 heavy = false
-est_memory_gib = 14
-license_tag = "flux2-klein"
+est_memory_gib = 24   # estimate; adjust after measuring
+license_tag = "flux2-klein-4b-apache-2.0"
 commercial_ok = true
 prompt_profile = "natural_en"
 timeout_sec = 1800
+command = "mflux-generate-flux2"
+weights = "~/models/flux2-klein-base-4B"
+base_model = "flux2-klein-base-4b"
+
+[models."flux2-klein-base-4b-edit"]
+kind = "image.edit"
+provider = "mflux"
+version = "klein-base-4b"
+family = "flux2-klein"
+heavy = false
+est_memory_gib = 24
+license_tag = "flux2-klein-4b-apache-2.0"
+commercial_ok = true
+prompt_profile = "natural_en"
+timeout_sec = 1800
+command = "mflux-generate-flux2-edit"
+weights = "~/models/flux2-klein-base-4B"
+base_model = "flux2-klein-base-4b"
 
 # LTX-2.5 through the Phosphene panel (Pinokio app). One model, three kinds: picture+sound, picture only
 # (sound stripped) and audio-driven lip-sync. Values are the operator's measured best recipe (see the notes in
@@ -317,7 +340,7 @@ version = "mflux-train"
 family = "flux2-klein"
 heavy = true
 est_memory_gib = 64   # estimate; adjust after the first real run
-license_tag = "flux2-klein"
+license_tag = "flux2-klein-4b-apache-2.0"
 commercial_ok = true
 timeout_sec = 86400
 [models."flux2-klein-4b-lora-trainer".train_template]

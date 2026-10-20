@@ -67,6 +67,10 @@ command = "~/.local/bin/mflux-train"
 root = "~/myworkspace/flux2-lora"
 base_model_dir = "~/models/flux2-klein-base-4B"
 
+# mflux command-line tools (image generate / edit); the model entries name the command to run.
+[tools.mflux]
+bin_dir = "~/.local/bin"
+
 # whisper.cpp (ASR: subtitles, transcript of a cloning reference, back-check of generated dialogue).
 [tools.whisper]
 binary = "whisper-cli"   # a name on PATH or an absolute path

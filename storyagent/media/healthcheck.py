@@ -116,6 +116,12 @@ def _check_tools(settings: Settings, run: Runner) -> list[Entry]:
         else ["cosyvoice runtime"],
         [] if _exists(tp("cosyvoice", "model_dir")) else ["CosyVoice2-0.5B"],
     )
+    mflux_bin = tp("mflux", "bin_dir")
+    entry(
+        "mflux",
+        [] if mflux_bin and (mflux_bin / "mflux-generate-flux2").is_file() else ["mflux-generate-flux2"],
+        [] if _exists(tp("lora_train", "base_model_dir")) else ["FLUX.2 klein base 4B weights"],
+    )
     wh_model = tp("whisper", "model")
     entry(
         "whisper",

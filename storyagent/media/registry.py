@@ -57,7 +57,13 @@ def _whisper(settings: Settings) -> Adapter:
     return WhisperAdapter()
 
 
-_BUILTIN: list[Callable[[Settings], Adapter]] = [_acestep, _phosphene, _cosyvoice, _whisper]
+def _mflux(settings: Settings) -> Adapter:
+    from .adapters.mflux import MfluxAdapter
+
+    return MfluxAdapter()
+
+
+_BUILTIN: list[Callable[[Settings], Adapter]] = [_acestep, _phosphene, _cosyvoice, _whisper, _mflux]
 
 
 def default_registry(settings: Settings) -> AdapterRegistry:
