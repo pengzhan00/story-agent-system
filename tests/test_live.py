@@ -29,7 +29,7 @@ def test_the_machine_reports_a_coherent_health_table(tmp_path: Path) -> None:
 
 def test_one_sentence_to_a_playable_episode(tmp_path: Path) -> None:
     settings = load_settings({"STORY_AGENT_HOME": str(tmp_path / "home"), "STORY_AGENT_LOCALE": "en"})
-    state = {e.name: e.state for e in run_checks(settings).entries}
+    state = {e.name: e.state for e in run_checks(settings, registry=default_registry(settings)).entries}
     for needed in ("ollama", "adapter.mflux", "adapter.acestep", "adapter.ffmpeg"):
         if state.get(needed) is not HealthState.OK:
             pytest.skip(f"{needed} is not available: {state.get(needed)}")
