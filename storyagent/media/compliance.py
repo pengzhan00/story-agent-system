@@ -40,7 +40,7 @@ def check_job(
         )
     voice_ref = job.inputs.get("voice_ref") or {}
     if (
-        job.kind is MediaKind.AUDIO_TTS
+        job.kind in (MediaKind.AUDIO_TTS, MediaKind.AUDIO_CONVERT)
         and voice_ref.get("audio")
         and cfg.require_voice_consent
         and not voice_ref.get("consent")

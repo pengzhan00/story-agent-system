@@ -7,7 +7,7 @@ The API never generates anything itself: it reads/writes the ledger, and `storya
 ## Conventions
 
 * JSON in and out; ids: projects are integers, jobs/assets/specs are 32-char hex strings.
-* **Errors** are always `{"error": {"code", "message", "remediation", "detail"}}`. `message`/`remediation` are localised, `detail` is for developers. Codes: `not_found` (404), `conflict` (409), `spec_locked` (409), `invalid` (422), `asset_file_missing` (404), `internal` (500).
+* **Errors** are always `{"error": {"code", "message", "remediation", "detail"}}`. `message`/`remediation` are localised, `detail` is for developers. Codes: `not_found` (404), `conflict` (409), `spec_locked` (409), `invalid` (422), `asset_file_missing` (404), `too_large` (413), `internal` (500).
 * **Language**: `?lang=zh-CN` wins, then `Accept-Language`, then the configured locale. `GET /api/i18n/{locale}` returns the flat catalog the web client uses (same keys as the backend).
 * Job `error_code` values are `ErrorCode` names; translate them with `error.<code>` and `error.<code>.remediation` from the catalog.
 
@@ -23,6 +23,8 @@ The API never generates anything itself: it reads/writes the ledger, and `storya
 | Projects | `GET/POST /api/projects`, `GET/PATCH /api/projects/{id}`, `PATCH /api/projects/{id}/settings` | settings = per-project `compliance` and `models.<ref>` overrides (null removes a group) |
 | Jobs | `GET/POST /api/jobs`, `GET /api/jobs/{id}`, `GET /api/jobs/{id}/events`, `POST /api/jobs/{id}/cancel`, `POST /api/jobs/{id}/retry`, `GET /api/queue` | POST returns 201, or 200 with `created:false` when an identical request is already active |
 | Assets | `GET /api/assets`, `GET /api/assets/{id}`, `GET /api/assets/{id}/file`, `POST .../adopt`, `POST .../trash` | file streaming supports range requests; paths are confined to the data home |
+| Uploads & library | `POST /api/projects/{pid}/uploads?filename=&slot=&shot_id=` (raw body) | returns an `upload.*` asset; use it as `asset:<id>` in job inputs |
+| | `GET/POST /api/library`, `POST /api/library/upload?filename=&role=&name=[&consent=&text=]` (raw body), `GET/PATCH/DELETE /api/library/{id}`, `GET /api/library/{id}/file` | publish an asset (copy) under `role/name`; jobs use `library:<role>/<name>`; DELETE is a soft delete |
 | Specs | `/api/projects/{pid}/specs` (list, create), `.../specs/{subject_type}/{subject_id}` (get current, `PATCH` = new version), `.../versions`, `.../diff?v1=&v2=`, `.../revert`, `PUT/DELETE .../lock`, `.../acknowledge`, `.../regenerate`; `GET .../specs/review`, `GET /api/projects/{pid}/stale` | `?slot=` selects a variant (default `main`). `PATCH` only changes the fields that are sent; explicit `null` clears (e.g. `seed`) |
 
 ## Typical creative loop

@@ -63,13 +63,21 @@ def _mflux(settings: Settings) -> Adapter:
     return MfluxAdapter()
 
 
+def _seedvc(settings: Settings) -> Adapter:
+    from .adapters.seedvc import SeedVcAdapter
+
+    return SeedVcAdapter()
+
+
 def _lora_train(settings: Settings) -> Adapter:
     from .adapters.lora_train import LoraTrainAdapter
 
     return LoraTrainAdapter()
 
 
-_BUILTIN: list[Callable[[Settings], Adapter]] = [_acestep, _phosphene, _cosyvoice, _whisper, _mflux, _lora_train]
+_BUILTIN: list[Callable[[Settings], Adapter]] = [
+    _acestep, _phosphene, _cosyvoice, _whisper, _mflux, _lora_train, _seedvc,
+]
 
 
 def default_registry(settings: Settings) -> AdapterRegistry:

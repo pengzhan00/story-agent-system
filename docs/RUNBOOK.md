@@ -20,6 +20,9 @@ storyagent ops llm-unload             # unload resident LLMs (when a heavy job w
 | Job `running` with no progress, worker dead | Wait `lease_seconds`; the next worker requeues and re-attaches (or re-submits). After `max_attempts` the job fails `worker_lost` |
 | `missing_model` / `missing_tool` | `media healthcheck` names the file; downloads are never automatic |
 | `consent_required` / `license_ack_required` | Record voice consent on the character / acknowledge the licence in project settings, or turn compliance off for the project |
+| A subprocess job failed and its scratch directory is gone | `<home>/logs/jobs/<job id>.log` keeps the tool log |
+| Seed-VC job runs for minutes at 0 % CPU | The tool is stuck in the hub downloader (a checkpoint is not local). Keep `[tools.seedvc] offline = true`; only the f0 44.1 kHz model is installed, so `f0_condition` must stay true |
+| `train.lora` ends `output_missing` | mflux-train writes `<output>_<timestamp>/checkpoints/*_checkpoint.zip`; check the job log for a crash before the first checkpoint (`save_frequency`) |
 | Output exists but job failed `output_invalid` | Zero-byte or unreadable by ffprobe; see `media show <id>` events |
 
 ## Recovery verified

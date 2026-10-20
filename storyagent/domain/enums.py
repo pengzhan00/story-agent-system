@@ -24,6 +24,7 @@ class MediaKind(StrEnum):
     AUDIO_TTS = "audio.tts"  # incl. voice cloning
     AUDIO_MUSIC = "audio.music"
     AUDIO_SFX = "audio.sfx"
+    AUDIO_CONVERT = "audio.convert"  # voice conversion: keep the words/performance, swap the speaker
     AUDIO_ENHANCE = "audio.enhance"  # denoise / loudness / ducking stems
     TEXT_ASR = "text.asr"  # transcription (subtitles, clone ref_text)
     COMPOSE_ASSEMBLE = "compose.assemble"  # shots + stems -> episode

@@ -43,6 +43,7 @@
   "media.kind.audio.music": "Music",
   "media.kind.audio.sfx": "Sound effects",
   "media.kind.audio.enhance": "Audio processing",
+  "media.kind.audio.convert": "Voice conversion",
   "media.kind.text.asr": "Transcription",
   "media.kind.compose.assemble": "Episode assembly",
   "media.kind.analyze.qc": "Quality check",

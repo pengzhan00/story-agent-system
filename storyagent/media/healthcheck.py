@@ -122,6 +122,13 @@ def _check_tools(settings: Settings, run: Runner) -> list[Entry]:
         [] if mflux_bin and (mflux_bin / "mflux-generate-flux2").is_file() else ["mflux-generate-flux2"],
         [] if _exists(tp("lora_train", "base_model_dir")) else ["FLUX.2 klein base 4B weights"],
     )
+    sv_root = tp("seedvc", "root")
+    entry(
+        "seedvc",
+        [] if _exists(tp("seedvc", "python"), executable=True) and sv_root and (sv_root / "inference.py").is_file()
+        else ["Seed-VC runtime"],
+        [] if sv_root and (sv_root / "checkpoints").is_dir() else ["Seed-VC checkpoints"],
+    )
     wh_model = tp("whisper", "model")
     entry(
         "whisper",

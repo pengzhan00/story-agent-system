@@ -55,6 +55,13 @@ workdir = "~/cosyvoice/CosyVoice"
 script = "~/cosyvoice/clone_tts.py"
 model_dir = "~/cosyvoice/CosyVoice/pretrained_models/CosyVoice2-0.5B"
 
+# Seed-VC (voice conversion). GPL-3.0 code, run as a separate process.
+[tools.seedvc]
+root = "~/seed-vc"
+python = "~/venvs/seedvc/bin/python"
+# Use only local checkpoints: a missing one would otherwise hang inside the hub downloader.
+offline = true
+
 [tools.fastvideo]
 root = "~/myworkspace/FastVideo"
 python = "~/myworkspace/FastVideo/.venv/bin/python"

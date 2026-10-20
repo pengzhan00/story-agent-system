@@ -43,6 +43,7 @@
   "media.kind.audio.music": "配乐",
   "media.kind.audio.sfx": "音效",
   "media.kind.audio.enhance": "音频处理",
+  "media.kind.audio.convert": "声音转换",
   "media.kind.text.asr": "语音转写",
   "media.kind.compose.assemble": "成片装配",
   "media.kind.analyze.qc": "质量检查",

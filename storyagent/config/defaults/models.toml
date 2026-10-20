@@ -24,6 +24,7 @@
 "video.lipsync" = "ltx-2.5-lipsync"
 "video.avatar" = "longcat-avatar-1.5-q4"
 "audio.tts" = "cosyvoice2-0.5b"
+"audio.convert" = "seed-vc"
 "text.asr" = "whisper-large-v3-turbo"
 "audio.music" = "acestep-1.5-turbo"
 "compose.assemble" = "ffmpeg-assemble"
@@ -274,6 +275,35 @@ speed = 1.0
 ref_min_sec = 3     # reference voice length window (3-10 s works best)
 ref_max_sec = 20
 auto_transcribe = true
+
+# Voice conversion (Seed-VC): the performance (words, timing, emotion, melody) of a source recording is re-voiced
+# as the reference speaker. Only the pitch-aware 44.1 kHz checkpoint is installed, so f0_condition stays true
+# (speech: auto_f0_adjust on; singing: off, use semi_tone_shift). Code is GPL-3.0; the checkpoints live in
+# ~/seed-vc/checkpoints (the weights' own terms were not verified here: check before commercial use).
+# Reference clips of 10-30 s match the timbre best.
+[models."seed-vc"]
+kind = "audio.convert"
+provider = "seedvc"
+version = "v1"
+heavy = false
+est_memory_gib = 8   # estimate; adjust after measuring
+license_tag = "gpl-3.0-code"
+commercial_ok = true
+prompt_profile = "plain"
+timeout_sec = 1800
+[models."seed-vc".params]
+diffusion_steps = 30
+length_adjust = 1.0
+inference_cfg_rate = 0.7
+f0_condition = true
+auto_f0_adjust = true
+fp16 = true
+ref_min_sec = 3
+ref_max_sec = 60
+[models."seed-vc".tiers.draft]
+diffusion_steps = 15
+[models."seed-vc".tiers.final]
+diffusion_steps = 50
 
 [models."whisper-large-v3-turbo"]
 kind = "text.asr"

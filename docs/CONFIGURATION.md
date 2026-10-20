@@ -16,14 +16,14 @@ Nothing is hard-wired: pipelines differ, so defaults are layered and every layer
 
 | File | Purpose |
 |---|---|
-| `services.toml` | `[services.<name>]` url/health_path/enabled/probe_only (comfy 8188, acestep 8001, ollama, llamacpp (off), fastvideo, nodus probe-only); `[tools.<name>]` binaries and model dirs (h3, longcat, cosyvoice, fastvideo, lora_train, ffmpeg); `[runtime]` worker knobs; `[healthcheck]` required + min_free_gib |
+| `services.toml` | `[services.<name>]` url/health_path/enabled/probe_only (comfy 8188, acestep 8001, ollama, llamacpp (off), fastvideo, nodus probe-only); `[tools.<name>]` binaries and model dirs (h3, longcat, cosyvoice, fastvideo, lora_train, mflux, whisper, seedvc, ffmpeg); `[runtime]` worker knobs; `[healthcheck]` required + min_free_gib |
 | `models.toml` | `[models.<ref>]`: kind, provider, family, version, heavy, est_memory_gib, license_tag, commercial_ok, attribution, prompt_profile, timeout_sec, `params`, `tiers.draft/preview/final`, extra (e.g. `train_template`); `[defaults]` kind -> default model |
 | `recipes.toml` | `[recipes.<name>]` ordered `[[steps]]` (kind, model, tier, slot, params, when). Validated at load; executed from R3 |
-| `compliance.toml` | `enabled`, `implicit_metadata`, `explicit_label` (`off|overlay|both`), `require_voice_consent`, `require_restricted_license_ack` |
+| `compliance.toml` | `enabled`, `implicit_metadata`, `explicit_label` (`off|overlay|both`), `require_voice_consent`, `require_likeness_consent`, `require_restricted_license_ack` |
 | `llm.toml` | `[llm.backends.*]` (`ollama`, `llamacpp`, `openai_compat`; url comes from a service or `url`) and `[llm.roles.*]` (backend + model + params per agent role, `default` is the fallback) |
 | `delivery.toml` | Delivery profiles and QC thresholds |
 
-`services.toml` also holds `[api]` for `storyagent serve`: `host`, `port`, `cors_origins` (browser origins allowed to call it; the Vite dev server by default), `sse_poll_seconds`, `sse_keepalive_seconds`. See [API.md](API.md).
+`services.toml` also holds `[api]` for `storyagent serve`: `host`, `port`, `cors_origins` (browser origins allowed to call it; the Vite dev server by default), `sse_poll_seconds`, `sse_keepalive_seconds`, `max_upload_mb` (largest accepted upload, default 2048). See [API.md](API.md).
 
 ## Environment variables
 

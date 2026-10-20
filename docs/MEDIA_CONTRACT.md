@@ -12,7 +12,7 @@ Code: `storyagent/media/`. Config: [CONFIGURATION.md](CONFIGURATION.md). Operati
 | **Asset** (`media_assets`) | A produced file: relative path, sha256, size, ffprobe facts, provenance, version. At most one `is_current` per (project, shot, kind, slot); the rest are candidates. | Only `is_current` / `trashed_at` |
 | **Adapter** | Wrapper around one runtime (ComfyUI, ACE-Step, CosyVoice, h3, ...). Never touches the DB. | n/a |
 
-`MediaKind` is `<domain>.<operation>`: `image.generate image.edit video.generate video.av video.avatar video.lipsync video.enhance audio.tts audio.music audio.sfx audio.enhance text.asr compose.assemble analyze.qc train.lora`.
+`MediaKind` is `<domain>.<operation>`: `image.generate image.edit video.generate video.av video.avatar video.lipsync video.enhance audio.tts audio.convert audio.music audio.sfx audio.enhance text.asr compose.assemble analyze.qc train.lora`.
 `QualityTier`: `draft | preview | final`.
 
 ## Job lifecycle
@@ -47,6 +47,36 @@ class Adapter(Protocol):
 Rules: raise `AdapterError(ErrorCode.X, ..., retryable=...)`; never invent parameter defaults you cannot justify (leave to config); write only inside `ctx.work_dir` (the worker moves artifacts into `projects/<slug>/media/<kind>/<shot>/`).
 Register in `media/registry.py`. The `fake` adapter exists only when `STORY_AGENT_ENABLE_FAKE=1` and defines the contract tests.
 
+## Asset references and the library
+
+Any value in a job's `inputs` / `params` (a list item, a nested field) may name an asset instead of a path:
+`asset:<32-hex id>` or `library:<role>/<name>` (or the dict forms `{"asset": id}` / `{"library": "role/name"}`).
+Only a whole value of exactly that shape counts, so prompts containing the word "asset:" are never rewritten.
+The worker resolves them to absolute paths **before** compliance and validation, so adapters only ever see paths;
+the ledger keeps the reference form and logs a `refs_resolved` event with the sha256 of every file used (reproducible).
+An unknown / trashed / missing reference fails the job `invalid_input` with the reference named.
+`library:voice/<name>` used as the whole `voice_ref` expands to `{audio, text, consent, consent_note}` from the item.
+
+The **library** (`media/library.py`, table `library_items`) is cross-project: publishing copies the file to
+`<home>/library/<role>/` with its own asset row (no project), so deleting the source project never breaks it.
+Roles: `voice portrait lora music sfx reference video`; names are unique per role (soft-deleted names are free again).
+Uploads (`import_file`) register outside files as `upload.<audio|image|video|model|file>` assets.
+
+## Adapters (live-verified on the reference machine unless noted)
+
+| Provider | Kinds | Runtime | Notes |
+|---|---|---|---|
+| `acestep` | audio.music | HTTP :8001 | `batch_size=1`; XL SFT model absent -> `missing_model` (honest) |
+| `phosphene` | video.av / video.generate / video.lipsync | LTX-2.5 panel :8198 | fake-panel tested only (panel was not running) |
+| `cosyvoice` | audio.tts | subprocess, one model load per job | zero-shot clone needs `voice_ref` {audio, text, consent}; `lines=[...]` batches |
+| `whisper` | text.asr | whisper-cli | transcript.txt + .srt; homophones ("工坊"/"工房") mean QC must compare fuzzily |
+| `mflux` | image.generate / image.edit | `mflux-generate-flux2[-edit]` | FLUX.2 has **no negative prompt** (dropped + `negative_prompt_ignored` event); tuned defaults 30 steps, guidance 4.0 |
+| `lora_train` | train.lora | `mflux-train` (heavy) | photos -> dataset -> `train.json` from `train_template` + params; adapter taken from `checkpoints/*_checkpoint.zip`; needs `consent` |
+| `seedvc` | audio.convert | Seed-VC `inference.py` (v1) | only the f0 44.1 kHz checkpoint is local -> `f0_condition=true`; v2 hangs on MPS; offline by default |
+
+Subprocess adapters share `adapters/_subprocess.py` (own session, log file, progress parsed from the log, terminate on cancel,
+no reattach). A failed job's `tool.log` is copied to `<home>/logs/jobs/<job id>.log` before its scratch directory is removed.
+
 ## Parameter resolution (`media/params.py`)
 
 adapter built-ins < `[models.X.params]` < `[models.X.tiers.<tier>]` < `projects.settings.models.X` < per-job/spec `params`. The final dict is stored in `media_jobs.params`. Unknown keys warn (block when `[runtime] strict_params = true`).
@@ -57,7 +87,7 @@ One heavy job at a time; at most `max_light_jobs` light jobs; `memory_budget_gib
 
 ## Compliance (`media/compliance.py`)
 
-On by default, switchable globally / per env / per project (see CONFIGURATION). When on: restricted-licence models need a project ack (`license_ack_required`), voice cloning needs recorded consent (`consent_required`). Provenance (model, version, params, seed, licence) is **always** recorded, independent of the switch. `redact_for_export` strips internal paths.
+On by default, switchable globally / per env / per project (see CONFIGURATION). When on: restricted-licence models need a project ack (`license_ack_required`), voice cloning / voice conversion need recorded consent on the reference voice, and LoRA training needs `inputs.consent` for the depicted person (`consent_required`; `require_voice_consent`, `require_likeness_consent`). Provenance (model, version, params, seed, licence) is **always** recorded, independent of the switch. `redact_for_export` strips internal paths.
 
 ## Error codes -> i18n
 
