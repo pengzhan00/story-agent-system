@@ -362,3 +362,15 @@ def test_a_stage_can_reshape_its_weight_without_the_bar_going_back() -> None:
     assert p.percent() == 75.0                 # plateau, not a rewind
     p.update("b", 2, 2, "")
     assert p.percent() == 100.0
+
+
+def test_an_edited_line_reaches_its_spec_without_force(tmp_path: Path) -> None:
+    engine, _, _ = make_engine(tmp_path)
+    pid = new_project(engine)
+    run_all(engine, pid)
+    shot = engine.store.list_shots(pid)[0]
+    engine.store.update_shot(shot["id"], {"dialogue": [{"character": NAMES[0], "line": "Edited!", "emotion": "calm"}]})
+    out = engine.run(pid, ["specs"], {"visual_prompts": False})["specs"]       # no force
+    line = engine.spec_store.current(pid, "dialogue.line", f"{shot['id']}#0")
+    assert line.text_payload == "Edited!" and line.version == 2 and out["refreshed"] >= 1
+    assert engine.spec_store.current(pid, "shot.keyframe", str(shot["id"])).version == 1     # prompts were left alone

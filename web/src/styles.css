@@ -104,3 +104,9 @@ details > summary { cursor: pointer; }
 input[type="number"] { width: 5.5rem; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
 .episode { width: 100%; max-width: 360px; max-height: 70vh; margin: 0 auto; border-radius: 8px; background: #000; display: block; }
 .plain { margin: 0; padding-left: 18px; }
+.edit-row td { background: var(--bg); }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.form-grid .wide { grid-column: 1 / -1; }
+.line-row select { min-width: 120px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.line-row input { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); min-width: 0; }
+button.link.bad { color: var(--bad); }

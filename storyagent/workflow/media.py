@@ -152,7 +152,7 @@ def produce(ctx: Ctx) -> dict[str, Any]:
     ctx.hint_weight(_expected_seconds(ctx, ledger, specs, tier))
     ctx.step(0, max(total_planned, 1), "")
     done_before = 0
-    for phase in PHASES:
+    for number, phase in enumerate(PHASES, 1):
         plan = _plan_phase(ctx, ledger, specs, phase, skipped, tier, counts)
         if not plan:
             continue
@@ -160,7 +160,7 @@ def produce(ctx: Ctx) -> dict[str, Any]:
         for _spec, job in plan:
             rec, _ = ledger.enqueue(job, ctx.project.settings)
             jobs.append(rec)
-        label = f"spec.subject.{phase[0]}|{len(plan)}"
+        label = f"workflow.progress.phase.{number}|({len(plan)})"
 
         def report(done: int, n: int, bad: int, base: int = done_before, text: str = label) -> None:
             ctx.step(base + done, max(total_planned, base + n), text)

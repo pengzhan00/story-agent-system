@@ -128,11 +128,23 @@ def seed_specs(ctx: Ctx) -> dict[str, Any]:
     shots = store.list_shots(ctx.pid)
     use_llm = bool(ctx.params.get("visual_prompts", True))
     previous = ""
+
+    def sync_dialogue(shot: dict[str, Any]) -> None:
+        """Spoken lines follow the story every time (cheap, deterministic): an edited line reaches its spec."""
+        sid = str(shot["id"])
+        for idx, line in enumerate(shot["dialogue"]):
+            who = chars.get(line["character"])
+            vparam = _voice_param(who) if who else None
+            seeder.sync(DIALOGUE, f"{sid}#{idx}", MediaKind.AUDIO_TTS, prompt=line.get("emotion", ""),
+                        text_payload=line["line"], params={"voice_ref": vparam} if vparam else {},
+                        depends_on=seeder.dep(voices.get(line["character"])))
+
     for i, shot in enumerate(shots):
         ctx.step(len(chars) + i, len(chars) + len(shots), f"shot {shot['id']}")
         sid = str(shot["id"])
         have = specs.current(ctx.pid, KEYFRAME, sid)
         if have is not None and not ctx.force():
+            sync_dialogue(shot)
             previous = shot["narration"]
             continue
         prompts = _shot_prompts(ctx, shot, chars, style, previous, use_llm)
@@ -145,12 +157,7 @@ def seed_specs(ctx: Ctx) -> dict[str, Any]:
                           negative_prompt=prompts["negative_prompt"] or neg, refs=refs, depends_on=deps)
         seeder.sync(VIDEO, sid, MediaKind.VIDEO_GENERATE, prompt=prompts["video_prompt"],
                     negative_prompt=prompts["negative_prompt"] or neg, depends_on=seeder.dep(key))
-        for idx, line in enumerate(shot["dialogue"]):
-            who = chars.get(line["character"])
-            vparam = _voice_param(who) if who else None
-            seeder.sync(DIALOGUE, f"{sid}#{idx}", MediaKind.AUDIO_TTS, prompt=line.get("emotion", ""),
-                        text_payload=line["line"], params={"voice_ref": vparam} if vparam else {},
-                        depends_on=seeder.dep(voices.get(line["character"])))
+        sync_dialogue(shot)
         previous = shot["narration"]
     ctx.step(total + len(shots), total + len(shots), "done")
     return {"created": seeder.created, "refreshed": seeder.refreshed, "kept_user_edits": seeder.kept,

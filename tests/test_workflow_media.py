@@ -102,7 +102,7 @@ def test_produce_makes_every_spec_in_dependency_order_and_is_resumable(tmp_path:
     # progress: monotonic item counts, labelled with i18n keys
     counts = [d for _, d, _, _ in seen]
     assert counts == sorted(counts) and seen[-1][1] == seen[-1][2]
-    assert any(m.startswith("spec.subject.shot.video|") for _, _, _, m in seen)
+    assert any(m.startswith("workflow.progress.phase.3|") for _, _, _, m in seen)
     # second run: nothing to do
     again = engine.run_stage(1, "produce", {})
     assert again["made"] == 0 and again["reused"] == MADE
