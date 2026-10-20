@@ -542,5 +542,10 @@
   "web.jobs.d.params": "Parameters used (all layers resolved)",
   "web.jobs.d.events": "What happened",
   "web.jobs.d.error": "Error",
-  "web.jobs.d.spec": "From spec"
+  "web.jobs.d.spec": "From spec",
+  "web.flow.no_model": "No model is configured for this: nothing is made (the step is skipped and says so).",
+  "api.error.heavy_busy": "A heavy video/avatar job is running; a language model cannot run next to it.",
+  "api.error.heavy_busy.remediation": "Wait for that job to finish (Jobs page) and try again. Running both at once can exhaust memory.",
+  "llm.error.heavy_busy": "A heavy media job is running; the language model must wait for it.",
+  "llm.error.heavy_busy.remediation": "The step continues by itself when the heavy job is done; run it again if it gave up waiting."
 }

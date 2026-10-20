@@ -185,3 +185,51 @@ def test_openai_compat_client_uses_response_format_and_bearer() -> None:
         req = next(r for r in srv.requests if r.path == "/v1/chat/completions")
         assert req.json["response_format"]["json_schema"]["schema"] == {"type": "object", "properties": {}}
         assert req.json["max_tokens"] == 4096 and "messages" in req.json
+
+
+# ---- memory safety: no language-model call next to a heavy media job ---------------------------------
+def _heavy_job(db: Database, status: str) -> None:
+    db.conn.execute("INSERT INTO projects(slug, name) VALUES ('p', 'P')")
+    db.conn.execute("INSERT INTO media_jobs(id, project_id, kind, provider, model_ref, heavy, status)"
+                    " VALUES ('j1', 1, 'video.avatar', 'longcat', 'm', 1, ?)", (status,))
+
+
+def test_a_call_is_refused_at_once_while_a_heavy_job_runs(lsettings: Settings, tmp_path: Path) -> None:
+    db = Database(tmp_path / "x.db")
+    migrate(db)
+    _heavy_job(db, "running")
+    c = ScriptedClient(['{"a": 1}'])
+    r = router(lsettings, c, db)
+    r.heavy_wait_sec = 0
+    with pytest.raises(LLMError) as err:
+        r.json("writer", "p", schema=None)
+    assert err.value.code == "heavy_busy" and c.calls == []            # the model was never asked
+
+
+def test_a_call_waits_for_the_heavy_job_to_finish(lsettings: Settings, tmp_path: Path) -> None:
+    import threading
+    import time
+
+    db = Database(tmp_path / "y.db")
+    migrate(db)
+    _heavy_job(db, "running")
+    c = ScriptedClient(['{"a": 1}'])
+    r = router(lsettings, c, db)
+    r.heavy_wait_sec = 20
+
+    def finish() -> None:
+        time.sleep(0.5)
+        other = Database(tmp_path / "y.db")
+        other.conn.execute("UPDATE media_jobs SET status='completed' WHERE id='j1'")
+
+    threading.Thread(target=finish, daemon=True).start()
+    assert r.json("writer", "p", schema=None) == {"a": 1} and len(c.calls) == 1
+
+
+def test_light_or_finished_jobs_do_not_block_the_model(lsettings: Settings, tmp_path: Path) -> None:
+    db = Database(tmp_path / "z.db")
+    migrate(db)
+    _heavy_job(db, "completed")
+    r = router(lsettings, ScriptedClient(['{"a": 1}']), db)
+    r.heavy_wait_sec = 0
+    assert r.json("writer", "p", schema=None) == {"a": 1}

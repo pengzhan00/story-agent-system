@@ -287,3 +287,24 @@ def test_the_project_overview_points_at_the_finished_episode(client: TestClient,
     client.delete(f"/api/projects/{pid}")
     assert client.get("/api/projects/overview").json() == []
     assert client.get("/api/projects/overview", params={"trashed": True}).json()[0]["id"] == pid
+
+
+def test_the_flow_names_the_default_model_for_specs_that_have_none(client: TestClient, fsettings: Settings) -> None:
+    pid = new_project(client)
+    started(client, pid)
+    run_to_end(fsettings)
+    steps = {s["stage"]: s for s in client.get("/api/flow", params={"project_id": pid}).json()["steps"]}
+    refs = {m["subject"]: [x["ref"] for x in m["models"]] for m in steps["produce"]["media"]}
+    assert refs["shot.video"] and refs["shot.video"][0] and refs["dialogue.line"][0]
+    assert refs["sfx.cue"] == [""]                      # no sound-effect model is configured: shown as such
+
+
+def test_script_review_is_refused_while_a_heavy_job_runs(client: TestClient, fsettings: Settings) -> None:
+    pid = new_project(client)
+    started(client, pid)
+    run_to_end(fsettings)
+    db = Database(fsettings.db_path)
+    db.conn.execute("INSERT INTO media_jobs(id, project_id, kind, provider, model_ref, heavy, status)"
+                    " VALUES ('hj', ?, 'video.avatar', 'longcat', 'x', 1, 'running')", (pid,))
+    r = client.post(f"/api/projects/{pid}/review")
+    assert r.status_code == 409 and r.json()["error"]["code"] == "heavy_busy"

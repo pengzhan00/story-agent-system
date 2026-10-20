@@ -92,8 +92,12 @@ def review_script(project_id: int, request: Request, episode: int = 1) -> Script
     """Ask the script editor agent for a critique (a language-model call: can take a minute; changes nothing)."""
     ctx = ctx_of(request)
     ctx.projects.get(project_id)
+    engine = WorkflowEngine(ctx.settings, ctx.db, spec_store=ctx.specs)
+    engine.router.heavy_wait_sec = 0          # a request must not hang for minutes behind a video model
     try:
-        data = WorkflowEngine(ctx.settings, ctx.db, spec_store=ctx.specs).review_script(project_id, episode)
+        data = engine.review_script(project_id, episode)
     except LLMError as exc:
+        if exc.code == "heavy_busy":
+            raise ApiError(409, "heavy_busy", exc.message) from exc
         raise ApiError(502, "llm_failed", f"{exc.code}: {exc.message}") from exc
     return ScriptReviewOut.model_validate(data)

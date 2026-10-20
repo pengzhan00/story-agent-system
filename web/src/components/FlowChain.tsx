@@ -22,6 +22,7 @@ function MediaRow({ m, health }: { m: FlowMedia; health: Map<string, { ok: boole
         ) : null}
       </div>
       {m.models.map((model) => {
+        if (!model.ref) return <p key="none" className="small bad">{t("web.flow.no_model")}</p>;
         const h = model.provider ? health.get(`adapter.${model.provider}`) : undefined;
         return (
           <details key={model.ref} className="flow-model">

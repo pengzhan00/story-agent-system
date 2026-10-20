@@ -53,6 +53,8 @@ MEDIA: tuple[tuple[str, MediaKind, int], ...] = (
 
 
 def _model_info(settings: Settings, ref: str) -> dict[str, Any]:
+    if not ref:
+        return {"ref": "", "known": False}
     try:
         m = settings.model(ref)
     except ConfigError:
@@ -107,12 +109,15 @@ def describe_flow(
         if stage == "produce":
             for subject, kind, phase in MEDIA:
                 counts = _counts(db, ledger, project_id, subject) if project_id is not None else None
-                refs = list(counts["models"]) if counts and counts["models"] else []
-                if not refs:
-                    try:
-                        refs = [settings.default_model(kind.value).ref]
-                    except ConfigError:
-                        refs = []
+                try:
+                    default_ref = settings.default_model(kind.value).ref
+                except ConfigError:
+                    default_ref = ""
+                # a spec without its own model uses the kind's default when the job is made
+                refs = list(dict.fromkeys((r or default_ref) for r in (counts["models"] if counts else [])))
+                if not refs and default_ref:
+                    refs = [default_ref]
+                refs = [r for r in refs if r] or [""]            # "" = nothing configured for this kind
                 step["media"].append({
                     "subject": subject, "kind": kind.value, "phase": phase, "counts": counts,
                     "models": [_model_info(settings, r) for r in refs]})

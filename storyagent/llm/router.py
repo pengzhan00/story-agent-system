@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from collections.abc import Callable, Mapping
 from typing import Any
 
@@ -34,6 +35,7 @@ class LLMRouter:
         on_call: Callable[[dict[str, Any]], None] | None = None,
     ) -> None:
         self.settings, self.db, self.on_call = settings, db, on_call
+        self.heavy_wait_sec = float(settings.runtime.get("llm_wait_for_heavy_sec", 900))
         self._clients: dict[str, LLMBackendClient] = dict(clients or {})
         self._models: dict[str, list[str]] = {}
 
@@ -89,11 +91,29 @@ class LLMRouter:
             except Exception:  # the audit log must never break generation  # noqa: BLE001
                 log.warning("could not write generation_logs", exc_info=True)
 
+    def _heavy_jobs_running(self) -> int:
+        if self.db is None:
+            return 0
+        row = self.db.conn.execute(
+            "SELECT COUNT(*) AS n FROM media_jobs WHERE status='running' AND heavy=1").fetchone()
+        return int(row["n"])
+
+    def _wait_for_heavy(self) -> None:
+        """A model that fits next to a light job does not fit next to a heavy one: hold the call (or refuse it)."""
+        if self._heavy_jobs_running() == 0:
+            return
+        deadline = time.monotonic() + max(self.heavy_wait_sec, 0.0)
+        while self._heavy_jobs_running() > 0:
+            if time.monotonic() >= deadline:
+                raise LLMError("heavy_busy", "a heavy media job is running; the language model must wait for it")
+            time.sleep(min(2.0, max(deadline - time.monotonic(), 0.05)))
+
     # -- calls --------------------------------------------------------------------------------
     def chat(
         self, role: str, prompt: str, *, system: str = "", project_id: int | None = None, model: str = "",
         schema: dict[str, Any] | None = None, label: str = "", **opts: Any,
     ) -> ChatResult:
+        self._wait_for_heavy()
         backend, model_name, params = self.resolve(role, model)
         merged = {"temperature": 0.7, "max_tokens": 4096, **params, **opts}
         res = self.client(backend).chat(

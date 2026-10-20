@@ -542,5 +542,10 @@
   "web.jobs.d.params": "实际使用的参数（各层已合并）",
   "web.jobs.d.events": "过程记录",
   "web.jobs.d.error": "错误",
-  "web.jobs.d.spec": "来自规格"
+  "web.jobs.d.spec": "来自规格",
+  "web.flow.no_model": "这一项没有配置模型：不会生成（该步骤会跳过并说明）。",
+  "api.error.heavy_busy": "有一个重型视频/数字人任务正在运行，语言模型不能同时运行。",
+  "api.error.heavy_busy.remediation": "等那个任务完成（见「任务」页）再试。两者同时跑可能把内存占满。",
+  "llm.error.heavy_busy": "有重型媒体任务在运行，语言模型需要等它结束。",
+  "llm.error.heavy_busy.remediation": "重型任务结束后这一步会自己继续；若等待超时放弃了，请再运行一次。"
 }
