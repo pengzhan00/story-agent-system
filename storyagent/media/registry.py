@@ -45,7 +45,19 @@ def _phosphene(settings: Settings) -> Adapter:
     return PhospheneAdapter(ServiceClient(settings.service("phosphene")))
 
 
-_BUILTIN: list[Callable[[Settings], Adapter]] = [_acestep, _phosphene]
+def _cosyvoice(settings: Settings) -> Adapter:
+    from .adapters.cosyvoice import CosyVoiceAdapter
+
+    return CosyVoiceAdapter()
+
+
+def _whisper(settings: Settings) -> Adapter:
+    from .adapters.whisper import WhisperAdapter
+
+    return WhisperAdapter()
+
+
+_BUILTIN: list[Callable[[Settings], Adapter]] = [_acestep, _phosphene, _cosyvoice, _whisper]
 
 
 def default_registry(settings: Settings) -> AdapterRegistry:

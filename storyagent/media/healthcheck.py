@@ -22,6 +22,7 @@ import requests
 from storyagent.config import ConfigError, Settings, get_settings
 from storyagent.i18n import set_locale, t
 
+from .asr import find_whisper
 from .contracts import HealthState
 from .llm_resident import ResidentLLMProbe, build_probes
 from .probe import find_tool
@@ -114,6 +115,12 @@ def _check_tools(settings: Settings, run: Runner) -> list[Entry]:
         [] if _exists(tp("cosyvoice", "python"), executable=True) and _exists(tp("cosyvoice", "script"))
         else ["cosyvoice runtime"],
         [] if _exists(tp("cosyvoice", "model_dir")) else ["CosyVoice2-0.5B"],
+    )
+    wh_model = tp("whisper", "model")
+    entry(
+        "whisper",
+        [] if find_whisper(settings) else ["whisper-cli"],
+        [] if wh_model and wh_model.is_file() else ["whisper model"],
     )
     fv_w = tp("fastvideo", "weights_dir")
     entry(

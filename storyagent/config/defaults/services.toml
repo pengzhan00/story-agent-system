@@ -67,6 +67,11 @@ command = "~/.local/bin/mflux-train"
 root = "~/myworkspace/flux2-lora"
 base_model_dir = "~/models/flux2-klein-base-4B"
 
+# whisper.cpp (ASR: subtitles, transcript of a cloning reference, back-check of generated dialogue).
+[tools.whisper]
+binary = "whisper-cli"   # a name on PATH or an absolute path
+model = "~/myworkspace/models/whisper/ggml-large-v3-turbo.bin"
+
 [tools.ffmpeg]
 # Needs libass (subtitles filter) and ideally whisper: use ffmpeg-full. Falls back to PATH if the file is missing.
 binary = "/opt/homebrew/opt/ffmpeg-full/bin/ffmpeg"

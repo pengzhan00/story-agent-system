@@ -23,6 +23,7 @@
 "video.lipsync" = "ltx-2.5-lipsync"
 "video.avatar" = "longcat-avatar-1.5-q4"
 "audio.tts" = "cosyvoice2-0.5b"
+"text.asr" = "whisper-large-v3-turbo"
 "audio.music" = "acestep-1.5-turbo"
 "compose.assemble" = "ffmpeg-assemble"
 "train.lora" = "flux2-klein-4b-lora-trainer"
@@ -221,7 +222,23 @@ timeout_sec = 900
 [models."cosyvoice2-0.5b".params]
 mode = "zero_shot"
 sample_rate = 24000
-output_format = "mp3"
+output_format = "wav"
+speed = 1.0
+ref_min_sec = 3     # reference voice length window (3-10 s works best)
+ref_max_sec = 20
+auto_transcribe = true
+
+[models."whisper-large-v3-turbo"]
+kind = "text.asr"
+provider = "whisper"
+version = "ggml-large-v3-turbo"
+heavy = false
+est_memory_gib = 3
+license_tag = "mit"
+commercial_ok = true
+timeout_sec = 900
+[models."whisper-large-v3-turbo".params]
+language = "zh"
 
 [models."minimax-h3"]
 kind = "video.av"
