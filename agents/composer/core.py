@@ -41,7 +41,7 @@ Design a complete music concept including:
 5. Emotional arc (how the piece progresses)
 6. Leitmotif ideas (recurring melodic phrases)
 7. Reference tracks (what existing music is similar in feel)
-8. A generation prompt suitable for AI music generators (MusicGen/Suno)
+8. A generation prompt suitable for the project's music generation backend
 
 Output JSON (no markdown):
 {{
@@ -52,7 +52,7 @@ Output JSON (no markdown):
     "instruments": "detailed instrumentation list",
     "key_signature": "key and mode (e.g. D minor)",
     "description": "full music description and emotional journey",
-    "prompt_for_gen": "detailed prompt for Suno/MusicGen AI music generation",
+    "prompt_for_gen": "detailed prompt for AI music generation",
     "reference": "similar existing music for reference"
 }}
 """
@@ -117,7 +117,7 @@ Output JSON (no markdown):
     "key_signature": "key recommendation",
     "description": "how the music evolves with the scene",
     "duration_hint": "suggested duration",
-    "prompt_for_gen": "detailed prompt for MusicGen/Suno generation",
+    "prompt_for_gen": "detailed prompt for AI music generation",
     "loopable": "yes/no - can this loop seamlessly"
 }}
 """

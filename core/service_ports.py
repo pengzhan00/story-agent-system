@@ -26,17 +26,53 @@ from urllib.parse import urlparse
 
 import requests
 
+def _safe_print(msg: str) -> None:
+    """Print without raising BrokenPipeError (Gradio subprocess stdout may be closed)."""
+    try:
+        print(msg, flush=True)
+    except (BrokenPipeError, OSError):
+        pass
+
 # ── port scan order ───────────────────────────────────────────────────────────
-# ComfyUI community default is 8188; Desktop/App variants commonly use 8000/8080.
-# Do not probe 8001 here — that is reserved for ACE-Step and creates noisy 404s.
-COMFYUI_PORTS: list[int] = [8188, 8000, 8080]
-# ACEStep API server defaults to 8001 (start_api_server_macos.sh)
-ACESTEP_PORTS: list[int] = [8001, 8002, 8003]
+# ComfyUI project ports (远离 app 默认端口，避免冲突)
+COMFYUI_PORTS: list[int] = [13201]
+# ACEStep project ports
+ACESTEP_PORTS: list[int] = [13200]
 
 # ACE-Step-1.5 source directory (has its own .venv)
 ACESTEP_DIR = Path(os.path.expanduser("~/ACE-Step-1.5"))
 # The venv created by `uv sync` inside ACE-Step-1.5
 ACESTEP_VENV_PYTHON = ACESTEP_DIR / ".venv" / "bin" / "python3.12"
+
+
+def _acestep_env_pairs() -> list[tuple[str, str]]:
+    """Build the project-approved ACE-Step runtime env list.
+
+    Validated baseline for this project (Apple Silicon MPS, MLX 0.31.2):
+      - ACESTEP_LM_BACKEND=mlx          — MLX accelerates LLM (text→caption)
+      - ACESTEP_INIT_LLM=true           — load LLM weights at startup, not on first request
+      - TOKENIZERS_PARALLELISM=false    — suppress HuggingFace tokenizer fork warning
+      - PYTHONPATH=<acestep-dir>        — ACE-Step source must be on path
+      - ACESTEP_DISABLE_MLX_DIT=true   — REQUIRED on MLX 0.31.2: mx.Stream(mx.gpu) was
+                                          removed; if MLX DiT is allowed to initialise it
+                                          silently falls back to a broken MPS state and
+                                          produces pure noise. PyTorch MPS DiT is the
+                                          correct backend. Set to "false" only when MLX is
+                                          upgraded to a version that restores the Stream API.
+    """
+    env_pairs = [
+        ("ACESTEP_LM_BACKEND",        os.getenv("ACESTEP_LM_BACKEND", "mlx")),
+        ("ACESTEP_INIT_LLM",          os.getenv("ACESTEP_INIT_LLM", "true")),
+        ("TOKENIZERS_PARALLELISM",    os.getenv("TOKENIZERS_PARALLELISM", "false")),
+        ("PYTHONPATH",                str(ACESTEP_DIR)),
+        ("ACESTEP_CONFIG_PATH",       os.getenv("ACESTEP_CONFIG_PATH", "acestep-v15-turbo")),
+        # Always disable MLX DiT on this project — see docstring above.
+        ("ACESTEP_DISABLE_MLX_DIT",   os.getenv("ACESTEP_DISABLE_MLX_DIT", "true")),
+    ]
+    lm_model_path = os.getenv("ACESTEP_LM_MODEL_PATH", "").strip()
+    if lm_model_path:
+        env_pairs.append(("ACESTEP_LM_MODEL_PATH", lm_model_path))
+    return env_pairs
 
 # ── module-level cache ────────────────────────────────────────────────────────
 _lock = threading.Lock()
@@ -86,7 +122,7 @@ def comfyui_api_base() -> str:
     configured = _configured_comfyui_url()
     if configured:
         return _comfyui_api or _normalize_comfyui_candidate(configured)[1]
-    return _comfyui_api or (_comfyui_url or "http://127.0.0.1:8188")
+    return _comfyui_api or (_comfyui_url or "http://127.0.0.1:13201")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -171,16 +207,16 @@ def _scan_comfyui() -> Optional[tuple[str, str]]:
         if explicit:
             base, api_base = explicit
             suffix = " [App /api]" if api_base.endswith("/api") else " [CLI]"
-            print(f"[ServicePorts] ComfyUI found via COMFYUI_URL={configured}{suffix}")
+            _safe_print(f"[ServicePorts] ComfyUI found via COMFYUI_URL={configured}{suffix}")
             return base, api_base
-        print(f"[ServicePorts] COMFYUI_URL 已配置但当前不可达: {configured}")
+        _safe_print(f"[ServicePorts] COMFYUI_URL 已配置但当前不可达: {configured}")
         return None
     for port in COMFYUI_PORTS:
         api_base = _probe_comfyui(port)
         if api_base:
             base = f"http://127.0.0.1:{port}"
             suffix = " [App /api]" if api_base.endswith("/api") else " [CLI]"
-            print(f"[ServicePorts] ComfyUI found on port {port}{suffix}")
+            _safe_print(f"[ServicePorts] ComfyUI found on port {port}{suffix}")
             return base, api_base
     return None
 
@@ -188,7 +224,7 @@ def _scan_comfyui() -> Optional[tuple[str, str]]:
 def _scan_acestep() -> Optional[str]:
     for port in ACESTEP_PORTS:
         if _probe_acestep(port):
-            print(f"[ServicePorts] ACEStep API found on port {port}")
+            _safe_print(f"[ServicePorts] ACEStep API found on port {port}")
             return f"http://127.0.0.1:{port}"
     return None
 
@@ -289,17 +325,16 @@ def _launch_acestep() -> Optional[str]:
     port = ACESTEP_PORTS[0]
     logfile = "/tmp/acestep_auto.log"
 
+    env_prefix = " ".join(f"{k}={shlex.quote(v)}" for k, v in _acestep_env_pairs())
+
     # Prefer the .venv shipped with ACE-Step-1.5 (python3.12, all deps installed
-    # by prior `uv sync`).  Set PYTHONPATH so `import acestep` resolves from
-    # the source tree without needing a proper editable-install.
-    # This completely avoids `uv run` and its cross-platform dep resolution.
+    # by prior `uv sync`).  Keep all runtime env in the same shell command so
+    # the backgrounded process inherits the validated Apple Silicon settings.
     if ACESTEP_VENV_PYTHON.exists():
         python_exe = ACESTEP_VENV_PYTHON
         cmd = (
             f"cd {ACESTEP_DIR} && "
-            f"ACESTEP_LM_BACKEND=mlx "
-            f"TOKENIZERS_PARALLELISM=false "
-            f"PYTHONPATH={ACESTEP_DIR} "
+            f"export {env_prefix} && "
             f"nohup {python_exe} "
             f"  {ACESTEP_DIR}/acestep/api_server.py "
             f"  --host 127.0.0.1 --port {port} "
@@ -310,8 +345,7 @@ def _launch_acestep() -> Optional[str]:
         print("[ServicePorts] ACE-Step .venv not found — falling back to uv run")
         cmd = (
             f"cd {ACESTEP_DIR} && "
-            f"ACESTEP_LM_BACKEND=mlx "
-            f"TOKENIZERS_PARALLELISM=false "
+            f"export {env_prefix} && "
             f"nohup uv run --no-sync acestep-api "
             f"  --host 127.0.0.1 --port {port} "
             f"> {logfile} 2>&1 &"
@@ -335,7 +369,15 @@ def _launch_acestep() -> Optional[str]:
             try:
                 r = requests.post(
                     f"{url}/v1/init",
-                    json={"init_llm": True, "lm_model_path": "acestep-5Hz-lm-1.7B"},
+                    json={
+                        "model": os.getenv("ACESTEP_CONFIG_PATH", "acestep-v15-turbo"),
+                        "init_llm": True,
+                        **(
+                            {"lm_model_path": os.getenv("ACESTEP_LM_MODEL_PATH", "").strip()}
+                            if os.getenv("ACESTEP_LM_MODEL_PATH", "").strip()
+                            else {}
+                        ),
+                    },
                     timeout=300,   # allow up to 5 min for first MLX compilation
                 )
                 if r.status_code == 200:

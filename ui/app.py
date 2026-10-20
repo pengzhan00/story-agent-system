@@ -1944,7 +1944,9 @@ def quick_video_flow(prompt, bgm_prompt, duration_sec, aspect_ratio, product_tar
         "auto（自动）": "",
         "本机友好成片（AI 分镜图 → 运镜合成）": "local_storyboard_reel",
         "Qwen 云端重视频（API）": "qwen_wan_cloud",
-        "LTX 本机直出视频": "ltx_t2v",
+        "LTX 单镜头（I2V / 局部续写）": "ltx_i2v",
+        "LTX 单镜头（需要参考图）": "ltx_i2v",
+        "LTX 单镜头概念探索（纯 T2V，实验）": "ltx_t2v_only",
     }
     # 直接传中文别名（get_preset 能识别所有选项）
     aspect_map = {
@@ -1961,6 +1963,13 @@ def quick_video_flow(prompt, bgm_prompt, duration_sec, aspect_ratio, product_tar
     chosen_pipeline = pipeline_map.get(pipeline_choice or "", "")
     reference_image_path = (reference_image_path or "").strip()
     has_reference = bool(reference_image_path and Path(reference_image_path).exists())
+    if execution_route in {"LTX 单镜头（I2V / 局部续写）", "LTX 单镜头（需要参考图）"} and not has_reference:
+        yield (
+            "当前未提供真实参考图。",
+            gr.update(value=None, visible=False),
+            "### ⛔ 已阻止\nLTX 现仅用于单镜头 I2V / 局部续写。请上传角色或首帧参考图，或改走“本机友好成片（AI 分镜图 → 运镜合成）”。",
+        )
+        return
     allow_fallback = True
     audio_mode = "auto"
     strict_production = False
@@ -1970,8 +1979,10 @@ def quick_video_flow(prompt, bgm_prompt, duration_sec, aspect_ratio, product_tar
         if not chosen_pipeline:
             if execution_route == "Qwen 云端重视频（API）":
                 chosen_pipeline = "qwen_wan_cloud"
-            elif execution_route == "LTX 本机直出视频":
-                chosen_pipeline = "ltx_t2v"
+            elif execution_route in {"LTX 单镜头（I2V / 局部续写）", "LTX 单镜头（需要参考图）"}:
+                chosen_pipeline = "ltx_i2v"
+            elif execution_route == "LTX 单镜头概念探索（纯 T2V，实验）":
+                chosen_pipeline = "ltx_t2v_only"
             else:
                 chosen_pipeline = "local_storyboard_reel"
         allow_fallback = True
@@ -1979,8 +1990,10 @@ def quick_video_flow(prompt, bgm_prompt, duration_sec, aspect_ratio, product_tar
         if not chosen_pipeline:
             if execution_route == "Qwen 云端重视频（API）":
                 chosen_pipeline = "qwen_wan_cloud"
-            elif execution_route == "LTX 本机直出视频":
-                chosen_pipeline = "ltx_t2v"
+            elif execution_route in {"LTX 单镜头（I2V / 局部续写）", "LTX 单镜头（需要参考图）"}:
+                chosen_pipeline = "ltx_i2v"
+            elif execution_route == "LTX 单镜头概念探索（纯 T2V，实验）":
+                chosen_pipeline = "ltx_t2v_only"
             else:
                 chosen_pipeline = "local_storyboard_reel"
         allow_fallback = False
@@ -1989,8 +2002,10 @@ def quick_video_flow(prompt, bgm_prompt, duration_sec, aspect_ratio, product_tar
         if not chosen_pipeline:
             if execution_route == "Qwen 云端重视频（API）":
                 chosen_pipeline = "qwen_wan_cloud"
-            elif execution_route == "LTX 本机直出视频":
-                chosen_pipeline = "ltx_t2v"
+            elif execution_route in {"LTX 单镜头（I2V / 局部续写）", "LTX 单镜头（需要参考图）"}:
+                chosen_pipeline = "ltx_i2v"
+            elif execution_route == "LTX 单镜头概念探索（纯 T2V，实验）":
+                chosen_pipeline = "ltx_t2v_only"
             else:
                 chosen_pipeline = "local_storyboard_reel"
         allow_fallback = True
@@ -2027,7 +2042,9 @@ def quick_video_flow(prompt, bgm_prompt, duration_sec, aspect_ratio, product_tar
     elif chosen_pipeline == "qwen_wan_cloud":
         log_lines.append("☁️ 当前走 Qwen 云端重视频：适合偶尔做重视频，不占本机视频引擎。")
     elif has_reference:
-        log_lines.append("🖼️ 已检测到参考图：本机路线会把它当角色/画面锚点优先利用。")
+        log_lines.append("🖼️ 已检测到参考图：LTX 将按单镜头 I2V / 局部续写方式处理。")
+    elif chosen_pipeline == "ltx_t2v_only":
+        log_lines.append("🧪 当前走 LTX 单镜头纯 T2V 实验路线：只适合概念探索，不承诺角色一致性。")
     else:
         log_lines.append("🧪 当前走实验链：仅用于摸底验证，不作为本机默认生产。")
 
@@ -2218,15 +2235,17 @@ def _pipeline_choices():
             status_icon = "⚪"
         # 提取层级标签：生产主链 / 实验链 / 兜底
         tier_tag = ""
-        if "【生产主力】" in desc:
+        if "【默认单镜头】" in desc or "【生产主力】" in desc:
             tier_tag = "🏭生产"
-        elif "【实验链】" in desc:
+        elif "【实验单镜头】" in desc or "【实验链】" in desc:
             tier_tag = "🧪实验"
         elif "【兜底】" in desc:
             tier_tag = "🔧兜底"
         # 去掉描述中的中文标签，只保留核心说明
         core_desc = (
-            desc.replace("【生产主力】", "")
+            desc.replace("【默认单镜头】", "")
+            .replace("【实验单镜头】", "")
+            .replace("【生产主力】", "")
             .replace("【实验链】", "")
             .replace("【兜底】", "")
             .strip()
@@ -2830,7 +2849,11 @@ def collect_backend_readiness(auto_launch_comfyui: bool = False, auto_launch_ace
             "ready": bool(comfy.get("online")),
             "detail": comfy.get("api_base") or comfy.get("url") or "ComfyUI 未启动",
         }
+    except Exception as e:
+        readiness["comfyui"] = {"ready": False, "detail": str(e)}
 
+    try:
+        from core.service_ports import get_acestep_url, acestep_status_dict
         if auto_launch_acestep:
             get_acestep_url(auto_launch=True)
         ace = acestep_status_dict()
@@ -2839,7 +2862,7 @@ def collect_backend_readiness(auto_launch_comfyui: bool = False, auto_launch_ace
             "detail": ace.get("url") or "ACE-Step 未启动",
         }
     except Exception as e:
-        readiness["comfyui"] = {"ready": False, "detail": str(e)}
+        readiness["acestep"] = {"ready": False, "detail": str(e)}
 
     try:
         from pipelines.render_pipeline import get_dispatcher
@@ -3567,8 +3590,8 @@ def build_ui():
                     )
                     home_execution_route = gr.Radio(
                         label="② 执行路线",
-                        choices=["LTX 本机直出视频", "本机友好成片（AI 分镜 → 运镜）", "Qwen 云端（API）"],
-                        value="LTX 本机直出视频",
+                        choices=["LTX 单镜头（需要参考图）", "LTX 单镜头概念探索（纯 T2V，实验）", "本机友好成片（AI 分镜 → 运镜）"],
+                        value="本机友好成片（AI 分镜 → 运镜）",
                         interactive=True,
                     )
 
@@ -3578,7 +3601,7 @@ def build_ui():
 
                 with gr.Row():
                     home_duration = gr.Slider(
-                        label="③ 目标时长（秒）", minimum=6, maximum=300, value=15, step=3, scale=3,
+                        label="③ 目标时长（秒）", minimum=6, maximum=7200, value=15, step=3, scale=3,
                     )
 
                 with gr.Row():
@@ -3612,6 +3635,13 @@ def build_ui():
                     home_crossfade = gr.Slider(
                         label="转场（秒）", minimum=0.0, maximum=1.0, value=0.3, step=0.1, scale=1,
                     )
+
+                home_reference_image = gr.Image(
+                    label="参考图 / 首帧图（LTX 单镜头路线必填）",
+                    type="filepath",
+                    image_mode="RGB",
+                    sources=["upload"],
+                )
 
                 with gr.Accordion("☁️ Qwen 云端配置（仅选云端路线时填）", open=False):
                     home_cloud_api_key = gr.Textbox(
@@ -4053,7 +4083,7 @@ def build_ui():
                         gr.Markdown("##### 编辑配乐数据（JSON）")
                         gr.Markdown(
                             "每条记录包含 `name`、`mood`、`tempo`、`instruments`、`description`、`prompt_for_gen`。\n"
-                            "`prompt_for_gen` 是实际传给 MusicGen 的英文描述，对音乐质量影响最大。",
+                            "`prompt_for_gen` 是实际传给当前音乐生成后端的英文描述，对音乐质量影响最大。",
                             elem_classes="gr-text-small",
                         )
                         music_edit = gr.Textbox(
@@ -5221,19 +5251,19 @@ def build_ui():
             """根据内容类型更新首页视频默认值和说明文字。"""
             if "短剧" in content_type:
                 return (
-                    gr.update(value=15, minimum=6, maximum=60),
+                    gr.update(value=15, minimum=6, maximum=600),
                     gr.update(value="竖屏 9:16"),
                     "> **短剧模式**：竖屏 9:16，每集 3–5 分钟，节奏快、爽点密集，典型红果/抖音短剧风格。",
                 )
             elif "电影" in content_type:
                 return (
-                    gr.update(value=90, minimum=30, maximum=300),
+                    gr.update(value=90, minimum=30, maximum=7200),
                     gr.update(value="横屏 16:9"),
                     "> **电影模式**：横屏 16:9，叙事完整，场面调度丰富，适合长片/微电影。",
                 )
             else:  # 短视频
                 return (
-                    gr.update(value=30, minimum=10, maximum=180),
+                    gr.update(value=30, minimum=10, maximum=3600),
                     gr.update(value="竖屏 9:16"),
                     "> **短视频模式**：广告/Vlog/带货/10-15 分钟内容，竖屏为主，节奏适中。",
                 )
@@ -5274,7 +5304,7 @@ def build_ui():
         }
 
         def _home_qv_flow(premise_text, content_type, execution_route, duration,
-                          aspect, quality_label, bgm_prompt, crossfade,
+                          aspect, quality_label, bgm_prompt, reference_image, crossfade,
                           cloud_api_key, cloud_api_base, cloud_model):
             product_target = _home_content_type_to_product(content_type)
             if not (premise_text or "").strip():
@@ -5286,7 +5316,7 @@ def build_ui():
                 product_target, execution_route,
                 cloud_api_key, cloud_api_base, cloud_model,
                 "",    # pipeline (auto)
-                None,  # reference_image
+                reference_image,
                 crossfade,
                 "",    # workflow_template (auto)
                 "",    # render_strategy (auto)
@@ -5300,7 +5330,7 @@ def build_ui():
                 premise,
                 home_content_type, home_execution_route,
                 home_duration, home_aspect, home_quality,
-                home_bgm_prompt, home_crossfade,
+                home_bgm_prompt, home_reference_image, home_crossfade,
                 home_cloud_api_key, home_cloud_api_base, home_cloud_model,
             ],
             outputs=[home_qv_log, home_qv_video, home_qv_status],

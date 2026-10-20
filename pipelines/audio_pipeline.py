@@ -606,9 +606,7 @@ def generate_shot_sfx(project_id: int, shot_id: int, output_dir: Path) -> list[d
         desc = cue.get("description") or cue.get("name") or "环境音效"
         duration = int(cue.get("duration") or 3)
         out_path = str(sfx_dir / f"sfx_{idx:02d}_{(cue.get('name') or 'cue')[:20]}.mp3")
-        success = generate_sfx_audiocraft(desc, out_path, duration=duration)
-        if not success:
-            success = generate_sfx_ffmpeg(desc, out_path, duration=duration)
+        success = generate_sfx_ffmpeg(desc, out_path, duration=duration)
         if success:
             _register_audio(
                 project_id,
@@ -855,13 +853,17 @@ def generate_music_acestep_direct(
             json={
                 "prompt": caption,
                 "lyrics": "",
+                "model": os.getenv("ACESTEP_CONFIG_PATH", "acestep-v15-turbo"),
                 "audio_duration": float(duration),
                 "inference_steps": 8,
                 "guidance_scale": 7.0,
                 "thinking": True,
                 "vocal_language": "zh",
+                "lm_backend": os.getenv("ACESTEP_LM_BACKEND", "mlx"),
+                "lm_model_path": os.getenv("ACESTEP_LM_MODEL_PATH", ""),
                 "use_random_seed": True,
                 "seed": -1,
+                "infer_method": "ode",
             },
             timeout=30,
         )
@@ -1186,23 +1188,6 @@ def generate_project_music(project_id: int, output_dir: Path) -> list[dict]:
 
 # ── 音效生成 ──────────────────────────────────────────────
 
-def generate_sfx_audiocraft(description: str, output_path: str, duration: int = 5) -> bool:
-    """使用 audiocraft AudioGen 生成音效。"""
-    try:
-        cmd = [
-            sys.executable, "-m", "audiocraft.generate",
-            "--model", "audiogen-medium",
-            "--text", description,
-            "--duration", str(duration),
-            "--output", output_path,
-        ]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-        return result.returncode == 0 and _audio_valid(output_path)
-    except Exception as e:
-        print(f"[audiocraft-sfx] 失败: {e}")
-        return False
-
-
 def generate_sfx_ffmpeg(description: str, output_path: str, duration: int = 3) -> bool:
     """Local synthesized SFX fallback so the line never fully breaks."""
     desc = description.lower()
@@ -1242,9 +1227,7 @@ def generate_project_sfx(project_id: int, output_dir: Path) -> list[dict]:
             continue
         out_path = str(sfx_dir / f"sfx_{sfx.id}_{sfx.name[:20]}.mp3")
         desc = sfx.description or f"{sfx.category} {sfx.name}"
-        success = generate_sfx_audiocraft(desc, out_path)
-        if not success:
-            success = generate_sfx_ffmpeg(desc, out_path)
+        success = generate_sfx_ffmpeg(desc, out_path)
         if success:
             db.update_sfx(sfx.id, {"file_path": out_path})
         results.append({"id": sfx.id, "name": sfx.name, "file": out_path if success else "", "success": success})

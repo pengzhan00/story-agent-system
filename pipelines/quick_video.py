@@ -113,6 +113,7 @@ _DEFAULT_SHOT_SEC = 49 / 16  # 3.0625s
 LOCAL_STORYBOARD_PIPELINE = "local_storyboard_reel"
 QWEN_CLOUD_PIPELINE = "qwen_wan_cloud"
 LTX_LOCAL_PIPELINE = "ltx_t2v"
+LTX_LOCAL_I2V_PIPELINE = "ltx_i2v"
 LTX_LOCAL_PIPELINE_ONLY = "ltx_t2v_only"   # 纯 t2v，无 i2v 参考帧，速度更快
 LOCAL_PRODUCTION_PIPELINES = {LOCAL_STORYBOARD_PIPELINE, QWEN_CLOUD_PIPELINE}
 
@@ -813,11 +814,22 @@ class QuickVideoGenerator:
                     "output_path": None, "error": None, **kw}
 
         # ── 0. 参数校验 ──────────────────────────────────────────────
-        duration_sec = max(5.0, min(float(duration_sec), 300.0))
+        duration_sec = max(5.0, min(float(duration_sec), 7200.0))
         effective_quality = "preview" if preview_mode else (quality or "标准")
         preset = get_preset(aspect_ratio, effective_quality)
-        shot_sec = preset["frames"] / preset["fps"]  # 3.0625s for 49@16
-        n_shots = max(1, math.ceil(duration_sec / shot_sec))
+        single_shot_ltx = pipeline_name in {
+            LTX_LOCAL_PIPELINE,
+            LTX_LOCAL_I2V_PIPELINE,
+            LTX_LOCAL_PIPELINE_ONLY,
+        }
+        if single_shot_ltx:
+            shot_sec = duration_sec
+            n_shots = 1
+            target_frames = max(int(round(duration_sec * preset["fps"])), int(preset["frames"]))
+        else:
+            shot_sec = preset["frames"] / preset["fps"]  # 3.0625s for 49@16
+            n_shots = max(1, math.ceil(duration_sec / shot_sec))
+            target_frames = int(preset["frames"])
 
         yield _prog(
             "init",
@@ -859,7 +871,7 @@ class QuickVideoGenerator:
             yield _prog("plan", f"⚠️ 角色圣经提取失败（{_be}），跳过", 0.115)
 
         if not pipeline_name:
-            pipeline_name = LTX_LOCAL_PIPELINE_ONLY if preview_mode else (LTX_LOCAL_PIPELINE if has_reference else LOCAL_STORYBOARD_PIPELINE)
+            pipeline_name = LTX_LOCAL_I2V_PIPELINE if has_reference else LOCAL_STORYBOARD_PIPELINE
 
         if pipeline_name == QWEN_CLOUD_PIPELINE:
             try:
@@ -1014,7 +1026,7 @@ class QuickVideoGenerator:
                     "output_spec": {
                         "width":  preset["width"],
                         "height": preset["height"],
-                        "frames": preset["frames"],
+                        "frames": target_frames,
                         "fps":    preset["fps"],
                         "quality_tier": "preview" if preview_mode else "production",
                     },

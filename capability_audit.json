@@ -100,15 +100,7 @@
     }
   },
 
-  "music_generation": {
-    "musicgen_small": {
-      "status": "READY",
-      "venv": "~/audiocraft/venv (torch 2.11.0)",
-      "hf_cache": "~/.cache/huggingface/hub/models--facebook--musicgen-small (802MB)",
-      "output": "WAV/MP3",
-      "note": "文字→背景音乐，已集成至audio_pipeline.py"
-    }
-  },
+  "music_generation": {},
 
   "system_tools": {
     "ffmpeg": {

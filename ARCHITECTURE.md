@@ -141,7 +141,7 @@ ffmpeg 合成                        ~1–2 GB   按需
 > | 角色台词朗读 | ChatTTS → EdgeTTS | 自然语音对话，ACE-Step 不适合 |
 > | BGM / 背景音乐 | ACE-Step 1.5 | 主力，模型已下载 |
 > | 主题曲 / 带词人声 | ACE-Step 1.5 + lyrics | 中文歌词支持 |
-> | 音效 (SFX) | AudioCraft (audiogen) | 待安装 |
+> | 音效 (SFX) | ffmpeg 合成 / 后续可扩展 | 当前内置兜底 |
 
 | 能力 | 重要性 | 当前状态 | 技术路径 |
 |---|---|---|---|
@@ -150,7 +150,7 @@ ffmpeg 合成                        ~1–2 GB   按需
 | **音乐续写/编辑** | 重要 | ❌ 未实现 | ACE-Step retake 功能 |
 | **图/视频生音乐** | 有用 | ❌ 未实现 | ACE-Step 多模态输入 |
 | **带歌词人声合成** | 有用 | ❌ 未实现 | ACE-Step lyrics→vocal 功能 |
-| **音效生成** | 必备 | ⚠️ ffmpeg 占位 | AudioCraft audiogen-medium（待安装） |
+| **音效生成** | 必备 | ✅ ffmpeg 兜底 | 当前使用本地合成兜底 |
 
 ### 4.3 LoRA 体系
 
@@ -240,7 +240,6 @@ ACE-Step 1.5 生态（ACE Studio + StepFun）— 音乐生成主力
 └── pyttsx3    ✅ 兜底
 
 音效体系
-├── AudioCraft (facebook/audiogen-medium) ← 推荐下载（约1.5GB）
 └── ffmpeg 合成音效（当前占位方案）
 ```
 
@@ -438,8 +437,6 @@ ComfyUI 工作流文件:
     │        ⚠️ Bug2: DualCLIPLoader type="ace" 不在下拉列表
     │                  待确认正确 type 值或改用 AceStepText2MusicServer
     │
-    ├─ [2] MusicGen (AudioCraft)       ✅ musicgen-small (802MB)
-    │        质量较低，建议升级 musicgen-large (3.3GB)
     │
     └─ [3] ffmpeg 静音                  兜底
 
@@ -460,7 +457,6 @@ ComfyUI 工作流文件:
 
 ```
 音效描述 → generate_sfx()
-    ├─ AudioCraft (audiogen-medium)   ❌ 待安装（约1.5GB）
     └─ ffmpeg 合成                    当前占位
 ```
 
@@ -546,7 +542,6 @@ extra_model_paths.yaml（ComfyUI 模型映射）:
 | text_encoders/qwen_4b_ace15.safetensors | 7.8 GB | ✅ | ACE-Step 编码器 |
 | vae/ace_1.5_vae.safetensors | 322 MB | ✅ | ACE-Step VAE |
 | ChatTTS (全套) | ~1.5 GB | ✅ | 中文对话 TTS |
-| musicgen-small | 802 MB | ✅ | BGM 备用（低质） |
 
 ### LLM (Ollama)
 

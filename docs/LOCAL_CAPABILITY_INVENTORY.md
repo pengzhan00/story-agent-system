@@ -9,7 +9,6 @@ Host: `/Users/pengzhan`
 - Ollama data: `/Users/pengzhan/.ollama`
 - ChatTTS repo: `/Users/pengzhan/chattts`
 - Bark repo: `/Users/pengzhan/bark`
-- Audiocraft repo: `/Users/pengzhan/audiocraft`
 - Pinokio data: `/Users/pengzhan/.pinokio`
 - ffmpeg: `/opt/homebrew/bin/ffmpeg`
 

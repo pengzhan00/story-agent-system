@@ -1144,6 +1144,11 @@ class LTXT2VPipeline(RenderPipeline):
             elif ctype == "EmptyImage":
                 inputs["width"] = width
                 inputs["height"] = height
+            elif ctype == "EmptyLTXVLatentVideo":
+                # 直接注入 latent 分辨率和帧数，确保实际生成时长与 preset 一致
+                inputs["width"] = width
+                inputs["height"] = height
+                inputs["length"] = frames
             elif ctype == "LTXVConditioning":
                 inputs["frame_rate"] = fps
             elif ctype == "CreateVideo":
@@ -1166,10 +1171,12 @@ class LTXT2VPipeline(RenderPipeline):
                 inputs["filename_prefix"] = prefix
 
         # ── 噪声一致性：注入项目级固定种子（project_seed + shot_num 偏移）──────
+        # _attempt_idx > 0 时（dispatcher 降级重试）加入偏移，避免 ComfyUI 全节点缓存
         project_seed = shot_payload.get("_project_seed")
         shot_num_for_seed = int(shot_payload.get("_shot_num", 1))
+        attempt_idx = int(shot_payload.get("_attempt_idx", 0))
         if project_seed is not None:
-            shot_seed = (int(project_seed) + shot_num_for_seed * 1000) % (2 ** 31)
+            shot_seed = (int(project_seed) + shot_num_for_seed * 1000 + attempt_idx * 7777) % (2 ** 31)
             for node in wf.values():
                 if node.get("class_type") == "RandomNoise":
                     node["inputs"]["noise_seed"] = shot_seed
@@ -1213,10 +1220,24 @@ class LTXT2VPipeline(RenderPipeline):
         if not src.exists():
             raise RenderError(f"LTX 输出文件不存在: {src}")
 
-        # LTX Audio VAE 音频质量取决于 CFG/sigmas 参数
-        # 优化参数（CFG=1.0, sigmas=7步）后音频质量正常，无需移除
         shutil.copy2(src, output_path)
         return output_path
+
+
+# ══════════════════════════════════════════════════════
+# LTXI2VPipeline — 显式 i2v 路线（要求真实参考图）
+# ══════════════════════════════════════════════════════
+
+class LTXI2VPipeline(LTXT2VPipeline):
+    """LTX 2.3 distilled 参考图→视频主链。"""
+
+    name = "ltx_i2v"
+
+    def render(self, shot_payload: dict, output_path: Path) -> RenderResult:
+        ref_image = shot_payload.get("reference_image_path")
+        if not (ref_image and Path(str(ref_image)).exists()):
+            raise RenderError("LTXI2VPipeline 需要真实参考图（reference_image_path）")
+        return super().render(shot_payload, output_path)
 
 
 # ══════════════════════════════════════════════════════
@@ -1265,6 +1286,10 @@ class LTXT2VOnlyPipeline(LTXT2VPipeline):
             elif ctype == "EmptyImage":
                 inputs["width"] = width
                 inputs["height"] = height
+            elif ctype == "EmptyLTXVLatentVideo":
+                inputs["width"] = width
+                inputs["height"] = height
+                inputs["length"] = frames
             elif ctype == "LTXVConditioning":
                 inputs["frame_rate"] = fps
             elif ctype == "CreateVideo":
@@ -1286,11 +1311,12 @@ class LTXT2VOnlyPipeline(LTXT2VPipeline):
             elif ctype == "SaveVideo":
                 inputs["filename_prefix"] = prefix
 
-        # ── 噪声一致性 ──
+        # ── 噪声一致性（含降级重试偏移）──
         project_seed = shot_payload.get("_project_seed")
         shot_num_for_seed = int(shot_payload.get("_shot_num", 1))
+        attempt_idx = int(shot_payload.get("_attempt_idx", 0))
         if project_seed is not None:
-            shot_seed = (int(project_seed) + shot_num_for_seed * 1000) % (2 ** 31)
+            shot_seed = (int(project_seed) + shot_num_for_seed * 1000 + attempt_idx * 7777) % (2 ** 31)
             for node in wf.values():
                 if node.get("class_type") == "RandomNoise":
                     node["inputs"]["noise_seed"] = shot_seed
@@ -1316,8 +1342,6 @@ class LTXT2VOnlyPipeline(LTXT2VPipeline):
         if not src.exists():
             raise RenderError(f"LTX 输出文件不存在: {src}")
 
-        # LTX Audio VAE 音频质量取决于 CFG/sigmas 参数
-        # 优化参数（CFG=1.0, sigmas=7步）后音频质量正常，无需移除
         shutil.copy2(src, output_path)
         return output_path
 
@@ -1954,6 +1978,8 @@ class Wan2VACEFp8Pipeline(RenderPipeline):
 _PIPELINE_CLASSES: dict[str, type[RenderPipeline]] = {
     # LTX 快速 t2v 纯文本（无 i2v）
     "LTXT2VOnlyPipeline":  LTXT2VOnlyPipeline,
+    # LTX 显式 i2v（要求参考图）
+    "LTXI2VPipeline":      LTXI2VPipeline,
     # LTX 当前主力（含 i2v 参考帧）
     "LTXT2VPipeline":      LTXT2VPipeline,
     # Wan2.2 GGUF 快稿
@@ -2101,7 +2127,11 @@ class RenderDispatcher:
                 break  # 重试次数限制
 
             try:
-                path = pipeline.render(shot_payload, output_path)
+                # ── 폴백 시도 시 시드 오프셋 주입 (ComfyUI 캐시 버스트) ──────────
+                attempt_payload = dict(shot_payload)
+                if idx > 0:
+                    attempt_payload["_attempt_idx"] = idx
+                path = pipeline.render(attempt_payload, output_path)
 
                 # ── QC 检查：渲染成功后验证输出质量 ───────────────────────
                 from pipelines.quality_gate import validate_render_output
@@ -2109,9 +2139,12 @@ class RenderDispatcher:
                 quality_tier = str(output_spec.get("quality_tier") or "production").strip().lower()
                 qc_min_w = 256 if quality_tier in {"preview", "smoke", "draft"} else 320
                 qc_min_h = 144 if quality_tier in {"preview", "smoke", "draft"} else 180
+                # 每条管线可通过 config 设置自己的 qc_min_duration（默认 0.5s）。
+                # 这样 LTX distilled（17帧 @ 30fps ≈ 0.57s）不会被全局 1.0s 阈值误杀。
+                qc_min_dur = float(pipeline.config.get("qc_min_duration", 0.5))
                 qc_result = validate_render_output(
                     str(path),
-                    min_duration=1.0,
+                    min_duration=qc_min_dur,
                     min_width=qc_min_w,
                     min_height=qc_min_h,
                 )
@@ -2119,6 +2152,7 @@ class RenderDispatcher:
                     qc_err = f"QC 失败 [{pipeline.name}]: {'; '.join(qc_result.errors)}"
                     print(f"  ⚠️ {qc_err}")
                     qc_failures.append(qc_err)
+                    errors.append(qc_err)   # 让 QC 失败也出现在最终错误汇报里
                     # 删除不合格输出，准备重试
                     Path(path).unlink(missing_ok=True)
                     if idx < max_retries and allow_fallback:

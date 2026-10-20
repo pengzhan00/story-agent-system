@@ -18,7 +18,7 @@ PROJECT_ROOT = Path("/Users/pengzhan/myworkspace/projects/story-agent-system")
 OUTPUT_DIR = PROJECT_ROOT / "output" / "test_proper_prompt"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-COMFYUI_BASE = "http://127.0.0.1:8188"
+COMFYUI_BASE = "http://127.0.0.1:13201"
 COMFYUI_OUTPUT = Path("/Users/pengzhan/Documents/ComfyUI/output/video/LTX")
 
 # 加载工作流
@@ -95,6 +95,7 @@ print(f"\n🎬 提交渲染...")
 try:
     r = requests.post(f"{COMFYUI_BASE}/prompt", json={'prompt': wf}, timeout=10)
     result = r.json()
+    print(f"   API响应: {json.dumps(result, indent=2, ensure_ascii=False)[:2000]}")
     prompt_id = result.get('prompt_id')
     print(f"   prompt_id: {prompt_id}")
     

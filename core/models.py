@@ -185,7 +185,7 @@ class MusicTheme:
     key_signature: str = ""         # 调性
     description: str = ""
     file_path: str = ""             # 音频文件路径 (如果有)
-    prompt_for_gen: str = ""        # 用于MusicGen/Suno的prompt
+    prompt_for_gen: str = ""        # 用于音乐生成后端的prompt
     created_at: str = field(default_factory=_now)
 
 

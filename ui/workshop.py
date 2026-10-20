@@ -31,6 +31,7 @@ PROJECT_ROOT = Path(__file__).parent.parent
 OUTPUT_DIR = PROJECT_ROOT / "output"
 
 PIPELINE_CHOICES = [
+    "ltx_i2v",
     "ltx_t2v",
     "stub",
 ]
@@ -174,7 +175,7 @@ def _shot_counts(project_choice: str, episode_choice: str) -> str:
 
 def _load_shot_fields(shot_label: str):
     """根据选中的 shot label 返回所有 detail 字段值（按 outputs 顺序）"""
-    EMPTY = ("", "", "", "", "", "白天", "晴", "", "", None, "AI占位", None, "", "ltx_t2v", "暂无渲染记录")
+    EMPTY = ("", "", "", "", "", "白天", "晴", "", "", None, "AI占位", None, "", "ltx_i2v", "暂无渲染记录")
     if not shot_label:
         return EMPTY
     sid = _shot_id_from_label(shot_label)
@@ -189,7 +190,7 @@ def _load_shot_fields(shot_label: str):
         neg_prompt = payload.get("negative_prompt") or ""
         ref_img = payload.get("reference_image_path") or ""
         ref_source = payload.get("ref_image_source", "AI占位")
-        pipeline = payload.get("pipeline") or "ltx_t2v"
+        pipeline = payload.get("pipeline") or "ltx_i2v"
 
         # dialogue / narration
         try:
