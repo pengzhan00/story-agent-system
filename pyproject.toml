@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "storyagent"
+version = "2.0.0.dev0"
+description = "Local multimodal short-drama production system (script -> shots -> media -> episode)."
+requires-python = ">=3.11"
+dependencies = [
+    "requests>=2.25",
+]
+
+[project.optional-dependencies]
+ui = ["gradio>=4.0"]
+dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.10", "types-requests"]
+
+[project.scripts]
+storyagent = "storyagent.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["storyagent*"]
+
+[tool.setuptools.package-data]
+storyagent = ["db/migrations/*.sql", "config/defaults/*.toml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+norecursedirs = ["legacy", ".venv", "data"]
+addopts = "-q -m 'not live'"
+markers = [
+    "live: needs real local services/models (ComfyUI, ACE-Step, Ollama, ...); run with -m live",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+extend-exclude = ["core", "agents", "pipelines", "ui", "main.py", "tests/legacy", "test_render_6s.py", "test_vae_fix.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/legacy_db.py" = ["E501"]  # verbatim v1 DDL
+
+[tool.mypy]
+python_version = "3.11"
+files = ["storyagent"]
+ignore_missing_imports = true

@@ -57,3 +57,6 @@ agents/legacy_*
 
 # ── 临时测试文件 ──
 /tmp/
+
+# ── v2 runtime home (db, projects, media, logs) ──
+data/

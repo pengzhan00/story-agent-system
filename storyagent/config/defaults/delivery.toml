@@ -1,0 +1,73 @@
+# Delivery profiles consumed by the compose/ module and QC.
+[default]
+profile = "shortdrama_vertical_720"
+
+[profiles.shortdrama_vertical_720]
+label_key = "delivery.profile.shortdrama_vertical_720"
+width = 720
+height = 1280
+fps = 24
+video_codec = "libx264"
+crf = 18
+pix_fmt = "yuv420p"
+audio_codec = "aac"
+audio_bitrate = "192k"
+audio_rate = 48000
+min_episode_sec = 180
+max_episode_sec = 480
+
+[profiles.shortdrama_vertical_1080]
+label_key = "delivery.profile.shortdrama_vertical_1080"
+width = 1080
+height = 1920
+fps = 30
+video_codec = "libx264"
+crf = 18
+pix_fmt = "yuv420p"
+audio_codec = "aac"
+audio_bitrate = "192k"
+audio_rate = 48000
+min_episode_sec = 180
+max_episode_sec = 480
+
+[profiles.movie_landscape_720]
+label_key = "delivery.profile.movie_landscape_720"
+width = 1280
+height = 720
+fps = 24
+video_codec = "libx264"
+crf = 18
+pix_fmt = "yuv420p"
+audio_codec = "aac"
+audio_bitrate = "192k"
+audio_rate = 48000
+min_episode_sec = 0
+max_episode_sec = 0
+
+[mix]
+voice_gain = 1.0
+bgm_gain = 0.16
+sfx_gain = 0.5
+lead_in_sec = 0.4
+loudnorm_i = -16.0
+loudnorm_tp = -1.5
+loudnorm_lra = 11.0
+max_slowdown = 2.2
+
+[subtitles]
+font = "PingFang SC"
+font_size = 16
+margin_v = 42
+outline = 1
+
+[qc]
+# Thresholds carried over from the legacy quality gate.
+min_file_bytes = 4096
+min_duration_sec = 1.0
+min_width = 320
+min_height = 180
+max_black_ratio = 0.85
+freeze_sec = 1.5
+require_audio = true
+min_mean_volume_db = -45.0
+aspect_tolerance = 0.08
