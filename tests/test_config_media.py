@@ -115,7 +115,7 @@ def test_user_recipe_with_explicit_model_and_params(tmp_path: Path) -> None:
 def test_llm_roles_route_to_backends_with_default_fallback(tmp_path: Path) -> None:
     s = load_settings(home_with(tmp_path))
     assert s.llm_role("writer").model == "gemma4:31b" and s.llm_role("writer").backend == "ollama"
-    assert s.llm_role("scene").model == s.llm_role("default").model == "gemma4:31b"  # unrouted role -> default
+    assert s.llm_role("scene").model == s.llm_role("default").model == "gpt-oss-20b"  # unrouted role -> default
     assert s.llm_backends["ollama"].url == s.service("ollama").url  # one source of truth for the URL
 
 
