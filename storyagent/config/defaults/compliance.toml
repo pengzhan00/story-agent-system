@@ -12,5 +12,7 @@ explicit_label = "off"
 explicit_label_key = "compliance.label.aigc"
 # Voice cloning needs a recorded consent flag on the reference voice.
 require_voice_consent = true
+# Training a LoRA on photos of a person needs `consent = true` in the job's inputs (the person agreed).
+require_likeness_consent = true
 # Models with commercial_ok=false are blocked unless the project opts in explicitly.
 require_restricted_license_ack = true

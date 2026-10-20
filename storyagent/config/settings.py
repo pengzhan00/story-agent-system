@@ -83,6 +83,7 @@ class ComplianceConfig:
     explicit_label: str = "off"
     explicit_label_key: str = "compliance.label.aigc"
     require_voice_consent: bool = True
+    require_likeness_consent: bool = True
     require_restricted_license_ack: bool = True
 
 
@@ -308,6 +309,7 @@ def _build_compliance(raw: Mapping[str, Any]) -> ComplianceConfig:
         explicit_label=str(raw.get("explicit_label", "off")),
         explicit_label_key=str(raw.get("explicit_label_key", "compliance.label.aigc")),
         require_voice_consent=bool(raw.get("require_voice_consent", True)),
+        require_likeness_consent=bool(raw.get("require_likeness_consent", True)),
         require_restricted_license_ack=bool(raw.get("require_restricted_license_ack", True)),
     )
     if cfg.explicit_label not in EXPLICIT_LABEL_MODES:

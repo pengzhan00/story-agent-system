@@ -46,6 +46,8 @@ def check_job(
         and not voice_ref.get("consent")
     ):
         issues.append(ValidationIssue(ErrorCode.CONSENT_REQUIRED, "voice reference without consent"))
+    if job.kind is MediaKind.TRAIN_LORA and cfg.require_likeness_consent and not job.inputs.get("consent"):
+        issues.append(ValidationIssue(ErrorCode.CONSENT_REQUIRED, "training on a likeness without consent"))
     return issues
 
 

@@ -152,12 +152,15 @@ class Worker:
         )
         beat.start()
         work_dir = self.settings.home / "work" / job.id
+        failed = False
         try:
             self._execute(job, work_dir, cancel_flag, lost)
         except AdapterError as e:
+            failed = True
             if not lost.is_set():
                 led.fail(job.id, e.code, e.message, **e.params)
         except Exception as e:
+            failed = True
             log.exception("job %s crashed", job.id)
             led.add_event(job.id, "crash", "error", trace=traceback.format_exc(limit=8))
             if not lost.is_set():
@@ -165,7 +168,21 @@ class Worker:
         finally:
             stop_hb.set()
             beat.join(timeout=5)
+            if failed:
+                self._keep_tool_log(job.id, work_dir)
             shutil.rmtree(work_dir, ignore_errors=True)
+
+    def _keep_tool_log(self, job_id: str, work_dir: Path) -> None:
+        """The scratch directory is always removed; a failed job's tool log is the one thing worth keeping."""
+        src = work_dir / "tool.log"
+        if not src.is_file():
+            return
+        try:
+            dest = self.settings.logs_dir / "jobs"
+            dest.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dest / f"{job_id}.log")
+        except OSError:
+            log.warning("could not keep the tool log of job %s", job_id)
 
     def _heartbeat(self, job_id: str, stop: threading.Event, cancel: threading.Event, lost: threading.Event) -> None:
         while not stop.wait(self._beat):
