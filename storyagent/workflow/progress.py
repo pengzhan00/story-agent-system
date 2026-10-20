@@ -14,7 +14,7 @@ from typing import Any
 STAGE_WEIGHTS: dict[str, float] = {
     "analyze": 4, "cast": 10, "script": 40, "scenes": 8, "music": 8, "shotplan": 2, "specs": 28,
 }
-ETA_MIN_PERCENT = 3.0           # below this an extrapolated ETA is noise
+ETA_MIN_PERCENT = 10.0          # below this an extrapolated ETA is noise (LLM stages are lumpy)
 
 
 class RunProgress:
