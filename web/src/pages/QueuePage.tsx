@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useJobActions, useJobs, useQueueState } from "../api/hooks";
+import { Fragment, useState } from "react";
+import { useJobActions, useJobEvents, useJobs, useQueueState } from "../api/hooks";
 import type { Job } from "../api/types";
 import { ErrorNote } from "../components/ErrorNote";
 import { ProgressBar } from "../components/ProgressBar";
@@ -17,12 +17,46 @@ const FILTERS = {
 } as const;
 type Filter = keyof typeof FILTERS;
 
+function JobDetail({ job }: { job: Job }) {
+  const t = useT();
+  const events = useJobEvents(job.id);
+  const json = (v: unknown) => JSON.stringify(v, null, 2);
+  return (
+    <div className="stack">
+      <div className="row small">
+        <span>{`${t("web.jobs.d.model")}: ${job.model_ref} (${job.provider})`}</span>
+        <span>{`${t("web.jobs.d.tier")}: ${t(`media.tier.${job.tier}`)}`}</span>
+        <span>{`${t("web.jobs.d.seed")}: ${job.seed ?? "-"}`}</span>
+        {job.spec_id ? <span>{`${t("web.jobs.d.spec")}: ${job.spec_id.slice(0, 8)} v${job.spec_version ?? ""}`}</span> : null}
+      </div>
+      {job.error_message ? (
+        <div className="stack">
+          <strong className="small bad">{t("web.jobs.d.error")}</strong>
+          <pre className="transcript">{job.error_message}</pre>
+        </div>
+      ) : null}
+      <strong className="small">{t("web.jobs.d.inputs")}</strong>
+      <pre className="transcript">{json(job.inputs)}</pre>
+      <strong className="small">{t("web.jobs.d.params")}</strong>
+      <pre className="transcript">{json(job.params)}</pre>
+      <strong className="small">{t("web.jobs.d.events")}</strong>
+      <ul className="plain small">
+        {events.data?.map((e) => (
+          <li key={e.id} className="mono">{`${e.ts.slice(11, 19)} ${e.event} ${Object.keys(e.data ?? {}).length ? JSON.stringify(e.data).slice(0, 160) : ""}`}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function JobRow({ job }: { job: Job }) {
+  const [open, setOpen] = useState(false);
   const t = useT();
   const { cancel, retry } = useJobActions();
   const active = ACTIVE.has(job.status);
   const tone = job.status === "completed" ? "completed" : job.status === "running" ? "running" : job.status === "queued" ? "queued" : "failed";
   return (
+    <Fragment>
     <tr>
       <td className="strong">{t(`media.kind.${job.kind}`)}</td>
       <td>{job.model_ref}</td>
@@ -36,6 +70,9 @@ function JobRow({ job }: { job: Job }) {
       </td>
       <td className="muted small">{job.actual_seconds != null ? duration(job.actual_seconds) : ""}</td>
       <td className="actions">
+        <button className="link" aria-expanded={open} onClick={() => setOpen(!open)}>
+          {open ? t("web.close") : t("web.jobs.inspect")}
+        </button>
         {active ? (
           <button className="link" disabled={cancel.isPending} onClick={() => cancel.mutate(job.id)}>
             {t("web.jobs.cancel")}
@@ -47,6 +84,14 @@ function JobRow({ job }: { job: Job }) {
         ) : null}
       </td>
     </tr>
+    {open ? (
+      <tr className="edit-row">
+        <td colSpan={6}>
+          <JobDetail job={job} />
+        </td>
+      </tr>
+    ) : null}
+    </Fragment>
   );
 }
 

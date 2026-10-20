@@ -208,3 +208,82 @@ def test_a_character_gets_its_voice_from_an_uploaded_sample(client: TestClient, 
                            "voice_ref_consent": True})
     assert r.status_code == 200 and r.json()["voice_ref_audio"].startswith("library:voice/")
     assert r.json()["voice_ref_consent"] is True
+
+
+def test_every_model_call_can_be_read_back_in_full_and_prompts_are_editable(
+    client: TestClient, fsettings: Settings
+) -> None:
+    pid = new_project(client)
+    started(client, pid)
+    run_to_end(fsettings)
+    calls = client.get(f"/api/projects/{pid}/ai-calls").json()
+    assert calls and {c["label"] for c in calls} >= {"director.analyze", "screenwriter.outline"}
+    full = client.get(f"/api/ai-calls/{calls[-1]['id']}").json()
+    assert full["system"] and full["prompt"] and full["response"].startswith("{") and full["label"]
+    assert client.get(f"/api/projects/{pid}/ai-calls", params={"label": "director.analyze"}).json()
+
+    agents = {a["name"]: a for a in client.get("/api/agents").json()}
+    assert "reviewer.script" in agents and not agents["reviewer.script"]["overridden"]
+    new_prompt = agents["reviewer.script"]["prompt"] + "\nBe brief."
+    r = client.put("/api/agents/reviewer.script", json={"prompt": new_prompt, "temperature": 0.1})
+    assert r.status_code == 200 and r.json()["overridden"] and r.json()["temperature"] == 0.1
+    assert r.json()["default_prompt"] == agents["reviewer.script"]["prompt"]          # the packaged text is kept
+    bad = client.put("/api/agents/reviewer.script", json={"prompt": "uses $undeclared_placeholder"})
+    assert bad.status_code == 422
+    assert client.get("/api/agents").json()                                              # still loads after a bad edit
+    assert client.put("/api/agents/nope", json={"prompt": "x"}).status_code == 404
+    reset = client.delete("/api/agents/reviewer.script").json()
+    assert not reset["overridden"] and reset["prompt"] == agents["reviewer.script"]["prompt"]
+
+
+def test_plan_and_style_are_readable_and_editable(client: TestClient, fsettings: Settings) -> None:
+    pid = new_project(client)
+    started(client, pid)
+    run_to_end(fsettings)
+    plan = client.get(f"/api/projects/{pid}/data/plan").json()
+    assert plan["project_name"] == "Rain Night"
+    style = client.get(f"/api/projects/{pid}/data/style").json()
+    style["visual_style"] = "hand-painted watercolour"
+    assert client.put(f"/api/projects/{pid}/data/style", json=style).json()["visual_style"].startswith("hand")
+    assert client.get(f"/api/projects/{pid}/data/style").json()["visual_style"] == "hand-painted watercolour"
+    assert client.get(f"/api/projects/{pid}/data/other").status_code == 404
+
+
+def test_the_flow_describes_every_step_with_its_models(client: TestClient, fsettings: Settings) -> None:
+    generic = client.get("/api/flow").json()["steps"]
+    assert [s["stage"] for s in generic][:2] == ["analyze", "cast"] and generic[-1]["stage"] == "compose"
+    analyze = generic[0]
+    assert {a["name"] for a in analyze["agents"]} == {"director.analyze", "art.style"}
+    assert all(a["backend"] and a["model"] for a in analyze["agents"]) and analyze["status"] is None
+    produce = next(s for s in generic if s["stage"] == "produce")
+    video = next(m for m in produce["media"] if m["subject"] == "shot.video")
+    assert video["kind"] == "video.generate" and video["models"][0]["params"]["draft"] is not None
+    pid = new_project(client)
+    started(client, pid)
+    run_to_end(fsettings)
+    live = {s["stage"]: s for s in client.get("/api/flow", params={"project_id": pid}).json()["steps"]}
+    assert live["analyze"]["status"] == "completed" and live["specs"]["status"] == "completed"
+    dialogue = next(m for m in live["produce"]["media"] if m["subject"] == "dialogue.line")
+    assert dialogue["counts"]["specs"] >= 1 and dialogue["counts"]["made"] == 0
+    assert client.get("/api/flow", params={"project_id": 999}).status_code == 404
+
+
+def test_the_project_overview_points_at_the_finished_episode(client: TestClient, fsettings: Settings) -> None:
+    pid = new_project(client)
+    card = client.get("/api/projects/overview").json()[0]
+    assert card["id"] == pid and card["stages_done"] == 0 and card["stages_total"] == 9
+    assert card["episode_asset_id"] is None and card["running"] is False
+    started(client, pid)
+    assert client.get("/api/projects/overview").json()[0]["running"] is True
+    run_to_end(fsettings)
+    card = client.get("/api/projects/overview").json()[0]
+    assert card["stages_done"] == 7 and card["running"] is False
+    db = Database(fsettings.db_path)
+    db.conn.execute("INSERT INTO media_assets(id, project_id, kind, slot, path, sha256, bytes, duration_sec, version,"
+                    " is_current) VALUES ('film1', ?, 'compose.assemble', 'episode_01', 'x.mp4', 'h', 5, 12.5, 1, 1)",
+                    (pid,))
+    card = client.get("/api/projects/overview").json()[0]
+    assert card["episode_asset_id"] == "film1" and card["episode_seconds"] == 12.5 and card["episode_number"] == 1
+    client.delete(f"/api/projects/{pid}")
+    assert client.get("/api/projects/overview").json() == []
+    assert client.get("/api/projects/overview", params={"trashed": True}).json()[0]["id"] == pid

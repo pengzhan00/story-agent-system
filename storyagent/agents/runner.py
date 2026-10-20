@@ -39,7 +39,13 @@ class AgentResult:
 class AgentRunner:
     def __init__(self, settings: Settings, router: LLMRouter, specs: Mapping[str, AgentSpec] | None = None) -> None:
         self.settings, self.router = settings, router
-        self.specs = dict(specs) if specs is not None else load_specs(settings)
+        self._fixed = dict(specs) if specs is not None else None
+
+    @property
+    def specs(self) -> dict[str, AgentSpec]:
+        """Injected specs (tests), otherwise re-read from disk every time: an edited prompt applies to the very next
+        call, also in a long-running worker."""
+        return self._fixed if self._fixed is not None else load_specs(self.settings)
 
     def spec(self, name: str) -> AgentSpec:
         try:
@@ -62,7 +68,7 @@ class AgentRunner:
         try:
             data = self.router.json(
                 spec.role, prompt, system=system, schema=spec.schema, project_id=project_id, attempts=spec.attempts,
-                temperature=spec.temperature, max_tokens=spec.max_tokens,
+                temperature=spec.temperature, max_tokens=spec.max_tokens, label=name,
                 **({"model": spec.model} if spec.model else {}),
             )
         except LLMError as exc:

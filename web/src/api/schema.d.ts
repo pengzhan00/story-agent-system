@@ -4,6 +4,61 @@
  */
 
 export interface paths {
+    "/api/agents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Agents */
+        get: operations["list_agents_api_agents_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/agents/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Edit Agent
+         * @description Save your own wording for an agent; it applies to the next call (the packaged default is kept and restorable).
+         */
+        put: operations["edit_agent_api_agents__name__put"];
+        post?: never;
+        /** Reset Agent */
+        delete: operations["reset_agent_api_agents__name__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ai-calls/{call_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Call */
+        get: operations["get_call_api_ai_calls__call_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/assets": {
         parameters: {
             query?: never;
@@ -112,6 +167,27 @@ export interface paths {
          *     `timeout` (seconds) closes the stream after that long; 0 = until the client disconnects.
          */
         get: operations["events_api_events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/flow": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Flow
+         * @description The production chain: per step the agents (and their language models), the media models and their parameters
+         *     per quality tier, what it reads and writes; with ``project_id`` also the step's state and what is made so far.
+         */
+        get: operations["flow_api_flow_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -368,6 +444,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Overview
+         * @description For the list page: per project the step progress and the newest finished episode (open it to preview).
+         */
+        get: operations["overview_api_projects_overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{project_id}": {
         parameters: {
             query?: never;
@@ -388,6 +484,23 @@ export interface paths {
         head?: never;
         /** Patch Project */
         patch: operations["patch_project_api_projects__project_id__patch"];
+        trace?: never;
+    };
+    "/api/projects/{project_id}/ai-calls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Calls */
+        get: operations["list_calls_api_projects__project_id__ai_calls_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/projects/{project_id}/characters": {
@@ -425,6 +538,30 @@ export interface paths {
         head?: never;
         /** Update Character */
         patch: operations["update_character_api_projects__project_id__characters__item_id__patch"];
+        trace?: never;
+    };
+    "/api/projects/{project_id}/data/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Data
+         * @description The production ``plan`` (genre, tone, acts, cast and place lists) or the visual ``style`` guide.
+         */
+        get: operations["get_data_api_projects__project_id__data__key__get"];
+        /**
+         * Put Data
+         * @description Replace the plan/style. Later generation reads it; finished assets are not touched.
+         */
+        put: operations["put_data_api_projects__project_id__data__key__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/projects/{project_id}/dialogue": {
@@ -1126,6 +1263,104 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AgentEdit */
+        AgentEdit: {
+            /** Attempts */
+            attempts?: number | null;
+            /** Max Tokens */
+            max_tokens?: number | null;
+            /** Model */
+            model?: string | null;
+            /** Prompt */
+            prompt?: string | null;
+            /** Role */
+            role?: string | null;
+            /** System */
+            system?: string | null;
+            /** Temperature */
+            temperature?: number | null;
+        };
+        /** AgentOut */
+        AgentOut: {
+            /** Attempts */
+            attempts: number;
+            /** Default Prompt */
+            default_prompt: string;
+            /** Default System */
+            default_system: string;
+            /** Description */
+            description: string;
+            /** Editable */
+            editable: string[];
+            /** Inputs */
+            inputs: string[];
+            /** Max Tokens */
+            max_tokens: number;
+            /** Model */
+            model: string;
+            /** Name */
+            name: string;
+            /** Overridden */
+            overridden: boolean;
+            /** Prompt */
+            prompt: string;
+            /** Role */
+            role: string;
+            /** System */
+            system: string;
+            /** Temperature */
+            temperature: number;
+        };
+        /** AiCallDetail */
+        AiCallDetail: {
+            /** Agent */
+            agent: string;
+            /** Created At */
+            created_at: string;
+            /** Duration Ms */
+            duration_ms: number;
+            /** Id */
+            id: number;
+            /** Label */
+            label: string;
+            /** Model */
+            model: string;
+            /** Project Id */
+            project_id: number | null;
+            /** Prompt */
+            prompt: string;
+            /** Response */
+            response: string;
+            /** System */
+            system: string;
+            /** Tokens In */
+            tokens_in: number;
+            /** Tokens Out */
+            tokens_out: number;
+        };
+        /** AiCallRow */
+        AiCallRow: {
+            /** Agent */
+            agent: string;
+            /** Created At */
+            created_at: string;
+            /** Duration Ms */
+            duration_ms: number;
+            /** Id */
+            id: number;
+            /** Label */
+            label: string;
+            /** Model */
+            model: string;
+            /** Prompt Chars */
+            prompt_chars: number;
+            /** Response Chars */
+            response_chars: number;
+            /** Tokens In */
+            tokens_in: number;
+            /** Tokens Out */
+            tokens_out: number;
+        };
         /** AssetOut */
         AssetOut: {
             /** Bytes */
@@ -1180,6 +1415,13 @@ export interface components {
         /** CancelResult */
         CancelResult: {
             status: components["schemas"]["JobStatus"];
+        };
+        /** FlowOut */
+        FlowOut: {
+            /** Steps */
+            steps: {
+                [key: string]: unknown;
+            }[];
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1509,6 +1751,36 @@ export interface components {
             /** Version */
             version: string;
         };
+        /**
+         * ProjectCard
+         * @description One tile of the project list: the project, how far it is, and the finished episode if there is one.
+         */
+        ProjectCard: {
+            /** Description */
+            description: string;
+            /** Episode Asset Id */
+            episode_asset_id: string | null;
+            /** Episode Number */
+            episode_number: number | null;
+            /** Episode Seconds */
+            episode_seconds: number | null;
+            /** Genre */
+            genre: string;
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Running */
+            running: boolean;
+            /** Stages Done */
+            stages_done: number;
+            /** Stages Total */
+            stages_total: number;
+            /** Status */
+            status: string;
+            /** Updated At */
+            updated_at: string;
+        };
         /** ProjectCreate */
         ProjectCreate: {
             /**
@@ -1578,6 +1850,11 @@ export interface components {
          * @description Merged into ``projects.settings``; a key set to null is removed.
          */
         ProjectSettingsPatch: {
+            /**
+             * Allow Restricted Licenses
+             * @description acknowledge models whose licence restricts commercial use or territory
+             */
+            allow_restricted_licenses?: boolean | null;
             /** Compliance */
             compliance?: {
                 [key: string]: unknown;
@@ -2050,6 +2327,123 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    list_agents_api_agents_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentOut"][];
+                };
+            };
+        };
+    };
+    edit_agent_api_agents__name__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentEdit"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_agent_api_agents__name__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_call_api_ai_calls__call_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                call_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCallDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_assets_api_assets_get: {
         parameters: {
             query?: {
@@ -2229,6 +2623,37 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    flow_api_flow_get: {
+        parameters: {
+            query?: {
+                project_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlowOut"];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -2805,6 +3230,37 @@ export interface operations {
             };
         };
     };
+    overview_api_projects_overview_get: {
+        parameters: {
+            query?: {
+                trashed?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectCard"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_project_api_projects__project_id__get: {
         parameters: {
             query?: never;
@@ -2889,6 +3345,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_calls_api_projects__project_id__ai_calls_get: {
+        parameters: {
+            query?: {
+                label?: string | null;
+                limit?: number;
+                before?: number | null;
+            };
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCallRow"][];
                 };
             };
             /** @description Validation Error */
@@ -3045,6 +3536,80 @@ export interface operations {
             path: {
                 project_id: number;
                 item_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_data_api_projects__project_id__data__key__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_data_api_projects__project_id__data__key__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+                key: string;
             };
             cookie?: never;
         };

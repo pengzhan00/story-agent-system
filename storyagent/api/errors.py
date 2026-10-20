@@ -13,6 +13,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from storyagent.agents.registry import AgentSpecError
 from storyagent.config import ConfigError
 from storyagent.media.ledger import LedgerError
 from storyagent.media.library import LibraryError
@@ -109,6 +110,12 @@ def install(app: FastAPI) -> None:
         if _NOT_FOUND.match(msg):
             return respond(request, 404, "not_found", msg)
         return respond(request, 409, "conflict", msg)
+
+    @app.exception_handler(AgentSpecError)
+    async def _agent_spec(request: Request, exc: AgentSpecError) -> JSONResponse:
+        msg = str(exc)
+        return respond(request, 404 if msg.startswith("unknown agent") else 422, "not_found" if msg.startswith(
+            "unknown agent") else "invalid", msg)
 
     @app.exception_handler(ConfigError)
     async def _config(request: Request, exc: ConfigError) -> JSONResponse:

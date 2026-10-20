@@ -19,3 +19,44 @@ export type SpecDiffItem = S["SpecDiffItem"];
 export type ReviewItem = S["ReviewItemOut"];
 export type Asset = S["AssetOut"];
 export type StaleAsset = S["StaleAsset"];
+export type ProjectCard = S["ProjectCard"];
+export type Agent = S["AgentOut"];
+export type AgentEdit = S["AgentEdit"];
+export type AiCallRow = S["AiCallRow"];
+export type AiCallDetail = S["AiCallDetail"];
+
+export interface FlowModel {
+  ref: string;
+  known: boolean;
+  provider?: string;
+  kind?: string;
+  heavy?: boolean;
+  license_tag?: string;
+  commercial_ok?: boolean;
+  params?: Record<string, Record<string, unknown>>;
+}
+export interface FlowMedia {
+  subject: string;
+  kind: string;
+  phase: number;
+  counts: { specs: number; made: number; stale: number; models: Record<string, number> } | null;
+  models: FlowModel[];
+}
+export interface FlowAgent {
+  name: string;
+  optional: boolean;
+  role: string;
+  backend: string;
+  model: string;
+  description: string;
+}
+export interface FlowStep {
+  stage: string;
+  how: "llm" | "rules" | "media" | "compose";
+  reads: string[];
+  writes: string[];
+  agents: FlowAgent[];
+  media: FlowMedia[];
+  status: string | null;
+  summary: Record<string, unknown> | null;
+}

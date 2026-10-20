@@ -101,3 +101,56 @@ def load_specs(settings: Settings | None = None) -> dict[str, AgentSpec]:
             description=str(entry.get("description", "")), source=origin[name],
         )
     return out
+
+
+EDITABLE = ("role", "system", "prompt", "temperature", "max_tokens", "attempts", "model")
+
+
+def user_file(settings: Settings, name: str) -> Path:
+    return settings.config_dir / "agents" / f"{name}.toml"
+
+
+def _toml_value(value: Any) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        return repr(value)
+    return json.dumps(str(value), ensure_ascii=False)     # JSON string escapes are valid TOML basic strings
+
+
+def write_override(settings: Settings, name: str, changes: dict[str, Any]) -> AgentSpec:
+    """Merge ``changes`` into the user's override file for agent ``name`` and return the resulting spec.
+
+    The result is validated by loading every spec again; on any error the previous file content is restored and
+    ``AgentSpecError`` is raised, so a bad edit can never leave the pipeline unable to start.
+    """
+    if name not in load_specs(settings):
+        raise AgentSpecError(f"unknown agent {name!r}")
+    unknown = set(changes) - set(EDITABLE)
+    if unknown:
+        raise AgentSpecError(f"cannot edit {sorted(unknown)}; editable: {list(EDITABLE)}")
+    path = user_file(settings, name)
+    before = path.read_text("utf-8") if path.is_file() else None
+    current = _read(path) if before is not None else {}
+    merged = {**current, **{k: v for k, v in changes.items() if v is not None}, "name": name}
+    lines = [f"{k} = {_toml_value(v)}" for k, v in merged.items()]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    try:
+        return load_specs(settings)[name]
+    except AgentSpecError:
+        if before is None:
+            path.unlink(missing_ok=True)
+        else:
+            path.write_text(before, encoding="utf-8")
+        raise
+
+
+def remove_override(settings: Settings, name: str) -> AgentSpec:
+    """Back to the packaged prompt."""
+    user_file(settings, name).unlink(missing_ok=True)
+    return load_specs(settings)[name]
+
+
+def packaged_spec(name: str) -> AgentSpec:
+    return load_specs(None)[name]

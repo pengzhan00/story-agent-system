@@ -3,6 +3,7 @@ import { useEventFeed } from "./api/events";
 import { useI18n } from "./i18n";
 import { ProjectPage } from "./pages/ProjectPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
+import { PromptsPage } from "./pages/PromptsPage";
 import { QueuePage } from "./pages/QueuePage";
 import { SystemPage } from "./pages/SystemPage";
 
@@ -20,6 +21,9 @@ export function App() {
           </NavLink>
           <NavLink to="/queue" className={link}>
             {t("web.nav.queue")}
+          </NavLink>
+          <NavLink to="/prompts" className={link}>
+            {t("web.nav.prompts")}
           </NavLink>
           <NavLink to="/system" className={link}>
             {t("web.nav.system")}
@@ -43,6 +47,7 @@ export function App() {
           <Route path="/projects" element={<ProjectsPage />} />
           <Route path="/projects/:id/*" element={<ProjectPage />} />
           <Route path="/queue" element={<QueuePage />} />
+          <Route path="/prompts" element={<PromptsPage />} />
           <Route path="/system" element={<SystemPage />} />
           <Route path="*" element={<p className="empty">{t("web.not_found")}</p>} />
         </Routes>

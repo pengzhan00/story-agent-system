@@ -111,3 +111,26 @@ input[type="number"] { width: 5.5rem; padding: 8px 10px; border: 1px solid var(-
 .line-row select { min-width: 120px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
 .line-row input { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); min-width: 0; }
 button.link.bad { color: var(--bad); }
+
+.project-card { display: flex; flex-direction: column; gap: 8px; }
+.poster { position: relative; padding: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #000; cursor: pointer; aspect-ratio: 16 / 9; }
+.poster video { width: 100%; height: 100%; object-fit: cover; pointer-events: none; display: block; }
+.poster .play { position: absolute; inset: 0; margin: auto; width: 48px; height: 48px; border-radius: 50%; background: rgba(0, 0, 0, 0.55); }
+.poster .play::after { content: ""; position: absolute; left: 19px; top: 14px; border-left: 16px solid #fff; border-top: 10px solid transparent; border-bottom: 10px solid transparent; }
+.poster .badge { position: absolute; right: 6px; bottom: 6px; background: rgba(0, 0, 0, 0.65); color: #fff; padding: 1px 6px; border-radius: 4px; font-size: 0.75rem; }
+.poster:focus-visible { outline: 3px solid var(--accent); }
+dialog.preview { width: min(92vw, 560px); max-height: 94vh; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--text); }
+dialog.preview::backdrop { background: rgba(0, 0, 0, 0.6); }
+dialog.preview video { max-height: 70vh; width: 100%; background: #000; }
+a.button { display: inline-block; text-decoration: none; padding: 6px 12px; border: 1px solid var(--line); border-radius: 8px; color: var(--text); }
+
+pre.transcript { margin: 0; padding: 10px 12px; max-height: 360px; overflow: auto; white-space: pre-wrap; word-break: break-word; background: var(--track); border: 1px solid var(--line); border-radius: 8px; font-size: 0.82rem; }
+ol.flow { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0; }
+.flow-step { position: relative; display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; margin-bottom: 22px; border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: var(--radius); background: var(--panel); }
+.flow-step:not(:last-child)::after { content: ""; position: absolute; left: 28px; bottom: -22px; height: 22px; border-left: 2px dashed var(--line); }
+.flow-step.flow-rules { border-left-color: var(--muted); } .flow-step.flow-media { border-left-color: var(--ok); } .flow-step.flow-compose { border-left-color: var(--warn); }
+.flow-index { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; background: var(--track); font-size: 0.85rem; font-weight: 600; }
+.flow-io { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.flow-medias, .flow-agents { display: flex; flex-direction: column; gap: 8px; }
+.flow-media { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; }
+.flow-model summary { cursor: pointer; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }

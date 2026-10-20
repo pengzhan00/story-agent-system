@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, del, patch, post, put } from "./client";
-import type { Health, ScriptReview, Job, Meta, Project, QueueState, Row, WorkflowOverview, WorkflowRun } from "./types";
+import type { Agent, AgentEdit, AiCallDetail, AiCallRow, FlowStep, Health, ProjectCard, ScriptReview, Job, Meta, Project, QueueState, Row, WorkflowOverview, WorkflowRun } from "./types";
 import { useI18n } from "../i18n";
 
 /** Polling is the fallback; the SSE feed (``events.ts``) pushes the same data much sooner. */
@@ -12,6 +12,12 @@ export const useMeta = () => {
 };
 export const useProjects = (trashed = false) =>
   useQuery({ queryKey: ["projects", trashed], queryFn: () => api<Project[]>(`/api/projects?trashed=${trashed}`) });
+export const useProjectCards = (trashed = false) =>
+  useQuery({
+    queryKey: ["projects", "cards", trashed],
+    queryFn: () => api<ProjectCard[]>(`/api/projects/overview?trashed=${trashed}`),
+    refetchInterval: 5000,
+  });
 export const useProject = (id: number) =>
   useQuery({ queryKey: ["project", id], queryFn: () => api<Project>(`/api/projects/${id}`) });
 
@@ -105,6 +111,12 @@ export const useJobs = (projectId?: number, statuses: string[] = []) =>
     },
     refetchInterval: LIVE_MS,
   });
+export const useJobEvents = (id: string | null) =>
+  useQuery({
+    queryKey: ["job-events", id],
+    enabled: id !== null,
+    queryFn: () => api<{ id: number; event: string; level: string; data: Record<string, unknown>; ts: string }[]>(`/api/jobs/${id}/events`),
+  });
 export const useQueueState = (projectId?: number) =>
   useQuery({
     queryKey: ["queue", projectId ?? "all"],
@@ -122,3 +134,40 @@ export function useJobActions() {
 }
 
 export const useHealth = () => useQuery({ queryKey: ["health"], queryFn: () => api<Health>("/api/health") });
+
+// ---- transparency: what the models were asked, the prompts, the plan/style, the chain ---------------------------
+export const useFlow = (projectId?: number) =>
+  useQuery({
+    queryKey: ["flow", projectId ?? "all"],
+    queryFn: () => api<{ steps: FlowStep[] }>(`/api/flow${projectId ? `?project_id=${projectId}` : ""}`),
+    refetchInterval: projectId ? LIVE_MS : false,
+  });
+export const useAiCalls = (projectId: number, label = "") =>
+  useQuery({
+    queryKey: ["ai-calls", projectId, label],
+    queryFn: () => api<AiCallRow[]>(`/api/projects/${projectId}/ai-calls?limit=200${label ? `&label=${label}` : ""}`),
+    refetchInterval: LIVE_MS,
+  });
+export const useAiCall = (id: number | null) =>
+  useQuery({ queryKey: ["ai-call", id], enabled: id !== null, queryFn: () => api<AiCallDetail>(`/api/ai-calls/${id}`) });
+export const useAgents = () => useQuery({ queryKey: ["agents"], queryFn: () => api<Agent[]>("/api/agents") });
+export function useAgentEdit() {
+  const qc = useQueryClient();
+  const done = () => qc.invalidateQueries({ queryKey: ["agents"] });
+  return {
+    save: useMutation({
+      mutationFn: ({ name, body }: { name: string; body: AgentEdit }) => put<Agent>(`/api/agents/${name}`, body),
+      onSuccess: done,
+    }),
+    reset: useMutation({ mutationFn: (name: string) => api<Agent>(`/api/agents/${name}`, { method: "DELETE" }), onSuccess: done }),
+  };
+}
+export const useProjectData = (projectId: number, key: "plan" | "style") =>
+  useQuery({ queryKey: ["data", projectId, key], queryFn: () => api<Record<string, unknown>>(`/api/projects/${projectId}/data/${key}`) });
+export function useSaveProjectData(projectId: number, key: "plan" | "style") {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Record<string, unknown>) => put<Record<string, unknown>>(`/api/projects/${projectId}/data/${key}`, body),
+    onSuccess: (data) => qc.setQueryData(["data", projectId, key], data),
+  });
+}

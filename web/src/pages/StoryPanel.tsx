@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { STORY_PARTS, useStory, useStoryEdit, type StoryPart } from "../api/hooks";
 import type { Row } from "../api/types";
 import { ErrorNote } from "../components/ErrorNote";
+import { ScriptOutline } from "../components/ScriptOutline";
 import { VoiceUpload } from "../components/VoiceUpload";
 import { useT } from "../i18n";
 
@@ -56,7 +57,7 @@ export function StoryPanel({ id }: { id: number }) {
   const rows = useStory(id, part);
   const [editing, setEditing] = useState<number | null>(null);
   const columns = COLUMNS[part];
-  const editable = (EDITABLE[part] ?? []).length > 0 || part === "dialogue";
+  const editable = (EDITABLE[part] ?? []).length > 0 || part === "dialogue" || part === "scripts";
   return (
     <div className="stack">
       <nav className="tabs" aria-label={t("web.story.parts")}>
@@ -137,7 +138,13 @@ function RowView(props: { pid: number; part: StoryPart; row: Row; columns: strin
       {open ? (
         <tr className="edit-row">
           <td colSpan={columns.length + 1}>
-            {part === "dialogue" ? <DialogueEditor pid={pid} row={row} onDone={onToggle} /> : <RowEditor pid={pid} part={part} row={row} onDone={onToggle} />}
+            {part === "dialogue" ? (
+              <DialogueEditor pid={pid} row={row} onDone={onToggle} />
+            ) : part === "scripts" ? (
+              <ScriptOutline pid={pid} row={row} />
+            ) : (
+              <RowEditor pid={pid} part={part} row={row} onDone={onToggle} />
+            )}
           </td>
         </tr>
       ) : null}

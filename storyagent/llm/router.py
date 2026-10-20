@@ -15,6 +15,8 @@ from .jsonfix import parse_object
 from .schema import validate
 
 log = logging.getLogger(__name__)
+
+TRANSCRIPT_CAP = 200_000     # characters kept per prompt / answer in generation_logs (a safety cap, not a summary)
 JSON_RULES = (
     "Respond with ONE valid JSON object and nothing else: no markdown, no code fences, no commentary. "
     "Keep every string on one line (use \\n for line breaks)."
@@ -63,11 +65,16 @@ class LLMRouter:
                            available=", ".join(have[:8]))
         return backend, model
 
-    def _log(self, role: str, backend: str, project_id: int | None, prompt: str, res: ChatResult | None) -> None:
+    def _log(
+        self, role: str, backend: str, project_id: int | None, prompt: str, res: ChatResult | None, *,
+        system: str = "", label: str = "",
+    ) -> None:
         rec = {
-            "project_id": project_id, "agent": role, "model": res.model if res else "", "prompt": prompt[:500],
-            "response": (res.text if res else "")[:2000], "tokens_in": res.tokens_in if res else 0,
+            "project_id": project_id, "agent": role, "model": res.model if res else "",
+            "prompt": prompt[:TRANSCRIPT_CAP],
+            "response": (res.text if res else "")[:TRANSCRIPT_CAP], "tokens_in": res.tokens_in if res else 0,
             "tokens_out": res.tokens_out if res else 0, "duration_ms": res.duration_ms if res else 0,
+            "system": system[:TRANSCRIPT_CAP], "label": label,
         }
         if self.on_call:
             self.on_call({**rec, "backend": backend})
@@ -75,9 +82,9 @@ class LLMRouter:
             try:
                 self.db.conn.execute(
                     "INSERT INTO generation_logs(project_id, agent, model, prompt, response, tokens_in, tokens_out,"
-                    " duration_ms) VALUES (?,?,?,?,?,?,?,?)",
+                    " duration_ms, system, label) VALUES (?,?,?,?,?,?,?,?,?,?)",
                     (rec["project_id"], rec["agent"], rec["model"], rec["prompt"], rec["response"], rec["tokens_in"],
-                     rec["tokens_out"], rec["duration_ms"]),
+                     rec["tokens_out"], rec["duration_ms"], rec["system"], rec["label"]),
                 )
             except Exception:  # the audit log must never break generation  # noqa: BLE001
                 log.warning("could not write generation_logs", exc_info=True)
@@ -85,7 +92,7 @@ class LLMRouter:
     # -- calls --------------------------------------------------------------------------------
     def chat(
         self, role: str, prompt: str, *, system: str = "", project_id: int | None = None, model: str = "",
-        schema: dict[str, Any] | None = None, **opts: Any,
+        schema: dict[str, Any] | None = None, label: str = "", **opts: Any,
     ) -> ChatResult:
         backend, model_name, params = self.resolve(role, model)
         merged = {"temperature": 0.7, "max_tokens": 4096, **params, **opts}
@@ -94,7 +101,7 @@ class LLMRouter:
             max_tokens=int(merged["max_tokens"]), num_ctx=merged.get("num_ctx"), schema=schema,
             timeout=merged.get("timeout"),
         )
-        self._log(role, backend, project_id, prompt, res)
+        self._log(role, backend, project_id, prompt, res, system=system, label=label)
         return res
 
     def json(

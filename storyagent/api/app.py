@@ -29,6 +29,7 @@ from storyagent.workflow import WorkflowState
 
 from . import (
     errors,
+    routes_ai,
     routes_assets,
     routes_jobs,
     routes_library,
@@ -97,7 +98,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
     errors.install(app)
     for module in (routes_projects, routes_jobs, routes_assets, routes_library, routes_specs, routes_story,
-                   routes_workflow, routes_system):
+                   routes_workflow, routes_system, routes_ai):
         app.include_router(module.router)
     web = web_root(settings)
     if web is not None:

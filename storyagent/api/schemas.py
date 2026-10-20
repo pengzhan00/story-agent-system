@@ -12,6 +12,12 @@ class Out(BaseModel):
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
 
+class Strict(BaseModel):
+    """Response models whose defaulted fields are still always present: the generated TS types mark them required."""
+
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
+
 # -- errors -----------------------------------------------------------------------------------------
 class ErrorBody(BaseModel):
     code: str
@@ -37,6 +43,23 @@ class ProjectOut(Out):
     status: str
     settings: dict[str, Any]
     created_at: str
+    updated_at: str
+
+
+class ProjectCard(Strict):
+    """One tile of the project list: the project, how far it is, and the finished episode if there is one."""
+
+    id: int
+    name: str
+    description: str
+    genre: str
+    status: str
+    stages_done: int
+    stages_total: int
+    running: bool
+    episode_asset_id: str | None
+    episode_seconds: float | None
+    episode_number: int | None
     updated_at: str
 
 
@@ -362,10 +385,6 @@ class Ready(BaseModel):
     schema_version: int
 
 
-class Strict(BaseModel):
-    """Response models whose defaulted fields are still always present: the generated TS types mark them required."""
-
-    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
 
 # -- story workflow -----------------------------------------------------------------------------------------
@@ -440,6 +459,65 @@ class ScriptReviewOut(Strict):
     score: float
     summary: str = ""
     issues: list[ReviewIssue] = Field(default_factory=list)
+
+
+class AgentOut(Strict):
+    name: str
+    role: str
+    description: str
+    system: str
+    prompt: str
+    inputs: list[str]
+    temperature: float
+    max_tokens: int
+    attempts: int
+    model: str
+    overridden: bool
+    default_system: str
+    default_prompt: str
+    editable: list[str]
+
+
+class AgentEdit(BaseModel):
+    role: str | None = None
+    system: str | None = None
+    prompt: str | None = None
+    temperature: float | None = Field(default=None, ge=0, le=2)
+    max_tokens: int | None = Field(default=None, ge=16, le=65536)
+    attempts: int | None = Field(default=None, ge=1, le=10)
+    model: str | None = None
+
+
+class AiCallRow(Strict):
+    id: int
+    label: str
+    agent: str
+    model: str
+    tokens_in: int
+    tokens_out: int
+    duration_ms: int
+    created_at: str
+    prompt_chars: int
+    response_chars: int
+
+
+class AiCallDetail(Strict):
+    id: int
+    project_id: int | None
+    label: str
+    agent: str
+    model: str
+    system: str
+    prompt: str
+    response: str
+    tokens_in: int
+    tokens_out: int
+    duration_ms: int
+    created_at: str
+
+
+class FlowOut(Strict):
+    steps: list[dict[str, Any]]
 
 
 class LockBody(BaseModel):
