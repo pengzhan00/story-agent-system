@@ -28,6 +28,27 @@ class MediaKind(StrEnum):
     TEXT_ASR = "text.asr"  # transcription (subtitles, clone ref_text)
     COMPOSE_ASSEMBLE = "compose.assemble"  # shots + stems -> episode
     ANALYZE_QC = "analyze.qc"  # technical + semantic quality checks
+    TRAIN_LORA = "train.lora"  # LoRA training; the adapter output is a LoRA asset
+
+
+class SubjectType(StrEnum):
+    """What a generation spec is *about* (the editable thing). Deployments may add more
+    ``<noun>.<aspect>`` values in config; these are the built-in ones.
+
+    i18n keys: ``spec.subject.<value>``.
+    """
+
+    CHARACTER_PORTRAIT = "character.portrait"
+    CHARACTER_VOICE = "character.voice"
+    DIALOGUE_LINE = "dialogue.line"
+    SCENE_KEYFRAME = "scene.keyframe"
+    SHOT_KEYFRAME = "shot.keyframe"
+    SHOT_VIDEO = "shot.video"
+    MUSIC_BGM = "music.bgm"
+    MUSIC_THEME_SONG = "music.theme_song"
+    SFX_CUE = "sfx.cue"
+    STYLE_GUIDE = "style.guide"
+    LORA_TRAINING = "lora.training"
 
 
 class QualityTier(StrEnum):

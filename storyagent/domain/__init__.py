@@ -1,3 +1,3 @@
-from .enums import JobStatus, MediaKind, QualityTier, ShotStatus, slugify
+from .enums import JobStatus, MediaKind, QualityTier, ShotStatus, SubjectType, slugify
 
-__all__ = ["JobStatus", "MediaKind", "QualityTier", "ShotStatus", "slugify"]
+__all__ = ["JobStatus", "MediaKind", "QualityTier", "ShotStatus", "SubjectType", "slugify"]

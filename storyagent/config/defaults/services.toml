@@ -21,6 +21,12 @@ url = "http://127.0.0.1:8002"
 health_path = "/health"
 
 # Read-only probe target; never started, restarted or modified by this system.
+# llama.cpp llama-server (OpenAI-compatible). Off by default: probed only when enabled.
+[services.llamacpp]
+url = "http://127.0.0.1:8080"
+health_path = "/health"
+enabled = false
+
 [services.nodus]
 url = "http://127.0.0.1:8000"
 health_path = "/"
@@ -34,29 +40,55 @@ model_dir = "~/myworkspace/MiniMax-H3"
 [tools.longcat]
 root = "~/myworkspace/longcat-avatar-mlx"
 python = "~/myworkspace/longcat-avatar-mlx/.venv/bin/python"
-variant = "q4-merged"
+weights_dir = "~/myworkspace/longcat-avatar-mlx/weights"
+variant_dir = "LongCat-Video-Avatar-1.5-q4-dmd-merged"
 
 [tools.cosyvoice]
 root = "~/cosyvoice"
 python = "~/cosyvoice/venv/bin/python"
 workdir = "~/cosyvoice/CosyVoice"
 script = "~/cosyvoice/clone_tts.py"
+model_dir = "~/cosyvoice/CosyVoice/pretrained_models/CosyVoice2-0.5B"
 
 [tools.fastvideo]
 root = "~/myworkspace/FastVideo"
 python = "~/myworkspace/FastVideo/.venv/bin/python"
+# Converted FastH3 weights (not downloaded yet; downloading/converting needs the operator's go-ahead).
+weights_dir = ""
+
+# LoRA training (mflux-train). Paths only; the training recipe lives in models.toml (train_template).
+[tools.lora_train]
+command = "~/.local/bin/mflux-train"
+root = "~/myworkspace/flux2-lora"
+base_model_dir = "~/models/flux2-klein-base-4B"
 
 [tools.ffmpeg]
-# Needs libass (subtitles filter). Empty = auto-detect on PATH / Homebrew.
-binary = ""
-ffprobe = ""
+# Needs libass (subtitles filter) and ideally whisper: use ffmpeg-full. Falls back to PATH if the file is missing.
+binary = "/opt/homebrew/opt/ffmpeg-full/bin/ffmpeg"
+ffprobe = "/opt/homebrew/opt/ffmpeg-full/bin/ffprobe"
 
 [runtime]
-# What to do with models resident in Ollama before a heavy media job:
-#   never = leave Ollama alone (default), ask = require operator confirmation,
-#   auto  = `ollama stop <model>` for every resident model.
-ollama_unload_policy = "never"
+# What to do with LLM models resident in memory (Ollama, llama.cpp, ...) before a heavy media job:
+#   never = leave them alone (default), ask = hold the job until the operator unloads them
+#   (`storyagent ops llm-unload`), auto = unload via the backend API.
+llm_unload_policy = "never"
+# Unknown job params: false = pass through with a warning, true = reject as failed_validation.
+strict_params = false
+# A new successful candidate becomes the current asset automatically (false = pick manually).
+auto_adopt = true
+# Concurrent non-heavy jobs the worker may run next to (at most) one heavy job.
+max_light_jobs = 2
+# Job lease: a worker that stops heartbeating for lease_seconds loses its jobs to re-queue.
+lease_seconds = 60
+heartbeat_seconds = 15
+poll_interval_seconds = 2
 # Wrap long jobs in `caffeinate -i` on macOS.
 caffeinate = true
 # Total unified-memory budget (GiB) the broker may hand out to running jobs.
 memory_budget_gib = 96
+
+[healthcheck]
+# Entries that must be "ok" for the healthcheck exit code to be 0. Names: a service (comfy), or tool.<name>.
+required = ["comfy", "acestep", "ollama", "tool.ffmpeg"]
+# Below this much free disk (GiB) on the data home the system entry reports "degraded".
+min_free_gib = 50

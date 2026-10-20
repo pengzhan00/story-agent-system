@@ -1,0 +1,16 @@
+# AIGC compliance. ON by default, optional: switch off globally here, with
+# STORY_AGENT_COMPLIANCE=off, or per project (projects.settings.compliance).
+# Provenance recording in the ledger is an engineering feature and is always on;
+# this switch only governs labelling, consent checks and licence gating.
+
+[compliance]
+enabled = true
+# Write AIGC provenance into container metadata and ship provenance.json with exports.
+implicit_metadata = true
+# Visible label on delivered video: off | overlay | both(overlay + end card). Text: i18n key below.
+explicit_label = "off"
+explicit_label_key = "compliance.label.aigc"
+# Voice cloning needs a recorded consent flag on the reference voice.
+require_voice_consent = true
+# Models with commercial_ok=false are blocked unless the project opts in explicitly.
+require_restricted_license_ack = true

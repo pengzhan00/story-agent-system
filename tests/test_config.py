@@ -18,7 +18,7 @@ def test_defaults(tmp_path: Path) -> None:
     assert s.service("comfy").url == "http://127.0.0.1:8188"
     assert s.service("acestep").health_url == "http://127.0.0.1:8001/v1/models"
     assert s.default_model("video.generate").ref == "ltx-2.3-22b-distilled"
-    assert s.ollama_unload_policy == "never"
+    assert s.llm_unload_policy == "never"
     assert s.locale == "zh-CN"
 
 
@@ -34,12 +34,12 @@ def test_env_overrides(tmp_path: Path) -> None:
             tmp_path,
             STORY_AGENT_COMFY_URL="http://10.0.0.5:9999/",
             STORY_AGENT_LOCALE="en",
-            STORY_AGENT_OLLAMA_UNLOAD_POLICY="ask",
+            STORY_AGENT_LLM_UNLOAD_POLICY="ask",
         )
     )
     assert s.service("comfy").url == "http://10.0.0.5:9999"
     assert s.locale == "en"
-    assert s.ollama_unload_policy == "ask"
+    assert s.llm_unload_policy == "ask"
 
 
 def test_user_override_file_merges_deeply(tmp_path: Path) -> None:
@@ -62,8 +62,8 @@ def test_restricted_license_flows_from_registry(tmp_path: Path) -> None:
 
 
 def test_invalid_policy_rejected(tmp_path: Path) -> None:
-    with pytest.raises(ConfigError, match="ollama_unload_policy"):
-        load_settings(env(tmp_path, STORY_AGENT_OLLAMA_UNLOAD_POLICY="yolo"))
+    with pytest.raises(ConfigError, match="llm_unload_policy"):
+        load_settings(env(tmp_path, STORY_AGENT_LLM_UNLOAD_POLICY="yolo"))
 
 
 def test_unknown_default_ref_rejected(tmp_path: Path) -> None:
@@ -86,7 +86,8 @@ def test_tool_path_expands_user(tmp_path: Path) -> None:
     s = load_settings(env(tmp_path))
     p = s.tool_path("h3", "binary")
     assert p is not None and p.is_absolute() and "~" not in str(p)
-    assert s.tool_path("ffmpeg", "binary") is None  # empty => auto-detect
+    assert s.tool_path("ffmpeg", "binary", ) is not None  # configured default; falls back to PATH at use
+    assert s.tool_path("h3", "nonexistent_key") is None  # empty/missing => auto-detect
 
 
 def test_media_dir_layout(tmp_path: Path) -> None:

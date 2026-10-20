@@ -6,6 +6,7 @@ import pytest
 
 from storyagent.cli import main
 from storyagent.config import get_settings
+from storyagent.db.migrator import discover
 
 from .legacy_db import build_legacy_db
 
@@ -23,12 +24,13 @@ def cli_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 def test_migrate_then_status(cli_env: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    latest = len(discover())
     assert main(["db", "migrate"]) == 0
-    assert "Migrated to version 1" in capsys.readouterr().out
+    assert f"Migrated to version {latest}" in capsys.readouterr().out
     assert main(["db", "migrate"]) == 0
     assert "already up to date" in capsys.readouterr().out
     assert main(["db", "status"]) == 0
-    assert capsys.readouterr().out.strip() == "1"
+    assert capsys.readouterr().out.strip() == str(latest)
 
 
 def test_import_legacy_cli(cli_env: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -52,6 +54,6 @@ def test_i18n_check_and_config_show(cli_env: Path, capsys: pytest.CaptureFixture
 
 
 def test_bad_config_exits_2(cli_env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("STORY_AGENT_OLLAMA_UNLOAD_POLICY", "yolo")
+    monkeypatch.setenv("STORY_AGENT_LLM_UNLOAD_POLICY", "yolo")
     get_settings.__globals__["_cached"] = None
     assert main(["config", "show"]) == 2

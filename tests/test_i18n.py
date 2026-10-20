@@ -55,10 +55,17 @@ def test_unknown_locale(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize("locale", ["en", "zh-CN"])
 def test_every_enum_value_has_a_label(locale: str) -> None:
-    from storyagent.domain import JobStatus, MediaKind, QualityTier
+    from storyagent.domain import JobStatus, MediaKind, QualityTier, SubjectType
+    from storyagent.domain.errors import ErrorCode, WaitReason
 
     cat = get_catalog(locale)
-    for prefix, enum in (("status", JobStatus), ("media.kind", MediaKind), ("media.tier", QualityTier)):
+    enums = (
+        ("status", JobStatus), ("media.kind", MediaKind), ("media.tier", QualityTier),
+        ("spec.subject", SubjectType), ("error", ErrorCode), ("wait", WaitReason),
+    )
+    for prefix, enum in enums:
         for member in enum:
             key = f"{prefix}.{member.value}"
             assert cat.messages.get(key), f"{locale}: missing label {key}"
+            if prefix == "error":
+                assert cat.messages.get(f"{key}.remediation"), f"{locale}: missing remediation {key}"

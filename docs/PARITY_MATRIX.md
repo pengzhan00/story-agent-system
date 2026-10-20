@@ -70,7 +70,7 @@
 | E3 | `main.py --render / --workshop / --cli / --demo / --check` | `storyagent ui|worker|…`;`--check` → healthcheck | R1/R4 | ⬜ |
 | E4 | 独立渲染服务 UI(`render_app.py`,有陈旧 API bug) | ⛔ 并入「媒体生产」页 + worker | R4 | ⛔ |
 | E5 | 系统 Tab:状态、日志、TTS/BGM 试听、工业化控制台 SOP | UI「系统」页 | R4 | ⬜ |
-| E6 | 旧 DB 数据 | `db import-legacy`(只读) — 注意:旧 `data/story_agents.db` 主文件已缺失,仅余 WAL | R0 | ✅(工具)/ ⚠ 数据 |
+| E6 | 旧 DB 数据 | 决策:**不迁移旧数据**,v2 库全新生成;`db import-legacy` 保留为可选只读工具(旧 `-wal/-shm` 不触碰) | R0 | ✅(决策) |
 
 ## 汇总门禁
 

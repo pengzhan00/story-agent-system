@@ -1,0 +1,36 @@
+# Recipes = ordered media steps for one shot/asset. Pipelines are not uniform, so these are
+# data, not code: copy and edit freely, or define project-specific ones in
+# <STORY_AGENT_HOME>/config/recipes.toml. A step without `model` uses the default for its kind.
+# Execution is done by the workflow layer (R3); this file is validated on load.
+
+[recipes.quick_draft]
+label_key = "recipe.quick_draft"
+[[recipes.quick_draft.steps]]
+kind = "video.generate"
+tier = "draft"
+
+[recipes.standard_shot]
+label_key = "recipe.standard_shot"
+[[recipes.standard_shot.steps]]
+kind = "image.generate"
+slot = "keyframe"
+[[recipes.standard_shot.steps]]
+kind = "video.generate"
+[[recipes.standard_shot.steps]]
+kind = "audio.tts"
+when = "shot.has_dialogue"
+
+[recipes.av_shot]
+label_key = "recipe.av_shot"
+[[recipes.av_shot.steps]]
+kind = "video.av"
+
+[recipes.avatar_shot]
+label_key = "recipe.avatar_shot"
+[[recipes.avatar_shot.steps]]
+kind = "image.generate"
+slot = "portrait"
+[[recipes.avatar_shot.steps]]
+kind = "audio.tts"
+[[recipes.avatar_shot.steps]]
+kind = "video.avatar"

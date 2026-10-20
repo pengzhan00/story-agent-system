@@ -1,0 +1,29 @@
+# LLM backends and per-role routing. Any backend can serve any role.
+#   kind: ollama | llamacpp | openai_compat
+#   service: take the URL from [services.<name>] (single source of truth); or give `url`.
+# Backends are only probed, never started or stopped, unless you run `storyagent ops llm ...`.
+
+[llm.backends.ollama]
+kind = "ollama"
+service = "ollama"
+
+[llm.backends.llamacpp]
+kind = "llamacpp"
+service = "llamacpp"
+
+[llm.roles.default]
+backend = "ollama"
+model = "qwen3:8b"
+
+# Creative roles use the larger model installed locally.
+[llm.roles.director]
+backend = "ollama"
+model = "gemma4:31b"
+
+[llm.roles.writer]
+backend = "ollama"
+model = "gemma4:31b"
+
+[llm.roles.reviewer]
+backend = "ollama"
+model = "gemma4:31b"

@@ -1,12 +1,20 @@
-# Model registry. Switching a model is a config change only: point
-# [defaults] at another ref. `ref` strings are what the ledger stores.
+# Model registry. Switching a model is a config change only: point [defaults] at another ref.
 #
 #   kind     : a MediaKind value (storyagent/domain/enums.py), e.g. "video.generate"
-#   provider : the runtime/adapter that executes it: comfy | acestep | cosyvoice | h3 | longcat | fastvideo | ffmpeg
+#   provider : the runtime/adapter that executes it:
+#              comfy | acestep | cosyvoice | h3 | longcat | fastvideo | lora_train | ffmpeg
 #   family   : the underlying model family — the same weights may have several runtimes
 #              (MiniMax H3 runs via h3.c or FastVideo-MLX); licence applies per family
-#   heavy    : true => the broker allows only one heavy job at a time
-#   license_tag / commercial_ok : copied into the ledger for every artifact
+#   heavy    : true => the broker runs at most one heavy job at a time
+#   license_tag / commercial_ok / attribution : copied into the ledger for every artifact
+#   params   : model defaults;  tiers.<draft|preview|final> : per-tier overrides on top of params
+#   prompt_profile : how the final prompt is phrased for this model (see media/specs.py)
+#   timeout_sec    : wall-clock limit for one job
+#
+# Parameter precedence (low -> high): adapter built-ins < params < tiers.<tier>
+#   < projects.settings.models.<ref> < per-job params.
+# Values below come from the legacy configuration or the tools' documented defaults;
+# anything unknown is left to the adapter. They are starting points, not rules.
 
 [defaults]
 "image.generate" = "flux2-klein-4b"
@@ -16,6 +24,7 @@
 "audio.tts" = "cosyvoice2-0.5b"
 "audio.music" = "acestep-1.5-turbo"
 "compose.assemble" = "ffmpeg-assemble"
+"train.lora" = "flux2-klein-4b-lora-trainer"
 
 [models."flux2-klein-4b"]
 kind = "image.generate"
@@ -25,6 +34,8 @@ heavy = false
 est_memory_gib = 14
 license_tag = "flux2-klein"
 commercial_ok = true
+prompt_profile = "natural_en"
+timeout_sec = 1800
 
 [models."ltx-2.3-22b-distilled"]
 kind = "video.generate"
@@ -34,66 +45,44 @@ heavy = true
 est_memory_gib = 60
 license_tag = "ltx-community"
 commercial_ok = true
+prompt_profile = "cinematic_en"
+timeout_sec = 7200
+[models."ltx-2.3-22b-distilled".params]
+fps = 16
+frames = 49
+cfg = 3.0
+shift = 8.0
+steps = 9
+lora_strength = 0.35
+[models."ltx-2.3-22b-distilled".tiers.draft]
+width = 288
+height = 512
+frames = 9
+fps = 8
+[models."ltx-2.3-22b-distilled".tiers.preview]
+width = 384
+height = 672
+[models."ltx-2.3-22b-distilled".tiers.final]
+width = 720
+height = 1280
 
 [models."acestep-1.5-turbo"]
 kind = "audio.music"
 provider = "acestep"
 version = "v15-turbo"
+family = "acestep-1.5"
 heavy = false
 est_memory_gib = 20
 license_tag = "acestep"
 commercial_ok = true
-
-[models."cosyvoice2-0.5b"]
-kind = "audio.tts"
-provider = "cosyvoice"
-version = "CosyVoice2-0.5B"
-heavy = false
-est_memory_gib = 6
-license_tag = "apache-2.0"
-commercial_ok = true
-
-[models."minimax-h3"]
-family = "minimax-h3"
-kind = "video.av"
-provider = "h3"
-version = "FL2VA+Ref2VA"
-heavy = true
-est_memory_gib = 48
-# MiniMax H3 Community License: territory excludes EU/UK/South Korea/USA;
-# commercial UIs must display "MiniMax H3".
-license_tag = "minimax-h3-community"
-commercial_ok = false
-attribution = "MiniMax H3"
-
-[models."longcat-avatar-1.5-q4"]
-kind = "video.avatar"
-provider = "longcat"
-version = "q4-merged"
-heavy = true
-est_memory_gib = 30
-license_tag = "mit"
-commercial_ok = true
-
-[models."fastvideo-fasth3"]
-family = "minimax-h3"
-kind = "video.av"
-provider = "fastvideo"
-version = "FastH3-8step-V2"
-heavy = true
-est_memory_gib = 27
-license_tag = "minimax-h3-community"
-commercial_ok = false
-attribution = "MiniMax H3"
-
-[models."ffmpeg-assemble"]
-kind = "compose.assemble"
-provider = "ffmpeg"
-version = "ffmpeg"
-heavy = false
-est_memory_gib = 2
-license_tag = "lgpl-gpl"
-commercial_ok = true
+prompt_profile = "music_tags"
+timeout_sec = 900
+[models."acestep-1.5-turbo".params]
+duration = 30
+steps = 8
+guidance_scale = 7.0
+vocal_language = "zh"
+infer_method = "ode"
 
 [models."acestep-1.5-xl-sft"]
 kind = "audio.music"
@@ -104,3 +93,134 @@ heavy = false
 est_memory_gib = 28
 license_tag = "acestep"
 commercial_ok = true
+prompt_profile = "music_tags"
+timeout_sec = 1800
+
+[models."cosyvoice2-0.5b"]
+kind = "audio.tts"
+provider = "cosyvoice"
+version = "CosyVoice2-0.5B"
+heavy = false
+est_memory_gib = 6
+license_tag = "apache-2.0"
+commercial_ok = true
+prompt_profile = "plain"
+timeout_sec = 900
+[models."cosyvoice2-0.5b".params]
+mode = "zero_shot"
+sample_rate = 24000
+output_format = "mp3"
+
+[models."minimax-h3"]
+kind = "video.av"
+provider = "h3"
+version = "FL2VA+Ref2VA"
+family = "minimax-h3"
+heavy = true
+est_memory_gib = 48
+# MiniMax H3 Community License: territory excludes EU/UK/South Korea/USA;
+# commercial UIs must display "MiniMax H3".
+license_tag = "minimax-h3-community"
+commercial_ok = false
+attribution = "MiniMax H3"
+prompt_profile = "h3_structured"
+timeout_sec = 7200
+[models."minimax-h3".params]
+width = 480
+height = 864
+frames = 56
+steps = 20
+[models."minimax-h3".tiers.draft]
+frames = 22
+layers = 40
+reuse = 3
+
+[models."fastvideo-fasth3"]
+kind = "video.av"
+provider = "fastvideo"
+version = "FastH3-8step-V2"
+family = "minimax-h3"
+heavy = true
+est_memory_gib = 27
+license_tag = "minimax-h3-community"
+commercial_ok = false
+attribution = "MiniMax H3"
+prompt_profile = "h3_structured"
+timeout_sec = 7200
+[models."fastvideo-fasth3".params]
+width = 832
+height = 480
+num_frames = 124
+fps = 24
+
+[models."longcat-avatar-1.5-q4"]
+kind = "video.avatar"
+provider = "longcat"
+version = "q4-merged"
+heavy = true
+est_memory_gib = 30
+license_tag = "mit"
+commercial_ok = true
+prompt_profile = "natural_en"
+timeout_sec = 7200
+[models."longcat-avatar-1.5-q4".params]
+height = 480
+width = 832
+num_frames = 93
+
+[models."ffmpeg-assemble"]
+kind = "compose.assemble"
+provider = "ffmpeg"
+version = "ffmpeg"
+heavy = false
+est_memory_gib = 2
+license_tag = "lgpl-gpl"
+commercial_ok = true
+timeout_sec = 3600
+
+# LoRA training. Everything here is a *template* deep-merged with the job's params, so any
+# training knob (epochs, rank, layers, learning rate, resolution ...) is configurable per job.
+# Paths (model_path, data, checkpoint.output_path) are injected by the adapter.
+[models."flux2-klein-4b-lora-trainer"]
+kind = "train.lora"
+provider = "lora_train"
+version = "mflux-train"
+family = "flux2-klein"
+heavy = true
+est_memory_gib = 64   # estimate; adjust after the first real run
+license_tag = "flux2-klein"
+commercial_ok = true
+timeout_sec = 86400
+[models."flux2-klein-4b-lora-trainer".train_template]
+model = "flux2-klein-base-4b"
+seed = 42
+steps = 40
+guidance = 1.0
+low_ram = false
+gradient_checkpointing = true
+max_resolution = 1024
+[models."flux2-klein-4b-lora-trainer".train_template.training_loop]
+num_epochs = 60
+batch_size = 1
+timestep_low = 25
+timestep_high = 40
+[models."flux2-klein-4b-lora-trainer".train_template.optimizer]
+name = "AdamW"
+learning_rate = 0.0001
+[models."flux2-klein-4b-lora-trainer".train_template.checkpoint]
+save_frequency = 5
+[models."flux2-klein-4b-lora-trainer".train_template.monitoring]
+plot_frequency = 5
+generate_image_frequency = 5
+[[models."flux2-klein-4b-lora-trainer".train_template.lora_layers.targets]]
+module_path = "transformer_blocks.{block}.attn.to_q"
+blocks = { start = 0, end = 5 }
+rank = 16
+[[models."flux2-klein-4b-lora-trainer".train_template.lora_layers.targets]]
+module_path = "transformer_blocks.{block}.attn.to_k"
+blocks = { start = 0, end = 5 }
+rank = 16
+[[models."flux2-klein-4b-lora-trainer".train_template.lora_layers.targets]]
+module_path = "transformer_blocks.{block}.attn.to_v"
+blocks = { start = 0, end = 5 }
+rank = 16

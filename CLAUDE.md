@@ -8,7 +8,7 @@ Local, offline "idea → short-drama MP4" system (漫剧故事工坊 / Story Age
 
 ## Rewrite in progress (v2)
 
-The legacy code (`core/ agents/ pipelines/ ui/ main.py`, described below) is frozen and being replaced by the new `storyagent/` package, built milestone by milestone (R0–R7; plan and review in `docs/reviews/`, feature-by-feature tracking in `docs/PARITY_MATRIX.md`). Do not extend legacy code; new work goes in `storyagent/`. R0 (done) provides: `config/` (settings from packaged TOML defaults < `$STORY_AGENT_HOME/config/*.toml` < env; no hard-coded paths/ports), `i18n/` (all user-visible text via `t(key)` with `locales/{zh-CN,en}.json`), `db/` (versioned SQL migrations, automatic pre-upgrade snapshot, read-only `legacy_import`), `domain/enums.py` (`MediaKind` as `<domain>.<operation>`, `JobStatus`, `QualityTier`), `cli.py`.
+The legacy code (`core/ agents/ pipelines/ ui/ main.py`, described below) is frozen and being replaced by the new `storyagent/` package, built milestone by milestone (R0–R7; plan and review in `docs/reviews/`, feature-by-feature tracking in `docs/PARITY_MATRIX.md`). Do not extend legacy code; new work goes in `storyagent/`. R0 (done) provides: `config/` (settings from packaged TOML defaults < `$STORY_AGENT_HOME/config/*.toml` < env; no hard-coded paths/ports), `i18n/` (all user-visible text via `t(key)` with `locales/{zh-CN,en}.json`), `db/` (versioned SQL migrations, automatic pre-upgrade snapshot, read-only `legacy_import`), `domain/enums.py` (`MediaKind` as `<domain>.<operation>`, `JobStatus`, `QualityTier`), `cli.py`. R1 (done) adds the media core in `media/`: `contracts.py` (MediaJob/Adapter protocol), `ledger.py` (jobs + versioned assets, leases, idempotency), `specs.py` (editable, versioned creative specs → regenerate), `broker.py` + `worker.py` (heavy/light arbitration, lease/heartbeat, reattach), `healthcheck.py`, `compliance.py`, `params.py` (layered params); config now also covers `compliance/recipes/llm.toml`. See `docs/MEDIA_CONTRACT.md`, `docs/CONFIGURATION.md`, `docs/RUNBOOK.md`.
 
 ```bash
 uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python -e '.[dev]'   # first time
@@ -16,6 +16,8 @@ uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python -e '.[de
 .venv/bin/pytest tests/test_config.py::test_defaults   # single test
 .venv/bin/ruff check storyagent tests --exclude tests/legacy && .venv/bin/mypy
 .venv/bin/python -m storyagent db migrate | status | import-legacy --from <v1 db> ; config show ; i18n check
+.venv/bin/python -m storyagent media healthcheck | submit | jobs | show | cancel | retry | adopt ; spec create|show|edit|diff|revert|lock|unlock|regenerate ; worker [--once] ; ops llm-unload
+STORY_AGENT_ENABLE_FAKE=1 registers the fake adapter for local end-to-end runs (see tests/test_cli_media.py)
 ```
 
 Rules enforced by `tests/test_guards.py`: no `/Users/`, `~/myworkspace`, `127.0.0.1`/`localhost` literals, `pkill`/`shell=True`, or CJK string literals inside `storyagent/`. Services/tools/models come from `Settings` (`storyagent/config/defaults/*.toml`). `tests/legacy/` holds the old run-at-import scripts (excluded from pytest, deleted in R7).

@@ -128,3 +128,86 @@ def test_no_snapshot_on_fresh_install_or_noop(db: Database) -> None:
 def test_content_language_independent_of_ui_locale(db: Database) -> None:
     db.conn.execute("INSERT INTO projects(slug) VALUES ('p')")
     assert db.conn.execute("SELECT content_language FROM projects").fetchone()[0] == "zh-CN"
+
+
+# ---- 002_media -------------------------------------------------------------------------------
+def _project(db: Database) -> int:
+    db.conn.execute("INSERT INTO projects(slug,name) VALUES ('p','P')")
+    return int(db.conn.execute("SELECT id FROM projects").fetchone()["id"])
+
+
+def _job(db: Database, jid: str, pid: int, **kw: object) -> None:
+    cols = {"id": jid, "project_id": pid, "kind": "video.generate", "provider": "fake", "model_ref": "m", **kw}
+    names = ",".join(cols)
+    db.conn.execute(f"INSERT INTO media_jobs({names}) VALUES ({','.join('?' * len(cols))})", list(cols.values()))
+
+
+def test_active_idempotency_key_is_unique_but_reusable_after_finish(db: Database) -> None:
+    pid = _project(db)
+    _job(db, "a", pid, idempotency_key="k1")
+    with pytest.raises(sqlite3.IntegrityError):
+        _job(db, "b", pid, idempotency_key="k1")
+    db.conn.execute("UPDATE media_jobs SET status='completed' WHERE id='a'")
+    _job(db, "c", pid, idempotency_key="k1")  # fine: the first one is no longer active
+    _job(db, "d", pid, idempotency_key="")  # empty key never collides
+    _job(db, "e", pid, idempotency_key="")
+
+
+def test_job_status_and_tier_constrained(db: Database) -> None:
+    pid = _project(db)
+    with pytest.raises(sqlite3.IntegrityError):
+        _job(db, "x", pid, status="done")
+    with pytest.raises(sqlite3.IntegrityError):
+        _job(db, "y", pid, tier="ultra")
+
+
+def _asset(db: Database, aid: str, pid: int, shot: int | None, current: int, **kw: object) -> None:
+    cols = {"id": aid, "project_id": pid, "shot_id": shot, "kind": "video.generate", "slot": "main",
+            "path": f"x/{aid}.mp4", "is_current": current, **kw}
+    db.conn.execute(
+        f"INSERT INTO media_assets({','.join(cols)}) VALUES ({','.join('?' * len(cols))})", list(cols.values())
+    )
+
+
+def test_exactly_one_current_asset_per_slot_including_project_level(db: Database) -> None:
+    pid = _project(db)
+    _asset(db, "a1", pid, None, 1)
+    _asset(db, "a2", pid, None, 0)  # candidates are unlimited
+    _asset(db, "a3", pid, None, 0)
+    with pytest.raises(sqlite3.IntegrityError):  # NULL shot must not escape the constraint
+        _asset(db, "a4", pid, None, 1)
+    _asset(db, "b1", pid, None, 1, kind="audio.music")  # other kind: fine
+    _asset(db, "c1", pid, None, 1, slot="alt")  # other slot: fine
+    db.conn.execute("UPDATE media_assets SET trashed_at='2026-01-01' WHERE id='a1'")
+    _asset(db, "a5", pid, None, 1)  # trashed assets do not hold the slot
+
+
+def test_spec_versions_unique_and_current_view(db: Database) -> None:
+    pid = _project(db)
+    ins = ("INSERT INTO gen_specs(id,project_id,subject_type,subject_id,version,kind,prompt) "
+           "VALUES (?,?,?,?,?,?,?)")
+    db.conn.execute(ins, ("s1", pid, "character.portrait", "7", 1, "image.generate", "v1"))
+    db.conn.execute(ins, ("s2", pid, "character.portrait", "7", 2, "image.generate", "v2"))
+    db.conn.execute(ins, ("s3", pid, "character.portrait", "8", 1, "image.generate", "other"))
+    with pytest.raises(sqlite3.IntegrityError):
+        db.conn.execute(ins, ("s4", pid, "character.portrait", "7", 2, "image.generate", "dup"))
+    cur = {r["subject_id"]: r["prompt"] for r in db.conn.execute("SELECT * FROM gen_specs_current")}
+    assert cur == {"7": "v2", "8": "other"}
+
+
+def test_project_delete_cascades_to_ledger(db: Database) -> None:
+    pid = _project(db)
+    _job(db, "j", pid)
+    _asset(db, "a", pid, None, 1, job_id="j")
+    db.conn.execute("INSERT INTO job_events(job_id,event) VALUES ('j','x')")
+    db.conn.execute("DELETE FROM projects WHERE id=?", (pid,))
+    for table in ("media_jobs", "media_assets", "job_events"):
+        assert db.conn.execute(f"SELECT COUNT(*) c FROM {table}").fetchone()["c"] == 0
+
+
+def test_voice_consent_and_project_settings_columns(db: Database) -> None:
+    pid = _project(db)
+    assert db.conn.execute("SELECT settings FROM projects").fetchone()[0] == "{}"
+    db.conn.execute("INSERT INTO characters(project_id,name) VALUES (?, 'A')", (pid,))
+    row = db.conn.execute("SELECT voice_ref_consent, voice_consent_note FROM characters").fetchone()
+    assert (row[0], row[1]) == (0, "")
