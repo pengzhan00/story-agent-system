@@ -175,11 +175,15 @@ class Ledger:
         *,
         project_id: int | None = None,
         shot_id: int | None = None,
+        spec_id: str | None = None,
         status: Sequence[JobStatus | str] | None = None,
         limit: int = 100,
     ) -> list[JobRecord]:
         where: list[str] = ["1=1"]
         args: list[Any] = []
+        if spec_id is not None:
+            where.append("spec_id=?")
+            args.append(spec_id)
         if project_id is not None:
             where.append("project_id=?")
             args.append(project_id)
@@ -442,13 +446,15 @@ class Ledger:
         shot_id: int | None = None,
         kind: str | None = None,
         slot: str | None = None,
+        spec_id: str | None = None,
         current_only: bool = False,
         include_trashed: bool = False,
         limit: int = 200,
     ) -> list[AssetRecord]:
         where: list[str] = ["1=1"]
         args: list[Any] = []
-        for col, val in (("project_id", project_id), ("shot_id", shot_id), ("kind", kind), ("slot", slot)):
+        for col, val in (("project_id", project_id), ("shot_id", shot_id), ("kind", kind), ("slot", slot),
+                         ("spec_id", spec_id)):
             if val is not None:
                 where.append(f"{col}=?")
                 args.append(val)

@@ -1958,6 +1958,7 @@ export interface operations {
                 shot_id?: number | null;
                 kind?: string | null;
                 slot?: string | null;
+                spec_id?: string | null;
                 current_only?: boolean;
                 include_trashed?: boolean;
                 limit?: number;
@@ -2199,6 +2200,7 @@ export interface operations {
             query?: {
                 project_id?: number | null;
                 shot_id?: number | null;
+                spec_id?: string | null;
                 status?: components["schemas"]["JobStatus"][] | null;
                 limit?: number;
             };

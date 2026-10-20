@@ -20,12 +20,14 @@ def list_assets(
     shot_id: int | None = None,
     kind: str | None = None,
     slot: str | None = None,
+    spec_id: str | None = None,
     current_only: bool = False,
     include_trashed: bool = False,
     limit: Annotated[int, Query(ge=1, le=1000)] = 200,
 ) -> list[AssetOut]:
     rows = ctx_of(request).ledger.list_assets(
-        project_id=project_id, shot_id=shot_id, kind=kind, slot=slot, current_only=current_only,
+        project_id=project_id, shot_id=shot_id, kind=kind, slot=slot, spec_id=spec_id,
+        current_only=current_only,
         include_trashed=include_trashed, limit=limit,
     )
     return [AssetOut.model_validate(a) for a in rows]

@@ -24,10 +24,12 @@ def list_jobs(
     request: Request,
     project_id: int | None = None,
     shot_id: int | None = None,
+    spec_id: str | None = None,
     status: Annotated[list[JobStatus] | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
 ) -> list[JobOut]:
-    jobs = ctx_of(request).ledger.list_jobs(project_id=project_id, shot_id=shot_id, status=status, limit=limit)
+    jobs = ctx_of(request).ledger.list_jobs(
+        project_id=project_id, shot_id=shot_id, spec_id=spec_id, status=status, limit=limit)
     return [JobOut.model_validate(j) for j in jobs]
 
 

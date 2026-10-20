@@ -2411,6 +2411,22 @@
           },
           {
             "in": "query",
+            "name": "spec_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Spec Id"
+            }
+          },
+          {
+            "in": "query",
             "name": "current_only",
             "required": false,
             "schema": {
@@ -2810,6 +2826,22 @@
                 }
               ],
               "title": "Shot Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "spec_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Spec Id"
             }
           },
           {

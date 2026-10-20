@@ -3,6 +3,7 @@ import { useProject, useWorkflow } from "../api/hooks";
 import { ErrorNote } from "../components/ErrorNote";
 import { ProgressBar } from "../components/ProgressBar";
 import { useT } from "../i18n";
+import { CreativePanel } from "./CreativePanel";
 import { JobsPanel } from "./QueuePage";
 import { StoryPanel } from "./StoryPanel";
 import { WorkflowPanel } from "./WorkflowPanel";
@@ -32,6 +33,9 @@ export function ProjectPage() {
         <NavLink to="story" className={({ isActive }) => (isActive ? "tab active" : "tab")}>
           {t("web.tab.story")}
         </NavLink>
+        <NavLink to="creative" className={({ isActive }) => (isActive ? "tab active" : "tab")}>
+          {t("web.tab.creative")}
+        </NavLink>
         <NavLink to="jobs" className={({ isActive }) => (isActive ? "tab active" : "tab")}>
           {t("web.tab.jobs")}
         </NavLink>
@@ -40,6 +44,7 @@ export function ProjectPage() {
         <Route index element={<Navigate to="workflow" replace />} />
         <Route path="workflow" element={<WorkflowPanel id={id} />} />
         <Route path="story" element={<StoryPanel id={id} />} />
+        <Route path="creative" element={<CreativePanel id={id} />} />
         <Route path="jobs" element={<JobsPanel projectId={id} />} />
       </Routes>
     </div>

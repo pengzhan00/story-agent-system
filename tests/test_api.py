@@ -425,3 +425,22 @@ def test_library_upload_and_limits(client: TestClient) -> None:
     assert client.post(f"/api/projects/{p['id']}/uploads?filename=x.wav", content=b"").status_code == 422
     assert client.post("/api/projects/999/uploads?filename=x.wav", content=b"abc").status_code == 404
     assert client.get("/api/library/nope").status_code == 404
+
+
+def test_jobs_and_assets_can_be_filtered_by_spec(client: TestClient, run_worker) -> None:  # noqa: ANN001
+    pid = project(client)["id"]
+    a = client.post(f"/api/projects/{pid}/specs", json={
+        "subject_type": "shot.video", "subject_id": "1", "kind": "video.generate", "model_ref": "fake-video",
+        "prompt": "a", "seed": 1}).json()
+    b = client.post(f"/api/projects/{pid}/specs", json={
+        "subject_type": "shot.video", "subject_id": "2", "kind": "video.generate", "model_ref": "fake-video",
+        "prompt": "b", "seed": 2}).json()
+    for spec in (a, b):
+        url = f"/api/projects/{pid}/specs/shot.video/{spec['subject_id']}/regenerate"
+        r = client.post(url, json={"n_candidates": 2, "tier": "draft"})
+        assert r.status_code == 201
+    assert len(client.get("/api/jobs", params={"spec_id": a["id"]}).json()) == 2
+    run_worker()
+    mine = client.get("/api/assets", params={"spec_id": a["id"]}).json()
+    assert len(mine) == 2 and {x["spec_id"] for x in mine} == {a["id"]}
+    assert len(client.get("/api/assets", params={"project_id": pid}).json()) == 4
