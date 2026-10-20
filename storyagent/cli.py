@@ -10,6 +10,7 @@
     storyagent worker [--once]
     storyagent workflow run | status | watch      (story pipeline with live progress bars)
     storyagent llm check
+    storyagent api openapi [--out FILE]
     storyagent ops llm-unload
 
 Commands that touch data migrate the database first (idempotent, snapshot taken before an upgrade).
@@ -397,6 +398,17 @@ def _cmd_worker(s: Settings, a: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_api_openapi(s: Settings, a: argparse.Namespace) -> int:
+    from storyagent.api.app import create_app
+
+    text = json.dumps(create_app(s).openapi(), ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    if a.out:
+        Path(a.out).write_text(text, encoding="utf-8")
+    else:
+        sys.stdout.write(text)
+    return 0
+
+
 def _cmd_llm_unload(s: Settings, _a: argparse.Namespace) -> int:
     unloaded: list[str] = []
     for p in build_probes(s):
@@ -662,6 +674,10 @@ def build_parser() -> argparse.ArgumentParser:
     wp.add_argument("--interval", type=float, default=1.0)
     llm = sub.add_parser("llm").add_subparsers(dest="cmd", required=True)
     add(llm, "check", _cmd_llm_check)
+
+    api = sub.add_parser("api").add_subparsers(dest="cmd", required=True)
+    wp = add(api, "openapi", _cmd_api_openapi)
+    wp.add_argument("--out", help="write the OpenAPI document here (web/openapi.json feeds `pnpm gen:api`)")
 
     ops = sub.add_parser("ops").add_subparsers(dest="cmd", required=True)
     add(ops, "llm-unload", _cmd_llm_unload)

@@ -60,3 +60,7 @@ agents/legacy_*
 
 # ── v2 runtime home (db, projects, media, logs) ──
 data/
+
+# ── Web client ──
+node_modules/
+web/src/api/schema.d.ts.map

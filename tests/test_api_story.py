@@ -130,3 +130,19 @@ def test_the_event_stream_carries_workflow_progress(client: TestClient, fsetting
     assert any(f.get("id") == run["id"] and f["status"] == "completed" and f["progress"]["percent"] == 100
                for f in frames)
     assert "event: workflow" in text
+
+
+def test_the_built_web_client_is_served_with_spa_fallback(fsettings: Settings, tmp_path: Any) -> None:
+    from dataclasses import replace
+
+    dist = tmp_path / "dist"
+    (dist / "assets").mkdir(parents=True)
+    (dist / "index.html").write_text("<div id=root></div>")
+    (dist / "assets" / "app.js").write_text("console.log(1)")
+    s = replace(fsettings, api={**fsettings.api, "web_dir": str(dist)})
+    with TestClient(create_app(s), raise_server_exceptions=False) as c:
+        assert c.get("/projects/1/workflow").text == "<div id=root></div>"        # client-side route
+        assert c.get("/assets/app.js").text == "console.log(1)"
+        assert c.get("/api/ready").json()["ok"] is True                           # the API still wins
+        assert c.get("/api/nope").status_code == 404
+        assert c.get("/../../etc/passwd").text == "<div id=root></div>"           # never leaves the web root

@@ -10,9 +10,9 @@ from __future__ import annotations
 import time
 from typing import Any
 
-# Rough shares of one episode run. Tunable without touching the algorithm.
+# Rough shares of one episode run (measured live: analyze 49 s, cast 68 s, script 766 s on gemma4:31b). Tunable.
 STAGE_WEIGHTS: dict[str, float] = {
-    "analyze": 4, "cast": 10, "script": 40, "scenes": 8, "music": 8, "shotplan": 2, "specs": 28,
+    "analyze": 4, "cast": 5, "script": 50, "scenes": 8, "music": 8, "shotplan": 1, "specs": 24,
 }
 ETA_MIN_PERCENT = 10.0          # below this an extrapolated ETA is noise (LLM stages are lumpy)
 

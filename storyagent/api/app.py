@@ -10,9 +10,12 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 import storyagent
 from storyagent.config import Settings, get_settings
@@ -48,6 +51,28 @@ def build_context(settings: Settings) -> ApiContext:
     )
 
 
+def web_root(settings: Settings) -> Path | None:
+    """The built web client, if there is one (``[api] web_dir``, default ``web/dist`` beside the package)."""
+    raw = str(settings.api.get("web_dir", "")).strip()
+    root = Path(raw).expanduser() if raw else Path(storyagent.__file__).resolve().parents[1] / "web" / "dist"
+    if not root.is_absolute():
+        root = settings.home / root
+    return root if (root / "index.html").is_file() else None
+
+
+def mount_web(app: FastAPI, root: Path) -> None:
+    app.mount("/assets", StaticFiles(directory=root / "assets"), name="web-assets")
+
+    @app.get("/{path:path}", include_in_schema=False)
+    def spa(path: str) -> FileResponse:
+        if path.startswith("api/"):
+            raise HTTPException(404)
+        target = (root / path).resolve()
+        if path and target.is_file() and root.resolve() in target.parents:
+            return FileResponse(target)
+        return FileResponse(root / "index.html")        # client-side routes
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
 
@@ -74,6 +99,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     for module in (routes_projects, routes_jobs, routes_assets, routes_library, routes_specs, routes_story,
                    routes_workflow, routes_system):
         app.include_router(module.router)
+    web = web_root(settings)
+    if web is not None:
+        mount_web(app, web)
     return app
 
 

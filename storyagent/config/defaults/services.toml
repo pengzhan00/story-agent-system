@@ -116,6 +116,8 @@ port = 8765
 max_upload_mb = 2048
 # Browser origins allowed to call the API (the Vite dev server; empty = same-origin only).
 cors_origins = ["http://localhost:5173"]
+# Built web client served at "/" (`pnpm build` in web/). Empty = web/dist next to the package; missing = API only.
+web_dir = ""
 sse_poll_seconds = 0.5
 sse_keepalive_seconds = 15
 

@@ -360,15 +360,21 @@ class Ready(BaseModel):
     schema_version: int
 
 
+class Strict(BaseModel):
+    """Response models whose defaulted fields are still always present: the generated TS types mark them required."""
+
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
+
 # -- story workflow -----------------------------------------------------------------------------------------
-class StageProgressOut(BaseModel):
+class StageProgressOut(Strict):
     stage: str
     status: Literal["pending", "running", "completed", "failed", "cancelled"] = "pending"
     percent: float | None = None            # None while a running stage has not reported its item count yet
     seconds: float | None = None
 
 
-class RunProgressOut(BaseModel):
+class RunProgressOut(Strict):
     """Everything a progress bar needs. ``percent`` is overall (0-100, never decreases); ``stages`` gives one bar per
     stage; ``eta_sec`` is None until enough has run to estimate."""
 
@@ -384,7 +390,7 @@ class RunProgressOut(BaseModel):
     stages: list[StageProgressOut] = Field(default_factory=list)
 
 
-class WorkflowRunOut(BaseModel):
+class WorkflowRunOut(Strict):
     id: str
     project_id: int
     stages: list[str]
@@ -399,7 +405,7 @@ class WorkflowRunOut(BaseModel):
     finished_at: str | None = None
 
 
-class WorkflowStageOut(BaseModel):
+class WorkflowStageOut(Strict):
     stage: str
     status: Literal["pending", "running", "completed", "failed", "stale"]
     started_at: str | None = None
@@ -410,7 +416,7 @@ class WorkflowStageOut(BaseModel):
     attempts: int = 0
 
 
-class WorkflowOut(BaseModel):
+class WorkflowOut(Strict):
     stages: list[WorkflowStageOut]
     active_run: WorkflowRunOut | None = None
     recent_runs: list[WorkflowRunOut] = Field(default_factory=list)
