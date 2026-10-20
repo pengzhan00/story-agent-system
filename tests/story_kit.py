@@ -104,12 +104,14 @@ class StoryClient:
 
 
 def make_engine(
-    tmp_path: Path, client: StoryClient | None = None, *, toml: str = ""
+    tmp_path: Path, client: StoryClient | None = None, *, toml: str = "", services: str = ""
 ) -> tuple[WorkflowEngine, StoryClient, Settings]:
     home = tmp_path / "home"
     (home / "config").mkdir(parents=True, exist_ok=True)
     if toml:
         (home / "config" / "models.toml").write_text(toml)
+    if services:
+        (home / "config" / "services.toml").write_text(services)
     settings = load_settings({"STORY_AGENT_HOME": str(home), "STORY_AGENT_LOCALE": "en"})
     db = Database(settings.db_path)
     migrate(db)

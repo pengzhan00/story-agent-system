@@ -121,6 +121,17 @@ web_dir = ""
 sse_poll_seconds = 0.5
 sse_keepalive_seconds = 15
 
+[workflow]
+# The produce stage turns every spec into media. Quality tier for the first pass (draft | preview | final).
+tier = "draft"
+# Library voice used for a character without a voice of their own, e.g. "library:voice/narrator". Empty = such
+# lines are skipped and the episode shows them as subtitles only (the report says which).
+default_voice = ""
+# Seconds between checks of the job ledger while the stage waits for the worker.
+poll_seconds = 1.0
+# How many takes per spec in the first pass (the creative panel can always make more).
+takes = 1
+
 [healthcheck]
 # Entries that must be "ok" for the healthcheck exit code to be 0. Names: a service (comfy), or tool.<name>.
 required = ["comfy", "acestep", "ollama", "tool.ffmpeg"]

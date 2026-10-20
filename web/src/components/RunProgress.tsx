@@ -1,8 +1,18 @@
 import type { WorkflowRun } from "../api/types";
 import { duration } from "../lib/format";
-import { useT } from "../i18n";
+import { useT, type T } from "../i18n";
 import { ProgressBar } from "./ProgressBar";
 import { StatusChip } from "./StatusChip";
+
+/** Stage messages are plain text or `<i18n key>|<detail>`: translate the key, keep the detail. */
+export function stageMessage(t: T, raw: string): string {
+  const [key = "", ...rest] = raw.split("|");
+  if (rest.length === 0) return raw;
+  const label = t(key);
+  if (label === key) return raw;
+  const detail = rest.join("|");
+  return detail ? `${label} ${detail}` : label;
+}
 
 /**
  * Everything about a run's progress in one place: the overall bar with its percentage, the step and what is
@@ -33,7 +43,7 @@ export function RunProgress({ run }: { run: WorkflowRun }) {
             {p.stage ? t("workflow.progress.stage_of", { index: p.stage_index, count: p.stage_count }) : t("workflow.progress.working")}
             {p.stage ? ` · ${t(`workflow.stage.${p.stage}`)}` : ""}
             {p.total > 0 ? ` · ${t("workflow.progress.items", { done: p.done, total: p.total })}` : ""}
-            {p.message ? ` · ${p.message}` : ""}
+            {p.message ? ` · ${stageMessage(t, p.message)}` : ""}
           </>
         )}
       </p>

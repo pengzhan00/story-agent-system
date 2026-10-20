@@ -8,16 +8,21 @@ from typing import Any
 from storyagent.db import Database
 from storyagent.util import iso_at, loads, new_id, now_iso
 
-STAGES = ("analyze", "cast", "script", "scenes", "music", "shotplan", "specs")
+STAGES = ("analyze", "cast", "script", "scenes", "music", "shotplan", "specs", "produce", "compose")
+# What a plain "resume" runs: the story and its editable specs. Producing media and assembling the episode spend
+# GPU hours, so they only run when asked for.
+DEFAULT_STAGES = STAGES[:7]
 # What becomes stale when a stage is (re)run.
 DOWNSTREAM: dict[str, tuple[str, ...]] = {
-    "analyze": ("cast", "script", "scenes", "music", "shotplan", "specs"),
-    "cast": ("script", "scenes", "shotplan", "specs"),
-    "script": ("scenes", "music", "shotplan", "specs"),
-    "scenes": ("shotplan", "specs"),
-    "music": ("specs",),
-    "shotplan": ("specs",),
-    "specs": (),
+    "analyze": ("cast", "script", "scenes", "music", "shotplan", "specs", "produce", "compose"),
+    "cast": ("script", "scenes", "shotplan", "specs", "produce", "compose"),
+    "script": ("scenes", "music", "shotplan", "specs", "produce", "compose"),
+    "scenes": ("shotplan", "specs", "produce", "compose"),
+    "music": ("specs", "produce", "compose"),
+    "shotplan": ("specs", "produce", "compose"),
+    "specs": ("produce", "compose"),
+    "produce": ("compose",),
+    "compose": (),
 }
 
 
@@ -75,11 +80,12 @@ class WorkflowState:
                         (project_id, later))
 
     def pending_stages(self, project_id: int, requested: list[str] | None = None) -> list[str]:
-        """``requested`` in pipeline order; ``None`` = resume: every stage that is not completed (stale included)."""
+        """``requested`` in pipeline order; ``None`` = resume: every story stage that is not completed (stale
+        included). Producing media and composing only run when requested."""
         if requested:
             return [s for s in STAGES if s in requested]
         done = {s["stage"] for s in self.stages(project_id) if s["status"] == "completed"}
-        return [s for s in STAGES if s not in done]
+        return [s for s in DEFAULT_STAGES if s not in done]
 
     # -- data ---------------------------------------------------------------------------------
     def get_data(self, project_id: int, key: str, default: Any = None) -> Any:

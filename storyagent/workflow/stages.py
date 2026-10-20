@@ -8,6 +8,8 @@ saves after every LLM call, so an interrupted or failed run continues where it s
     music     theme song + scene BGM + sound effects                (composer.*, sound.design)
     shotplan  script -> shot rows (shot.v3), deterministic
     specs     everything above -> editable generation specs
+    produce   specs -> pictures, voices, music, video (waits for the media worker; see workflow/media.py)
+    compose   media -> the episode file (timeline + ffmpeg)
 
 Params (all optional): ``premise``, ``episode`` (default 1), ``acts``, ``scenes_per_act``, ``shots_per_scene``,
 ``source_text`` (adapt an existing text instead of inventing), ``force`` (redo even if present), ``skip_sfx``,
@@ -346,9 +348,21 @@ def specs(ctx: Ctx) -> dict[str, Any]:
     return seed_specs(ctx)
 
 
+def produce(ctx: Ctx) -> dict[str, Any]:
+    from .media import produce as run
+
+    return run(ctx)
+
+
+def compose(ctx: Ctx) -> dict[str, Any]:
+    from .media import compose as run
+
+    return run(ctx)
+
+
 STAGE_FUNCS: dict[str, Callable[[Ctx], dict[str, Any]]] = {
     "analyze": analyze, "cast": cast, "script": script, "scenes": scenes, "music": music, "shotplan": shotplan,
-    "specs": specs,
+    "specs": specs, "produce": produce, "compose": compose,
 }
 
 

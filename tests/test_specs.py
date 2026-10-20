@@ -102,7 +102,7 @@ def test_slots_are_separate_subjects(store: SpecStore) -> None:
 def test_job_is_a_frozen_snapshot_of_the_spec_version(store: SpecStore) -> None:
     spec = make_portrait(store, negative_prompt="blurry", params={"steps": 5}, refs=[{"image": "a.png"}])
     [job] = store.regenerate(1, PORTRAIT, "7", shot_id=1)
-    assert job.spec_id == spec.id and job.spec_version == 1 and job.slot == "main" and job.shot_id == 1
+    assert job.spec_id == spec.id and job.spec_version == 1 and job.slot == "character.portrait:7" and job.shot_id == 1
     assert job.inputs["prompt"] == "a tall swordswoman" and job.inputs["negative_prompt"] == "blurry"
     assert job.inputs["refs"] == [{"image": "a.png"}]
     assert job.inputs["subject"] == {"type": PORTRAIT, "id": "7", "slot": "main"}
@@ -232,3 +232,17 @@ def test_job_end_to_end_status(store: SpecStore, fsettings: Settings, fdb: Datab
     assert w.drain(10)
     assert store.ledger.get_job(rec.id).status is JobStatus.COMPLETED
     w.shutdown()
+
+
+def test_assets_of_different_subjects_never_share_a_current_slot(store: SpecStore) -> None:
+    """The ledger keeps one current asset per (project, shot, kind, slot): two portraits must not demote each other."""
+    a = store.create(1, "character.portrait", "1", MediaKind.VIDEO_GENERATE, model_ref="fake-video", prompt="a")
+    b = store.create(1, "character.portrait", "2", MediaKind.VIDEO_GENERATE, model_ref="fake-video", prompt="b")
+    line0 = store.create(1, "dialogue.line", "1#0", MediaKind.AUDIO_TTS, model_ref="fake-tts", text_payload="x")
+    line1 = store.create(1, "dialogue.line", "1#1", MediaKind.AUDIO_TTS, model_ref="fake-tts", text_payload="y")
+    slots = {store.job_slot(s) for s in (a, b, line0, line1)}
+    assert len(slots) == 4
+    video = store.create(1, "shot.video", "5", MediaKind.VIDEO_GENERATE, model_ref="fake-video", prompt="v")
+    assert store.job_slot(video) == "main"                       # one per shot: keeps the plain slot
+    variant = store.create(1, "scene.keyframe", "3", MediaKind.VIDEO_GENERATE, slot="night", model_ref="fake-video")
+    assert store.job_slot(variant) == "scene.keyframe:3:night"

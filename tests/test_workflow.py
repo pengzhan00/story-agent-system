@@ -5,7 +5,8 @@ from pathlib import Path
 import pytest
 
 from storyagent.llm import LLMError
-from storyagent.workflow import STAGES, StageError, WorkflowCancelled, WorkflowStateError
+from storyagent.workflow import DEFAULT_STAGES as STORY
+from storyagent.workflow import StageError, WorkflowCancelled, WorkflowStateError
 
 from .story_kit import NAMES, StoryClient, make_engine, new_project
 
@@ -18,7 +19,7 @@ def test_full_pipeline_builds_the_whole_story(tmp_path: Path) -> None:
     engine, client, _ = make_engine(tmp_path)
     pid = new_project(engine)
     out = run_all(engine, pid)
-    assert list(out) == list(STAGES)
+    assert list(out) == list(STORY)
     store = engine.store
     assert {c["name"] for c in store.list_characters(pid)} == set(NAMES)
     assert store.find_character(pid, NAMES[0])["appearance"].startswith("short black hair")
@@ -37,7 +38,8 @@ def test_full_pipeline_builds_the_whole_story(tmp_path: Path) -> None:
     assert p["scene_id"] == "act01_scene01_shot01" and p["output_spec"]["width"] == 720
     assert p["subject"]["characters"][0]["appearance"].startswith("short black hair")
     assert p["camera"]["duration_sec"] >= 2.0 and p["audio"]["tts_required"] is True
-    assert {s["stage"]: s["status"] for s in engine.state.stages(pid)} == {s: "completed" for s in STAGES}
+    expected = {**{s: "completed" for s in STORY}, "produce": "pending", "compose": "pending"}
+    assert {s["stage"]: s["status"] for s in engine.state.stages(pid)} == expected
     assert engine.projects.get(pid).genre == "mystery"
 
 
@@ -70,7 +72,7 @@ def test_a_second_run_does_nothing_and_asks_the_llm_nothing(tmp_path: Path) -> N
     before = len(client.calls)
     assert run_all(engine, pid) == {}              # resume: every stage is completed
     # an explicit rerun of the stages after analyze skips what already exists (analyze itself re-plans by design)
-    out = engine.run(pid, list(STAGES[1:]), {"visual_prompts": False})
+    out = engine.run(pid, list(STORY[1:]), {"visual_prompts": False})
     assert len(client.calls) == before and out["cast"]["created"] == 0 and out["specs"]["created"] == 0
 
 
@@ -215,7 +217,7 @@ def test_cancel_stops_between_llm_calls_and_resume_continues(tmp_path: Path) -> 
     stages = {s["stage"]: s for s in engine.state.stages(pid)}
     assert any(s["error_code"] == "cancelled" for s in stages.values())
     run_all(engine, pid)
-    assert all(s["status"] == "completed" for s in engine.state.stages(pid))
+    assert all(s["status"] == "completed" for s in engine.state.stages(pid) if s["stage"] in STORY)
 
 
 # ---- the run queue ---------------------------------------------------------------------------------------
@@ -276,13 +278,13 @@ def test_the_worker_runs_queued_workflow_runs(tmp_path: Path) -> None:
     pid = new_project(engine)
     worker = Worker(settings, engine.db, AdapterRegistry(), probes=[], workflow=engine)
     try:
-        run = engine.state.enqueue(pid, list(STAGES), {"visual_prompts": False})
+        run = engine.state.enqueue(pid, list(STORY), {"visual_prompts": False})
         assert worker.drain(timeout=20)
     finally:
         worker.shutdown()
     done = engine.state.get_run(run["id"])
     assert done["status"] == "completed" and done["progress"]["stage"] == "specs"
-    assert all(s["status"] == "completed" for s in engine.state.stages(pid))
+    assert all(s["status"] == "completed" for s in engine.state.stages(pid) if s["stage"] in STORY)
 
 
 # ---- progress you can see ---------------------------------------------------------------------------------

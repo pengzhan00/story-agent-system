@@ -140,6 +140,7 @@ class Settings:
     healthcheck_min_free_gib: float = 50.0
     legacy_db_path: Path | None = None
     api: Mapping[str, Any] = field(default_factory=dict)  # [api] host/port/cors_origins/sse_*
+    workflow: Mapping[str, Any] = field(default_factory=dict)  # [workflow] produce/compose defaults
 
     # -- derived paths ----------------------------------------------------
     @property
@@ -480,6 +481,7 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         healthcheck_min_free_gib=float(health_cfg.get("min_free_gib", 50)),
         legacy_db_path=Path(legacy).expanduser() if legacy else None,
         api=_build_api(merged["services"].get("api", {})),
+        workflow=dict(merged["services"].get("workflow", {})),
     )
 
 

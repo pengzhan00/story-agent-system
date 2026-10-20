@@ -12,7 +12,8 @@ from typing import Any
 
 # Rough shares of one episode run (measured live: analyze 49 s, cast 68 s, script 766 s on gemma4:31b). Tunable.
 STAGE_WEIGHTS: dict[str, float] = {
-    "analyze": 4, "cast": 5, "script": 50, "scenes": 8, "music": 8, "shotplan": 1, "specs": 24,
+    "analyze": 4, "cast": 5, "script": 50, "scenes": 8, "music": 8, "shotplan": 1, "specs": 24, "produce": 400,
+    "compose": 20,
 }
 ETA_MIN_PERCENT = 10.0          # below this an extrapolated ETA is noise (LLM stages are lumpy)
 

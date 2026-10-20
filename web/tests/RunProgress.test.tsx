@@ -3,7 +3,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import type { WorkflowRun } from "../src/api/types";
-import { RunProgress } from "../src/components/RunProgress";
+import { RunProgress, stageMessage } from "../src/components/RunProgress";
+import { makeT } from "../src/i18n";
 import { I18nProvider } from "../src/i18n";
 
 const en = JSON.parse(readFileSync(join(__dirname, "..", "..", "locales", "en.json"), "utf-8")) as Record<string, string>;
@@ -69,5 +70,15 @@ describe("RunProgress", () => {
     await view(run({ status: "failed", error_code: "llm.unreachable", error_message: "boom" }));
     expect(await screen.findByText(/language model service cannot be reached/)).toBeInTheDocument();
     expect(screen.getByText(/Start Ollama/)).toBeInTheDocument();
+  });
+});
+
+describe("stageMessage", () => {
+  const t = makeT(en);
+  it("translates a leading i18n key and keeps the detail", () => {
+    expect(stageMessage(t, "plain")).toBe("plain");
+    expect(stageMessage(t, "spec.subject.shot.video|8")).toBe("Shot video 8");
+    expect(stageMessage(t, "workflow.progress.assembling|shot 3/8")).toBe("Assembling the episode shot 3/8");
+    expect(stageMessage(t, "nope.key|x")).toBe("nope.key|x");
   });
 });

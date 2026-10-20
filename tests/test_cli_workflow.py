@@ -66,3 +66,12 @@ def test_rendering() -> None:
     assert "Estimating" in render_run({**running, "progress": {**running["progress"], "eta_sec": None}})
     stages = render_stages(running)
     assert "100.0%" in stages[0] and "..." in stages[1]
+
+
+def test_messages_with_an_i18n_key_are_translated() -> None:
+    from storyagent.progressbar import message
+
+    assert message("plain text") == "plain text"
+    assert message("spec.subject.shot.video|8") == "Shot video 8"
+    assert message("workflow.progress.assembling|shot 3/8") == "Assembling the episode shot 3/8"
+    assert message("not.a.key|x") == "not.a.key|x"

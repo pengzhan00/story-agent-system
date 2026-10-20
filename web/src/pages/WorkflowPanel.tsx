@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useCancelRun, useProject, useStartRun, useUpdateProject, useWorkflow } from "../api/hooks";
 import { ErrorNote } from "../components/ErrorNote";
 import { ProgressBar } from "../components/ProgressBar";
+import { EpisodePlayer } from "../components/EpisodePlayer";
 import { RunError, RunProgress } from "../components/RunProgress";
 import { StatusChip } from "../components/StatusChip";
 import { duration } from "../lib/format";
@@ -19,7 +20,13 @@ export function WorkflowPanel({ id }: { id: number }) {
 
   const active = wf.data?.active_run ?? null;
   const last = wf.data?.recent_runs.find((r) => r.status !== "queued" && r.status !== "running") ?? null;
-  const allDone = wf.data?.stages.every((s) => s.status === "completed") ?? false;
+  const STORY = 7;
+  const storyStages = wf.data?.stages.slice(0, STORY) ?? [];
+  const storyDone = storyStages.length === STORY && storyStages.every((s) => s.status === "completed");
+  const allDone = storyDone;
+  const stage = (name: string) => wf.data?.stages.find((s) => s.stage === name);
+  const compose = stage("compose");
+  const pendingAll = (wf.data?.stages ?? []).filter((s) => s.status !== "completed").map((s) => s.stage);
   const text = premise ?? project.data?.description ?? "";
   const dirty = premise !== null && premise !== (project.data?.description ?? "");
 
@@ -66,6 +73,32 @@ export function WorkflowPanel({ id }: { id: number }) {
       </section>
 
       {active ? <RunProgress run={active} /> : null}
+
+      {storyDone && !active ? (
+        <section className="card stack">
+          <div className="row">
+            <button className="primary" disabled={start.isPending} onClick={() => start.mutate({ stages: ["produce"], params: force ? { force: true } : {} })}>
+              {t("web.workflow.make_media")}
+            </button>
+            <button disabled={start.isPending} onClick={() => start.mutate({ stages: ["compose"] })}>
+              {t("web.workflow.make_episode")}
+            </button>
+            <button disabled={start.isPending || pendingAll.length === 0} onClick={() => start.mutate({ stages: pendingAll })}>
+              {t("web.workflow.make_everything")}
+            </button>
+          </div>
+          <p className="muted small">{t("web.workflow.make_media_hint")} {t("web.workflow.needs_worker")}</p>
+          {stage("produce")?.summary && Number(stage("produce")?.summary["skipped"] ?? 0) > 0 ? (
+            <p className="muted small">
+              {t("web.produce.skipped", { n: Number(stage("produce")?.summary["skipped"]) })}
+              {" · "}
+              {[...new Set(((stage("produce")?.summary["skipped_detail"] ?? []) as { reason: string }[]).map((d) => t(`web.produce.reason.${d.reason}`)))].join(", ")}
+            </p>
+          ) : null}
+        </section>
+      ) : null}
+
+      {compose?.status === "completed" && compose.summary ? <EpisodePlayer projectId={id} summary={compose.summary} /> : null}
 
       <section className="card stack">
         <h2>{t("web.workflow.stages")}</h2>

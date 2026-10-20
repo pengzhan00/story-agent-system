@@ -102,3 +102,5 @@ fieldset { border: none; padding: 0; margin: 0; min-width: 0; } fieldset:disable
 details > summary { cursor: pointer; }
 
 input[type="number"] { width: 5.5rem; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.episode { width: 100%; max-width: 360px; max-height: 70vh; margin: 0 auto; border-radius: 8px; background: #000; display: block; }
+.plain { margin: 0; padding-left: 18px; }

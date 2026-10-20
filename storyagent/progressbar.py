@@ -23,6 +23,15 @@ def bar(percent: float, width: int = WIDTH) -> str:
     return "[" + "#" * filled + "-" * (width - filled) + "]"
 
 
+def message(raw: str) -> str:
+    """Stage messages are plain text or ``<i18n key>|<detail>``: translate the key, keep the detail."""
+    key, sep, detail = raw.partition("|")
+    if sep and not key.startswith(" "):
+        label = t(key)
+        return label if label != key and not detail else (f"{label} {detail}".strip() if label != key else raw)
+    return raw
+
+
 def render_run(run: dict[str, Any]) -> str:
     """``[#####-------] 42.0%  Step 3 of 7 Script 4 of 8 - message  | Elapsed 1m20s, About 2m left``"""
     pr = run.get("progress") or {}
@@ -36,7 +45,7 @@ def render_run(run: dict[str, Any]) -> str:
         if pr.get("total"):
             parts.append(t("workflow.progress.items", done=pr["done"], total=pr["total"]))
         if pr.get("message"):
-            parts.append("- " + str(pr["message"]))
+            parts.append("- " + message(str(pr["message"])))
     else:
         parts.append(t("workflow.progress.working"))
     tail = [t("workflow.progress.elapsed", time=duration(pr.get("elapsed_sec")))]

@@ -270,6 +270,15 @@ class SpecStore:
         )
 
     # -- spec -> job --------------------------------------------------------------------------
+    @staticmethod
+    def job_slot(spec: SpecRecord) -> str:
+        """The ledger keeps ONE current asset per (project, shot, kind, slot). A shot's keyframe or video is the only
+        one of its kind in that shot, so it keeps the spec's own slot; everything else (two characters' portraits, the
+        lines of one shot, two music cues ...) would collide, so its slot names the subject."""
+        if spec.subject_type in ("shot.keyframe", "shot.video"):
+            return spec.slot
+        return f"{spec.subject_type}:{spec.subject_id}" + ("" if spec.slot == "main" else f":{spec.slot}")
+
     def build_job(
         self, spec: SpecRecord, *, tier: QualityTier = QualityTier.FINAL, seed: int | None = None,
         shot_id: int | None = None, priority: int = 5, extra_inputs: Mapping[str, Any] | None = None,
@@ -291,7 +300,7 @@ class SpecStore:
         }
         return MediaJob(
             kind=spec.kind, inputs=inputs, project_id=spec.project_id, shot_id=shot_id, model_ref=model_ref,
-            tier=tier, slot=spec.slot, params=params, seed=seed if seed is not None else spec.seed,
+            tier=tier, slot=self.job_slot(spec), params=params, seed=seed if seed is not None else spec.seed,
             priority=priority, spec_id=spec.id, spec_version=spec.version,
         )
 
