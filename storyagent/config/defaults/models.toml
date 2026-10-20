@@ -46,6 +46,25 @@ timeout_sec = 1800
 command = "mflux-generate-flux2"
 weights = "~/models/flux2-klein-base-4B"
 base_model = "flux2-klein-base-4b"
+negative_prompt = false   # FLUX.2 has no negative prompt: describe what you want instead
+
+# Measured on a fixed seed (640x896): 20 steps at 512x768 gave a distorted face and a tangled weapon; 30-50 steps
+# with guidance 3.5-5 gave clean faces and hands. Guidance is the only quality knob besides steps.
+[models."flux2-klein-base-4b".params]
+width = 768
+height = 1024
+steps = 30
+guidance = 4.0
+[models."flux2-klein-base-4b".tiers.draft]
+width = 640
+height = 896
+steps = 24
+[models."flux2-klein-base-4b".tiers.preview]
+steps = 30
+[models."flux2-klein-base-4b".tiers.final]
+width = 896
+height = 1280
+steps = 50
 
 [models."flux2-klein-base-4b-edit"]
 kind = "image.edit"
@@ -61,6 +80,11 @@ timeout_sec = 1800
 command = "mflux-generate-flux2-edit"
 weights = "~/models/flux2-klein-base-4B"
 base_model = "flux2-klein-base-4b"
+negative_prompt = false
+
+[models."flux2-klein-base-4b-edit".params]
+steps = 30
+guidance = 4.0
 
 # LTX-2.5 through the Phosphene panel (Pinokio app). One model, three kinds: picture+sound, picture only
 # (sound stripped) and audio-driven lip-sync. Values are the operator's measured best recipe (see the notes in

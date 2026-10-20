@@ -186,3 +186,12 @@ def test_defaults_point_at_mflux(tmp_path: Path) -> None:
     gen, edit = s.default_model("image.generate"), s.default_model("image.edit")
     assert (gen.provider, edit.provider) == ("mflux", "mflux") and gen.commercial_ok
     assert gen.extra["command"] == "mflux-generate-flux2" and edit.extra["command"] == "mflux-generate-flux2-edit"
+
+
+def test_negative_prompt_dropped_when_model_has_none(tmp_path: Path) -> None:
+    rig = build(tmp_path)
+    rig.settings.models["img-test"].extra["negative_prompt"] = False
+    rec, _ = rig.run(job(MediaKind.IMAGE_GENERATE, "img-test", {"prompt": "x", "negative_prompt": "blurry"}, seed=1))
+    assert rec.status is JobStatus.COMPLETED
+    [argv] = calls(tmp_path)
+    assert "--negative-prompt" not in argv

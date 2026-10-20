@@ -8,7 +8,8 @@ Inputs:  ``prompt``, ``negative_prompt``, ``refs`` = image paths (generate: the 
          ``image_strength``; edit: all of them are the images to edit).
 Params:  width, height (multiples of 16), steps, guidance, quantize (3|4|5|6|8), scheduler, low_ram,
          image_strength, loras = [{"path": ..., "scale": 0.8}]  (a LoRA keeps the licence of its base model).
-Unset parameters are left to the tool's own defaults.
+Unset parameters are left to the tool's own defaults. A model entry with ``negative_prompt = false`` (FLUX.2)
+has any negative prompt dropped with a ``negative_prompt_ignored`` event.
 """
 from __future__ import annotations
 
@@ -116,7 +117,10 @@ class MfluxAdapter(SubprocessAdapter):
         if job.seed is not None:
             argv += ["--seed", str(job.seed)]
         if job.inputs.get("negative_prompt"):
-            argv += ["--negative-prompt", str(job.inputs["negative_prompt"])]
+            if entry.get("negative_prompt", True):
+                argv += ["--negative-prompt", str(job.inputs["negative_prompt"])]
+            else:  # FLUX.2 rejects the flag outright; keep the job alive and say so
+                ctx.log("negative_prompt_ignored", model=job.model_ref)
         for key, flag in (("width", "--width"), ("height", "--height"), ("steps", "--steps"),
                           ("guidance", "--guidance"), ("quantize", "--quantize"), ("scheduler", "--scheduler")):
             if key in p:
