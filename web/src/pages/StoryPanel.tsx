@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { STORY_PARTS, useStory, useStoryEdit, type StoryPart } from "../api/hooks";
 import type { Row } from "../api/types";
 import { ErrorNote } from "../components/ErrorNote";
+import { VoiceUpload } from "../components/VoiceUpload";
 import { useT } from "../i18n";
 
 type FieldType = "text" | "area" | "number";
@@ -163,6 +164,7 @@ function RowEditor({ pid, part, row, onDone }: { pid: number; part: StoryPart; r
   return (
     <div className="stack">
       {part === "shots" ? <ShotDialogue pid={pid} row={row} disabled={locked} /> : null}
+      {part === "characters" ? <VoiceUpload pid={pid} row={row} /> : null}
       <div className="form-grid">
         {fields.map((f) => (
           <label key={f.key} className={f.type === "area" ? "field wide" : "field"}>

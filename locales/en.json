@@ -431,5 +431,13 @@
   "web.review.title": "Script review",
   "web.review.score": "Score {score}/10",
   "web.review.none": "No issues found.",
-  "web.review.running": "Reviewing…"
+  "web.review.running": "Reviewing…",
+  "web.voice.title": "Voice sample",
+  "web.voice.current": "Current reference: {ref}",
+  "web.voice.none": "No voice sample yet: dialogue uses the default voice, if one is configured.",
+  "web.voice.file": "Choose a recording",
+  "web.voice.consent": "The speaker agreed to have this voice cloned.",
+  "web.voice.upload": "Upload and use",
+  "web.voice.uploading": "Uploading…",
+  "web.voice.hint": "3 to 20 seconds of clean speech, and the words said in it."
 }

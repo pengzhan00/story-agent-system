@@ -189,3 +189,22 @@ def test_script_review_over_the_api(client: TestClient, fsettings: Settings, mon
     monkeypatch.setattr(routes_workflow.WorkflowEngine, "review_script", fake_review)
     body = client.post(f"/api/projects/{pid}/review").json()
     assert body["score"] == 6 and body["issues"][0]["fix"] == "" and body["issues"][0]["severity"] == "high"
+
+
+def test_a_character_gets_its_voice_from_an_uploaded_sample(client: TestClient, fsettings: Settings) -> None:
+    from .adapter_kit import wav_bytes
+
+    pid = new_project(client)
+    started(client, pid)
+    run_to_end(fsettings)
+    char = client.get(f"/api/projects/{pid}/characters").json()[0]
+    up = client.post("/api/library/upload", params={"filename": "me.wav", "role": "voice", "name": char["name"],
+                                                    "text": "It is raining again.", "consent": "true",
+                                                    "replace": "true"},
+                     content=wav_bytes(4.0), headers={"Content-Type": "application/octet-stream"})
+    assert up.status_code == 201, up.text
+    r = client.patch(f"/api/projects/{pid}/characters/{char['id']}",
+                     json={"voice_ref_audio": f"library:voice/{char['name']}", "voice_ref_text": "It is raining again.",
+                           "voice_ref_consent": True})
+    assert r.status_code == 200 and r.json()["voice_ref_audio"].startswith("library:voice/")
+    assert r.json()["voice_ref_consent"] is True
