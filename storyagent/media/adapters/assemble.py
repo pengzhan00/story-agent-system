@@ -57,6 +57,10 @@ class AssembleAdapter(SubprocessAdapter):
         if not isinstance(tl, dict) or not tl.get("segments"):
             return [ValidationIssue(ErrorCode.INVALID_INPUT, "a timeline with at least one segment is required",
                                     {"detail": "timeline"})]
+        ffmpeg = find_tool(ctx.settings, "ffmpeg")
+        if tl.get("label") and ffmpeg is not None and not has_libass(str(ffmpeg)):
+            return [ValidationIssue(ErrorCode.MISSING_TOOL, "the visible AIGC label needs an ffmpeg with libass",
+                                    {"tool": "ffmpeg-full"})]
         missing = [s["shot_id"] for s in tl["segments"]
                    if s["source"]["type"] != "black" and not Path(str(s["source"].get("asset", ""))).is_file()]
         if missing:

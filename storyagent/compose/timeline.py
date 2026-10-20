@@ -19,6 +19,7 @@ from typing import Any
 GAP_SEC = 0.25          # silence between two lines of one shot
 TAIL_SEC = 0.35         # breathing room after the last line
 MIN_SHOT_SEC = 1.0
+END_CARD_SEC = 2.0
 
 
 @dataclass(frozen=True)
@@ -55,6 +56,8 @@ class TimelineInput:
     bgm: AssetRef | None = None
     theme: AssetRef | None = None
     title: str = ""
+    label: Mapping[str, Any] | None = None       # {"text": ..., "mode": "overlay" | "both"} - the visible AIGC label
+    metadata: Mapping[str, str] = field(default_factory=dict)   # container metadata (implicit AIGC marking)
 
 
 Timeline = dict[str, Any]
@@ -126,7 +129,17 @@ def build_timeline(inp: TimelineInput) -> Timeline:
             sfx.append({"asset": asset.ref, "start": round(cursor + offset, 3), "duration": asset.duration_sec})
         cursor += duration
 
+    label_block: dict[str, Any] | None = None
+    if inp.label and inp.label.get("text"):
+        label_block = {"text": str(inp.label["text"]), "mode": str(inp.label.get("mode", "overlay"))}
+        if label_block["mode"] == "both":                    # an end card: the label alone on black for two seconds
+            label_block["card_start"] = round(cursor, 3)
+            segments.append({"shot_id": 0, "label": "card", "start": round(cursor, 3), "duration": END_CARD_SEC,
+                             "source": {"type": "black"}})
+            cursor += END_CARD_SEC
     total = round(cursor, 3)
+    if label_block is not None:
+        label_block["total"] = total
     music: list[dict[str, Any]] = []
     if inp.bgm is not None:
         music.append({"asset": inp.bgm.ref, "start": 0.0, "duration": total, "loop": True,
@@ -145,4 +158,5 @@ def build_timeline(inp: TimelineInput) -> Timeline:
                                "lra": float(mix.get("loudnorm_lra", 11.0))}},
         "subtitles": {**dict(inp.subtitles), "cues": subtitles},
         "segments": segments, "speech": speech, "sfx": sfx, "music": music, "warnings": warnings,
+        "label": label_block, "metadata": dict(inp.metadata),
     }

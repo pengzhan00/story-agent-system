@@ -474,6 +474,26 @@ export interface paths {
         patch: operations["update_episode_api_projects__project_id__episodes__episode_id__patch"];
         trace?: never;
     };
+    "/api/projects/{project_id}/episodes/{episode}/package": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Episode Package
+         * @description The delivery package of an assembled episode as one zip (film, subtitles, stems, manifest, provenance).
+         */
+        get: operations["episode_package_api_projects__project_id__episodes__episode__package_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{project_id}/locations": {
         parameters: {
             query?: never;
@@ -3032,6 +3052,38 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    episode_package_api_projects__project_id__episodes__episode__package_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+                episode: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

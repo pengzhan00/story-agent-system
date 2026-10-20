@@ -148,3 +148,10 @@ def test_the_built_web_client_is_served_with_spa_fallback(fsettings: Settings, t
         assert c.get("/api/ready").json()["ok"] is True                           # the API still wins
         assert c.get("/api/nope").status_code == 404
         assert c.get("/../../etc/passwd").text == "<div id=root></div>"           # never leaves the web root
+
+
+def test_a_package_of_an_unassembled_episode_is_a_clear_conflict(client: TestClient) -> None:
+    pid = new_project(client)
+    r = client.get(f"/api/projects/{pid}/episodes/1/package")
+    assert r.status_code == 409 and r.json()["error"]["code"] == "episode_not_ready"
+    assert client.get("/api/projects/999/episodes/1/package").status_code == 404

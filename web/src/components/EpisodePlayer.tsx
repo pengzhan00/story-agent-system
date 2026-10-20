@@ -4,6 +4,13 @@ import type { Asset, Row } from "../api/types";
 import { duration } from "../lib/format";
 import { useT } from "../i18n";
 
+interface QcCheck {
+  code: string;
+  ok: boolean | null;
+  value: string | number | boolean | null;
+  limit: string | number | boolean | null;
+}
+
 interface Warning {
   code: string;
   shot_id?: number;
@@ -24,6 +31,7 @@ export function EpisodePlayer({ projectId, summary }: { projectId: number; summa
   });
   if (!assetId) return null;
   const warnings = (Array.isArray(summary["warnings"]) ? summary["warnings"] : []) as Warning[];
+  const qc = (summary["qc"] ?? null) as { passed: boolean; checks: QcCheck[] } | null;
   const file = `/api/assets/${assetId}/file`;
   return (
     <section className="card stack">
@@ -34,6 +42,9 @@ export function EpisodePlayer({ projectId, summary }: { projectId: number; summa
         <span className="spacer" />
         <a href={file} download>
           {t("web.episode.download")}
+        </a>
+        <a href={`/api/projects/${projectId}/episodes/${Number(summary["episode"] ?? 1)}/package`} download>
+          {t("web.episode.package")}
         </a>
         {srt.data ? (
           <a href={`/api/assets/${srt.data.id}/file`} download>
@@ -48,6 +59,20 @@ export function EpisodePlayer({ projectId, summary }: { projectId: number; summa
             {warnings.map((w, i) => (
               <li key={`${w.code}-${w.shot_id ?? ""}-${w.line ?? ""}-${i}`}>
                 {t(`web.compose.warning.${w.code}`, { shot: w.shot_id ?? "", line: (w.line ?? 0) + 1 })}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {qc ? (
+        <div className={qc.passed ? "notice stack notice-ok" : "notice stack"}>
+          <strong>{t("web.episode.qc")}: {t(qc.passed ? "web.episode.qc_passed" : "web.episode.qc_failed")}</strong>
+          <ul className="plain">
+            {qc.checks.map((c) => (
+              <li key={c.code}>
+                <span aria-hidden="true">{c.ok === null ? "–" : c.ok ? "✓" : "✗"}</span>{" "}
+                {t(`web.compose.qc.${c.code}`, { value: String(c.value ?? ""), limit: String(c.limit ?? "") })}
+                {c.ok === null ? <span className="muted"> ({t("web.episode.qc_skipped")})</span> : null}
               </li>
             ))}
           </ul>

@@ -108,6 +108,34 @@ def audio_cmd(ffmpeg: str, tl: dict[str, Any], dest: Path) -> list[str]:
             str(dest)]
 
 
+def ass_time(sec: float) -> str:
+    cs = int(round(sec * 100))
+    h, cs = divmod(cs, 360_000)
+    m, cs = divmod(cs, 6000)
+    return f"{h}:{m:02d}:{cs // 100:02d}.{cs % 100:02d}"
+
+
+def write_label_ass(label: dict[str, Any], vid: dict[str, Any], font: str, dest: Path) -> None:
+    """The visible AIGC label: small in the top-left corner all along; with an end card also big in the middle."""
+    w, h = vid["width"], vid["height"]
+    small, big = max(h // 56, 14), max(h // 24, 28)
+    text = str(label["text"]).replace("\n", " ")
+    lines = [
+        "[Script Info]", "ScriptType: v4.00+", f"PlayResX: {w}", f"PlayResY: {h}", "",
+        "[V4+ Styles]",
+        "Format: Name,Fontname,Fontsize,PrimaryColour,OutlineColour,BackColour,Bold,BorderStyle,Outline,Shadow,"
+        "Alignment,MarginL,MarginR,MarginV",
+        f"Style: Tag,{font},{small},&H00FFFFFF,&H00000000,&H80000000,0,1,1,0,7,24,24,24",
+        f"Style: Card,{font},{big},&H00FFFFFF,&H00000000,&H80000000,1,1,2,0,5,40,40,40", "",
+        "[Events]", "Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text",
+    ]
+    end = float(label["total"])
+    lines.append(f"Dialogue: 0,{ass_time(0)},{ass_time(end)},Tag,,0,0,0,,{text}")
+    if label.get("mode") == "both" and "card_start" in label:
+        lines.append(f"Dialogue: 1,{ass_time(float(label['card_start']))},{ass_time(end)},Card,,0,0,0,,{text}")
+    dest.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def has_filter(ffmpeg: str, name: str) -> bool:
     proc = subprocess.run([ffmpeg, "-hide_banner", "-filters"], capture_output=True, text=True, check=False)  # noqa: S603
     return any(line.split()[1:2] == [name] for line in proc.stdout.splitlines())
@@ -146,21 +174,35 @@ def main(config_path: str) -> int:
     srt = out / "episode.srt"
     write_srt(cues, srt)
     final = out / "episode.mp4"
-    burn = bool(cfg.get("burn_subtitles", True)) and bool(cues) and has_filter(ffmpeg, "subtitles")
+    label = tl.get("label")
+    libass = has_filter(ffmpeg, "subtitles") and has_filter(ffmpeg, "ass")
+    if label and not libass:                      # a required label is never silently dropped
+        print("this ffmpeg has no libass: cannot burn the visible AIGC label", file=sys.stderr, flush=True)
+        return 3
+    burn = bool(cfg.get("burn_subtitles", True)) and bool(cues) and libass
     sub = tl["subtitles"]
     style = (f"FontName={sub.get('font', 'Arial')},FontSize={sub.get('font_size', 16)},"
              f"MarginV={sub.get('margin_v', 42)},Outline={sub.get('outline', 1)},Alignment=2")
     cmd = [ffmpeg, "-y", "-loglevel", "error", "-nostdin", "-i", str(joined), "-i", str(mixed)]
+    filters: list[str] = []
     if burn:
-        cmd += ["-vf", f"subtitles=filename='{srt.name}':force_style='{style}'",
-                "-c:v", vid["codec"], "-crf", str(vid["crf"]), "-pix_fmt", vid["pix_fmt"], "-preset", "medium"]
+        filters.append(f"subtitles=filename='{srt.name}':force_style='{style}'")
+    if label:
+        write_label_ass(label, vid, str(sub.get("font", "Arial")), out / "label.ass")
+        filters.append("ass=filename='label.ass'")
+    if filters:
+        cmd += ["-vf", ",".join(filters), "-c:v", vid["codec"], "-crf", str(vid["crf"]), "-pix_fmt", vid["pix_fmt"],
+                "-preset", "medium"]
     else:
         cmd += ["-c:v", "copy"]
+    for key, value in (tl.get("metadata") or {}).items():
+        cmd += ["-metadata", f"{key}={value}"]
     cmd += ["-map", "0:v:0", "-map", "1:a:0", "-c:a", "copy", "-movflags", "+faststart", "-shortest", str(final)]
     run(cmd, cwd=out)
     emit(total, total, "done")
-    (out / "report.json").write_text(json.dumps({"burned_subtitles": burn, "total_sec": tl["total_sec"],
-                                                  "warnings": tl.get("warnings", [])}, ensure_ascii=False), "utf-8")
+    report = {"burned_subtitles": burn, "label": bool(label), "total_sec": tl["total_sec"],
+              "warnings": tl.get("warnings", [])}
+    (out / "report.json").write_text(json.dumps(report, ensure_ascii=False), "utf-8")
     return 0
 
 

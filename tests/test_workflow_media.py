@@ -178,7 +178,7 @@ def _register(
     return ledger.get_asset(aid)
 
 
-def test_compose_assembles_the_episode_from_the_assets_that_exist(tmp_path: Path) -> None:
+def _episode_rig(tmp_path: Path) -> tuple[WorkflowEngine, Worker]:
     ff = _ffmpeg(tmp_path)
     engine, worker, _ = story(tmp_path, [AssembleAdapter(poll_interval_sec=0.02)])
     media = tmp_path / "src"
@@ -203,6 +203,11 @@ def test_compose_assembles_the_episode_from_the_assets_that_exist(tmp_path: Path
                       shot=shot["id"])
     bgm = next(m for m in engine.store.list_music(1) if m["kind"] == "bgm")
     _register(engine, sp.current(1, "music.bgm", str(bgm["id"])), media / "bgm.wav", "audio.music", dur=2.0, shot=None)
+    return engine, worker
+
+
+def test_compose_assembles_the_episode_from_the_assets_that_exist(tmp_path: Path) -> None:
+    engine, worker = _episode_rig(tmp_path)
     seen: list[tuple[str, int, int, str]] = []
     with serving(worker):
         out = engine.run_stage(1, "compose", {"burn_subtitles": False}, progress=lambda *a: seen.append(a))
@@ -212,3 +217,29 @@ def test_compose_assembles_the_episode_from_the_assets_that_exist(tmp_path: Path
     assert info and info.has_video and info.has_audio and (info.width, info.height) == (720, 1280)
     assert abs((info.duration_sec or 0) - out["duration_sec"]) < 0.5
     assert seen[-1][1] == seen[-1][2] == 100 and any(m.startswith("workflow.progress.assembling|") for *_, m in seen)
+    assert out["qc"] and {c["code"] for c in out["qc"]["checks"]} >= {"duration", "aspect", "loudness", "black_ratio"}
+
+
+def test_compliance_label_goes_into_the_film_and_the_package_describes_it(tmp_path: Path) -> None:
+    import json
+
+    from storyagent.compose.export import build_package
+
+    engine, worker = _episode_rig(tmp_path)
+    engine.db.conn.execute("UPDATE projects SET settings=? WHERE id=1",
+                           (json.dumps({"compliance": {"explicit_label": "overlay"}}),))
+    with serving(worker):
+        out = engine.run_stage(1, "compose", {})
+    ledger = engine.spec_store.ledger
+    asset = ledger.get_asset(out["asset_id"])
+    assert asset.metadata["label"] is True
+    tl = ledger.get_job(out["job_id"]).inputs["timeline"]
+    assert tl["label"]["text"] == "AI-generated content" and tl["metadata"]["comment"].startswith("AIGC")
+    dest = tmp_path / "package"
+    manifest = build_package(engine.settings, ledger, 1, 1, dest, dict(engine.settings.delivery_profile(None)))
+    names = {f["name"] for f in manifest["files"]}
+    assert {"episode.mp4", "provenance.json"} <= names and any(n.startswith("stems/speech_") for n in names)
+    assert any(n.startswith("stems/music_") for n in names)
+    prov = json.loads((dest / "provenance.json").read_text("utf-8"))
+    assert prov["aigc"] and prov["sources"] and "inputs" not in json.dumps(prov)
+    assert json.loads((dest / "manifest.json").read_text("utf-8"))["qc"]["checks"]

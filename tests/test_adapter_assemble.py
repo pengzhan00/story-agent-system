@@ -41,7 +41,8 @@ def as_paths(tl: dict[str, Any]) -> dict[str, Any]:
     return json.loads(json.dumps(tl).replace('"asset:', '"'))
 
 
-def timeline(m: dict[str, Path], *, with_bgm: bool = True) -> dict[str, Any]:
+def timeline(m: dict[str, Path], *, with_bgm: bool = True, label: dict[str, Any] | None = None,
+             metadata: dict[str, str] | None = None) -> dict[str, Any]:
     def ref(name: str, kind: str, dur: float | None) -> AssetRef:
         return AssetRef(str(m[name]), kind, dur)
 
@@ -55,7 +56,8 @@ def timeline(m: dict[str, Path], *, with_bgm: bool = True) -> dict[str, Any]:
     profile = {"width": 72, "height": 128, "fps": 12, "crf": 28, "pix_fmt": "yuv420p"}
     mix = {"lead_in_sec": 0.3, "max_slowdown": 2.2, "bgm_gain": 0.2, "sfx_gain": 0.5, "loudnorm_i": -16.0}
     return as_paths(build_timeline(TimelineInput(shots, profile, mix, {"font": "Arial", "font_size": 12},
-                                                 bgm=ref("bgm.wav", "audio.music", 2.0) if with_bgm else None)))
+                                                 bgm=ref("bgm.wav", "audio.music", 2.0) if with_bgm else None,
+                                                 label=label, metadata=metadata or {})))
 
 
 def test_renders_a_playable_episode_with_the_planned_duration(tmp_path: Path) -> None:
@@ -104,3 +106,33 @@ def test_progress_reads_the_runner_log() -> None:
     assert a.progress(None, "")[1] == "starting"       # type: ignore[arg-type]
     log = json.dumps({"event": "step", "done": 3, "total": 6, "msg": "shot 3/3"})
     assert a.progress(None, log + "\n") == (0.5, "shot 3/3")   # type: ignore[arg-type]
+
+
+def test_the_aigc_label_and_metadata_are_written(tmp_path: Path) -> None:
+    ff = ffmpeg_of(tmp_path)
+    if not has_libass(ff):
+        pytest.skip("this ffmpeg has no libass")
+    m = make_media(tmp_path, ff)
+    tl = timeline(m, label={"text": "AI-generated content", "mode": "both"}, metadata={"comment": "AIGC; test"})
+    plain = timeline(m)
+    assert tl["total_sec"] == pytest.approx(plain["total_sec"] + 2.0)           # the end card
+    assert tl["segments"][-1]["label"] == "card" and tl["label"]["card_start"] == plain["total_sec"]
+    rig = make_rig(make_settings(tmp_path), AssembleAdapter(poll_interval_sec=0.02))
+    rec, assets = rig.run(job(MediaKind.COMPOSE_ASSEMBLE, "ffmpeg-assemble", {"timeline": tl}, seed=1), timeout=120)
+    assert rec.status is JobStatus.COMPLETED, (rec.error_code, rec.error_message)
+    main = next(a for a in assets if a.slot == "main")
+    assert main.metadata["label"] is True
+    out = subprocess.run([find_tool(rig.settings, "ffprobe") or "ffprobe", "-v", "error", "-show_entries",
+                          "format_tags=comment", "-of", "default=nw=1:nk=1", str(rig.settings.home / main.path)],
+                         capture_output=True, text=True, check=True).stdout
+    assert "AIGC; test" in out
+
+
+def test_a_required_label_without_libass_is_refused_up_front(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    ff = ffmpeg_of(tmp_path)
+    m = make_media(tmp_path, ff)
+    tl = timeline(m, label={"text": "AI", "mode": "overlay"})
+    monkeypatch.setattr("storyagent.media.adapters.assemble.has_libass", lambda _f: False)
+    rig = make_rig(make_settings(tmp_path), AssembleAdapter(poll_interval_sec=0.02))
+    rec, _ = rig.run(job(MediaKind.COMPOSE_ASSEMBLE, "ffmpeg-assemble", {"timeline": tl}, seed=1))
+    assert rec.status is JobStatus.FAILED_VALIDATION and rec.error_code == ErrorCode.MISSING_TOOL.value

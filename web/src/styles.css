@@ -89,6 +89,7 @@ th { font-size: 0.8rem; color: var(--muted); font-weight: 600; } tr:last-child t
 .clamp1 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; } .dot-warn { background: var(--warn); }
 .notice { display: flex; justify-content: space-between; align-items: center; gap: 12px; border: 1px solid var(--warn); border-radius: 8px; padding: 8px 12px; }
+.notice.notice-ok { border-color: var(--ok); }
 fieldset { border: none; padding: 0; margin: 0; min-width: 0; } fieldset:disabled textarea, fieldset:disabled input, fieldset:disabled select { opacity: 0.6; }
 .grow { flex: 1; min-width: 160px; } .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85rem; }
 .bad { color: var(--bad); }

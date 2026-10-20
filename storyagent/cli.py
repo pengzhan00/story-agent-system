@@ -9,6 +9,7 @@
     storyagent serve [--host H] [--port P]
     storyagent worker [--once]
     storyagent workflow run | status | watch      (story pipeline with live progress bars)
+    storyagent export episode --project N [--episode 1] --out DIR   (film + subtitles + stems + provenance)
     storyagent llm check
     storyagent api openapi [--out FILE]
     storyagent ops llm-unload
@@ -28,6 +29,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+from storyagent.compose.export import ExportError, build_package
 from storyagent.config import ConfigError, Settings, get_settings
 from storyagent.db import Database, MigrationError, current_version, migrate
 from storyagent.db.legacy_import import LegacyImportError, import_legacy
@@ -447,6 +449,21 @@ def _finish_message(run: dict[str, Any]) -> int:
     return 0 if run["status"] == "completed" else 1
 
 
+def _cmd_export_episode(s: Settings, a: argparse.Namespace) -> int:
+    c = _ctx(s)
+    project = ProjectStore(c.db, s).get(a.project)
+    try:
+        manifest = build_package(s, c.ledger, a.project, a.episode, Path(a.out), dict(s.delivery_profile(
+            project.delivery_profile)))
+    except ExportError as exc:
+        raise CliError("cli.export.failed", 1, detail=str(exc)) from exc
+    failed = [x["code"] for x in manifest["qc"]["checks"] if x["ok"] is False]
+    print(t("cli.export.done", path=a.out, files=len(manifest["files"])))
+    if failed:
+        print(t("cli.export.qc_failed", checks=", ".join(failed)), file=sys.stderr)
+    return 0 if not failed else 6
+
+
 def _cmd_workflow_run(s: Settings, a: argparse.Namespace) -> int:
     c = _ctx(s)
     state = WorkflowState(c.db)
@@ -672,6 +689,11 @@ def build_parser() -> argparse.ArgumentParser:
     wp.add_argument("run", nargs="?")
     wp.add_argument("--project", type=int)
     wp.add_argument("--interval", type=float, default=1.0)
+    ex = sub.add_parser("export").add_subparsers(dest="cmd", required=True)
+    wp = add(ex, "episode", _cmd_export_episode)
+    wp.add_argument("--project", type=int, required=True)
+    wp.add_argument("--episode", type=int, default=1)
+    wp.add_argument("--out", required=True, help="directory to write the package into")
     llm = sub.add_parser("llm").add_subparsers(dest="cmd", required=True)
     add(llm, "check", _cmd_llm_check)
 

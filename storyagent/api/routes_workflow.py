@@ -1,9 +1,15 @@
 from __future__ import annotations
 
+import shutil
+import tempfile
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Request
+from fastapi.responses import FileResponse
+from starlette.background import BackgroundTask
 
+from storyagent.compose.export import ExportError, build_package
 from storyagent.workflow import WorkflowStateError
 
 from .context import ctx_of
@@ -60,3 +66,20 @@ def cancel_run(run_id: str, request: Request) -> WorkflowRunOut:
     except WorkflowStateError as exc:
         raise ApiError(404, "not_found", str(exc)) from exc
     return run_out(wf.get_run(run_id))
+
+
+@router.get("/projects/{project_id}/episodes/{episode}/package")
+def episode_package(project_id: int, episode: int, request: Request) -> FileResponse:
+    """The delivery package of an assembled episode as one zip (film, subtitles, stems, manifest, provenance)."""
+    ctx = ctx_of(request)
+    project = ctx.projects.get(project_id)
+    work = Path(tempfile.mkdtemp(prefix="package-", dir=ctx.settings.home))
+    try:
+        build_package(ctx.settings, ctx.ledger, project_id, episode, work / "package",
+                      dict(ctx.settings.delivery_profile(project.delivery_profile)))
+    except ExportError as exc:
+        shutil.rmtree(work, ignore_errors=True)
+        raise ApiError(409, "episode_not_ready", str(exc)) from exc
+    archive = shutil.make_archive(str(work / f"{project.slug}-ep{episode:02d}"), "zip", work / "package")
+    return FileResponse(archive, media_type="application/zip", filename=Path(archive).name,
+                        background=BackgroundTask(shutil.rmtree, work, ignore_errors=True))
