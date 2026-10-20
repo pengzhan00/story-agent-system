@@ -48,7 +48,7 @@ scripts/start.sh                       # worker + 网页服务;浏览器打开 h
 cd web && pnpm typecheck && pnpm lint && pnpm test && pnpm build  # 前端
 ```
 
-约束由 `tests/test_guards.py` 强制:`storyagent/` 内不得出现 `/Users/`、`localhost`/`127.0.0.1` 字面量、`shell=True`、`pkill`、中文字符串字面量(提示词放 TOML,界面文案走 `locales/{zh-CN,en}.json`)。
+约束由 `tests/test_guards.py` 强制:`storyagent/` 内不得出现 `/Users/`、`localhost`/`127.0.0.1` 字面量、`shell=True`、`pkill`、中文字符串字面量(提示词放 TOML,界面文案走 `storyagent/locales/{zh-CN,en}.json`)。
 
 ## 约定
 

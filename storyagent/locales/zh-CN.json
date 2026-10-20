@@ -272,7 +272,6 @@
   "web.field.episode_no": "集",
   "web.field.title": "标题",
   "web.field.synopsis": "梗概",
-  "web.jobs.summary": "{running} 个进行中，{queued} 个等待",
   "web.jobs.empty": "还没有任务。",
   "web.jobs.kind": "类型",
   "web.jobs.model": "模型",
@@ -439,5 +438,10 @@
   "web.voice.consent": "发声者已同意这段声音被克隆。",
   "web.voice.upload": "上传并使用",
   "web.voice.uploading": "正在上传…",
-  "web.voice.hint": "3 到 20 秒清晰的人声，并填写其中说的话。"
+  "web.voice.hint": "3 到 20 秒清晰的人声，并填写其中说的话。",
+  "web.jobs.filter": "筛选任务",
+  "web.jobs.filter.all": "全部",
+  "web.jobs.filter.running": "进行中",
+  "web.jobs.filter.waiting": "排队中",
+  "web.jobs.filter.problems": "失败或已取消"
 }

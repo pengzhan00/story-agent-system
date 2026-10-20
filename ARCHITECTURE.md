@@ -20,7 +20,7 @@ Either process can restart at any time: queued work stays in the database, runni
 | Layer | Package | Responsibility |
 |---|---|---|
 | Config | `config/` | Layered TOML + env (`Settings`); no hard-coded paths/ports (enforced by `tests/test_guards.py`) |
-| i18n | `i18n/`, `locales/` | `t(key)` everywhere; the web client downloads the same catalog (`/api/i18n/{locale}`) |
+| i18n | `i18n/`, `locales/` (inside the package) | `t(key)` everywhere; the web client downloads the same catalog (`/api/i18n/{locale}`) |
 | Persistence | `db/` | Versioned, checksummed SQL migrations (001-004), automatic pre-upgrade snapshot, optional read-only v1 import |
 | Domain | `domain/enums.py` | `MediaKind` (`<domain>.<operation>`), `JobStatus`, `QualityTier`, `ErrorCode` |
 | Media core | `media/` | `contracts` (MediaJob, Adapter protocol) · `ledger` (jobs, versioned assets, leases, idempotency) · `specs` (editable creative specs, stale propagation, regenerate) · `broker` (one heavy job at a time, memory budget, LLM-resident policy) · `worker` · `healthcheck` · `compliance` · `library` (cross-project voices/refs/LoRAs) · `params` (layered parameters) |

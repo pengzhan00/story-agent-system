@@ -7,7 +7,7 @@ import { RunProgress, stageMessage } from "../src/components/RunProgress";
 import { makeT } from "../src/i18n";
 import { I18nProvider } from "../src/i18n";
 
-const en = JSON.parse(readFileSync(join(__dirname, "..", "..", "locales", "en.json"), "utf-8")) as Record<string, string>;
+const en = JSON.parse(readFileSync(join(__dirname, "..", "..", "storyagent", "locales", "en.json"), "utf-8")) as Record<string, string>;
 
 beforeAll(() => {
   vi.stubGlobal("fetch", async (url: string) => ({

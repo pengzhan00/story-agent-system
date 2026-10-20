@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const root = join(__dirname, "..");
-const catalogs = ["en", "zh-CN"].map((l) => JSON.parse(readFileSync(join(root, "..", "locales", `${l}.json`), "utf-8")) as Record<string, string>);
+const catalogs = ["en", "zh-CN"].map((l) => JSON.parse(readFileSync(join(root, "..", "storyagent", "locales", `${l}.json`), "utf-8")) as Record<string, string>);
 
 function sources(dir: string): string[] {
   return readdirSync(dir).flatMap((f) => {

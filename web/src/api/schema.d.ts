@@ -4738,7 +4738,9 @@ export interface operations {
     };
     queue_api_queue_get: {
         parameters: {
-            query?: never;
+            query?: {
+                project_id?: number | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -4752,6 +4754,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QueueState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

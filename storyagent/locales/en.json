@@ -272,7 +272,6 @@
   "web.field.episode_no": "Episode",
   "web.field.title": "Title",
   "web.field.synopsis": "Synopsis",
-  "web.jobs.summary": "{running} running, {queued} waiting",
   "web.jobs.empty": "No jobs yet.",
   "web.jobs.kind": "Kind",
   "web.jobs.model": "Model",
@@ -439,5 +438,10 @@
   "web.voice.consent": "The speaker agreed to have this voice cloned.",
   "web.voice.upload": "Upload and use",
   "web.voice.uploading": "Uploading…",
-  "web.voice.hint": "3 to 20 seconds of clean speech, and the words said in it."
+  "web.voice.hint": "3 to 20 seconds of clean speech, and the words said in it.",
+  "web.jobs.filter": "Show jobs",
+  "web.jobs.filter.all": "All",
+  "web.jobs.filter.running": "Running",
+  "web.jobs.filter.waiting": "Waiting",
+  "web.jobs.filter.problems": "Failed or cancelled"
 }

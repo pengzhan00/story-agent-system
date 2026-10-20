@@ -93,14 +93,24 @@ export function useStoryEdit(id: number, part: StoryPart) {
   };
 }
 
-export const useJobs = (projectId?: number) =>
+/** ``statuses`` empty = every job. The same filter drives the list a count on the page opens. */
+export const useJobs = (projectId?: number, statuses: string[] = []) =>
   useQuery({
-    queryKey: ["jobs", projectId ?? "all"],
-    queryFn: () => api<Job[]>(`/api/jobs?limit=100${projectId ? `&project_id=${projectId}` : ""}`),
+    queryKey: ["jobs", projectId ?? "all", statuses.join(",")],
+    queryFn: () => {
+      const q = new URLSearchParams({ limit: "100" });
+      if (projectId) q.set("project_id", String(projectId));
+      for (const st of statuses) q.append("status", st);
+      return api<Job[]>(`/api/jobs?${q.toString()}`);
+    },
     refetchInterval: LIVE_MS,
   });
-export const useQueueState = () =>
-  useQuery({ queryKey: ["queue"], queryFn: () => api<QueueState>("/api/queue"), refetchInterval: LIVE_MS });
+export const useQueueState = (projectId?: number) =>
+  useQuery({
+    queryKey: ["queue", projectId ?? "all"],
+    queryFn: () => api<QueueState>(`/api/queue${projectId ? `?project_id=${projectId}` : ""}`),
+    refetchInterval: LIVE_MS,
+  });
 
 export function useJobActions() {
   const qc = useQueryClient();

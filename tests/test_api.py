@@ -444,3 +444,19 @@ def test_jobs_and_assets_can_be_filtered_by_spec(client: TestClient, run_worker)
     mine = client.get("/api/assets", params={"spec_id": a["id"]}).json()
     assert len(mine) == 2 and {x["spec_id"] for x in mine} == {a["id"]}
     assert len(client.get("/api/assets", params={"project_id": pid}).json()) == 4
+
+
+def test_queue_counts_reconcile_with_the_job_lists(client: TestClient) -> None:
+    """A number on the page must equal the length of the list it opens (global and per project)."""
+    first = project(client)["id"]
+    other = project(client, "Other")["id"]
+    for seed, pid in ((1, first), (2, first), (3, other)):
+        r = client.post("/api/jobs", json=job_body(pid, seed=seed))
+        assert r.status_code in (200, 201), r.text
+    for scope in ({}, {"project_id": first}, {"project_id": other}):
+        counts = client.get("/api/queue", params=scope).json()
+        for status in ("queued", "running"):
+            listed = client.get("/api/jobs", params={**scope, "status": status}).json()
+            assert len(listed) == counts[status], (scope, status)
+    assert client.get("/api/queue", params={"project_id": first}).json()["queued"] == 2
+    assert client.get("/api/queue").json()["queued"] == 3

@@ -70,14 +70,15 @@ def retry_job(job_id: str, request: Request, body: RetryRequest | None = None) -
 
 
 @router.get("/queue", response_model=QueueState)
-def queue(request: Request) -> QueueState:
-    return queue_state(request)
+def queue(request: Request, project_id: int | None = None) -> QueueState:
+    return queue_state(request, project_id)
 
 
-def queue_state(request: Request) -> QueueState:
+def queue_state(request: Request, project_id: int | None = None) -> QueueState:
+    """Counts of active jobs, all projects or one. They are the sizes of ``GET /api/jobs?status=...`` lists."""
     rows = ctx_of(request).db.conn.execute(
         "SELECT status, progress_msg, COUNT(*) AS n FROM media_jobs WHERE status IN ('queued','running') "
-        "GROUP BY status, progress_msg"
+        "AND (? IS NULL OR project_id = ?) GROUP BY status, progress_msg", (project_id, project_id)
     ).fetchall()
     queued = running = 0
     waiting: dict[str, int] = {}

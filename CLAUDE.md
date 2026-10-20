@@ -41,7 +41,7 @@ Config layers (low → high): packaged `storyagent/config/defaults/*.toml` < `$S
 
 ## Rules enforced by tests
 
-`tests/test_guards.py`: inside `storyagent/` no `/Users/`, `~/myworkspace`, `127.0.0.1`/`localhost` literals, `pkill`/`shell=True`, or CJK string literals. Services/tools/models come from `Settings`; prompts live in TOML/JSON; every user-visible string is an i18n key in `locales/{zh-CN,en}.json` (`storyagent i18n check` must stay green; the web has `react/jsx-no-literals`). Never add code that kills or starts processes belonging to someone else.
+`tests/test_guards.py`: inside `storyagent/` no `/Users/`, `~/myworkspace`, `127.0.0.1`/`localhost` literals, `pkill`/`shell=True`, or CJK string literals. Services/tools/models come from `Settings`; prompts live in TOML/JSON; every user-visible string is an i18n key in `storyagent/locales/{zh-CN,en}.json` (`storyagent i18n check` must stay green; the web has `react/jsx-no-literals`). Never add code that kills or starts processes belonging to someone else.
 
 ## Gotchas
 

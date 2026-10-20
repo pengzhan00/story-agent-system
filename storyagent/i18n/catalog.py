@@ -18,7 +18,7 @@ class LocaleError(ValueError):
 
 
 def locales_dir() -> Path:
-    return Path(__file__).resolve().parents[2] / "locales"
+    return Path(__file__).resolve().parents[1] / "locales"
 
 
 def available_locales(directory: Path | None = None) -> list[str]:

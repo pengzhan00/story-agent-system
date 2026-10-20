@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useJobActions, useJobs, useQueueState } from "../api/hooks";
 import type { Job } from "../api/types";
 import { ErrorNote } from "../components/ErrorNote";
@@ -7,6 +8,14 @@ import { duration } from "../lib/format";
 import { useT } from "../i18n";
 
 const ACTIVE = new Set(["queued", "running"]);
+/** What each filter chip asks the server for; the chip's count (where it has one) is the size of that list. */
+const FILTERS = {
+  all: [],
+  running: ["running"],
+  waiting: ["queued"],
+  problems: ["workflow_error", "transport_error", "timeout", "failed_validation", "cancelled"],
+} as const;
+type Filter = keyof typeof FILTERS;
 
 function JobRow({ job }: { job: Job }) {
   const t = useT();
@@ -43,13 +52,20 @@ function JobRow({ job }: { job: Job }) {
 
 export function JobsPanel({ projectId }: { projectId?: number }) {
   const t = useT();
-  const jobs = useJobs(projectId);
-  const queue = useQueueState();
+  const [filter, setFilter] = useState<Filter>("all");
+  const jobs = useJobs(projectId, [...FILTERS[filter]]);
+  const queue = useQueueState(projectId);
+  const count = (f: Filter) => (f === "running" ? queue.data?.running : f === "waiting" ? queue.data?.queued : undefined);
   return (
     <div className="stack">
-      {queue.data ? (
-        <p className="muted">{t("web.jobs.summary", { running: queue.data.running, queued: queue.data.queued })}</p>
-      ) : null}
+      <nav className="tabs" aria-label={t("web.jobs.filter")}>
+        {(Object.keys(FILTERS) as Filter[]).map((f) => (
+          <button key={f} className={f === filter ? "tab active" : "tab"} aria-pressed={f === filter} onClick={() => setFilter(f)}>
+            {t(`web.jobs.filter.${f}`)}
+            {count(f) !== undefined ? ` (${count(f)})` : ""}
+          </button>
+        ))}
+      </nav>
       <ErrorNote error={jobs.error} />
       {jobs.data && jobs.data.length === 0 ? <p className="empty">{t("web.jobs.empty")}</p> : null}
       {jobs.data && jobs.data.length > 0 ? (

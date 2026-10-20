@@ -1,7 +1,7 @@
 """Minimal JSON-backed i18n.
 
 All user-visible text goes through ``t(key, **params)``; locale files live in
-``<repo>/locales/<locale>.json`` as flat ``{"dotted.key": "text {param}"}`` maps.
+``storyagent/locales/<locale>.json`` as flat ``{"dotted.key": "text {param}"}`` maps.
 """
 from .catalog import (
     Catalog,
