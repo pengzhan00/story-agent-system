@@ -43,3 +43,11 @@ storyagent ops llm-unload             # unload resident LLMs (when a heavy job w
 ## Backups
 
 The DB is `$STORY_AGENT_HOME/data/*.db` (WAL). Copy with `sqlite3 <db> ".backup <file>"`, never the bare file while a worker runs. Assets live under `projects/<slug>/media/`; the ledger is authoritative, the disk is verified against sha256.
+
+## Upgrade and rollback
+
+Migrations only go forward. Before a schema upgrade `storyagent db migrate` copies the database to `<db>.bak-v<N>` (the version it had). To roll back: stop the worker and the server, move the current `*.db` (and its `-wal`/`-shm`) aside, copy the snapshot back as the database, and check out the matching code revision (`git checkout <tag or commit>`). The v1 implementation is the git tag `v1-final`; v1 databases are never touched (`db import-legacy` only reads them).
+
+## What is not audited yet
+
+Destructive actions (project to recycle bin, library removal, asset trash) are reversible and logged in the application log, but there is no separate audit table; jobs keep their full event history (`media show <id>`).
