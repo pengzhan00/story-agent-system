@@ -349,3 +349,16 @@ def test_a_run_publishes_progress_from_the_first_second_to_100_percent(tmp_path:
     final = engine.state.get_run(run["id"])["progress"]
     assert final["percent"] == 100 and [s["status"] for s in final["stages"]] == ["completed", "completed"]
     assert final["elapsed_sec"] > 0
+
+
+def test_a_stage_can_reshape_its_weight_without_the_bar_going_back() -> None:
+    from storyagent.workflow.progress import RunProgress
+
+    p = RunProgress(["a", "b"], {"a": 1, "b": 1})
+    p.update("a", 1, 1, "")
+    p.update("b", 1, 2, "")
+    assert p.percent() == 75.0
+    p.set_weight("b", 9)                       # b turns out to be much bigger than guessed
+    assert p.percent() == 75.0                 # plateau, not a rewind
+    p.update("b", 2, 2, "")
+    assert p.percent() == 100.0

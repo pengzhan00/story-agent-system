@@ -93,8 +93,18 @@ class WorkflowEngine:
                 if cancel_req:
                     cancel.set()
 
-        def progress(stage: str, done: int, total: int, msg: str) -> None:
-            tracker.update(stage, done, total, msg)
+        class Reporter:
+            """Callable progress sink that also lets a stage reshape its weight (``Ctx.hint_weight``)."""
+
+            @staticmethod
+            def __call__(stage: str, done: int, total: int, msg: str) -> None:
+                tracker.update(stage, done, total, msg)
+
+            @staticmethod
+            def set_weight(stage: str, units: float) -> None:
+                tracker.set_weight(stage, units)
+
+        progress = Reporter()
 
         def end(status: str, **error: str) -> None:
             tracker.finish(status)

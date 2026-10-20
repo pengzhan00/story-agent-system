@@ -74,6 +74,14 @@ class Ctx:
     def force(self) -> bool:
         return bool(self.params.get("force"))
 
+    def hint_weight(self, seconds: float) -> None:
+        """Tell the progress bar how long this stage is expected to take (it only reshapes the overall percentage)."""
+        from .progress import SECONDS_PER_UNIT
+
+        hook = getattr(self.progress, "set_weight", None)
+        if callable(hook):
+            hook(self.stage, max(seconds / SECONDS_PER_UNIT, 1.0))
+
     def step(self, done: int, total: int, msg: str = "") -> None:
         if self.cancelled():
             raise WorkflowCancelled()

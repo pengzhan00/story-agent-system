@@ -81,8 +81,20 @@ def _ffmpeg(settings: Settings) -> Adapter:
     return AssembleAdapter()
 
 
+def _h3(settings: Settings) -> Adapter:
+    from .adapters.h3 import H3Adapter
+
+    return H3Adapter()
+
+
+def _longcat(settings: Settings) -> Adapter:
+    from .adapters.longcat import LongCatAdapter
+
+    return LongCatAdapter()
+
+
 _BUILTIN: list[Callable[[Settings], Adapter]] = [
-    _acestep, _phosphene, _cosyvoice, _whisper, _mflux, _lora_train, _seedvc, _ffmpeg,
+    _acestep, _phosphene, _cosyvoice, _whisper, _mflux, _lora_train, _seedvc, _ffmpeg, _h3, _longcat,
 ]
 
 

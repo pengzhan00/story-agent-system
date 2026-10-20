@@ -10,11 +10,13 @@ from __future__ import annotations
 import time
 from typing import Any
 
-# Rough shares of one episode run (measured live: analyze 49 s, cast 68 s, script 766 s on gemma4:31b). Tunable.
+# Rough shares of one episode run (measured live: analyze 49 s, cast 68 s, script 766 s on gemma4:31b, i.e. one unit
+# is about 14 s). ``produce`` and ``compose`` replace their weight at run time from the ledger's duration estimates.
 STAGE_WEIGHTS: dict[str, float] = {
-    "analyze": 4, "cast": 5, "script": 50, "scenes": 8, "music": 8, "shotplan": 1, "specs": 24, "produce": 400,
-    "compose": 20,
+    "analyze": 4, "cast": 5, "script": 50, "scenes": 8, "music": 8, "shotplan": 1, "specs": 24, "produce": 60,
+    "compose": 4,
 }
+SECONDS_PER_UNIT = 14.0
 ETA_MIN_PERCENT = 10.0          # below this an extrapolated ETA is noise (LLM stages are lumpy)
 
 
@@ -34,8 +36,14 @@ class RunProgress:
         self.ended: tuple[str, str] | None = None       # (stage, 'failed' | 'cancelled')
         self.stage_started: dict[str, float] = {}
         self.stage_seconds: dict[str, float] = {}
+        self._high = 0.0
 
     # -- writer side ------------------------------------------------------------------------------
+    def set_weight(self, stage: str, units: float) -> None:
+        """A stage that knows how long it will really take (media jobs have estimates) corrects its share of the bar."""
+        if stage in self.weights and units > 0:
+            self.weights[stage] = float(units)
+
     def update(self, stage: str, done: int, total: int, message: str = "") -> None:
         if stage != self.current:
             if self.current is not None:
@@ -66,9 +74,11 @@ class RunProgress:
         return None if stage == self.current else 0.0
 
     def percent(self) -> float:
+        """Overall 0-100. Never goes down: a stage that corrects its weight mid-run may pause the bar, not rewind it."""
         total = sum(self.weights.values()) or 1.0
         got = sum(w * (self._stage_fraction(s) or 0.0) for s, w in self.weights.items())
-        return round(100.0 * got / total, 1)
+        self._high = max(self._high, round(100.0 * got / total, 1))
+        return self._high
 
     def snapshot(self) -> dict[str, Any]:
         elapsed = self._clock() - self._t0

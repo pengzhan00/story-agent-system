@@ -8,7 +8,8 @@ Phases (each waits for the one before, because a video starts from its keyframe)
     1  portraits, scene keyframes, music, theme song, sound effects, dialogue lines
     2  shot keyframes
     3  shot videos (first frame = the keyframe)
-Params: ``tier``, ``skip`` (subject types not to make), ``force``. Progress messages are ``<i18n key>|<detail>``; clients translate the part before ``|``.
+Params: ``tier``, ``skip`` (subject types not to make), ``force``.
+Progress messages are ``<i18n key>|<detail>``; clients translate the part before ``|``.
 """
 from __future__ import annotations
 
@@ -116,6 +117,29 @@ def _plan_phase(
     return out
 
 
+# Seconds per job when the ledger has no history for the model yet (only used to shape the progress bar).
+FALLBACK_SECONDS = {"image": 45.0, "video": 240.0, "audio.tts": 12.0, "audio.music": 90.0, "audio.sfx": 20.0}
+
+
+def _expected_seconds(ctx: Ctx, ledger: Ledger, specs: list[SpecRecord], tier: QualityTier) -> float:
+    total = 0.0
+    skip = {str(x) for x in ctx.params.get("skip", [])}
+    for spec in specs:
+        if spec.subject_type in skip or not any(spec.subject_type in p for p in PHASES):
+            continue
+        if up_to_date(ledger, spec) and not ctx.force():
+            continue
+        try:
+            model_ref = spec.model_ref or ctx.settings.default_model(spec.kind.value).ref
+        except ConfigError:
+            continue
+        known = ledger.estimate_seconds(model_ref, tier.value)
+        kind = spec.kind.value
+        guess = FALLBACK_SECONDS.get(kind) or FALLBACK_SECONDS.get(kind.split(".")[0], 60.0)
+        total += float(known or guess)
+    return total
+
+
 def produce(ctx: Ctx) -> dict[str, Any]:
     ledger = _ledger(ctx)
     tier = QualityTier(str(ctx.params.get("tier") or ctx.settings.workflow.get("tier", "draft")))
@@ -125,6 +149,7 @@ def produce(ctx: Ctx) -> dict[str, Any]:
     counts = {"reused": 0}
     failures: list[dict[str, Any]] = []
     total_planned = sum(1 for s in specs if any(s.subject_type in p for p in PHASES))
+    ctx.hint_weight(_expected_seconds(ctx, ledger, specs, tier))
     ctx.step(0, max(total_planned, 1), "")
     done_before = 0
     for phase in PHASES:
