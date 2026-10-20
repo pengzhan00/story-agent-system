@@ -3,7 +3,7 @@
     storyagent config show
     storyagent db migrate | status | import-legacy [--from PATH]
     storyagent i18n check
-    storyagent project create NAME | list
+    storyagent project create NAME | list [--trashed] | trash ID [--restore]
     storyagent media healthcheck | submit | jobs | show | cancel | retry | adopt
     storyagent spec create | show | edit | diff | revert | lock | unlock | regenerate
     storyagent serve [--host H] [--port P]
@@ -45,7 +45,7 @@ from storyagent.media.registry import default_registry
 from storyagent.media.specs import SpecError, SpecLocked, SpecStore
 from storyagent.media.worker import Worker, run_once
 from storyagent.progressbar import render_run, render_stages
-from storyagent.projects import ProjectNotFound, ProjectStore
+from storyagent.projects import ProjectNotFound, ProjectStateError, ProjectStore
 from storyagent.workflow import STAGES, WorkflowEngine, WorkflowState, WorkflowStateError
 
 
@@ -141,9 +141,19 @@ def _cmd_project_create(s: Settings, a: argparse.Namespace) -> int:
     return 0
 
 
-def _cmd_project_list(s: Settings, _a: argparse.Namespace) -> int:
-    for p in ProjectStore(_ctx(s).db, s).list():
+def _cmd_project_list(s: Settings, a: argparse.Namespace) -> int:
+    for p in ProjectStore(_ctx(s).db, s).list(trashed=a.trashed):
         print(t("cli.project.row", id=p.id, slug=p.slug, name=p.name))
+    return 0
+
+
+def _cmd_project_trash(s: Settings, a: argparse.Namespace) -> int:
+    store = ProjectStore(_ctx(s).db, s)
+    try:
+        project = store.restore(a.project) if a.restore else store.trash(a.project)
+    except ProjectStateError as exc:
+        raise CliError("cli.project.state", 1, detail=str(exc)) from exc
+    print(t("cli.project.restored" if a.restore else "cli.project.trashed", id=project.id, name=project.name))
     return 0
 
 
@@ -583,7 +593,11 @@ def build_parser() -> argparse.ArgumentParser:
     pc = add(pr, "create", _cmd_project_create)
     pc.add_argument("name")
     pc.add_argument("--genre")
-    add(pr, "list", _cmd_project_list)
+    pl = add(pr, "list", _cmd_project_list)
+    pl.add_argument("--trashed", action="store_true", help="list the recycle bin")
+    pt = add(pr, "trash", _cmd_project_trash)
+    pt.add_argument("project", type=int)
+    pt.add_argument("--restore", action="store_true", help="bring a trashed project back")
 
     me = sub.add_parser("media").add_subparsers(dest="cmd", required=True)
     hc = add(me, "healthcheck", _cmd_media_health)

@@ -1,12 +1,14 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useCreateProject, useProjects } from "../api/hooks";
+import { useCreateProject, useProjectBin, useProjects } from "../api/hooks";
 import { useI18n } from "../i18n";
 import { ErrorNote } from "../components/ErrorNote";
 
 export function ProjectsPage() {
   const { t, locale } = useI18n();
-  const projects = useProjects();
+  const [bin, setBin] = useState(false);
+  const projects = useProjects(bin);
+  const binActions = useProjectBin();
   const create = useCreateProject();
   const nav = useNavigate();
   const [name, setName] = useState("");
@@ -22,7 +24,14 @@ export function ProjectsPage() {
 
   return (
     <div className="stack">
-      <h1>{t("web.projects.title")}</h1>
+      <div className="row">
+        <h1>{bin ? t("web.projects.bin") : t("web.projects.title")}</h1>
+        <span className="spacer" />
+        <button type="button" onClick={() => setBin(!bin)}>
+          {bin ? t("web.projects.live") : t("web.projects.bin")}
+        </button>
+      </div>
+      {bin ? null : (
       <form className="card stack" onSubmit={submit}>
         <h2>{t("web.projects.new")}</h2>
         <label className="field">
@@ -40,10 +49,14 @@ export function ProjectsPage() {
         </div>
         <ErrorNote error={create.error} />
       </form>
+      )}
 
       {projects.isLoading ? <p className="muted">{t("web.loading")}</p> : null}
       <ErrorNote error={projects.error} />
-      {projects.data && projects.data.length === 0 ? <p className="empty">{t("web.projects.empty")}</p> : null}
+      {projects.data && projects.data.length === 0 ? (
+        <p className="empty">{bin ? t("web.projects.bin_empty") : t("web.projects.empty")}</p>
+      ) : null}
+      <ErrorNote error={binActions.restore.error} />
       <ul className="grid">
         {projects.data?.map((p) => (
           <li key={p.id} className="card">
@@ -52,6 +65,11 @@ export function ProjectsPage() {
             </h3>
             <p className="muted clamp">{p.description || t("web.projects.no_premise")}</p>
             <p className="muted small">{p.genre}</p>
+            {bin ? (
+              <button type="button" onClick={() => binActions.restore.mutate(p.id)} disabled={binActions.restore.isPending}>
+                {t("web.projects.restore")}
+              </button>
+            ) : null}
           </li>
         ))}
       </ul>

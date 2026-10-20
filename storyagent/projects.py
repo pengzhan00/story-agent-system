@@ -18,6 +18,10 @@ class ProjectNotFound(LookupError):
     pass
 
 
+class ProjectStateError(RuntimeError):
+    """The requested status change does not fit the project's current state."""
+
+
 @dataclass(frozen=True)
 class Project:
     id: int
@@ -66,8 +70,32 @@ class ProjectStore:
             raise ProjectNotFound(str(project_id))
         return Project.from_row(row)
 
-    def list(self) -> list[Project]:
-        return [Project.from_row(r) for r in self.db.conn.execute("SELECT * FROM projects ORDER BY id")]
+    def list(self, *, trashed: bool = False) -> list[Project]:
+        """Live projects, or (``trashed=True``) the ones in the recycle bin."""
+        rows = self.db.conn.execute(
+            "SELECT * FROM projects WHERE (status = 'trashed') = ? ORDER BY id", (1 if trashed else 0,))
+        return [Project.from_row(r) for r in rows]
+
+    def trash(self, project_id: int) -> Project:
+        """Soft delete: hidden from the list, nothing is removed (media stays on disk), reversible with ``restore``."""
+        return self._set_status(project_id, "trashed", from_status=None)
+
+    def restore(self, project_id: int) -> Project:
+        return self._set_status(project_id, "draft", from_status="trashed")
+
+    def _set_status(self, project_id: int, status: str, *, from_status: str | None) -> Project:
+        with self.db.transaction() as conn:
+            current = self.get(project_id)
+            if from_status is not None and current.status != from_status:
+                raise ProjectStateError(f"project {project_id} is not {from_status}")
+            if status == "trashed":
+                busy = conn.execute("SELECT 1 FROM workflow_runs WHERE project_id=? AND status IN ('queued','running')",
+                                    (project_id,)).fetchone()
+                if busy is not None:
+                    raise ProjectStateError(f"project {project_id} has a run in progress; cancel it first")
+            conn.execute("UPDATE projects SET status=?, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?",
+                         (status, project_id))
+        return self.get(project_id)
 
     def update(self, project_id: int, **changes: Any) -> Project:
         unknown = set(changes) - set(_PATCHABLE)

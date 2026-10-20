@@ -410,5 +410,16 @@
   "cli.export.done": "交付包已写入 {path}（{files} 个文件）。",
   "cli.export.failed": "无法导出：{detail}",
   "cli.export.qc_failed": "质量检查未通过：{checks}",
-  "web.episode.package": "下载交付包（zip）"
+  "web.episode.package": "下载交付包（zip）",
+  "cli.project.trashed": "项目 {id}（{name}）已移入回收站，文件仍保留。",
+  "cli.project.restored": "项目 {id}（{name}）已恢复。",
+  "cli.project.state": "无法修改项目：{detail}",
+  "web.projects.trash": "移入回收站",
+  "web.projects.trash_confirm": "把这个项目移入回收站？文件和历史都会保留，之后可以恢复。",
+  "web.projects.restore": "恢复",
+  "web.projects.bin": "回收站",
+  "web.projects.bin_empty": "回收站是空的。",
+  "web.projects.live": "项目",
+  "web.projects.rename": "重命名",
+  "web.projects.save_name": "保存名称"
 }

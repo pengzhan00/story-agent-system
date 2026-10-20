@@ -1,5 +1,6 @@
-import { NavLink, Navigate, Route, Routes, useParams } from "react-router-dom";
-import { useProject, useWorkflow } from "../api/hooks";
+import { useState } from "react";
+import { NavLink, Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
+import { useProject, useProjectBin, useUpdateProject, useWorkflow } from "../api/hooks";
 import { ErrorNote } from "../components/ErrorNote";
 import { ProgressBar } from "../components/ProgressBar";
 import { useT } from "../i18n";
@@ -14,18 +15,58 @@ export function ProjectPage() {
   const project = useProject(id);
   const wf = useWorkflow(id);
   const run = wf.data?.active_run;
+  const rename = useUpdateProject(id);
+  const bin = useProjectBin();
+  const nav = useNavigate();
+  const [draft, setDraft] = useState<string | null>(null);
+  function saveName() {
+    if (draft && draft.trim() && draft.trim() !== project.data?.name) rename.mutate({ name: draft.trim() });
+    setDraft(null);
+  }
   return (
     <div className="stack">
       <header className="row">
-        <h1>{project.data?.name ?? t("web.loading")}</h1>
+        {draft === null ? (
+          <h1>{project.data?.name ?? t("web.loading")}</h1>
+        ) : (
+          <input
+            className="grow"
+            autoFocus
+            value={draft}
+            maxLength={200}
+            aria-label={t("web.projects.rename")}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={saveName}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") saveName();
+              if (e.key === "Escape") setDraft(null);
+            }}
+          />
+        )}
+        {draft === null && project.data ? (
+          <button type="button" onClick={() => setDraft(project.data?.name ?? "")}>
+            {t("web.projects.rename")}
+          </button>
+        ) : null}
         {run ? (
           <div className="mini-progress" title={t("web.workflow.overall")}>
             <ProgressBar percent={run.status === "queued" ? 0 : run.progress.percent} label={t("web.workflow.overall")} />
             <span className="small">{run.status === "queued" ? "0%" : `${run.progress.percent.toFixed(0)}%`}</span>
           </div>
         ) : null}
+        <span className="spacer" />
+        <button
+          type="button"
+          disabled={!!run || bin.trash.isPending}
+          onClick={() => {
+            if (window.confirm(t("web.projects.trash_confirm"))) bin.trash.mutate(id, { onSuccess: () => nav("/") });
+          }}
+        >
+          {t("web.projects.trash")}
+        </button>
       </header>
       <ErrorNote error={project.error} />
+      <ErrorNote error={rename.error ?? bin.trash.error} />
       <nav className="tabs">
         <NavLink to="workflow" className={({ isActive }) => (isActive ? "tab active" : "tab")}>
           {t("web.tab.workflow")}

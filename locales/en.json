@@ -410,5 +410,16 @@
   "cli.export.done": "Package written to {path} ({files} files).",
   "cli.export.failed": "Cannot export: {detail}",
   "cli.export.qc_failed": "Quality checks failed: {checks}",
-  "web.episode.package": "Download package (zip)"
+  "web.episode.package": "Download package (zip)",
+  "cli.project.trashed": "Project {id} ({name}) moved to the recycle bin; files are kept.",
+  "cli.project.restored": "Project {id} ({name}) restored.",
+  "cli.project.state": "Cannot change the project: {detail}",
+  "web.projects.trash": "Move to recycle bin",
+  "web.projects.trash_confirm": "Move this project to the recycle bin? Files and history are kept and you can restore it.",
+  "web.projects.restore": "Restore",
+  "web.projects.bin": "Recycle bin",
+  "web.projects.bin_empty": "The recycle bin is empty.",
+  "web.projects.live": "Projects",
+  "web.projects.rename": "Rename",
+  "web.projects.save_name": "Save name"
 }

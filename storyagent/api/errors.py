@@ -17,7 +17,7 @@ from storyagent.config import ConfigError
 from storyagent.media.ledger import LedgerError
 from storyagent.media.library import LibraryError
 from storyagent.media.specs import SpecError, SpecLocked
-from storyagent.projects import ProjectNotFound
+from storyagent.projects import ProjectNotFound, ProjectStateError
 from storyagent.story import ShotLocked, StoryError, StoryNotFound
 from storyagent.workflow import WorkflowStateError
 
@@ -57,6 +57,10 @@ def install(app: FastAPI) -> None:
     @app.exception_handler(ProjectNotFound)
     async def _project(request: Request, exc: ProjectNotFound) -> JSONResponse:
         return respond(request, 404, "not_found", f"project {exc}")
+
+    @app.exception_handler(ProjectStateError)
+    async def _project_state(request: Request, exc: ProjectStateError) -> JSONResponse:
+        return respond(request, 409, "conflict", str(exc))
 
     @app.exception_handler(SpecLocked)
     async def _locked(request: Request, exc: SpecLocked) -> JSONResponse:

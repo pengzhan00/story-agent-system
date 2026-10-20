@@ -10,7 +10,8 @@ export const useMeta = () => {
   const { locale } = useI18n();
   return useQuery({ queryKey: ["meta", locale], queryFn: () => api<Meta>("/api/meta") });
 };
-export const useProjects = () => useQuery({ queryKey: ["projects"], queryFn: () => api<Project[]>("/api/projects") });
+export const useProjects = (trashed = false) =>
+  useQuery({ queryKey: ["projects", trashed], queryFn: () => api<Project[]>(`/api/projects?trashed=${trashed}`) });
 export const useProject = (id: number) =>
   useQuery({ queryKey: ["project", id], queryFn: () => api<Project>(`/api/projects/${id}`) });
 
@@ -21,6 +22,16 @@ export function useCreateProject() {
       post<Project>("/api/projects", body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["projects"] }),
   });
+}
+
+/** Move a project to the recycle bin, or bring it back. Both lists change, so both are refreshed. */
+export function useProjectBin() {
+  const qc = useQueryClient();
+  const done = () => qc.invalidateQueries({ queryKey: ["projects"] });
+  return {
+    trash: useMutation({ mutationFn: (id: number) => api<Project>(`/api/projects/${id}`, { method: "DELETE" }), onSuccess: done }),
+    restore: useMutation({ mutationFn: (id: number) => post<Project>(`/api/projects/${id}/restore`), onSuccess: done }),
+  };
 }
 
 export function useUpdateProject(id: number) {

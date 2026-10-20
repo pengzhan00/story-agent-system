@@ -38,7 +38,8 @@ def get_workflow(project_id: int, request: Request) -> WorkflowOut:
 def start_run(project_id: int, body: WorkflowRunCreate, request: Request) -> WorkflowRunOut:
     """Queue a run; the worker executes it. Without ``stages`` the run resumes where the project stopped."""
     ctx = ctx_of(request)
-    ctx.projects.get(project_id)
+    if ctx.projects.get(project_id).status == "trashed":
+        raise ApiError(409, "conflict", "the project is in the recycle bin; restore it first")
     stages = ctx.workflow.pending_stages(project_id, body.stages)
     if not stages:
         raise ApiError(409, "nothing_to_do", "every stage is already completed")

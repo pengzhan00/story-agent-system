@@ -155,3 +155,21 @@ def test_a_package_of_an_unassembled_episode_is_a_clear_conflict(client: TestCli
     r = client.get(f"/api/projects/{pid}/episodes/1/package")
     assert r.status_code == 409 and r.json()["error"]["code"] == "episode_not_ready"
     assert client.get("/api/projects/999/episodes/1/package").status_code == 404
+
+
+def test_a_project_goes_to_the_recycle_bin_and_comes_back(client: TestClient) -> None:
+    pid = new_project(client)
+    assert client.delete(f"/api/projects/{pid}").json()["status"] == "trashed"
+    assert [p["id"] for p in client.get("/api/projects").json()] == []
+    assert [p["id"] for p in client.get("/api/projects?trashed=true").json()] == [pid]
+    r = client.post(f"/api/projects/{pid}/workflow/runs", json={})
+    assert r.status_code == 409 and "recycle bin" in json.dumps(r.json())
+    assert client.post(f"/api/projects/{pid}/restore").json()["status"] == "draft"
+    assert client.post(f"/api/projects/{pid}/restore").status_code == 409        # not in the bin any more
+    assert [p["id"] for p in client.get("/api/projects").json()] == [pid]
+
+
+def test_a_project_with_a_run_in_progress_cannot_be_trashed(client: TestClient) -> None:
+    pid = new_project(client)
+    started(client, pid)
+    assert client.delete(f"/api/projects/{pid}").status_code == 409
