@@ -4,8 +4,8 @@
 Verdict: partial
 Validation: pass-with-warnings
 Git baseline: branch claude/init-127186 (clean tree), v1 preserved as tag v1-final (ca223f5)
-Release readiness: ready for local single-user use of the image + voice + music + compose path;
-                   NOT ready to claim for h3 / longcat / Phosphene video (never run live) or for network exposure
+Release readiness: ready for local single-user use of the image + voice + music + Phosphene video + compose path;
+                   NOT ready to claim for h3 / longcat (never run live) or for network exposure
 ```
 
 ## Validation (all run on this commit)
@@ -24,7 +24,7 @@ Release readiness: ready for local single-user use of the image + voice + music 
 
 ## Findings
 
-**P1 — not verified live: h3, longcat, Phosphene video, FastVideo.** Evidence: Phosphene service down; h3/longcat only exercised with stub tools + contract tests; FastVideo adapter not written (weights absent, API unverified). Impact: video generation is unproven end-to-end (stills with Ken Burns are the verified fallback). Fix: run each once when the service/weights are available; the produce stage already reports `no_model` instead of failing silently.
+**P1 — not verified live: h3, longcat, FastVideo.** (Update 2026-10-21 later: Phosphene came up and was verified live — `produce` rendered both shot videos (LTX 2.5, draft, 3m11s for the whole stage), `compose` then assembled them with no `no_video` warnings, QC clean apart from the advisory episode length.) Evidence: h3/longcat only exercised with stub tools + contract tests; FastVideo adapter not written (weights absent, API unverified). Impact: the h3 (video+audio) and LongCat (avatar) paths are unproven. Fix: run each once when the service/weights are available; the produce stage already reports `no_model` instead of failing silently.
 
 **P2 — no browser e2e (Playwright).** Evidence: coverage is API tests + vitest + the live pipeline test + manual browser checks. Impact: UI regressions in multi-step flows are caught only manually. Fix: add Playwright against `storyagent serve` with the fake LLM/adapters.
 
@@ -52,6 +52,6 @@ Git-managed with a tagged rollback point; MECE workflow (story → media → epi
 
 ## Suggested next tasks
 
-1. Bring Phosphene/h3/longcat up once and run `workflow run --stage produce` on a project; fix what real output reveals.
+1. Bring h3/longcat up once and run `workflow run --stage produce` on a project; fix what real output reveals.
 2. Playwright smoke for the create → run → edit → compose path.
 3. Decide on `recipes.toml` (wire or delete) and the SFX model question.
