@@ -158,7 +158,8 @@ class H3Adapter(SubprocessAdapter):
         ffmpeg = find_tool(ctx.settings, "ffmpeg")
         path = os.environ.get("PATH", "")
         env = {"PATH": f"{ffmpeg.parent}{os.pathsep}{path}"} if ffmpeg else {}
-        return Command(argv, cwd=ctx.work_dir, env=env)
+        # h3 looks for its Metal shader source next to the binary, so it must run from there (all paths are absolute)
+        return Command(argv, cwd=binary.parent, env=env)
 
     def progress(self, job: JobRecord, log_text: str) -> tuple[float, str]:
         hits = _STEP.findall(log_text)

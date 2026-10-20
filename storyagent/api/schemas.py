@@ -61,6 +61,8 @@ class ProjectSettingsPatch(BaseModel):
 
     compliance: dict[str, Any] | None = None
     models: dict[str, dict[str, Any]] | None = None
+    allow_restricted_licenses: bool | None = Field(
+        default=None, description="acknowledge models whose licence restricts commercial use or territory")
 
 
 # -- jobs -------------------------------------------------------------------------------------------

@@ -11,7 +11,7 @@ from storyagent.db import Database
 from storyagent.domain import slugify
 
 _PATCHABLE = ("name", "description", "genre", "content_language", "delivery_profile", "aspect_ratio")
-_SETTINGS_KEYS = ("compliance", "models")
+_SETTINGS_KEYS = ("compliance", "models", "allow_restricted_licenses")
 
 
 class ProjectNotFound(LookupError):

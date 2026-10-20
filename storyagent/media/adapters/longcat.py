@@ -27,6 +27,13 @@ SCHEMA: dict[str, dict[str, Any]] = {
     "height": {"type": "int", "min": 64, "max": 2048},
     "num_frames": {"type": "int", "min": 5, "max": 600},
 }
+# directory name under ``weights_dir`` -> the tool's ``--variant`` choice (scripts/run_inference.py VARIANT_DIRNAMES)
+VARIANTS = {
+    "LongCat-Video-Avatar-1.5-bf16-dmd-merged": "merged",
+    "LongCat-Video-Avatar-1.5-bf16": "base",
+    "LongCat-Video-Avatar-1.5-q4-dmd-merged": "q4-merged",
+    "LongCat-Video-Avatar-1.5-q8-dmd-merged": "q8-merged",
+}
 _STEP = re.compile(r"(\d+)\s*/\s*(\d+)")
 
 
@@ -85,8 +92,8 @@ class LongCatAdapter(SubprocessAdapter):
         image, audio = self._sources(job, ctx)
         assert image and audio
         p = job.params
-        argv = [str(python), str(root / "scripts" / "run_inference.py"), "--weights", str(variant),
-                "--out", str(ctx.work_dir / "avatar.mp4")]
+        argv = [str(python), str(root / "scripts" / "run_inference.py"), "--weights", str(variant.parent),
+                "--variant", VARIANTS.get(variant.name, "merged"), "--out", str(ctx.work_dir / "avatar.mp4")]
         for key, flag in (("height", "--height"), ("width", "--width"), ("num_frames", "--num-frames")):
             if key in p:
                 argv += [flag, str(p[key])]

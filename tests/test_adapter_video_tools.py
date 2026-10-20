@@ -24,7 +24,8 @@ H3_STUB = textwrap.dedent(f'''\
     a = sys.argv[1:]
     here = os.path.dirname(os.path.abspath(__file__))
     with open(os.path.join(here, "calls.jsonl"), "a", encoding="utf-8") as fh:
-        fh.write(json.dumps({{"argv": a, "path": os.environ.get("PATH", "")}}, ensure_ascii=False) + "\\n")
+        rec = {{"argv": a, "path": os.environ.get("PATH", ""), "cwd": os.getcwd()}}
+        fh.write(json.dumps(rec, ensure_ascii=False) + "\\n")
     prompt = a[a.index("-p") + 1]
     for i in range(1, 4):
         print(f"denoising step {{i}}/3", flush=True)
@@ -119,6 +120,7 @@ def test_h3_generates_with_a_first_frame_and_carries_the_attribution(tmp_path: P
         "12", "40", "3", "9")
     assert flag(argv, "--first-frame") == str(frame) and "--ref-image" not in argv
     assert call["path"].startswith(str(tmp_path / "bin"))                  # h3 shells out to ffmpeg
+    assert Path(call["cwd"]).resolve() == (tmp_path / "h3tool").resolve()     # it finds its Metal shader there
     assert a.metadata["attribution"] == "MiniMax H3" and a.metadata["engine"] == "h3.c"
 
 
@@ -185,9 +187,9 @@ def build_longcat(tmp_path: Path, *, variant: bool = True, script: bool = True) 
         tiny_mp4(root / "scripts" / "tiny.mp4")
     weights = root / "weights"
     if variant:
-        (weights / "q4-merged").mkdir(parents=True, exist_ok=True)
+        (weights / "LongCat-Video-Avatar-1.5-q4-dmd-merged").mkdir(parents=True, exist_ok=True)
     services = (f'[tools.longcat]\nroot = "{root}"\npython = "{sys.executable}"\nweights_dir = "{weights}"\n'
-                'variant_dir = "q4-merged"\n')
+                'variant_dir = "LongCat-Video-Avatar-1.5-q4-dmd-merged"\n')
     models = """
 [models."lc-test"]
 kind = "video.avatar"
@@ -212,7 +214,8 @@ def test_longcat_makes_a_talking_head_from_portrait_and_speech(tmp_path: Path) -
                            params={"width": 832, "height": 480, "num_frames": 93}))
     assert rec.status is JobStatus.COMPLETED, (rec.error_code, rec.error_message)
     [call] = lc_calls(tmp_path)
-    assert flag(call["argv"], "--weights") == str(tmp_path / "longcat" / "weights" / "q4-merged")
+    assert flag(call["argv"], "--weights") == str(tmp_path / "longcat" / "weights")      # the root, not the variant
+    assert flag(call["argv"], "--variant") == "q4-merged"
     assert (flag(call["argv"], "--width"), flag(call["argv"], "--height"), flag(call["argv"], "--num-frames")) == (
         "832", "480", "93")
     assert flag(call["argv"], "--seed") == "4"
@@ -243,3 +246,4 @@ def test_longcat_no_output_and_capabilities(tmp_path: Path) -> None:
     assert caps.heavy and caps.kinds == (MediaKind.VIDEO_AVATAR,)
     assert "longcat" in __import__("storyagent.media.registry", fromlist=["default_registry"]).default_registry(
         rig.settings)
+

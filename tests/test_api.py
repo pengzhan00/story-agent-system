@@ -460,3 +460,11 @@ def test_queue_counts_reconcile_with_the_job_lists(client: TestClient) -> None:
             assert len(listed) == counts[status], (scope, status)
     assert client.get("/api/queue", params={"project_id": first}).json()["queued"] == 2
     assert client.get("/api/queue").json()["queued"] == 3
+
+
+def test_a_project_can_acknowledge_restricted_licences(client: TestClient) -> None:
+    pid = project(client)["id"]
+    r = client.patch(f"/api/projects/{pid}/settings", json={"allow_restricted_licenses": True})
+    assert r.status_code == 200 and r.json()["settings"]["allow_restricted_licenses"] is True
+    r = client.patch(f"/api/projects/{pid}/settings", json={"allow_restricted_licenses": None})
+    assert "allow_restricted_licenses" not in r.json()["settings"]
