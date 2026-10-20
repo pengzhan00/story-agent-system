@@ -11,6 +11,7 @@ from storyagent.db import Database
 from storyagent.i18n import available_locales
 from storyagent.i18n.catalog import Catalog, get_catalog
 from storyagent.media.ledger import Ledger
+from storyagent.media.library import Library
 from storyagent.media.specs import SpecStore
 from storyagent.projects import ProjectStore
 
@@ -22,6 +23,7 @@ class ApiContext:
     ledger: Ledger
     specs: SpecStore
     projects: ProjectStore
+    library: Library
 
 
 def ctx_of(request: Request) -> ApiContext:

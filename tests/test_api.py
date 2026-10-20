@@ -62,7 +62,7 @@ def job_body(project_id: int, **over: Any) -> dict[str, Any]:
 
 # ---- basics ---------------------------------------------------------------------------------------
 def test_ready_and_meta(client: TestClient) -> None:
-    assert client.get("/api/ready").json() == {"ok": True, "schema_version": 2}
+    assert client.get("/api/ready").json() == {"ok": True, "schema_version": 3}
     m = client.get("/api/meta").json()
     assert {"value": "video.generate", "label": "Video"} in [
         {"value": k["value"], "label": k["label"]} for k in m["kinds"]
@@ -374,3 +374,54 @@ def test_cors_allows_the_dev_server_origin_only(client: TestClient) -> None:
     assert ok.headers.get("access-control-allow-origin") == "http://localhost:5173"
     other = client.get("/api/ready", headers={"Origin": "http://evil.example"})
     assert "access-control-allow-origin" not in other.headers
+
+
+# ---- uploads and the library ----------------------------------------------------------------------
+def test_upload_publish_and_use_a_voice_reference_end_to_end(
+    client: TestClient, fsettings: Settings, run_worker  # noqa: ANN001
+) -> None:
+    p = project(client)
+    up = client.post(f"/api/projects/{p['id']}/uploads?filename=lin.wav", content=b"RIFFvoice")
+    assert up.status_code == 201, up.text
+    asset = up.json()
+    assert asset["kind"] == "upload.audio" and asset["metadata"]["original_name"] == "lin.wav"
+    assert client.get(f"/api/assets/{asset['id']}/file").content == b"RIFFvoice"
+
+    pub = client.post("/api/library", json={"asset_id": asset["id"], "role": "voice", "name": "Lin",
+                                             "tags": ["zh"], "meta": {"text": "hello", "consent": True}})
+    assert pub.status_code == 201, pub.text
+    item = pub.json()
+    assert item["ref"] == "library:voice/Lin" and item["asset"]["project_id"] is None
+    dup = {"asset_id": asset["id"], "role": "voice", "name": "Lin"}
+    assert client.post("/api/library", json=dup).status_code == 409
+    assert client.post("/api/library", json={**dup, "role": "bogus", "name": "Z"}).status_code == 422
+    assert [i["name"] for i in client.get("/api/library", params={"role": "voice", "tag": "zh"}).json()] == ["Lin"]
+    assert client.get(f"/api/library/{item['id']}/file").content == b"RIFFvoice"
+
+    # a job in ANOTHER project can use the item by name
+    q = project(client, "Other")
+    body = {"kind": "audio.tts", "model_ref": "fake-tts", "project_id": q["id"],
+            "inputs": {"text": "hi", "voice_ref": item["ref"]}}
+    job = client.post("/api/jobs", json=body).json()["job"]
+    run_worker()
+    done = client.get(f"/api/jobs/{job['id']}").json()
+    assert done["status"] == "completed", done
+    assert done["inputs"]["voice_ref"] == "library:voice/Lin"
+    events = client.get(f"/api/jobs/{job['id']}/events").json()
+    assert any(e["event"] == "refs_resolved" for e in events)
+
+    patched = client.patch(f"/api/library/{item['id']}", json={"description": "heroine"}).json()
+    assert patched["description"] == "heroine" and patched["meta"]["consent"] is True
+    assert client.delete(f"/api/library/{item['id']}").status_code == 200
+    assert client.get("/api/library").json() == []
+
+
+def test_library_upload_and_limits(client: TestClient) -> None:
+    r = client.post("/api/library/upload?filename=v.wav&role=voice&name=Direct&consent=true&text=hey", content=b"abc")
+    assert r.status_code == 201, r.text
+    assert r.json()["meta"] == {"text": "hey", "consent": True}
+    assert client.post("/api/library/upload?filename=v.wav&role=voice&name=Empty", content=b"").status_code == 422
+    p = project(client)
+    assert client.post(f"/api/projects/{p['id']}/uploads?filename=x.wav", content=b"").status_code == 422
+    assert client.post("/api/projects/999/uploads?filename=x.wav", content=b"abc").status_code == 404
+    assert client.get("/api/library/nope").status_code == 404

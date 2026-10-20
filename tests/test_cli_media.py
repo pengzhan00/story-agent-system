@@ -97,3 +97,24 @@ def test_submit_dedup_cancel_retry(env: Path, capsys: pytest.CaptureFixture[str]
 
 def test_unknown_spec_is_not_found_exit_1(env: Path, capsys: pytest.CaptureFixture[str]) -> None:
     assert run(capsys, "spec", "show", "--project", "1", "music.bgm", "nope")[0] == 1
+
+
+def test_library_through_the_cli(env: Path, capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
+    assert run(capsys, "project", "create", "Demo")[0] == 0
+    wav = tmp_path / "lin.wav"
+    wav.write_bytes(b"RIFFfake")
+    code, out = run(capsys, "asset", "import", str(wav), "--project", "1")
+    assert code == 0 and "upload.audio" in out
+    asset_id = out.split()[2]
+    code, out = run(capsys, "library", "add", asset_id, "--asset", "--role", "voice", "--name", "Lin",
+                    "--text", "hello", "--consent", "--tag", "zh")
+    assert code == 0 and "library:voice/Lin" in out
+    code, out = run(capsys, "library", "add", str(wav), "--role", "voice", "--name", "Lin")
+    assert code == 1  # name taken
+    code, out = run(capsys, "library", "list", "--role", "voice")
+    assert code == 0 and "library:voice/Lin" in out and "zh" in out
+    item_id = out.split("\t")[0]
+    code, out = run(capsys, "library", "show", item_id)
+    assert json.loads(out)["meta"] == {"text": "hello", "consent": True}
+    code, out = run(capsys, "library", "remove", item_id)
+    assert code == 0 and run(capsys, "library", "list")[1].strip() == ""

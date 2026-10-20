@@ -15,6 +15,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from storyagent.config import ConfigError
 from storyagent.media.ledger import LedgerError
+from storyagent.media.library import LibraryError
 from storyagent.media.specs import SpecError, SpecLocked
 from storyagent.projects import ProjectNotFound
 
@@ -74,6 +75,15 @@ def install(app: FastAPI) -> None:
         if _NOT_FOUND.match(msg):
             return respond(request, 404, "not_found", msg)
         return respond(request, 409, "conflict", msg)
+
+    @app.exception_handler(LibraryError)
+    async def _library(request: Request, exc: LibraryError) -> JSONResponse:
+        msg = str(exc)
+        if _NOT_FOUND.match(msg):
+            return respond(request, 404, "not_found", msg)
+        if "already exists" in msg:
+            return respond(request, 409, "conflict", msg)
+        return respond(request, 422, "invalid", msg)
 
     @app.exception_handler(ConfigError)
     async def _config(request: Request, exc: ConfigError) -> JSONResponse:

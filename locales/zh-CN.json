@@ -147,5 +147,11 @@
   "api.error.asset_file_missing": "这个产物在磁盘上的文件不见了。",
   "api.error.asset_file_missing.remediation": "重新生成它,或从备份里恢复文件。",
   "api.error.internal": "服务端出了点问题。",
-  "api.error.internal.remediation": "请重试;如果反复出现,查看服务端日志。"
+  "api.error.internal.remediation": "请重试;如果反复出现,查看服务端日志。",
+  "api.error.too_large": "文件超过了上传大小上限。",
+  "api.error.too_large.remediation": "换一个更小的文件，或在 services.toml 的 [api] 里调大 max_upload_mb。",
+  "cli.asset.imported": "已导入素材 {id}（{kind}）。",
+  "cli.library.added": "已加入资产库：{ref}",
+  "cli.library.removed": "已从资产库移除：{ref}",
+  "cli.error.library": "资产库错误：{detail}"
 }

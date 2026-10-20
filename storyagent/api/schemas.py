@@ -164,6 +164,37 @@ class StaleAsset(BaseModel):
     latest_spec_version: int
 
 
+# -- library ----------------------------------------------------------------------------------------
+class LibraryItemOut(BaseModel):
+    id: str
+    role: str
+    name: str
+    ref: str = Field(description="what a job input uses to refer to this item: library:<role>/<name>")
+    description: str
+    tags: list[str]
+    meta: dict[str, Any]
+    asset: AssetOut
+    source_asset_id: str | None
+    source_project_id: int | None
+    created_at: str
+
+
+class LibraryPublish(BaseModel):
+    asset_id: str
+    role: str
+    name: str = Field(min_length=1, max_length=80)
+    description: str = ""
+    tags: list[str] = Field(default_factory=list)
+    meta: dict[str, Any] = Field(default_factory=dict)
+    replace: bool = False
+
+
+class LibraryPatch(BaseModel):
+    description: str | None = None
+    tags: list[str] | None = None
+    meta: dict[str, Any] | None = None
+
+
 # -- specs ------------------------------------------------------------------------------------------
 class SpecOut(Out):
     id: str

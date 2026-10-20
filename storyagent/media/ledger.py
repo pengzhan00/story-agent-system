@@ -326,6 +326,45 @@ class Ledger:
                 self.add_event(job_id, "cancel_requested")
         return self.get_job(job_id).status
 
+    def _insert_asset(
+        self, conn: Any, a: NewAsset, *, project_id: int | None, shot_id: int | None, job_id: str | None,
+        spec_id: str | None = None, spec_version: int | None = None, auto_adopt: bool = True,
+    ) -> str:
+        """Register ``a`` as the next version of its (project, shot, kind, slot) group (caller owns the transaction)."""
+        group = (project_id, shot_id or 0, a.kind, a.slot)
+        where = "project_id IS ? AND COALESCE(shot_id,0)=? AND kind=? AND slot=?"
+        version = conn.execute(
+            f"SELECT COALESCE(MAX(version),0)+1 FROM media_assets WHERE {where}", group
+        ).fetchone()[0]
+        has_current = conn.execute(
+            f"SELECT 1 FROM media_assets WHERE {where} AND is_current=1 AND trashed_at IS NULL", group
+        ).fetchone()
+        adopt = auto_adopt or not has_current
+        if adopt and has_current:
+            conn.execute(f"UPDATE media_assets SET is_current=0 WHERE {where} AND is_current=1", group)
+        aid = new_id()
+        conn.execute(
+            """INSERT INTO media_assets(id, job_id, project_id, shot_id, spec_id, spec_version, kind,
+                   slot, path, sha256, bytes, duration_sec, width, height, fps, has_audio, metadata,
+                   provenance, version, is_current, created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (
+                aid, job_id, project_id, shot_id, spec_id, spec_version, a.kind, a.slot,
+                a.path, a.sha256, a.bytes, a.duration_sec, a.width, a.height, a.fps,
+                None if a.has_audio is None else int(a.has_audio), dumps(dict(a.metadata)),
+                dumps(dict(a.provenance)), version, int(adopt), self._now(),
+            ),
+        )
+        return aid
+
+    def register_asset(
+        self, a: NewAsset, *, project_id: int | None, shot_id: int | None = None, adopt: bool = True
+    ) -> AssetRecord:
+        """Register a file that did not come from a job (an upload, a library copy)."""
+        with self.db.transaction() as conn:
+            aid = self._insert_asset(conn, a, project_id=project_id, shot_id=shot_id, job_id=None, auto_adopt=adopt)
+        return self.get_asset(aid)
+
     def complete(
         self,
         job_id: str,
@@ -349,31 +388,10 @@ class Ledger:
                 if (a.kind, a.slot) in seen:
                     raise LedgerError(f"duplicate asset kind/slot in one job: {a.kind}/{a.slot}")
                 seen.add((a.kind, a.slot))
-                group = (job.project_id, job.shot_id or 0, a.kind, a.slot)
-                where = "project_id IS ? AND COALESCE(shot_id,0)=? AND kind=? AND slot=?"
-                version = conn.execute(
-                    f"SELECT COALESCE(MAX(version),0)+1 FROM media_assets WHERE {where}", group
-                ).fetchone()[0]
-                has_current = conn.execute(
-                    f"SELECT 1 FROM media_assets WHERE {where} AND is_current=1 AND trashed_at IS NULL", group
-                ).fetchone()
-                adopt = auto_adopt or not has_current
-                if adopt and has_current:
-                    conn.execute(f"UPDATE media_assets SET is_current=0 WHERE {where} AND is_current=1", group)
-                aid = new_id()
-                conn.execute(
-                    """INSERT INTO media_assets(id, job_id, project_id, shot_id, spec_id, spec_version, kind,
-                           slot, path, sha256, bytes, duration_sec, width, height, fps, has_audio, metadata,
-                           provenance, version, is_current, created_at)
-                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                    (
-                        aid, job_id, job.project_id, job.shot_id, job.spec_id, job.spec_version, a.kind, a.slot,
-                        a.path, a.sha256, a.bytes, a.duration_sec, a.width, a.height, a.fps,
-                        None if a.has_audio is None else int(a.has_audio), dumps(dict(a.metadata)),
-                        dumps(dict(a.provenance)), version, int(adopt), self._now(),
-                    ),
-                )
-                out.append(aid)
+                out.append(self._insert_asset(
+                    conn, a, project_id=job.project_id, shot_id=job.shot_id, job_id=job_id, spec_id=job.spec_id,
+                    spec_version=job.spec_version, auto_adopt=auto_adopt,
+                ))
             now = self._now()
             actual = _parse_iso(now) - _parse_iso(job.started_at) if job.started_at else None
             conn.execute(

@@ -147,5 +147,11 @@
   "api.error.asset_file_missing": "The file for this asset is missing on disk.",
   "api.error.asset_file_missing.remediation": "Regenerate the asset, or restore the file from a backup.",
   "api.error.internal": "Something went wrong on our side.",
-  "api.error.internal.remediation": "Try again; if it keeps happening, check the server log."
+  "api.error.internal.remediation": "Try again; if it keeps happening, check the server log.",
+  "api.error.too_large": "The file is larger than the upload limit.",
+  "api.error.too_large.remediation": "Upload a smaller file, or raise [api] max_upload_mb in services.toml.",
+  "cli.asset.imported": "Imported asset {id} ({kind}).",
+  "cli.library.added": "Added to the library: {ref}",
+  "cli.library.removed": "Removed from the library: {ref}",
+  "cli.error.library": "Library error: {detail}"
 }

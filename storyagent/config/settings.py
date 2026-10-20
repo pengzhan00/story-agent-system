@@ -387,7 +387,8 @@ def _build_llm(
 
 
 def _build_api(raw: Mapping[str, Any]) -> dict[str, Any]:
-    api = {"host": "", "port": 0, "cors_origins": [], "sse_poll_seconds": 0.5, "sse_keepalive_seconds": 15, **raw}
+    api = {"host": "", "port": 0, "cors_origins": [], "sse_poll_seconds": 0.5, "sse_keepalive_seconds": 15,
+           "max_upload_mb": 2048, **raw}
     if not isinstance(api["port"], int) or not 0 < api["port"] < 65536:
         raise ConfigError(f"[api] port must be 1..65535, got {api['port']!r}")
     if not api["host"]:

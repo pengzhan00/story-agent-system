@@ -39,6 +39,7 @@ class FakeAdapter(AdapterBase):
         self.reattachable = reattachable
         self.schema = schema or {}
         self.calls: list[tuple[str, str]] = []
+        self.seen: dict[str, tuple[dict, dict]] = {}  # job id -> (inputs, params) as the adapter received them
         self._polls: dict[str, int] = defaultdict(int)
         self._cancelled: set[str] = set()
         self._lock = threading.Lock()
@@ -60,6 +61,7 @@ class FakeAdapter(AdapterBase):
     def submit(self, job: JobRecord, ctx: JobContext) -> str:
         ext = f"fake-{job.id[:8]}"
         self._rec("submit", job.id)
+        self.seen[job.id] = (job.inputs, job.params)
         return ext
 
     def reattach(self, external_id: str, job: JobRecord, ctx: JobContext) -> bool:

@@ -18,10 +18,11 @@ import storyagent
 from storyagent.config import Settings, get_settings
 from storyagent.db import Database, migrate
 from storyagent.media.ledger import Ledger
+from storyagent.media.library import Library
 from storyagent.media.specs import SpecStore
 from storyagent.projects import ProjectStore
 
-from . import errors, routes_assets, routes_jobs, routes_projects, routes_specs, routes_system
+from . import errors, routes_assets, routes_jobs, routes_library, routes_projects, routes_specs, routes_system
 from .context import ApiContext
 
 
@@ -29,7 +30,9 @@ def build_context(settings: Settings) -> ApiContext:
     db = Database(settings.db_path)
     migrate(db)
     ledger = Ledger(db, settings)
-    return ApiContext(settings, db, ledger, SpecStore(db, settings, ledger), ProjectStore(db, settings))
+    return ApiContext(
+        settings, db, ledger, SpecStore(db, settings, ledger), ProjectStore(db, settings), Library(db, settings, ledger)
+    )
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -55,7 +58,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             expose_headers=["Content-Disposition"],
         )
     errors.install(app)
-    for module in (routes_projects, routes_jobs, routes_assets, routes_specs, routes_system):
+    for module in (routes_projects, routes_jobs, routes_assets, routes_library, routes_specs, routes_system):
         app.include_router(module.router)
     return app
 

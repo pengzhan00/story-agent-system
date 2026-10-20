@@ -20,6 +20,7 @@ import time
 import traceback
 from collections.abc import Callable, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -29,6 +30,7 @@ from storyagent.domain.errors import ErrorCode
 from storyagent.util import new_id
 
 from . import compliance
+from .assetrefs import RefError, Resolver
 from .broker import CaffeinateGuard, select_next
 from .contracts import (
     AdapterError,
@@ -67,6 +69,7 @@ class Worker:
         self.registry = registry
         self.ledger = ledger or Ledger(db, settings)
         self.probes = list(probes) if probes is not None else build_probes(settings)
+        self.resolver = Resolver(settings, self.ledger)
         self.owner = owner or f"{socket.gethostname()}:{os.getpid()}:{new_id()[:6]}"
         self._max_threads = max_threads or int(settings.runtime.get("max_light_jobs", 2)) + 2
         self._pool = ThreadPoolExecutor(max_workers=self._max_threads, thread_name_prefix="media-job")
@@ -184,6 +187,13 @@ class Worker:
         def log_event(event: str, level: str = "info", **data: Any) -> None:
             led.add_event(job.id, event, level, **data)
 
+        try:  # asset:/library: references become plain paths; adapters never see them
+            inputs, params, resolved = self.resolver.resolve(job.inputs, job.params)
+        except RefError as exc:
+            raise AdapterError(ErrorCode.INVALID_INPUT, str(exc), detail=str(exc)) from exc
+        if resolved:
+            job = replace(job, inputs=inputs, params=params)
+            log_event("refs_resolved", refs=resolved.assets, sha256=resolved.sha256)
         ctx = JobContext(s, job, work_dir, log_event, project_settings)
         caps = adapter.capabilities()
 

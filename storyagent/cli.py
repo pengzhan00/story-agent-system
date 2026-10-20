@@ -212,6 +212,80 @@ def _cmd_media_adopt(s: Settings, a: argparse.Namespace) -> int:
     return 0
 
 
+# -- uploads and the library ------------------------------------------------------------------------
+def _cmd_asset_import(s: Settings, a: argparse.Namespace) -> int:
+    from storyagent.media.library import LibraryError, import_file
+
+    c = _ctx(s)
+    try:
+        asset = import_file(s, c.ledger, Path(a.file).expanduser(), project_id=a.project, slot=a.slot)
+    except LibraryError as exc:
+        raise CliError("cli.error.library", 1, detail=str(exc)) from exc
+    print(t("cli.asset.imported", id=asset.id, kind=asset.kind))
+    return 0
+
+
+def _library(s: Settings) -> Any:
+    from storyagent.media.library import Library
+
+    c = _ctx(s)
+    return Library(c.db, s, c.ledger)
+
+
+def _library_meta(a: argparse.Namespace) -> dict[str, Any]:
+    meta = _kv(a.meta or [])
+    if a.text is not None:
+        meta["text"] = a.text
+    if a.consent:
+        meta["consent"] = True
+    return meta
+
+
+def _cmd_library_add(s: Settings, a: argparse.Namespace) -> int:
+    from storyagent.media.library import LibraryError
+
+    lib = _library(s)
+    try:
+        if a.asset:
+            item = lib.publish(a.source, a.role, a.name, description=a.description, tags=a.tag or [],
+                               meta=_library_meta(a), replace=a.replace)
+        else:
+            item = lib.add_file(Path(a.source).expanduser(), a.role, a.name, description=a.description,
+                                tags=a.tag or [], meta=_library_meta(a), replace=a.replace)
+    except LibraryError as exc:
+        raise CliError("cli.error.library", 1, detail=str(exc)) from exc
+    print(t("cli.library.added", ref=item.ref))
+    return 0
+
+
+def _cmd_library_list(s: Settings, a: argparse.Namespace) -> int:
+    for i in _library(s).list(role=a.role, tag=a.tag, q=a.q):
+        print("\t".join([i.id, i.ref, ",".join(i.tags), i.description]))
+    return 0
+
+
+def _cmd_library_show(s: Settings, a: argparse.Namespace) -> int:
+    from storyagent.media.library import LibraryError
+
+    try:
+        item = _library(s).get(a.id)
+    except LibraryError as exc:
+        raise CliError("cli.error.library", 1, detail=str(exc)) from exc
+    _dump(asdict(item))
+    return 0
+
+
+def _cmd_library_remove(s: Settings, a: argparse.Namespace) -> int:
+    from storyagent.media.library import LibraryError
+
+    try:
+        item = _library(s).remove(a.id)
+    except LibraryError as exc:
+        raise CliError("cli.error.library", 1, detail=str(exc)) from exc
+    print(t("cli.library.removed", ref=item.ref))
+    return 0
+
+
 # -- specs ------------------------------------------------------------------------------------------
 def _spec_fields(a: argparse.Namespace) -> dict[str, Any]:
     f: dict[str, Any] = {}
@@ -392,6 +466,31 @@ def build_parser() -> argparse.ArgumentParser:
     mr.add_argument("id")
     mr.add_argument("--new-seed", action="store_true")
     add(me, "adopt", _cmd_media_adopt).add_argument("id")
+
+    asset = sub.add_parser("asset").add_subparsers(dest="cmd", required=True)
+    ai = add(asset, "import", _cmd_asset_import)
+    ai.add_argument("file")
+    ai.add_argument("--project", type=int, required=True)
+    ai.add_argument("--slot", default="main")
+
+    li = sub.add_parser("library").add_subparsers(dest="cmd", required=True)
+    la = add(li, "add", _cmd_library_add)
+    la.add_argument("source", help="a file path, or an asset id with --asset")
+    la.add_argument("--asset", action="store_true", help="source is an asset id (publish it)")
+    la.add_argument("--role", required=True)
+    la.add_argument("--name", required=True)
+    la.add_argument("--description", default="")
+    la.add_argument("--tag", action="append")
+    la.add_argument("--meta", action="append", metavar="K=V")
+    la.add_argument("--text", help="voice: what the reference clip says")
+    la.add_argument("--consent", action="store_true", help="voice: the speaker agreed to cloning")
+    la.add_argument("--replace", action="store_true")
+    ll = add(li, "list", _cmd_library_list)
+    ll.add_argument("--role")
+    ll.add_argument("--tag")
+    ll.add_argument("-q")
+    add(li, "show", _cmd_library_show).add_argument("id")
+    add(li, "remove", _cmd_library_remove).add_argument("id")
 
     sp = sub.add_parser("spec").add_subparsers(dest="cmd", required=True)
     sc = add(sp, "create", _cmd_spec_create)
