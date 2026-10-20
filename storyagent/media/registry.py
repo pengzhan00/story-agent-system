@@ -75,8 +75,14 @@ def _lora_train(settings: Settings) -> Adapter:
     return LoraTrainAdapter()
 
 
+def _ffmpeg(settings: Settings) -> Adapter:
+    from .adapters.assemble import AssembleAdapter
+
+    return AssembleAdapter()
+
+
 _BUILTIN: list[Callable[[Settings], Adapter]] = [
-    _acestep, _phosphene, _cosyvoice, _whisper, _mflux, _lora_train, _seedvc,
+    _acestep, _phosphene, _cosyvoice, _whisper, _mflux, _lora_train, _seedvc, _ffmpeg,
 ]
 
 
