@@ -53,7 +53,7 @@ def test_user_override_file_merges_deeply(tmp_path: Path) -> None:
     assert s.default_model("audio.music").ref == "acestep-1.5-xl-sft"  # swap model = config only
     assert s.service("comfy").url == "http://127.0.0.1:1234"
     assert s.service("comfy").health_path == "/system_stats"  # untouched sibling key survives
-    assert s.default_model("audio.tts").ref == "cosyvoice2-0.5b"
+    assert s.default_model("audio.tts").ref == "cosyvoice3-0.5b"
 
 
 def test_restricted_license_flows_from_registry(tmp_path: Path) -> None:

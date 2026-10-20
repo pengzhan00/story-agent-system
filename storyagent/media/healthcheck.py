@@ -110,11 +110,16 @@ def _check_tools(settings: Settings, run: Runner) -> list[Entry]:
         [] if _exists(tp("longcat", "python"), executable=True) and _exists(lc_root) else ["longcat runtime"],
         [] if lc_w and lc_v and _exists(lc_w / lc_v) else [f"weights {lc_v or '(variant_dir unset)'}"],
     )
+    tts = settings.models.get(settings.default_models.get("audio.tts", ""))
+    cosy_model_dir = (
+        Path(str(tts.extra["model_dir"])).expanduser()
+        if tts and tts.extra.get("model_dir") else tp("cosyvoice", "model_dir")
+    )
     entry(
         "cosyvoice",
         [] if _exists(tp("cosyvoice", "python"), executable=True) and _exists(tp("cosyvoice", "script"))
         else ["cosyvoice runtime"],
-        [] if _exists(tp("cosyvoice", "model_dir")) else ["CosyVoice2-0.5B"],
+        [] if _exists(cosy_model_dir) else [cosy_model_dir.name if cosy_model_dir else "CosyVoice model"],
     )
     mflux_bin = tp("mflux", "bin_dir")
     entry(
@@ -123,11 +128,15 @@ def _check_tools(settings: Settings, run: Runner) -> list[Entry]:
         [] if _exists(tp("lora_train", "base_model_dir")) else ["FLUX.2 klein base 4B weights"],
     )
     sv_root = tp("seedvc", "root")
+    vc = settings.models.get(settings.default_models.get("audio.convert", ""))
+    vc_script = "inference_v2.py" if not vc or vc.extra.get("engine", "v2") == "v2" else "inference.py"
+    vc_ckpts = [str(vc.extra[k]) for k in ("ar_checkpoint", "cfm_checkpoint") if vc and vc.extra.get(k)]
+    vc_missing = [c for c in vc_ckpts if not (sv_root and (sv_root / c).is_file())]
     entry(
         "seedvc",
-        [] if _exists(tp("seedvc", "python"), executable=True) and sv_root and (sv_root / "inference.py").is_file()
+        [] if _exists(tp("seedvc", "python"), executable=True) and sv_root and (sv_root / vc_script).is_file()
         else ["Seed-VC runtime"],
-        [] if sv_root and (sv_root / "checkpoints").is_dir() else ["Seed-VC checkpoints"],
+        vc_missing if sv_root and (sv_root / "checkpoints").is_dir() else ["Seed-VC checkpoints"],
     )
     wh_model = tp("whisper", "model")
     entry(

@@ -65,12 +65,19 @@ class CosyVoiceAdapter(SubprocessAdapter):
 
     # -- paths --------------------------------------------------------------------------------
     @staticmethod
-    def _paths(ctx: JobContext) -> tuple[Path | None, Path | None, Path | None]:
+    def _paths(ctx: JobContext, job: JobRecord | None = None) -> tuple[Path | None, Path | None, Path | None]:
+        """python, work dir, model dir. The model entry's ``model_dir`` (CosyVoice 3) beats ``[tools.cosyvoice]``."""
         s = ctx.settings
-        return (
-            s.tool_path("cosyvoice", "python"), s.tool_path("cosyvoice", "workdir"),
-            s.tool_path("cosyvoice", "model_dir"),
-        )
+        model_dir = s.tool_path("cosyvoice", "model_dir")
+        entry = s.models[job.model_ref].extra if job is not None and job.model_ref in s.models else {}
+        if entry.get("model_dir"):
+            model_dir = Path(str(entry["model_dir"])).expanduser()
+        return s.tool_path("cosyvoice", "python"), s.tool_path("cosyvoice", "workdir"), model_dir
+
+    @staticmethod
+    def _engine(job: JobRecord, ctx: JobContext) -> str:
+        entry = ctx.settings.models[job.model_ref].extra if job.model_ref in ctx.settings.models else {}
+        return str(entry.get("engine", "cv2"))
 
     @staticmethod
     def _ref_audio(job: JobRecord, ctx: JobContext) -> Path | None:
@@ -82,12 +89,13 @@ class CosyVoiceAdapter(SubprocessAdapter):
 
     # -- validation ---------------------------------------------------------------------------
     def validate(self, job: JobRecord, ctx: JobContext) -> list[ValidationIssue]:
-        python, workdir, model_dir = self._paths(ctx)
+        python, workdir, model_dir = self._paths(ctx, job)
         runtime_ok = python and python.is_file() and workdir and workdir.is_dir() and self.runner.is_file()
         if not runtime_ok:
             return [ValidationIssue(ErrorCode.MISSING_TOOL, "CosyVoice runtime not found", {"tool": "cosyvoice"})]
         if model_dir is None or not model_dir.exists():
-            return [ValidationIssue(ErrorCode.MISSING_MODEL, "CosyVoice2-0.5B not found", {"model": "CosyVoice2-0.5B"})]
+            name = model_dir.name if model_dir else "CosyVoice"
+            return [ValidationIssue(ErrorCode.MISSING_MODEL, f"{name} not found", {"model": name})]
         issues: list[ValidationIssue] = []
 
         def bad(msg: str) -> None:
@@ -120,7 +128,7 @@ class CosyVoiceAdapter(SubprocessAdapter):
 
     # -- run ----------------------------------------------------------------------------------
     def submit(self, job: JobRecord, ctx: JobContext) -> str:
-        python, workdir, model_dir = self._paths(ctx)
+        python, workdir, model_dir = self._paths(ctx, job)
         assert python and workdir and model_dir
         ref = self._ref_audio(job, ctx)
         assert ref is not None
@@ -134,8 +142,8 @@ class CosyVoiceAdapter(SubprocessAdapter):
                                    exit_code=-1) from exc
             ctx.log("ref_transcribed", text=ref_text[:120])
         cfg = {
-            "root": str(workdir), "model_dir": str(model_dir), "mode": mode, "ref_wav": str(ref),
-            "ref_text": ref_text, "instruct": str(job.inputs.get("instruct", "")),
+            "root": str(workdir), "model_dir": str(model_dir), "engine": self._engine(job, ctx), "mode": mode,
+            "ref_wav": str(ref), "ref_text": ref_text, "instruct": str(job.inputs.get("instruct", "")),
             "speed": float(job.params.get("speed", 1.0)), "seed": job.seed, "out_dir": str(ctx.work_dir / "out"),
             "items": lines_of(job),
         }

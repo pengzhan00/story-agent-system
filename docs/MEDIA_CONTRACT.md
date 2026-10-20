@@ -68,11 +68,11 @@ Uploads (`import_file`) register outside files as `upload.<audio|image|video|mod
 |---|---|---|---|
 | `acestep` | audio.music | HTTP :8001 | `batch_size=1`; XL SFT model absent -> `missing_model` (honest) |
 | `phosphene` | video.av / video.generate / video.lipsync | LTX-2.5 panel :8198 | fake-panel tested only (panel was not running) |
-| `cosyvoice` | audio.tts | subprocess, one model load per job | zero-shot clone needs `voice_ref` {audio, text, consent}; `lines=[...]` batches |
+| `cosyvoice` | audio.tts | subprocess, one model load per job | default **CosyVoice 3.0** (`cosyvoice3-0.5b`, engine `cv3`, 3 s reference, `speed`); `cosyvoice2-0.5b` is the fallback. Zero-shot clone needs `voice_ref` {audio, text, consent}; `lines=[...]` batches |
 | `whisper` | text.asr | whisper-cli | transcript.txt + .srt; homophones ("工坊"/"工房") mean QC must compare fuzzily |
 | `mflux` | image.generate / image.edit | `mflux-generate-flux2[-edit]` | FLUX.2 has **no negative prompt** (dropped + `negative_prompt_ignored` event); tuned defaults 30 steps, guidance 4.0 |
 | `lora_train` | train.lora | `mflux-train` (heavy) | photos -> dataset -> `train.json` from `train_template` + params; adapter taken from `checkpoints/*_checkpoint.zip`; needs `consent` |
-| `seedvc` | audio.convert | Seed-VC `inference.py` (v1) | only the f0 44.1 kHz checkpoint is local -> `f0_condition=true`; v2 hangs on MPS; offline by default |
+| `seedvc` | audio.convert | Seed-VC via `runners/seedvc_pipeline.py` | default **v2** (`seed-vc-v2`, speech; AR/CFM checkpoints passed explicitly); `seed-vc` = v1 + `f0_condition` for singing. `separate_vocals=true` = Demucs split -> convert vocals -> mix back (needs `demucs` working in the Seed-VC venv). Offline by default |
 
 Subprocess adapters share `adapters/_subprocess.py` (own session, log file, progress parsed from the log, terminate on cancel,
 no reattach). A failed job's `tool.log` is copied to `<home>/logs/jobs/<job id>.log` before its scratch directory is removed.

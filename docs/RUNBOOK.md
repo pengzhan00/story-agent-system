@@ -21,7 +21,8 @@ storyagent ops llm-unload             # unload resident LLMs (when a heavy job w
 | `missing_model` / `missing_tool` | `media healthcheck` names the file; downloads are never automatic |
 | `consent_required` / `license_ack_required` | Record voice consent on the character / acknowledge the licence in project settings, or turn compliance off for the project |
 | A subprocess job failed and its scratch directory is gone | `<home>/logs/jobs/<job id>.log` keeps the tool log |
-| Seed-VC job runs for minutes at 0 % CPU | The tool is stuck in the hub downloader (a checkpoint is not local). Keep `[tools.seedvc] offline = true`; only the f0 44.1 kHz model is installed, so `f0_condition` must stay true |
+| Seed-VC job runs for minutes at 0 % CPU | The tool is stuck in the hub downloader: v2 looks up its AR/CFM checkpoints on the hub unless they are passed explicitly (the model entry does, from `checkpoints/`). Keep `[tools.seedvc] offline = true` |
+| `separate_vocals` job fails in Demucs | `~/venvs/seedvc/bin/demucs` needs the `sphn` package (missing on 2026-10-21); install it in that venv |
 | `train.lora` ends `output_missing` | mflux-train writes `<output>_<timestamp>/checkpoints/*_checkpoint.zip`; check the job log for a crash before the first checkpoint (`save_frequency`) |
 | Output exists but job failed `output_invalid` | Zero-byte or unreadable by ffprobe; see `media show <id>` events |
 

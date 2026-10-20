@@ -5,6 +5,7 @@
 config.json:
     root       CosyVoice checkout (cwd; its third_party/Matcha-TTS goes on sys.path)
     model_dir  pretrained model directory (relative to root or absolute)
+    engine     cv2 (CosyVoice2) | cv3 (CosyVoice 3.0: AutoModel, 3 s references, prompt_text needs <|endofprompt|>)
     mode       zero_shot (needs ref_text) | cross_lingual | instruct (needs instruct)
     ref_wav    reference voice, a FILE path (this CosyVoice version rejects tensors)
     ref_text   transcript of ref_wav            instruct   style instruction for mode=instruct
@@ -35,9 +36,17 @@ def main(cfg: dict[str, Any]) -> int:
 
     import numpy as np
     import soundfile as sf
-    from cosyvoice.cli.cosyvoice import CosyVoice2
+    engine = cfg.get("engine", "cv2")
+    if engine == "cv3":
+        from cosyvoice.cli.cosyvoice import AutoModel
 
-    model = CosyVoice2(cfg["model_dir"], load_jit=False, load_trt=False, fp16=False)
+        model = AutoModel(model_dir=cfg["model_dir"], load_trt=False, load_vllm=False, fp16=False)
+        if "<|endofprompt|>" not in cfg.get("ref_text", ""):  # CosyVoice3's LLM asserts on it
+            cfg["ref_text"] = f"You are a helpful assistant.<|endofprompt|>{cfg.get('ref_text', '')}"
+    else:
+        from cosyvoice.cli.cosyvoice import CosyVoice2
+
+        model = CosyVoice2(cfg["model_dir"], load_jit=False, load_trt=False, fp16=False)
     rate = model.sample_rate
     emit(event="loaded", sample_rate=rate)
     mode, speed = cfg.get("mode", "zero_shot"), float(cfg.get("speed", 1.0))

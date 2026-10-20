@@ -16,9 +16,11 @@ from storyagent.media.registry import AdapterRegistry
 from .fakes.http_server import FakeServer
 
 
-def cfg(tmp_path: Path, services: str = "", **tools: str) -> Settings:
+def cfg(tmp_path: Path, services: str = "", models: str = "", **tools: str) -> Settings:
     home = tmp_path / "home"
     (home / "config").mkdir(parents=True)
+    if models:
+        (home / "config" / "models.toml").write_text(models)
     toml = services
     for name, kv in tools.items():
         toml += f"\n[tools.{name}]\n{kv}\n"
@@ -93,6 +95,7 @@ def test_tool_states_distinguish_missing_tool_from_missing_model(tmp_path: Path)
         cosyvoice=(f'python = "{exe(root / "cpy")}"\nscript = "{exe(root / "clone.py")}"\n'
                    f'model_dir = "{root / "missing_model"}"'),
         lora_train=f'command = "{exe(root / "mflux-train")}"\nbase_model_dir = "{root}"',
+        models=f'[models."cosyvoice3-0.5b"]\nmodel_dir = "{root / "missing_model"}"\n',
     )
     e = by_name(run_checks(s, probes=NO_LLM))
     assert e["tool.h3"].state is HealthState.MISSING_MODEL  # binary there, weights not
@@ -100,7 +103,7 @@ def test_tool_states_distinguish_missing_tool_from_missing_model(tmp_path: Path)
     (h3_dir / "model_index.json").write_text("{}")
     assert by_name(run_checks(s, probes=NO_LLM))["tool.h3"].state is HealthState.OK
     assert e["tool.longcat"].state is HealthState.MISSING_TOOL
-    assert e["tool.cosyvoice"].state is HealthState.MISSING_MODEL and "CosyVoice2-0.5B" in e["tool.cosyvoice"].missing
+    assert e["tool.cosyvoice"].state is HealthState.MISSING_MODEL and "missing_model" in e["tool.cosyvoice"].missing
     assert e["tool.lora_train"].state is HealthState.OK
     assert e["tool.fastvideo"].state in (HealthState.MISSING_TOOL, HealthState.MISSING_MODEL)
 
