@@ -16,6 +16,7 @@ from storyagent.domain import JobStatus, MediaKind, QualityTier, SubjectType
 from storyagent.i18n import available_locales
 from storyagent.media import healthcheck as health
 from storyagent.media.registry import default_registry
+from storyagent.workflow import STAGES
 
 from .context import ApiContext, Translator, ctx_of, translator_of
 from .errors import ApiError
@@ -30,6 +31,7 @@ from .schemas import (
     Ready,
     RecipeOut,
     RecipeStepOut,
+    WorkflowRunOut,
 )
 
 router = APIRouter(prefix="/api", tags=["system"])
@@ -75,6 +77,9 @@ def meta(request: Request) -> Meta:
         tiers=_labeled(t, "media.tier", QualityTier),
         statuses=_labeled(t, "status", JobStatus),
         subject_types=_labeled(t, "spec.subject", SubjectType),
+        workflow_stages=[LabeledValue(value=n, label=t(f"workflow.stage.{n}")) for n in STAGES],
+        workflow_statuses=[LabeledValue(value=n, label=t(f"workflow.status.{n}"))
+                           for n in ("pending", "queued", "running", "completed", "failed", "stale", "cancelled")],
         models=[
             ModelOut(
                 ref=m.ref, kind=m.kind, provider=m.provider, version=m.version, family=m.family, heavy=m.heavy,
@@ -146,6 +151,23 @@ def collect_changes(
     return high, changed
 
 
+def _run_sig(run: WorkflowRunOut) -> tuple[Any, ...]:
+    pr = run.progress
+    return (run.status, pr.percent, pr.stage, pr.done, pr.total, pr.message, run.cancel_requested, run.error_code)
+
+
+def collect_runs(ctx: ApiContext, known: dict[str, tuple[Any, ...]], project_id: int | None) -> list[WorkflowRunOut]:
+    """Workflow runs that changed since the last tick: everything queued/running plus runs that ended in the last
+    minute (so the last frame, with the final status, always reaches the client). Blocking."""
+    changed: list[WorkflowRunOut] = []
+    for raw in ctx.workflow.recent_active(project_id):
+        run = WorkflowRunOut.model_validate(raw)
+        if known.get(run.id) != _run_sig(run):
+            known[run.id] = _run_sig(run)
+            changed.append(run)
+    return changed
+
+
 async def event_stream(
     request: Request, project_id: int | None, after: int | None, timeout: float
 ) -> AsyncIterator[str]:
@@ -166,6 +188,9 @@ async def event_stream(
         out = JobOut.model_validate(rec)
         known[out.id] = _sig(out)
         yield _frame("job", out.model_dump(mode="json"), last_id)
+    runs_known: dict[str, tuple[Any, ...]] = {}
+    for run in await run_in_threadpool(collect_runs, ctx, runs_known, project_id):
+        yield _frame("workflow", run.model_dump(mode="json"))
     if after is not None:  # resume: replay what happened while the client was away
         last_id, changed = await run_in_threadpool(collect_changes, ctx, after, known, project_id)
         for out in changed:
@@ -178,6 +203,9 @@ async def event_stream(
         for out in changed:
             last_sent = time.monotonic()
             yield _frame("job", out.model_dump(mode="json"), last_id)
+        for run in await run_in_threadpool(collect_runs, ctx, runs_known, project_id):
+            last_sent = time.monotonic()
+            yield _frame("workflow", run.model_dump(mode="json"))
         if time.monotonic() - last_sent >= keepalive:
             last_sent = time.monotonic()
             yield ": keepalive\n\n"
@@ -188,7 +216,8 @@ async def event_stream(
 async def events(
     request: Request, project_id: int | None = None, after: int | None = None, timeout: float = 0
 ) -> StreamingResponse:
-    """SSE feed of job changes (`event: job`, data = JobOut). Reconnect with `?after=<last id>` to catch up.
+    """SSE feed of job changes (`event: job`, data = JobOut) and story-workflow progress (`event: workflow`, data =
+    WorkflowRunOut with its live `progress`). Reconnect with `?after=<last id>` to catch up.
     `timeout` (seconds) closes the stream after that long; 0 = until the client disconnects."""
     return StreamingResponse(
         event_stream(request, project_id, after, timeout),

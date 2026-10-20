@@ -1,0 +1,62 @@
+{
+ "type": "object",
+ "properties": {
+  "project_name": {
+   "type": "string",
+   "minLength": 1
+  },
+  "genre": {
+   "type": "string"
+  },
+  "tone": {
+   "type": "string"
+  },
+  "summary": {
+   "type": "string"
+  },
+  "act_count": {
+   "type": "integer"
+  },
+  "characters": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "type": "string",
+      "minLength": 1
+     },
+     "role": {
+      "type": "string"
+     },
+     "brief": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "name"
+    ]
+   },
+   "minItems": 1
+  },
+  "locations": {
+   "type": "array",
+   "items": {
+    "type": "string"
+   }
+  },
+  "style_keywords": {
+   "type": "array",
+   "items": {
+    "type": "string"
+   }
+  }
+ },
+ "required": [
+  "project_name",
+  "genre",
+  "tone",
+  "summary",
+  "characters"
+ ]
+}

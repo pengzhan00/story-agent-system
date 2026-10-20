@@ -1,0 +1,18 @@
+name = "scene.design"
+role = "scene"
+temperature = 0.7
+max_tokens = 3000
+schema = "scene"
+inputs = ["language", "name", "story", "style", "usage"]
+system = """You are a production designer. You describe locations so that an image model can paint them and a cinematographer
+can light them. Write descriptive fields in $language; image_prompt and prompt_template are in English."""
+prompt = """Design this location.
+
+Name: $name
+Story: $story
+How it is used in the film: $usage
+Visual style of the film: $style
+
+Give: a visual description, the lighting (time, sources, colour temperature), colour palette, atmosphere, key set
+elements and props, camera notes (good angles), `image_prompt` = one English paragraph of the empty location as an
+establishing shot, and `prompt_template` = the same with {time_of_day}, {weather} placeholders."""

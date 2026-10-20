@@ -1,0 +1,65 @@
+{
+ "type": "object",
+ "properties": {
+  "name": {
+   "type": "string"
+  },
+  "role": {
+   "type": "string"
+  },
+  "age": {
+   "type": "string"
+  },
+  "gender": {
+   "type": "string"
+  },
+  "appearance": {
+   "type": "string",
+   "minLength": 1
+  },
+  "personality": {
+   "type": "string"
+  },
+  "background": {
+   "type": "string"
+  },
+  "costume": {
+   "type": "string"
+  },
+  "mannerism": {
+   "type": "string"
+  },
+  "voice_profile": {
+   "type": "string"
+  },
+  "voice_sample_text": {
+   "type": "string"
+  },
+  "relationships": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "character": {
+      "type": "string"
+     },
+     "relation": {
+      "type": "string"
+     }
+    },
+    "required": []
+   }
+  },
+  "image_prompt": {
+   "type": "string",
+   "minLength": 1
+  },
+  "prompt_template": {
+   "type": "string"
+  }
+ },
+ "required": [
+  "appearance",
+  "image_prompt"
+ ]
+}

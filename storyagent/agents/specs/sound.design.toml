@@ -1,0 +1,13 @@
+name = "sound.design"
+role = "sound"
+temperature = 0.6
+max_tokens = 2500
+schema = "sound"
+inputs = ["language", "location", "weather", "time_of_day", "actions", "description"]
+system = """You are a sound designer for film. You list the sound effects a scene needs, each described so that it can be
+generated or found: concrete, short, no music. Write names in $language and give English `tags`."""
+prompt = """Scene: $description
+Location: $location, $weather, $time_of_day
+Actions and events: $actions
+
+List the layered soundscape: ambience, weather, foley for the actions, and a transition sound. 3-8 effects."""

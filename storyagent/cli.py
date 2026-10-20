@@ -8,6 +8,8 @@
     storyagent spec create | show | edit | diff | revert | lock | unlock | regenerate
     storyagent serve [--host H] [--port P]
     storyagent worker [--once]
+    storyagent workflow run | status | watch      (story pipeline with live progress bars)
+    storyagent llm check
     storyagent ops llm-unload
 
 Commands that touch data migrate the database first (idempotent, snapshot taken before an upgrade).
@@ -19,6 +21,7 @@ import json
 import signal
 import sys
 import threading
+import time
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -37,7 +40,9 @@ from storyagent.media.llm_resident import build_probes
 from storyagent.media.registry import default_registry
 from storyagent.media.specs import SpecError, SpecLocked, SpecStore
 from storyagent.media.worker import Worker, run_once
-from storyagent.projects import ProjectStore
+from storyagent.progressbar import render_run, render_stages
+from storyagent.projects import ProjectNotFound, ProjectStore
+from storyagent.workflow import STAGES, WorkflowEngine, WorkflowState, WorkflowStateError
 
 
 class CliError(Exception):
@@ -400,6 +405,116 @@ def _cmd_llm_unload(s: Settings, _a: argparse.Namespace) -> int:
     return 0
 
 
+# -- story workflow ---------------------------------------------------------------------------------
+def _show_run(state: WorkflowState, run_id: str, interval: float) -> dict[str, Any]:
+    """Draw the run's progress bar until it ends (a worker - or ``--inline`` - is doing the work)."""
+    tty = sys.stdout.isatty()
+    last = ""
+    while True:
+        run = state.get_run(run_id)
+        line = render_run(run)
+        if tty:
+            print("\r\033[K" + line, end="", flush=True)
+        elif line != last:
+            print(line, flush=True)
+        last = line
+        if run["status"] not in ("queued", "running"):
+            if tty:
+                print()
+            return run
+        time.sleep(interval)
+
+
+def _finish_message(run: dict[str, Any]) -> int:
+    print(t("cli.workflow.done", id=run["id"][:8], status=t(f"workflow.status.{run['status']}")))
+    if run["status"] == "failed":
+        code = str(run.get("error_code") or "internal")
+        print("  " + (t(f"{code.replace('.', '.error.', 1)}") if "." in code else code), file=sys.stderr)
+        print("  " + str(run.get("error_message") or ""), file=sys.stderr)
+        return 1
+    return 0 if run["status"] == "completed" else 1
+
+
+def _cmd_workflow_run(s: Settings, a: argparse.Namespace) -> int:
+    c = _ctx(s)
+    state = WorkflowState(c.db)
+    ProjectStore(c.db, s).get(a.project)
+    unknown = [x for x in a.stage or [] if x not in STAGES]
+    if unknown:
+        raise CliError("cli.error.bad_kv", 2, item=",".join(unknown))
+    stages = state.pending_stages(a.project, a.stage)
+    if not stages:
+        print(t("cli.workflow.nothing"))
+        return 0
+    params = _kv(a.param or [])
+    if a.force:
+        params["force"] = True
+    run = state.enqueue(a.project, stages, params)
+    print(t("cli.workflow.queued", id=run["id"][:8], stages=", ".join(t(f"workflow.stage.{x}") for x in stages)))
+    if a.inline:
+        engine = WorkflowEngine(s, c.db, spec_store=c.specs)
+        claimed = state.claim_next(f"cli:{run['id'][:6]}", 60.0)
+        if claimed is None:
+            raise CliError("cli.workflow.nothing", 1)
+        runner = threading.Thread(target=engine.execute_run, args=(claimed, f"cli:{run['id'][:6]}", 60.0, 1.0),
+                                  daemon=True)
+        runner.start()
+        final = _show_run(state, run["id"], a.interval)
+        runner.join()
+        return _finish_message(final)
+    if a.no_wait:
+        return 0
+    return _finish_message(_show_run(state, run["id"], a.interval))
+
+
+def _cmd_workflow_status(s: Settings, a: argparse.Namespace) -> int:
+    c = _ctx(s)
+    state = WorkflowState(c.db)
+    ProjectStore(c.db, s).get(a.project)
+    runs = state.list_runs(a.project, 1)
+    if runs and runs[0]["status"] in ("queued", "running"):
+        print(render_run(runs[0]))
+        print("\n".join(render_stages(runs[0])))
+    for st in state.stages(a.project):
+        print(f"{t('workflow.stage.' + st['stage']):<14} {t('workflow.status.' + st['status'])}"
+              + (f"  ({st['error_code']})" if st["error_code"] else ""))
+    return 0
+
+
+def _cmd_workflow_watch(s: Settings, a: argparse.Namespace) -> int:
+    c = _ctx(s)
+    state = WorkflowState(c.db)
+    run_id = a.run
+    if run_id is None:
+        runs = state.list_runs(a.project, 1) if a.project else []
+        if not runs:
+            raise CliError("cli.workflow.nothing", 1)
+        run_id = runs[0]["id"]
+    try:
+        return _finish_message(_show_run(state, run_id, a.interval))
+    except WorkflowStateError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+
+
+def _cmd_llm_check(s: Settings, _a: argparse.Namespace) -> int:
+    from storyagent.llm import LLMError, LLMRouter
+
+    c = _ctx(s)
+    router = LLMRouter(s, c.db)
+    bad = 0
+    for role in sorted(s.llm_roles):
+        backend, model, _ = router.resolve(role)
+        try:
+            router.check_role(role)
+            print(t("cli.llm.ok", role=role, backend=backend, model=model))
+        except LLMError as exc:
+            bad += 1
+            problem = t(f"llm.error.{exc.code}", **{k: str(v) for k, v in exc.params.items()})
+            print(t("cli.llm.bad", role=role, backend=backend, model=model, problem=problem))
+    return 1 if bad else 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="storyagent")
     sub = p.add_subparsers(dest="group", required=True)
@@ -530,6 +645,24 @@ def build_parser() -> argparse.ArgumentParser:
     wk.add_argument("--once", action="store_true", help="process the queue, then exit")
     wk.add_argument("--timeout", type=float, default=3600.0)
 
+    wf = sub.add_parser("workflow").add_subparsers(dest="cmd", required=True)
+    wp = add(wf, "run", _cmd_workflow_run)
+    wp.add_argument("--project", type=int, required=True)
+    wp.add_argument("--stage", action="append", choices=list(STAGES), help="repeat; omit to resume the project")
+    wp.add_argument("--param", action="append", metavar="K=V", help="e.g. episode=2, source_text=..., acts=3")
+    wp.add_argument("--force", action="store_true", help="redo stages even if their output exists")
+    wp.add_argument("--inline", action="store_true", help="run here instead of waiting for a worker")
+    wp.add_argument("--no-wait", action="store_true", help="queue it and return")
+    wp.add_argument("--interval", type=float, default=1.0)
+    wp = add(wf, "status", _cmd_workflow_status)
+    wp.add_argument("--project", type=int, required=True)
+    wp = add(wf, "watch", _cmd_workflow_watch)
+    wp.add_argument("run", nargs="?")
+    wp.add_argument("--project", type=int)
+    wp.add_argument("--interval", type=float, default=1.0)
+    llm = sub.add_parser("llm").add_subparsers(dest="cmd", required=True)
+    add(llm, "check", _cmd_llm_check)
+
     ops = sub.add_parser("ops").add_subparsers(dest="cmd", required=True)
     add(ops, "llm-unload", _cmd_llm_unload)
     return p
@@ -556,6 +689,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 5
     except (SpecError, LedgerError) as exc:
         print(str(exc), file=sys.stderr)
+        return 1
+    except ProjectNotFound as exc:
+        print(t("cli.error.project_not_found", id=str(exc)), file=sys.stderr)
         return 1
     except CliError as exc:
         print(t(exc.key, **exc.params), file=sys.stderr)

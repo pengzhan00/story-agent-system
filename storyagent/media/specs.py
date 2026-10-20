@@ -279,12 +279,14 @@ class SpecStore:
         model = self.settings.model(model_ref)
         params = dict(spec.params)
         structured = params.pop("structured", None)
+        voice_ref = params.pop("voice_ref", None)   # TTS / voice conversion: who to sound like (job input, not a knob)
         inputs: dict[str, Any] = {
             "prompt": render_prompt(model.prompt_profile, spec.prompt, structured),
             "negative_prompt": spec.negative_prompt,
             "text": spec.text_payload,
             "refs": spec.refs,
             "subject": {"type": spec.subject_type, "id": spec.subject_id, "slot": spec.slot},
+            **({"voice_ref": voice_ref} if voice_ref else {}),
             **(extra_inputs or {}),
         }
         return MediaJob(

@@ -22,7 +22,7 @@ from collections.abc import Callable, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import replace
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from storyagent.config import Settings
 from storyagent.db import Database
@@ -44,6 +44,9 @@ from .params import validate_params
 from .probe import probe
 from .registry import AdapterRegistry
 
+if TYPE_CHECKING:
+    from storyagent.workflow import WorkflowEngine
+
 log = logging.getLogger(__name__)
 
 _MEDIA_EXT = {
@@ -63,6 +66,7 @@ class Worker:
         probes: Sequence[ResidentLLMProbe] | None = None,
         owner: str | None = None,
         max_threads: int | None = None,
+        workflow: WorkflowEngine | None = None,
     ) -> None:
         self.settings = settings
         self.db = db
@@ -74,6 +78,10 @@ class Worker:
         self._max_threads = max_threads or int(settings.runtime.get("max_light_jobs", 2)) + 2
         self._pool = ThreadPoolExecutor(max_workers=self._max_threads, thread_name_prefix="media-job")
         self._futures: dict[str, Future[None]] = {}
+        self._workflow = workflow
+        self._wf_max = int(settings.runtime.get("max_workflow_runs", 1))
+        self._wf_pool = ThreadPoolExecutor(max_workers=max(self._wf_max, 1), thread_name_prefix="workflow-run")
+        self._wf_futures: dict[str, Future[None]] = {}
         self._stop = threading.Event()
         self._lease = float(settings.runtime.get("lease_seconds", 60))
         self._beat = float(settings.runtime.get("heartbeat_seconds", 15))
@@ -101,6 +109,31 @@ class Worker:
                 continue
             self._futures[claimed.id] = self._pool.submit(self._run, claimed)
             started += 1
+        return started + self._tick_workflow()
+
+    def _engine(self) -> WorkflowEngine:
+        if self._workflow is None:
+            from storyagent.workflow import WorkflowEngine  # deferred: the LLM layer is only built when a run exists
+
+            self._workflow = WorkflowEngine(self.settings, self.db)
+        return self._workflow
+
+    def _tick_workflow(self) -> int:
+        """Story-workflow runs (LLM stages) share the worker but not the media job slots."""
+        from storyagent.workflow import WorkflowState
+
+        state = WorkflowState(self.db)
+        for run_id in state.requeue_expired():
+            log.warning("workflow run %s lost its worker; requeued", run_id)
+        self._wf_futures = {r: f for r, f in self._wf_futures.items() if not f.done()}
+        started = 0
+        while len(self._wf_futures) < self._wf_max:
+            run = state.claim_next(self.owner, self._lease)
+            if run is None:
+                break
+            self._wf_futures[run["id"]] = self._wf_pool.submit(
+                self._engine().execute_run, run, self.owner, self._lease, self._beat)
+            started += 1
         return started
 
     def run_forever(self, stop: threading.Event | None = None) -> None:
@@ -118,16 +151,23 @@ class Worker:
     def shutdown(self) -> None:
         self._stop.set()
         self._pool.shutdown(wait=True)
+        self._wf_pool.shutdown(wait=True)
 
     def drain(self, timeout: float = 30.0) -> bool:
         """Test/CLI helper: run until nothing is queued or running. False on timeout."""
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             self.tick()
-            if not self.ledger.queued() and not self.ledger.running() and not self._futures:
+            if not self.ledger.queued() and not self.ledger.running() and not self._futures \
+                    and not self._wf_futures and not self._workflow_pending():
                 return True
             time.sleep(0.01)
         return False
+
+    def _workflow_pending(self) -> bool:
+        row = self.db.conn.execute(
+            "SELECT 1 FROM workflow_runs WHERE status IN ('queued','running') LIMIT 1").fetchone()
+        return row is not None
 
     def _resident(self) -> list[str]:
         out: list[str] = []

@@ -329,6 +329,8 @@ class Meta(BaseModel):
     tiers: list[LabeledValue]
     statuses: list[LabeledValue]
     subject_types: list[LabeledValue]
+    workflow_stages: list[LabeledValue]
+    workflow_statuses: list[LabeledValue]
     models: list[ModelOut]
     defaults: dict[str, str]
     recipes: list[RecipeOut]
@@ -356,3 +358,72 @@ class HealthOut(BaseModel):
 class Ready(BaseModel):
     ok: bool = True
     schema_version: int
+
+
+# -- story workflow -----------------------------------------------------------------------------------------
+class StageProgressOut(BaseModel):
+    stage: str
+    status: Literal["pending", "running", "completed", "failed", "cancelled"] = "pending"
+    percent: float | None = None            # None while a running stage has not reported its item count yet
+    seconds: float | None = None
+
+
+class RunProgressOut(BaseModel):
+    """Everything a progress bar needs. ``percent`` is overall (0-100, never decreases); ``stages`` gives one bar per
+    stage; ``eta_sec`` is None until enough has run to estimate."""
+
+    stage: str | None = None
+    stage_index: int = 0
+    stage_count: int = 0
+    done: int = 0
+    total: int = 0
+    message: str = ""
+    percent: float = 0.0
+    elapsed_sec: float = 0.0
+    eta_sec: float | None = None
+    stages: list[StageProgressOut] = Field(default_factory=list)
+
+
+class WorkflowRunOut(BaseModel):
+    id: str
+    project_id: int
+    stages: list[str]
+    params: dict[str, Any]
+    status: Literal["queued", "running", "completed", "failed", "cancelled"]
+    progress: RunProgressOut
+    cancel_requested: bool
+    error_code: str | None = None
+    error_message: str | None = None
+    created_at: str
+    started_at: str | None = None
+    finished_at: str | None = None
+
+
+class WorkflowStageOut(BaseModel):
+    stage: str
+    status: Literal["pending", "running", "completed", "failed", "stale"]
+    started_at: str | None = None
+    finished_at: str | None = None
+    error_code: str | None = None
+    error_message: str | None = None
+    summary: dict[str, Any] = Field(default_factory=dict)
+    attempts: int = 0
+
+
+class WorkflowOut(BaseModel):
+    stages: list[WorkflowStageOut]
+    active_run: WorkflowRunOut | None = None
+    recent_runs: list[WorkflowRunOut] = Field(default_factory=list)
+
+
+class WorkflowRunCreate(BaseModel):
+    stages: list[str] | None = Field(default=None, description="omit to resume: every stage that is not completed")
+    params: dict[str, Any] = Field(default_factory=dict)
+
+
+class LockBody(BaseModel):
+    locked: bool
+
+
+class SpeakerBody(BaseModel):
+    character: str = Field(min_length=1)

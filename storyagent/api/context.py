@@ -14,6 +14,8 @@ from storyagent.media.ledger import Ledger
 from storyagent.media.library import Library
 from storyagent.media.specs import SpecStore
 from storyagent.projects import ProjectStore
+from storyagent.story import StoryStore
+from storyagent.workflow import WorkflowState
 
 
 @dataclass
@@ -24,6 +26,8 @@ class ApiContext:
     specs: SpecStore
     projects: ProjectStore
     library: Library
+    story: StoryStore
+    workflow: WorkflowState
 
 
 def ctx_of(request: Request) -> ApiContext:

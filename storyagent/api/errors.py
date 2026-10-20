@@ -18,6 +18,8 @@ from storyagent.media.ledger import LedgerError
 from storyagent.media.library import LibraryError
 from storyagent.media.specs import SpecError, SpecLocked
 from storyagent.projects import ProjectNotFound
+from storyagent.story import ShotLocked, StoryError, StoryNotFound
+from storyagent.workflow import WorkflowStateError
 
 from .context import translator_of
 
@@ -84,6 +86,25 @@ def install(app: FastAPI) -> None:
         if "already exists" in msg:
             return respond(request, 409, "conflict", msg)
         return respond(request, 422, "invalid", msg)
+
+    @app.exception_handler(StoryNotFound)
+    async def _story_missing(request: Request, exc: StoryNotFound) -> JSONResponse:
+        return respond(request, 404, "not_found", str(exc))
+
+    @app.exception_handler(ShotLocked)
+    async def _shot_locked(request: Request, exc: ShotLocked) -> JSONResponse:
+        return respond(request, 409, "shot_locked", str(exc))
+
+    @app.exception_handler(StoryError)
+    async def _story(request: Request, exc: StoryError) -> JSONResponse:
+        return respond(request, 422, "invalid", str(exc))
+
+    @app.exception_handler(WorkflowStateError)
+    async def _workflow(request: Request, exc: WorkflowStateError) -> JSONResponse:
+        msg = str(exc)
+        if _NOT_FOUND.match(msg):
+            return respond(request, 404, "not_found", msg)
+        return respond(request, 409, "conflict", msg)
 
     @app.exception_handler(ConfigError)
     async def _config(request: Request, exc: ConfigError) -> JSONResponse:

@@ -1,0 +1,38 @@
+{
+ "type": "object",
+ "properties": {
+  "score": {
+   "type": "number"
+  },
+  "summary": {
+   "type": "string"
+  },
+  "issues": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "severity": {
+      "type": "string"
+     },
+     "where": {
+      "type": "string"
+     },
+     "problem": {
+      "type": "string"
+     },
+     "fix": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "problem"
+    ]
+   }
+  }
+ },
+ "required": [
+  "score",
+  "summary"
+ ]
+}

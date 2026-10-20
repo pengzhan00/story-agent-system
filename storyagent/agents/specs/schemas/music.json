@@ -1,0 +1,41 @@
+{
+ "type": "object",
+ "properties": {
+  "name": {
+   "type": "string",
+   "minLength": 1
+  },
+  "mood": {
+   "type": "string"
+  },
+  "tempo": {
+   "type": "number"
+  },
+  "instruments": {
+   "type": "string"
+  },
+  "key_signature": {
+   "type": "string"
+  },
+  "description": {
+   "type": "string"
+  },
+  "music_prompt": {
+   "type": "string",
+   "minLength": 1
+  },
+  "duration_hint_sec": {
+   "type": "number"
+  },
+  "lyrics": {
+   "type": "string"
+  },
+  "loopable": {
+   "type": "boolean"
+  }
+ },
+ "required": [
+  "name",
+  "music_prompt"
+ ]
+}

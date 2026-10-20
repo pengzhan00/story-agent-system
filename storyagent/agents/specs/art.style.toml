@@ -1,0 +1,14 @@
+name = "art.style"
+role = "director"
+temperature = 0.6
+max_tokens = 2500
+schema = "style"
+inputs = ["language", "title", "genre", "tone", "keywords"]
+system = """You are the art director who fixes the look of a film so that every image and video clip matches. Be specific and
+reproducible. Write descriptive fields in $language; visual_style and negative_prompt are English phrases for image
+models."""
+prompt = """Define the visual style of "$title" ($genre, $tone). Style keywords: $keywords.
+
+Give: a palette name with 3-5 primary and 2-3 secondary colours (name, hex, use), the lighting style, atmosphere, the
+overall camera style, `visual_style` = one English line to append to every image prompt, and `negative_prompt` = English
+things to avoid."""

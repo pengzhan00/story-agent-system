@@ -1,0 +1,80 @@
+{
+ "type": "object",
+ "properties": {
+  "shots": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "shot_number": {
+      "type": "integer"
+     },
+     "camera_angle": {
+      "type": "string"
+     },
+     "camera_movement": {
+      "type": "string"
+     },
+     "characters_present": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "mood": {
+      "type": "string"
+     },
+     "action": {
+      "type": "string"
+     },
+     "expression": {
+      "type": "string"
+     },
+     "narration": {
+      "type": "string"
+     },
+     "dialogue": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "character": {
+         "type": "string",
+         "minLength": 1
+        },
+        "line": {
+         "type": "string",
+         "minLength": 1
+        },
+        "emotion": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "character",
+        "line"
+       ]
+      }
+     },
+     "duration_sec": {
+      "type": "number"
+     },
+     "sfx_cues": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     }
+    },
+    "required": [
+     "shot_number",
+     "camera_angle"
+    ]
+   },
+   "minItems": 1
+  }
+ },
+ "required": [
+  "shots"
+ ]
+}

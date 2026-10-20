@@ -1,0 +1,17 @@
+name = "composer.bgm"
+role = "composer"
+temperature = 0.7
+max_tokens = 2000
+schema = "music"
+inputs = ["language", "scene", "mood", "characters"]
+system = """You are a film composer scoring one scene of a short drama. The music supports dialogue and never competes with it.
+`music_prompt` is a comma-separated list of English style tags for a text-to-music model (no sentences). Write other
+fields in $language."""
+prompt = """Score this scene.
+
+Scene: $scene
+Mood: $mood
+Characters: $characters
+
+Instrumental only (lyrics is an empty string). Keep the arrangement sparse so voices stay clear. Give name, mood, tempo
+BPM, instruments, key, how the music develops, `music_prompt`, `duration_hint_sec` (15-60) and whether it can loop."""

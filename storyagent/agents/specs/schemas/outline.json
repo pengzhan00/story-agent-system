@@ -1,0 +1,81 @@
+{
+ "type": "object",
+ "properties": {
+  "title": {
+   "type": "string",
+   "minLength": 1
+  },
+  "synopsis": {
+   "type": "string"
+  },
+  "acts": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "number": {
+      "type": "integer"
+     },
+     "title": {
+      "type": "string"
+     },
+     "summary": {
+      "type": "string"
+     },
+     "scenes": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "number": {
+         "type": "integer"
+        },
+        "location": {
+         "type": "string",
+         "minLength": 1
+        },
+        "time_of_day": {
+         "type": "string"
+        },
+        "weather": {
+         "type": "string"
+        },
+        "characters": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        "mood": {
+         "type": "string"
+        },
+        "narration": {
+         "type": "string"
+        },
+        "beat": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "number",
+        "location",
+        "beat"
+       ]
+      },
+      "minItems": 1
+     }
+    },
+    "required": [
+     "number",
+     "scenes"
+    ]
+   },
+   "minItems": 1
+  }
+ },
+ "required": [
+  "title",
+  "synopsis",
+  "acts"
+ ]
+}

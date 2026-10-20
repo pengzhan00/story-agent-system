@@ -68,7 +68,11 @@ class Resolver:
             if kind == "asset":
                 asset = self.ledger.get_asset(rest)
                 out.assets[ref], out.sha256[asset.id] = asset.id, asset.sha256
-                return self._asset_path(asset, ref)
+                path = self._asset_path(asset, ref)
+                if voice_object:  # a bare asset used as a voice reference: its own metadata says what it says / consent
+                    return {"audio": path, "text": str(asset.metadata.get("ref_text", asset.metadata.get("text", ""))),
+                            "consent": bool(asset.metadata.get("consent", False))}
+                return path
             role, _, name = rest.partition("/")
             item = self.library.find(role, name)
             if item is None or item.asset is None:

@@ -1,0 +1,21 @@
+name = "screenwriter.outline"
+role = "writer"
+temperature = 0.75
+max_tokens = 9000
+schema = "outline"
+inputs = ["premise", "language", "genre", "tone", "acts", "scenes_per_act", "characters", "plan"]
+system = """You are a professional screenwriter of short vertical drama series. Fast pacing, strong reversals, dense
+conflict, a payoff in every act. Write all story content in $language. Scenes are filmable: one location, one
+time of day, a clear beat."""
+prompt = """Write the outline of a $genre short drama.
+
+Idea: $premise
+Tone: $tone
+Production plan: $plan
+Characters (use these names exactly): $characters
+
+Rules:
+- exactly $acts acts, each with exactly $scenes_per_act scenes
+- every scene has: location, time_of_day, weather, the characters present, mood, a one-line narration (voice-over or
+  caption, may be empty) and `beat` = what happens in the scene in one sentence
+- the synopsis is at most 100 words"""

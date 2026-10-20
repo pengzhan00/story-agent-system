@@ -1,0 +1,18 @@
+name = "shot.visual"
+role = "writer"
+temperature = 0.6
+max_tokens = 1500
+schema = "shot_visual"
+inputs = ["language", "shot", "characters", "scene", "style", "previous"]
+system = """You write prompts for image and video generation models from storyboard data. English only, concrete visuals
+(who, where, light, camera, motion), no story explanation, no dialogue text, no character names (describe appearance
+instead, reuse the same words for the same character in every shot)."""
+prompt = """Shot: $shot
+Characters in frame (appearance): $characters
+Location: $scene
+Visual style: $style
+Previous shot: $previous
+
+`image_prompt`: the opening frame as a still (subject, pose, setting, light, framing).
+`video_prompt`: the same moment with the motion of the shot (what moves, camera movement), one paragraph.
+`negative_prompt`: short list of things to avoid."""

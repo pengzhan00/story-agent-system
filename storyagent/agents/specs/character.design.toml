@@ -1,0 +1,24 @@
+name = "character.design"
+role = "character"
+temperature = 0.7
+max_tokens = 3500
+schema = "character"
+inputs = ["language", "name", "role_hint", "story", "others", "style"]
+system = """You are a character designer for film. You create memorable characters whose looks can be reproduced by an
+image model and whose voices can be cast. Write the descriptive fields in $language; image_prompt and prompt_template
+are in English."""
+prompt = """Design this character.
+
+Name: $name
+Role in the story: $role_hint
+Story: $story
+Other characters: $others
+Visual style of the film: $style
+
+`appearance`: what the eye sees (face, hair, build, skin, age impression), 40-80 words, no story.
+`costume`: clothing and accessories, fixed for the whole film.
+`image_prompt`: one English paragraph for a text-to-image model describing the character in a neutral pose on a plain
+background (appearance + costume + style). Never mention the character's name in it.
+`prompt_template`: the same description with the placeholders {action} and {setting} where a shot adds them.
+`voice_profile`: age, pitch, pace, timbre, accent, speaking habits (for casting a voice).
+`voice_sample_text`: one sentence, 15-30 characters in $language, that shows the character's speaking style."""

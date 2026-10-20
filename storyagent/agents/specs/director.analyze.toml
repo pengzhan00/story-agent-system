@@ -1,0 +1,15 @@
+name = "director.analyze"
+role = "director"
+temperature = 0.4
+max_tokens = 2500
+schema = "director_plan"
+inputs = ["premise", "language", "format", "acts"]
+system = """You are the director of a short-drama studio. You turn a one-line idea into a production plan.
+Write all story content in $language. Be concrete: names, places, conflicts. Short-form vertical drama: fast pacing,
+a hook in the first seconds, a reversal at the end of every act."""
+prompt = """Idea: $premise
+
+Format: $format. Planned number of acts: $acts.
+
+Return the production plan: a project name, genre, overall tone, a two-sentence summary, the main characters (3-5,
+each with a role and a one-line brief), the key locations, and style keywords for the look of the film."""
