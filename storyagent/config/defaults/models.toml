@@ -319,7 +319,9 @@ engine = "v2"
 ar_checkpoint = "checkpoints/ar_base.pth"
 cfm_checkpoint = "checkpoints/cfm_small.pth"
 [models."seed-vc-v2".params]
-diffusion_steps = 30
+# 13 is the upstream calibration; on this machine the step count barely changes the time (3.7 s of audio:
+# 30 steps 16.4 s, 13 steps 14.6 s, 8 steps 14.8 s: the vocoder dominates)
+diffusion_steps = 13
 length_adjust = 1.0
 intelligibility_cfg_rate = 0.7
 similarity_cfg_rate = 0.7
@@ -330,9 +332,9 @@ convert_style = false
 ref_min_sec = 3
 ref_max_sec = 60
 [models."seed-vc-v2".tiers.draft]
-diffusion_steps = 15
+diffusion_steps = 8
 [models."seed-vc-v2".tiers.final]
-diffusion_steps = 50
+diffusion_steps = 30
 
 [models."seed-vc"]
 kind = "audio.convert"

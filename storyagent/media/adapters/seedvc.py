@@ -64,7 +64,7 @@ _SCRIPT = {"v2": "inference_v2.py", "v1": "inference.py"}
 RUNNER = Path(__file__).resolve().parents[1] / "runners" / "seedvc_pipeline.py"
 # The hub client's HEAD probe is slow on this network (LocalEntryNotFoundError) and a missing checkpoint makes it
 # hang inside the xet downloader, so by default only the local files are used (``[tools.seedvc] offline``).
-_ENV = {"HF_HUB_ETAG_TIMEOUT": "60", "HF_HUB_DOWNLOAD_TIMEOUT": "600"}
+_ENV = {"HF_HUB_ETAG_TIMEOUT": "60", "HF_HUB_DOWNLOAD_TIMEOUT": "600", "HF_HUB_DISABLE_XET": "1"}
 
 
 def _abs(raw: Any, ctx: JobContext) -> Path:

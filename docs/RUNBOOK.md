@@ -27,7 +27,9 @@ storyagent ops llm-unload             # unload resident LLMs (when a heavy job w
 | `consent_required` / `license_ack_required` | Record voice consent on the character / acknowledge the licence in project settings, or turn compliance off for the project |
 | A subprocess job failed and its scratch directory is gone | `<home>/logs/jobs/<job id>.log` keeps the tool log |
 | Seed-VC job runs for minutes at 0 % CPU | The tool is stuck in the hub downloader: v2 looks up its AR/CFM checkpoints on the hub unless they are passed explicitly (the model entry does, from `checkpoints/`). Keep `[tools.seedvc] offline = true` |
-| `separate_vocals` job fails in Demucs | `~/venvs/seedvc/bin/demucs` needs the `sphn` package (missing on 2026-10-21); install it in that venv |
+| `separate_vocals` job fails in Demucs | `~/venvs/seedvc/bin/demucs` needs the `sphn` package (installed on 2026-10-21; a fresh venv needs `python -m ensurepip` then `pip install sphn julius lameenc openunmix einops`) |
+| Seed-VC hangs at 0 % CPU while downloading hubert/bigvgan | The hub's Xet transport does not work behind the firewall; the adapter sets `HF_HUB_DISABLE_XET=1`. The first run also downloads `hubert-large-ll60k` and `bigvgan_v2_22khz_80band_256x` and compiles shaders (~4 min), later runs take seconds |
+| Phosphene panel fails to start with `FileExistsError` | `~/pinokio/api/phosphene/mlx_outputs` is a dead symlink (its target was deleted): recreate the target directory, do not edit code |
 | `train.lora` ends `output_missing` | mflux-train writes `<output>_<timestamp>/checkpoints/*_checkpoint.zip`; check the job log for a crash before the first checkpoint (`save_frequency`) |
 | `produce` finishes with "skipped: no usable model" | Nothing is configured for that kind (e.g. no sound-effect model) or its service is down (`media healthcheck`); the rest of the stage is kept |
 | `produce` skips dialogue (`no_voice`) | The speaking character has no voice sample: upload one on the character (Web "故事" page) or set `[workflow] default_voice` |
