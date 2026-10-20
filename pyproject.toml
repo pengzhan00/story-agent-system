@@ -9,11 +9,13 @@ description = "Local multimodal short-drama production system (script -> shots -
 requires-python = ">=3.11"
 dependencies = [
     "requests>=2.25",
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
 ]
 
 [project.optional-dependencies]
 ui = ["gradio>=4.0"]
-dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.10", "types-requests"]
+dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.10", "types-requests", "httpx>=0.27"]
 
 [project.scripts]
 storyagent = "storyagent.cli:main"
@@ -28,6 +30,7 @@ storyagent = ["db/migrations/*.sql", "config/defaults/*.toml"]
 testpaths = ["tests"]
 norecursedirs = ["legacy", ".venv", "data"]
 addopts = "-q -m 'not live'"
+filterwarnings = ["ignore:Using .httpx. with .starlette.testclient"]
 markers = [
     "live: needs real local services/models (ComfyUI, ACE-Step, Ollama, ...); run with -m live",
 ]

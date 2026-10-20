@@ -6,6 +6,7 @@
     storyagent project create NAME | list
     storyagent media healthcheck | submit | jobs | show | cancel | retry | adopt
     storyagent spec create | show | edit | diff | revert | lock | unlock | regenerate
+    storyagent serve [--host H] [--port P]
     storyagent worker [--once]
     storyagent ops llm-unload
 
@@ -26,7 +27,7 @@ from typing import Any
 from storyagent.config import ConfigError, Settings, get_settings
 from storyagent.db import Database, MigrationError, current_version, migrate
 from storyagent.db.legacy_import import LegacyImportError, import_legacy
-from storyagent.domain import JobStatus, MediaKind, QualityTier, slugify
+from storyagent.domain import JobStatus, MediaKind, QualityTier
 from storyagent.i18n import available_locales, check_catalogs, set_locale, t
 from storyagent.logging_setup import setup_logging
 from storyagent.media import healthcheck as health
@@ -36,6 +37,7 @@ from storyagent.media.llm_resident import build_probes
 from storyagent.media.registry import default_registry
 from storyagent.media.specs import SpecError, SpecLocked, SpecStore
 from storyagent.media.worker import Worker, run_once
+from storyagent.projects import ProjectStore
 
 
 class CliError(Exception):
@@ -125,19 +127,23 @@ def _cmd_i18n_check(_s: Settings, _a: argparse.Namespace) -> int:
 
 # -- project ----------------------------------------------------------------------------------------
 def _cmd_project_create(s: Settings, a: argparse.Namespace) -> int:
-    c = _ctx(s)
-    base = slugify(a.name)
-    slug, n = base, 2
-    while c.db.conn.execute("SELECT 1 FROM projects WHERE slug=?", (slug,)).fetchone():
-        slug, n = f"{base}-{n}", n + 1
-    cur = c.db.conn.execute("INSERT INTO projects(slug, name, genre) VALUES (?,?,?)", (slug, a.name, a.genre or ""))
-    print(t("cli.project.created", id=cur.lastrowid, slug=slug))
+    p = ProjectStore(_ctx(s).db, s).create(a.name, genre=a.genre or "")
+    print(t("cli.project.created", id=p.id, slug=p.slug))
     return 0
 
 
 def _cmd_project_list(s: Settings, _a: argparse.Namespace) -> int:
-    for r in _ctx(s).db.conn.execute("SELECT id, slug, name FROM projects ORDER BY id"):
-        print(t("cli.project.row", id=r["id"], slug=r["slug"], name=r["name"]))
+    for p in ProjectStore(_ctx(s).db, s).list():
+        print(t("cli.project.row", id=p.id, slug=p.slug, name=p.name))
+    return 0
+
+
+def _cmd_serve(s: Settings, a: argparse.Namespace) -> int:
+    from storyagent.api.app import serve
+
+    migrate(Database(s.db_path))
+    print(t("cli.serve.starting", host=a.host or s.api["host"], port=a.port or s.api["port"]))
+    serve(s, a.host, a.port)
     return 0
 
 
@@ -416,6 +422,10 @@ def build_parser() -> argparse.ArgumentParser:
     sg.add_argument("--tier", default="final", choices=[x.value for x in QualityTier])
     sg.add_argument("--shot", type=int)
     sg.add_argument("--same-seed", action="store_true")
+
+    sv_ = add(sub, "serve", _cmd_serve)
+    sv_.add_argument("--host")
+    sv_.add_argument("--port", type=int)
 
     wk = add(sub, "worker", _cmd_worker)
     wk.add_argument("--once", action="store_true", help="process the queue, then exit")

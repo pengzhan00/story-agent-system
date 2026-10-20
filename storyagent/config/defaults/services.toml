@@ -87,6 +87,15 @@ caffeinate = true
 # Total unified-memory budget (GiB) the broker may hand out to running jobs.
 memory_budget_gib = 96
 
+[api]
+# `storyagent serve`. Loopback only by default: there is no authentication, so do not expose it on a LAN.
+host = "127.0.0.1"
+port = 8765
+# Browser origins allowed to call the API (the Vite dev server; empty = same-origin only).
+cors_origins = ["http://localhost:5173"]
+sse_poll_seconds = 0.5
+sse_keepalive_seconds = 15
+
 [healthcheck]
 # Entries that must be "ok" for the healthcheck exit code to be 0. Names: a service (comfy), or tool.<name>.
 required = ["comfy", "acestep", "ollama", "tool.ffmpeg"]

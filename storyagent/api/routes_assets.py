@@ -1,0 +1,76 @@
+from __future__ import annotations
+
+import mimetypes
+from typing import Annotated
+
+from fastapi import APIRouter, Query, Request
+from fastapi.responses import FileResponse
+
+from .context import ctx_of
+from .errors import ApiError
+from .schemas import AssetOut, StaleAsset
+
+router = APIRouter(prefix="/api", tags=["assets"])
+
+
+@router.get("/assets", response_model=list[AssetOut])
+def list_assets(
+    request: Request,
+    project_id: int | None = None,
+    shot_id: int | None = None,
+    kind: str | None = None,
+    slot: str | None = None,
+    current_only: bool = False,
+    include_trashed: bool = False,
+    limit: Annotated[int, Query(ge=1, le=1000)] = 200,
+) -> list[AssetOut]:
+    rows = ctx_of(request).ledger.list_assets(
+        project_id=project_id, shot_id=shot_id, kind=kind, slot=slot, current_only=current_only,
+        include_trashed=include_trashed, limit=limit,
+    )
+    return [AssetOut.model_validate(a) for a in rows]
+
+
+@router.get("/assets/{asset_id}", response_model=AssetOut)
+def get_asset(asset_id: str, request: Request) -> AssetOut:
+    return AssetOut.model_validate(ctx_of(request).ledger.get_asset(asset_id))
+
+
+@router.get("/assets/{asset_id}/file", response_class=FileResponse)
+def asset_file(asset_id: str, request: Request) -> FileResponse:
+    """Stream the stored file (range requests supported, so <video>/<audio> can seek)."""
+    ctx = ctx_of(request)
+    asset = ctx.ledger.get_asset(asset_id)
+    home = ctx.settings.home.resolve()
+    path = (home / asset.path).resolve()
+    if home not in path.parents:  # a ledger path must never escape the data home
+        raise ApiError(404, "not_found", "asset path outside the data home")
+    if not path.is_file():
+        raise ApiError(404, "asset_file_missing", asset.path)
+    media_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+    return FileResponse(path, media_type=media_type, filename=path.name, content_disposition_type="inline")
+
+
+@router.post("/assets/{asset_id}/adopt", response_model=AssetOut)
+def adopt_asset(asset_id: str, request: Request) -> AssetOut:
+    """Make this candidate the current asset of its slot."""
+    return AssetOut.model_validate(ctx_of(request).ledger.adopt(asset_id))
+
+
+@router.post("/assets/{asset_id}/trash", response_model=AssetOut)
+def trash_asset(asset_id: str, request: Request) -> AssetOut:
+    """Soft delete: the file stays on disk, the record leaves its slot."""
+    ledger = ctx_of(request).ledger
+    ledger.get_asset(asset_id)
+    return AssetOut.model_validate(ledger.trash_asset(asset_id))
+
+
+@router.get("/projects/{project_id}/stale", response_model=list[StaleAsset], tags=["specs"])
+def stale_assets(project_id: int, request: Request) -> list[StaleAsset]:
+    """Current assets that were generated from an older spec version than the latest."""
+    ctx = ctx_of(request)
+    ctx.projects.get(project_id)
+    return [
+        StaleAsset(asset=AssetOut.model_validate(a), latest_spec_version=v)
+        for a, v in ctx.specs.stale_assets(project_id)
+    ]

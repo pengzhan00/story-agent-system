@@ -134,5 +134,18 @@
   "cli.llm.unloaded": "Unloaded: {models}",
   "cli.llm.none": "No resident LLMs",
   "cli.error.not_found": "Not found: {what}",
-  "cli.error.bad_kv": "Expected key=value: {item}"
+  "cli.error.bad_kv": "Expected key=value: {item}",
+  "cli.serve.starting": "API listening on {host}:{port} (docs at /api/docs)",
+  "api.error.not_found": "That item does not exist.",
+  "api.error.not_found.remediation": "Refresh the list; it may have been removed or the id is wrong.",
+  "api.error.conflict": "That action conflicts with the item's current state.",
+  "api.error.conflict.remediation": "Reload the item and check its state before trying again.",
+  "api.error.invalid": "The request was not accepted.",
+  "api.error.invalid.remediation": "Check the highlighted fields and try again.",
+  "api.error.spec_locked": "This item is locked and cannot be edited.",
+  "api.error.spec_locked.remediation": "Unlock it first, then edit.",
+  "api.error.asset_file_missing": "The file for this asset is missing on disk.",
+  "api.error.asset_file_missing.remediation": "Regenerate the asset, or restore the file from a backup.",
+  "api.error.internal": "Something went wrong on our side.",
+  "api.error.internal.remediation": "Try again; if it keeps happening, check the server log."
 }

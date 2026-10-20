@@ -4,6 +4,7 @@
 storyagent db migrate                 # idempotent; snapshots *.bak-v<N> before upgrading
 storyagent media healthcheck          # one screen; exit 0 = every required entry ok, 1 = not, 2 = bad config
 storyagent media healthcheck --json --require tool.h3     # cron-friendly
+storyagent serve                      # HTTP API (+ /api/docs); run next to the worker, in any order
 storyagent worker                     # long-running; SIGTERM/SIGINT release leases cleanly
 storyagent worker --once              # drain the queue and exit
 storyagent media jobs [--status running]   |  media show <id>  |  media cancel <id>  |  media retry <id> [--new-seed]

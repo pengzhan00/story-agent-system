@@ -138,6 +138,7 @@ class Settings:
     healthcheck_required: tuple[str, ...]
     healthcheck_min_free_gib: float = 50.0
     legacy_db_path: Path | None = None
+    api: Mapping[str, Any] = field(default_factory=dict)  # [api] host/port/cors_origins/sse_*
 
     # -- derived paths ----------------------------------------------------
     @property
@@ -385,6 +386,17 @@ def _build_llm(
     return backends, roles
 
 
+def _build_api(raw: Mapping[str, Any]) -> dict[str, Any]:
+    api = {"host": "", "port": 0, "cors_origins": [], "sse_poll_seconds": 0.5, "sse_keepalive_seconds": 15, **raw}
+    if not isinstance(api["port"], int) or not 0 < api["port"] < 65536:
+        raise ConfigError(f"[api] port must be 1..65535, got {api['port']!r}")
+    if not api["host"]:
+        raise ConfigError("[api] host is required")
+    if not isinstance(api["cors_origins"], list):
+        raise ConfigError("[api] cors_origins must be a list")
+    return api
+
+
 def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     env = os.environ if env is None else env
 
@@ -464,6 +476,7 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         healthcheck_required=required,
         healthcheck_min_free_gib=float(health_cfg.get("min_free_gib", 50)),
         legacy_db_path=Path(legacy).expanduser() if legacy else None,
+        api=_build_api(merged["services"].get("api", {})),
     )
 
 

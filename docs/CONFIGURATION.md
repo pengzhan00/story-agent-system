@@ -23,6 +23,8 @@ Nothing is hard-wired: pipelines differ, so defaults are layered and every layer
 | `llm.toml` | `[llm.backends.*]` (`ollama`, `llamacpp`, `openai_compat`; url comes from a service or `url`) and `[llm.roles.*]` (backend + model + params per agent role, `default` is the fallback) |
 | `delivery.toml` | Delivery profiles and QC thresholds |
 
+`services.toml` also holds `[api]` for `storyagent serve`: `host`, `port`, `cors_origins` (browser origins allowed to call it; the Vite dev server by default), `sse_poll_seconds`, `sse_keepalive_seconds`. See [API.md](API.md).
+
 ## Environment variables
 
 | Variable | Effect |

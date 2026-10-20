@@ -134,5 +134,18 @@
   "cli.llm.unloaded": "已卸载:{models}",
   "cli.llm.none": "没有驻留的语言模型",
   "cli.error.not_found": "未找到:{what}",
-  "cli.error.bad_kv": "参数应写成 key=value:{item}"
+  "cli.error.bad_kv": "参数应写成 key=value:{item}",
+  "cli.serve.starting": "接口服务已监听 {host}:{port}(文档见 /api/docs)",
+  "api.error.not_found": "找不到这个对象。",
+  "api.error.not_found.remediation": "刷新列表看看,它可能已被移除,或编号有误。",
+  "api.error.conflict": "这个操作和对象当前状态冲突。",
+  "api.error.conflict.remediation": "重新加载该对象,确认状态后再试。",
+  "api.error.invalid": "请求没有被接受。",
+  "api.error.invalid.remediation": "请检查标出的字段后重试。",
+  "api.error.spec_locked": "这个对象已锁定,不能修改。",
+  "api.error.spec_locked.remediation": "先解锁,再修改。",
+  "api.error.asset_file_missing": "这个产物在磁盘上的文件不见了。",
+  "api.error.asset_file_missing.remediation": "重新生成它,或从备份里恢复文件。",
+  "api.error.internal": "服务端出了点问题。",
+  "api.error.internal.remediation": "请重试;如果反复出现,查看服务端日志。"
 }

@@ -86,6 +86,25 @@ class Ledger:
         ).fetchall()
         return [{**dict(r), "data": json.loads(r["data"])} for r in rows]
 
+    def last_event_id(self) -> int:
+        return int(self.db.conn.execute("SELECT COALESCE(MAX(id),0) FROM job_events").fetchone()[0])
+
+    def touched_jobs(self, after_event_id: int, *, project_id: int | None = None) -> tuple[int, list[JobRecord]]:
+        """Jobs that logged an event after ``after_event_id`` (the SSE feed). Returns (new high-water mark, jobs)."""
+        high = self.last_event_id()
+        if high <= after_event_id:
+            return after_event_id, []
+        sql = (
+            "SELECT j.* FROM media_jobs j WHERE j.id IN "
+            "(SELECT job_id FROM job_events WHERE id>? AND id<=?)"
+        )
+        args: list[Any] = [after_event_id, high]
+        if project_id is not None:
+            sql += " AND j.project_id=?"
+            args.append(project_id)
+        rows = self.db.conn.execute(sql + " ORDER BY j.created_at, j.rowid", args).fetchall()
+        return high, [JobRecord.from_row(r) for r in rows]
+
     # -- cost / ETA ---------------------------------------------------------------------------
     def estimate_seconds(self, model_ref: str, tier: str) -> int:
         """Median wall time of the last completed jobs for this model+tier (0 = no history)."""

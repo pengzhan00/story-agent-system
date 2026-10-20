@@ -157,3 +157,18 @@ def test_runtime_knobs_have_defaults_and_can_be_overridden(tmp_path: Path) -> No
     assert s.strict_params is False and s.runtime["auto_adopt"] is True and s.runtime["lease_seconds"] == 60
     s2 = load_settings(home_with(tmp_path / "b", services="[runtime]\nstrict_params = true\nmax_light_jobs = 4\n"))
     assert s2.strict_params and s2.runtime["max_light_jobs"] == 4 and s2.runtime["lease_seconds"] == 60
+
+
+# ---- api ------------------------------------------------------------------------------------------
+def test_api_defaults_and_overrides(tmp_path: Path) -> None:
+    api = load_settings(home_with(tmp_path)).api
+    assert api["port"] == 8765 and api["host"] and api["cors_origins"] == ["http://localhost:5173"]
+    s = load_settings(home_with(tmp_path / "b", services='[api]\nport = 9000\ncors_origins = []\n'))
+    assert s.api["port"] == 9000 and s.api["cors_origins"] == [] and s.api["host"] == api["host"]
+
+
+@pytest.mark.parametrize("toml", ['[api]\nport = 0\n', '[api]\nport = "x"\n', '[api]\nhost = ""\n',
+                                  '[api]\ncors_origins = "http://a"\n'])
+def test_api_validation(tmp_path: Path, toml: str) -> None:
+    with pytest.raises(ConfigError, match=r"\[api\]"):
+        load_settings(home_with(tmp_path, services=toml))
