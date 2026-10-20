@@ -592,6 +592,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{project_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Review Script
+         * @description Ask the script editor agent for a critique (a language-model call: can take a minute; changes nothing).
+         */
+        post: operations["review_script_api_projects__project_id__review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{project_id}/scripts": {
         parameters: {
             query?: never;
@@ -1657,6 +1677,29 @@ export interface components {
              */
             new_seed: boolean;
         };
+        /** ReviewIssue */
+        ReviewIssue: {
+            /**
+             * Fix
+             * @default
+             */
+            fix: string;
+            /**
+             * Problem
+             * @default
+             */
+            problem: string;
+            /**
+             * Severity
+             * @default
+             */
+            severity: string;
+            /**
+             * Where
+             * @default
+             */
+            where: string;
+        };
         /** ReviewItemOut */
         ReviewItemOut: {
             /** Changed Dependencies */
@@ -1712,6 +1755,18 @@ export interface components {
              * @default 0
              */
             total: number;
+        };
+        /** ScriptReviewOut */
+        ScriptReviewOut: {
+            /** Issues */
+            issues: components["schemas"]["ReviewIssue"][];
+            /** Score */
+            score: number;
+            /**
+             * Summary
+             * @default
+             */
+            summary: string;
         };
         /** SpeakerBody */
         SpeakerBody: {
@@ -3533,6 +3588,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_script_api_projects__project_id__review_post: {
+        parameters: {
+            query?: {
+                episode?: number;
+            };
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScriptReviewOut"];
                 };
             };
             /** @description Validation Error */

@@ -374,3 +374,17 @@ def test_an_edited_line_reaches_its_spec_without_force(tmp_path: Path) -> None:
     line = engine.spec_store.current(pid, "dialogue.line", f"{shot['id']}#0")
     assert line.text_payload == "Edited!" and line.version == 2 and out["refreshed"] >= 1
     assert engine.spec_store.current(pid, "shot.keyframe", str(shot["id"])).version == 1     # prompts were left alone
+
+
+def test_script_review_is_on_demand_and_changes_nothing(tmp_path: Path) -> None:
+    engine, client, _ = make_engine(tmp_path)
+    pid = new_project(engine)
+    with pytest.raises(WorkflowStateError):
+        engine.review_script(pid)                                   # no script yet
+    for stage in STORY[:5]:
+        engine.run_stage(pid, stage, {"visual_prompts": False})
+    before = [r["status"] for r in engine.state.stages(pid)]
+    review = engine.review_script(pid)
+    assert review["score"] == 7 and review["issues"] == []
+    assert client.calls[-1] == "review" and "Rain Night" in client.prompts[-1]
+    assert [r["status"] for r in engine.state.stages(pid)] == before

@@ -421,5 +421,15 @@
   "web.projects.bin_empty": "回收站是空的。",
   "web.projects.live": "项目",
   "web.projects.rename": "重命名",
-  "web.projects.save_name": "保存名称"
+  "web.projects.save_name": "保存名称",
+  "cli.review.score": "剧本审查得分：{score}/10",
+  "cli.review.issue": "  [{severity}] {where}：{problem} → {fix}",
+  "cli.review.none": "没有可审查的内容：{detail}",
+  "api.error.llm_failed": "语言模型没能完成这次请求。",
+  "api.error.llm_failed.remediation": "请确认模型服务在运行（见「系统」页），然后重试。",
+  "web.review.run": "审查剧本",
+  "web.review.title": "剧本审查",
+  "web.review.score": "评分 {score}/10",
+  "web.review.none": "没有发现问题。",
+  "web.review.running": "正在审查…"
 }

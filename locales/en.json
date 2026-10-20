@@ -421,5 +421,15 @@
   "web.projects.bin_empty": "The recycle bin is empty.",
   "web.projects.live": "Projects",
   "web.projects.rename": "Rename",
-  "web.projects.save_name": "Save name"
+  "web.projects.save_name": "Save name",
+  "cli.review.score": "Script review score: {score}/10",
+  "cli.review.issue": "  [{severity}] {where}: {problem} -> {fix}",
+  "cli.review.none": "Nothing to review: {detail}",
+  "api.error.llm_failed": "The language model could not complete this request.",
+  "api.error.llm_failed.remediation": "Check that the model service is running (System page), then try again.",
+  "web.review.run": "Review the script",
+  "web.review.title": "Script review",
+  "web.review.score": "Score {score}/10",
+  "web.review.none": "No issues found.",
+  "web.review.running": "Reviewing…"
 }

@@ -173,3 +173,19 @@ def test_a_project_with_a_run_in_progress_cannot_be_trashed(client: TestClient) 
     pid = new_project(client)
     started(client, pid)
     assert client.delete(f"/api/projects/{pid}").status_code == 409
+
+
+def test_script_review_over_the_api(client: TestClient, fsettings: Settings, monkeypatch: pytest.MonkeyPatch) -> None:
+    from storyagent.api import routes_workflow
+
+    pid = new_project(client)
+    assert client.post(f"/api/projects/{pid}/review").status_code == 409          # no script yet
+    started(client, pid)
+    run_to_end(fsettings)
+
+    def fake_review(self: WorkflowEngine, project_id: int, episode: int = 1) -> dict[str, Any]:
+        return {"score": 6, "summary": "ok", "issues": [{"severity": "high", "where": "1.1.1", "problem": "slow"}]}
+
+    monkeypatch.setattr(routes_workflow.WorkflowEngine, "review_script", fake_review)
+    body = client.post(f"/api/projects/{pid}/review").json()
+    assert body["score"] == 6 and body["issues"][0]["fix"] == "" and body["issues"][0]["severity"] == "high"

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import threading
 from collections.abc import Callable
@@ -7,6 +8,7 @@ from typing import Any
 
 from storyagent.agents import AgentRunner
 from storyagent.agents.registry import AgentSpecError
+from storyagent.agents.runner import language_name
 from storyagent.config import Settings
 from storyagent.db import Database
 from storyagent.llm import LLMError, LLMRouter
@@ -17,7 +19,7 @@ from storyagent.story import StoryStore
 
 from .progress import RunProgress
 from .stages import STAGE_FUNCS, Ctx, Progress, StageError, WorkflowCancelled
-from .state import WorkflowState
+from .state import WorkflowState, WorkflowStateError
 
 log = logging.getLogger(__name__)
 
@@ -38,6 +40,20 @@ class WorkflowEngine:
     def stages_to_run(self, project_id: int, requested: list[str] | None) -> list[str]:
         """``None`` = resume: every stage that is not completed (stale ones included), in pipeline order."""
         return self.state.pending_stages(project_id, requested)
+
+    def review_script(self, project_id: int, episode: int = 1) -> dict[str, Any]:
+        """Ask the script editor agent to critique the current script (on demand; nothing is stored or changed)."""
+        project = self.projects.get(project_id)
+        script = self.store.get_script(project_id, episode)
+        if not script or not script["acts"]:
+            raise WorkflowStateError("the script stage has not produced a script yet")
+        chars = [{"name": c["name"], "role": c["role"], "personality": c["personality"]}
+                 for c in self.store.list_characters(project_id)]
+        outline = {"title": script["title"], "synopsis": script["synopsis"], "acts": script["acts"]}
+        data = self.agents.run("reviewer.script", {
+            "language": language_name(project.content_language), "script": json.dumps(outline, ensure_ascii=False),
+            "characters": json.dumps(chars, ensure_ascii=False)}, project_id=project_id).data
+        return dict(data)
 
     def run_stage(
         self, project_id: int, stage: str, params: dict[str, Any] | None = None, *, progress: Progress | None = None,

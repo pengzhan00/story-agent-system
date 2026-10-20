@@ -10,11 +10,12 @@ from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
 
 from storyagent.compose.export import ExportError, build_package
-from storyagent.workflow import WorkflowStateError
+from storyagent.llm import LLMError
+from storyagent.workflow import WorkflowEngine, WorkflowStateError
 
 from .context import ctx_of
 from .errors import ApiError
-from .schemas import WorkflowOut, WorkflowRunCreate, WorkflowRunOut, WorkflowStageOut
+from .schemas import ScriptReviewOut, WorkflowOut, WorkflowRunCreate, WorkflowRunOut, WorkflowStageOut
 
 router = APIRouter(prefix="/api", tags=["workflow"])
 
@@ -84,3 +85,15 @@ def episode_package(project_id: int, episode: int, request: Request) -> FileResp
     archive = shutil.make_archive(str(work / f"{project.slug}-ep{episode:02d}"), "zip", work / "package")
     return FileResponse(archive, media_type="application/zip", filename=Path(archive).name,
                         background=BackgroundTask(shutil.rmtree, work, ignore_errors=True))
+
+
+@router.post("/projects/{project_id}/review", response_model=ScriptReviewOut)
+def review_script(project_id: int, request: Request, episode: int = 1) -> ScriptReviewOut:
+    """Ask the script editor agent for a critique (a language-model call: can take a minute; changes nothing)."""
+    ctx = ctx_of(request)
+    ctx.projects.get(project_id)
+    try:
+        data = WorkflowEngine(ctx.settings, ctx.db, spec_store=ctx.specs).review_script(project_id, episode)
+    except LLMError as exc:
+        raise ApiError(502, "llm_failed", f"{exc.code}: {exc.message}") from exc
+    return ScriptReviewOut.model_validate(data)

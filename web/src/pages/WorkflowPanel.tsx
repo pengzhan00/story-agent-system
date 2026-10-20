@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useCancelRun, useProject, useStartRun, useUpdateProject, useWorkflow } from "../api/hooks";
+import { useCancelRun, useProject, useReviewScript, useStartRun, useUpdateProject, useWorkflow } from "../api/hooks";
 import { ErrorNote } from "../components/ErrorNote";
 import { ProgressBar } from "../components/ProgressBar";
 import { EpisodePlayer } from "../components/EpisodePlayer";
@@ -15,6 +15,7 @@ export function WorkflowPanel({ id }: { id: number }) {
   const start = useStartRun(id);
   const cancel = useCancelRun(id);
   const update = useUpdateProject(id);
+  const review = useReviewScript(id);
   const [premise, setPremise] = useState<string | null>(null);
   const [force, setForce] = useState(false);
 
@@ -88,6 +89,29 @@ export function WorkflowPanel({ id }: { id: number }) {
             </button>
           </div>
           <p className="muted small">{t("web.workflow.make_media_hint")} {t("web.workflow.needs_worker")}</p>
+          <div className="row">
+            <button disabled={review.isPending} onClick={() => review.mutate()}>
+              {review.isPending ? t("web.review.running") : t("web.review.run")}
+            </button>
+          </div>
+          <ErrorNote error={review.error} />
+          {review.data ? (
+            <div className="stack">
+              <strong>
+                {t("web.review.title")}: {t("web.review.score", { score: review.data.score })}
+              </strong>
+              <p>{review.data.summary}</p>
+              {review.data.issues.length === 0 ? <p className="muted">{t("web.review.none")}</p> : null}
+              <ul className="plain">
+                {review.data.issues.map((i, n) => (
+                  <li key={n}>
+                    <span className="muted">{`[${i.severity}] ${i.where}`}</span> {i.problem}
+                    {i.fix ? <span className="muted">{` → ${i.fix}`}</span> : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           {stage("produce")?.summary && Number(stage("produce")?.summary["skipped"] ?? 0) > 0 ? (
             <p className="muted small">
               {t("web.produce.skipped", { n: Number(stage("produce")?.summary["skipped"]) })}

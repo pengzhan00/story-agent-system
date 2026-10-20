@@ -1484,6 +1484,38 @@
         "title": "RetryRequest",
         "type": "object"
       },
+      "ReviewIssue": {
+        "properties": {
+          "fix": {
+            "default": "",
+            "title": "Fix",
+            "type": "string"
+          },
+          "problem": {
+            "default": "",
+            "title": "Problem",
+            "type": "string"
+          },
+          "severity": {
+            "default": "",
+            "title": "Severity",
+            "type": "string"
+          },
+          "where": {
+            "default": "",
+            "title": "Where",
+            "type": "string"
+          }
+        },
+        "required": [
+          "severity",
+          "where",
+          "problem",
+          "fix"
+        ],
+        "title": "ReviewIssue",
+        "type": "object"
+      },
       "ReviewItemOut": {
         "properties": {
           "changed_dependencies": {
@@ -1586,6 +1618,33 @@
           "stages"
         ],
         "title": "RunProgressOut",
+        "type": "object"
+      },
+      "ScriptReviewOut": {
+        "properties": {
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewIssue"
+            },
+            "title": "Issues",
+            "type": "array"
+          },
+          "score": {
+            "title": "Score",
+            "type": "number"
+          },
+          "summary": {
+            "default": "",
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "score",
+          "summary",
+          "issues"
+        ],
+        "title": "ScriptReviewOut",
         "type": "object"
       },
       "SpeakerBody": {
@@ -4828,6 +4887,59 @@
         "summary": "Restore Project",
         "tags": [
           "projects"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/review": {
+      "post": {
+        "description": "Ask the script editor agent for a critique (a language-model call: can take a minute; changes nothing).",
+        "operationId": "review_script_api_projects__project_id__review_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "episode",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "title": "Episode",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScriptReviewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Review Script",
+        "tags": [
+          "workflow"
         ]
       }
     },

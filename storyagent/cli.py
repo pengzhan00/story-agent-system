@@ -8,7 +8,7 @@
     storyagent spec create | show | edit | diff | revert | lock | unlock | regenerate
     storyagent serve [--host H] [--port P]
     storyagent worker [--once]
-    storyagent workflow run | status | watch      (story pipeline with live progress bars)
+    storyagent workflow run | status | watch | review      (story pipeline with live progress bars)
     storyagent export episode --project N [--episode 1] --out DIR   (film + subtitles + stems + provenance)
     storyagent llm check
     storyagent api openapi [--out FILE]
@@ -475,6 +475,19 @@ def _cmd_export_episode(s: Settings, a: argparse.Namespace) -> int:
     return 0 if not failed else 6
 
 
+def _cmd_workflow_review(s: Settings, a: argparse.Namespace) -> int:
+    c = _ctx(s)
+    try:
+        review = WorkflowEngine(s, c.db, spec_store=c.specs).review_script(a.project, a.episode)
+    except WorkflowStateError as exc:
+        raise CliError("cli.review.none", 1, detail=str(exc)) from exc
+    print(t("cli.review.score", score=review.get("score", "?")), "-", review.get("summary", ""))
+    for issue in review.get("issues", []):
+        print(t("cli.review.issue", severity=issue.get("severity", ""), where=issue.get("where", ""),
+                problem=issue.get("problem", ""), fix=issue.get("fix", "")))
+    return 0
+
+
 def _cmd_workflow_run(s: Settings, a: argparse.Namespace) -> int:
     c = _ctx(s)
     state = WorkflowState(c.db)
@@ -698,6 +711,9 @@ def build_parser() -> argparse.ArgumentParser:
     wp.add_argument("--inline", action="store_true", help="run here instead of waiting for a worker")
     wp.add_argument("--no-wait", action="store_true", help="queue it and return")
     wp.add_argument("--interval", type=float, default=1.0)
+    wp = add(wf, "review", _cmd_workflow_review)
+    wp.add_argument("--project", type=int, required=True)
+    wp.add_argument("--episode", type=int, default=1)
     wp = add(wf, "status", _cmd_workflow_status)
     wp.add_argument("--project", type=int, required=True)
     wp = add(wf, "watch", _cmd_workflow_watch)

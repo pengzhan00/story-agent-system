@@ -427,6 +427,19 @@ class WorkflowRunCreate(BaseModel):
     params: dict[str, Any] = Field(default_factory=dict)
 
 
+class ReviewIssue(Strict):
+    severity: str = ""
+    where: str = ""
+    problem: str = ""
+    fix: str = ""
+
+
+class ScriptReviewOut(Strict):
+    score: float
+    summary: str = ""
+    issues: list[ReviewIssue] = Field(default_factory=list)
+
+
 class LockBody(BaseModel):
     locked: bool
 
