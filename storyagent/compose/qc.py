@@ -2,8 +2,8 @@
 
 Measured, not assumed: ffprobe for the container facts, ffmpeg filters (volumedetect, ebur128, blackdetect,
 freezedetect) for the picture and sound. Every check yields ``{code, ok, value, limit}``; ``passed`` is true when none
-of the checks failed. A tool that is missing makes the dependent checks ``skipped`` (never silently "ok").
-i18n keys for the codes: ``compose.qc.<code>``.
+of the blocking checks failed (``episode_length`` is advisory). A tool that is missing makes the dependent checks
+``skipped`` (never silently "ok"). The web client labels the codes with ``web.compose.qc.<code>``.
 """
 from __future__ import annotations
 
@@ -21,6 +21,7 @@ _LUFS = re.compile(r"I:\s+(-?[\d.]+|-inf) LUFS")
 _BLACK = re.compile(r"black_duration:\s*([\d.]+)")
 _FREEZE = re.compile(r"freeze_duration:\s*([\d.]+)")
 LOUDNESS_TOLERANCE = 3.0     # LU around the delivery target
+ADVISORY = ("episode_length",)   # reported, never blocking: drafts and previews are meant to be short
 
 
 def _check(code: str, ok: bool | None, value: Any = None, limit: Any = None) -> dict[str, Any]:
@@ -140,4 +141,5 @@ def run_qc(settings: Settings, path: Path, profile: Mapping[str, Any]) -> dict[s
 
 
 def _verdict(checks: list[dict[str, Any]], metrics: dict[str, Any]) -> dict[str, Any]:
-    return {"passed": all(c["ok"] is not False for c in checks), "checks": checks, "metrics": metrics}
+    blocking = [c for c in checks if c["code"] not in ADVISORY]
+    return {"passed": all(c["ok"] is not False for c in blocking), "checks": checks, "metrics": metrics}

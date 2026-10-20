@@ -60,3 +60,13 @@ def test_a_missing_or_garbage_file_is_a_failure_not_a_crash(tmp_path: Path) -> N
     junk.write_bytes(b"x" * 8192)
     res = run_qc(settings, junk, PROFILE)
     assert res["passed"] is False
+
+
+def test_a_short_draft_is_not_a_failure_only_an_advisory(tmp_path: Path) -> None:
+    settings = make_settings(tmp_path)
+    ff = find_tool(settings, "ffmpeg")
+    if ff is None:
+        pytest.skip("ffmpeg not installed")
+    path = render(str(ff), tmp_path / "ok.mp4", video="testsrc2", audio="sine=frequency=300:sample_rate=48000")
+    res = run_qc(settings, path, {**PROFILE, "width": 360, "height": 640, "min_episode_sec": 180})
+    assert "episode_length" in codes(res, False) and res["passed"]

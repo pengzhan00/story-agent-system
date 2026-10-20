@@ -30,6 +30,7 @@ from pathlib import Path
 from typing import Any
 
 from storyagent.compose.export import ExportError, build_package
+from storyagent.compose.qc import ADVISORY
 from storyagent.config import ConfigError, Settings, get_settings
 from storyagent.db import Database, MigrationError, current_version, migrate
 from storyagent.db.legacy_import import LegacyImportError, import_legacy
@@ -457,7 +458,7 @@ def _cmd_export_episode(s: Settings, a: argparse.Namespace) -> int:
             project.delivery_profile)))
     except ExportError as exc:
         raise CliError("cli.export.failed", 1, detail=str(exc)) from exc
-    failed = [x["code"] for x in manifest["qc"]["checks"] if x["ok"] is False]
+    failed = [x["code"] for x in manifest["qc"]["checks"] if x["ok"] is False and x["code"] not in ADVISORY]
     print(t("cli.export.done", path=a.out, files=len(manifest["files"])))
     if failed:
         print(t("cli.export.qc_failed", checks=", ".join(failed)), file=sys.stderr)
