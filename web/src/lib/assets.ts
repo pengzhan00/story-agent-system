@@ -31,7 +31,7 @@ export function targetsFor(modules: WorkshopModule[], media: string) {
   const out: { module: string; kind: string; field: string }[] = [];
   for (const m of modules)
     for (const k of m.kinds) {
-      const f = k.inputs.find((i) => (i.type === "media" || i.type === "medialist") && i.media === media);
+      const f = k.inputs.find((i) => (i.type === "media" || i.type === "medialist" || i.type === "shots") && i.media === media);
       if (f) out.push({ module: m.id, kind: k.kind, field: f.name });
     }
   return out;

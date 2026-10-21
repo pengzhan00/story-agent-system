@@ -21,7 +21,7 @@ from storyagent.compose.qc import run_qc
 from storyagent.compose.timeline import AssetRef, ShotInput, TimelineInput, build_timeline
 from storyagent.config import ConfigError
 from storyagent.domain import JobStatus, MediaKind, QualityTier
-from storyagent.i18n import get_catalog
+from storyagent.media.compliance import visible_marks
 from storyagent.media.contracts import AssetRecord, JobRecord, MediaJob
 from storyagent.media.ledger import Ledger
 from storyagent.media.specs import SpecRecord, SpecStore
@@ -230,16 +230,7 @@ def build_episode_timeline(ctx: Ctx, episode: int) -> dict[str, Any]:
 
 def compliance_marks(ctx: Ctx) -> tuple[dict[str, Any] | None, dict[str, str]]:
     """The visible AIGC label and the container metadata this project asks for (none when compliance is off)."""
-    cfg = ctx.settings.compliance_for(ctx.project.settings)
-    if not cfg.enabled:
-        return None, {}
-    text = get_catalog(ctx.project.content_language).t(cfg.explicit_label_key)
-    label = {"text": text, "mode": cfg.explicit_label} if cfg.explicit_label != "off" else None
-    metadata: dict[str, str] = {}
-    if cfg.implicit_metadata:
-        metadata = {"comment": f"AIGC; generator=storyagent; label={text}", "encoded_by": "storyagent",
-                    "title": ctx.project.name}
-    return label, metadata
+    return visible_marks(ctx.settings, ctx.project.settings, ctx.project.content_language, ctx.project.name)
 
 
 def compose(ctx: Ctx) -> dict[str, Any]:

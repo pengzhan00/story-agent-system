@@ -1033,5 +1033,20 @@
   "library.role.story": "故事",
   "library.role.script": "剧本",
   "library.role.dialogue": "对白",
-  "library.role.image": "图片"
+  "library.role.image": "图片",
+  "workshop.module.episode": "成片(剪辑)",
+  "workshop.field.shots": "按顺序排的镜头(画面、台词、配音)",
+  "workshop.field.bgm": "背景音乐(可选)",
+  "workshop.field.title": "标题(可选)",
+  "workshop.field.profile": "交付档位(留空 = 默认)",
+  "web.workshop.shot_n": "第 {n} 镜",
+  "web.workshop.add_shot": "添加一个镜头",
+  "web.workshop.shot.video": "视频片段",
+  "web.workshop.shot.image": "静态图(没有视频时用)",
+  "web.workshop.shot.speech": "这句台词的配音",
+  "web.workshop.shot.text": "台词 / 字幕",
+  "web.workshop.shot.narration": "旁白字幕(没人说话时)",
+  "web.workshop.shot.seconds": "预计秒数(配音更长时会自动延长)",
+  "web.workshop.move_up": "上移",
+  "web.workshop.move_down": "下移"
 }

@@ -83,7 +83,7 @@ def test_every_module_kind_has_a_default_model_and_an_output() -> None:
 # ---- API ----------------------------------------------------------------------------------------
 def test_modules_describe_models_params_and_inputs(api: TestClient) -> None:
     mods = {m["id"]: m for m in api.get("/api/workshop").json()}
-    assert set(mods) == {"story", "script", "image", "lora", "song", "voice", "video", "transcript"}
+    assert set(mods) == {"story", "script", "image", "lora", "song", "voice", "video", "episode", "transcript"}
     gen = next(k for k in mods["image"]["kinds"] if k["kind"] == "image.generate")
     assert any(m["ref"] == "fake-image" for m in gen["models"])
     assert [f["name"] for f in gen["inputs"]][:2] == ["prompt", "negative_prompt"] and gen["output"] == "image"
@@ -297,3 +297,37 @@ def test_assets_can_be_listed_by_kind_and_scope(api: TestClient, wsettings: Sett
     assert [a["kind"] for a in only] == ["audio.music"]
     first = api.get("/api/assets?standalone=true&limit=1").json()
     assert api.get("/api/assets?standalone=true&limit=1&offset=1").json() != first
+
+
+# ---- episode: shots, lines and music put together by hand --------------------------------------------
+def _stored(settings: Settings, kind: str, seconds: float) -> str:
+    from storyagent.media.ledger import Ledger, NewAsset
+
+    ledger = Ledger(Database(settings.db_path), settings)
+    rel = f"work/{kind}.bin"
+    (settings.home / "work").mkdir(exist_ok=True)
+    (settings.home / rel).write_bytes(b"x")
+    return ledger.register_asset(NewAsset(kind, "main", rel, duration_sec=seconds), project_id=None, adopt=False).id
+
+
+def test_an_episode_is_assembled_from_rows_of_picture_line_and_voice(api: TestClient, wsettings: Settings) -> None:
+    clip, still = _stored(wsettings, "video.generate", 4.0), _stored(wsettings, "image.generate", 0)
+    voice, music = _stored(wsettings, "audio.tts", 2.5), _stored(wsettings, "audio.music", 30.0)
+    body = {"kind": "compose.assemble", "inputs": {
+        "title": "Pilot", "bgm": f"asset:{music}",
+        "shots": [
+            {"video": f"asset:{clip}", "text": "Where were you?", "speech": f"asset:{voice}", "seconds": 3},
+            {"image": f"asset:{still}", "narration": "Three days earlier.", "seconds": 2},
+            {},                                                    # an empty row is ignored
+        ]}}
+    job = api.post("/api/workshop/run", json=body).json()[0]
+    tl = job["inputs"]["timeline"]
+    assert [s["source"]["type"] for s in tl["segments"][:2]] == ["video", "image"]
+    assert tl["segments"][0]["duration"] >= 0.4 + 2.5                      # the speech sets the length of the shot
+    assert tl["speech"][0]["asset"] == f"asset:{voice}" and tl["subtitles"]["cues"][0]["text"] == "Where were you?"
+    assert tl["music"][0]["asset"] == f"asset:{music}" and tl["title"] == "Pilot"
+    empty = api.post("/api/workshop/run", json={"kind": "compose.assemble", "inputs": {"shots": [{}]}})
+    assert empty.status_code == 422 and empty.json()["error"]["code"] == "workshop_missing_input"
+    bad = {"kind": "compose.assemble", "inputs": {"shots": [{"video": "asset:nope"}]}}
+    unknown = api.post("/api/workshop/run", json=bad)
+    assert unknown.status_code == 422 and unknown.json()["error"]["code"] == "workshop_bad_value"

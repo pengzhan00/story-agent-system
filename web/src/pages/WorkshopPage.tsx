@@ -101,6 +101,76 @@ function MediaList({ field, value, onChange, recents }: { field: WorkshopField; 
   );
 }
 
+type Shot = Record<string, string>;
+const SHOT_PICKS = [
+  { name: "video", media: "video" },
+  { name: "image", media: "image" },
+  { name: "speech", media: "audio" },
+] as const;
+
+/** An episode put together by hand: one row per shot with its picture, spoken line and the voice of that line. */
+function ShotList({ value, onChange, recents }: { value: Shot[]; onChange: (v: Shot[]) => void; recents: Asset[] }) {
+  const t = useT();
+  const set = (i: number, patch: Shot) => onChange(value.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+  const move = (i: number, d: number) => {
+    const next = [...value];
+    const [row] = next.splice(i, 1);
+    if (row) next.splice(i + d, 0, row);
+    onChange(next);
+  };
+  return (
+    <div className="stack">
+      {value.map((row, i) => (
+        <div key={i} className="card stack">
+          <div className="row">
+            <strong>{t("web.workshop.shot_n", { n: i + 1 })}</strong>
+            <span className="spacer" />
+            <button type="button" className="link" disabled={i === 0} onClick={() => move(i, -1)}>
+              {t("web.workshop.move_up")}
+            </button>
+            <button type="button" className="link" disabled={i === value.length - 1} onClick={() => move(i, 1)}>
+              {t("web.workshop.move_down")}
+            </button>
+            <button type="button" className="link" onClick={() => onChange(value.filter((_, j) => j !== i))}>
+              {t("web.workshop.remove")}
+            </button>
+          </div>
+          <div className="form-grid">
+            {SHOT_PICKS.map((p) => (
+              <div key={p.name} className="field wide">
+                <span>{`${t(`web.workshop.shot.${p.name}`)} (${t(`workshop.media.${p.media}`)})`}</span>
+                <MediaInput
+                  field={{ name: p.name, target: p.name, type: "media", media: p.media, required: false }}
+                  value={row[p.name] ?? ""}
+                  onChange={(v) => set(i, { [p.name]: v })}
+                  recents={recents}
+                />
+              </div>
+            ))}
+            <label className="field wide">
+              <span>{t("web.workshop.shot.text")}</span>
+              <textarea rows={2} value={row["text"] ?? ""} onChange={(e) => set(i, { text: e.target.value })} />
+            </label>
+            <label className="field wide">
+              <span>{t("web.workshop.shot.narration")}</span>
+              <input value={row["narration"] ?? ""} onChange={(e) => set(i, { narration: e.target.value })} />
+            </label>
+            <label className="field">
+              <span>{t("web.workshop.shot.seconds")}</span>
+              <input type="number" min={1} step={0.5} value={row["seconds"] ?? "3"} onChange={(e) => set(i, { seconds: e.target.value })} />
+            </label>
+          </div>
+        </div>
+      ))}
+      <div className="row">
+        <button type="button" onClick={() => onChange([...value, {}])}>
+          {t("web.workshop.add_shot")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function MediaInput({
   field, value, onChange, recents, prevOutput,
 }: {
@@ -180,6 +250,13 @@ function Inputs({
               <span>{label}</span>
             </label>
           );
+        if (f.type === "shots")
+          return (
+            <div key={f.name} className="field wide">
+              <span>{label}</span>
+              <ShotList value={Array.isArray(v) ? (v as Shot[]) : []} onChange={(x) => set(f.name, x)} recents={recents} />
+            </div>
+          );
         if (f.type === "medialist")
           return (
             <div key={f.name} className="field wide">
@@ -237,7 +314,7 @@ function KindPanel({
         const next = { ...v };
         for (const [name, val] of Object.entries(prefill.values)) {
           const f = kind.inputs.find((i) => i.name === name);
-          next[name] = f?.type === "medialist" && Array.isArray(val) ? [...(Array.isArray(v[name]) ? (v[name] as string[]) : []), ...val] : val;
+          next[name] = (f?.type === "medialist" || f?.type === "shots") && Array.isArray(val) ? [...(Array.isArray(v[name]) ? (v[name] as unknown[]) : []), ...val] : val;
         }
         return next;
       });
@@ -516,7 +593,9 @@ export function WorkshopPage() {
       const field = modules.find((m) => m.id === target.module)?.kinds.find((k) => k.kind === target.kind)?.inputs.find((i) => i.name === target.field);
       setTab(target.module);
       setKindPick((p) => ({ ...p, [target.module]: target.kind }));
-      setPrefill({ kind: target.kind, values: { [target.field]: field?.type === "medialist" ? [`asset:${assetId}`] : `asset:${assetId}` } });
+      const ref = `asset:${assetId}`;
+      const value = field?.type === "medialist" ? [ref] : field?.type === "shots" ? [{ [field.media]: ref }] : ref;
+      setPrefill({ kind: target.kind, values: { [target.field]: value } });
     },
     [modules],
   );

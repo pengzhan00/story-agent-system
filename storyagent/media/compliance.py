@@ -13,11 +13,27 @@ from storyagent import __version__
 from storyagent.config import Settings
 from storyagent.domain import MediaKind
 from storyagent.domain.errors import ErrorCode
+from storyagent.i18n import get_catalog
 from storyagent.util import now_iso
 
 from .contracts import JobRecord, ValidationIssue
 
 PROVENANCE_SCHEMA = "storyagent.provenance.v1"
+
+
+def visible_marks(
+    settings: Settings, project_settings: Mapping[str, Any] | None, language: str, title: str
+) -> tuple[dict[str, Any] | None, dict[str, str]]:
+    """The visible AIGC label and the container metadata an episode gets (none when compliance is off)."""
+    cfg = settings.compliance_for(project_settings)
+    if not cfg.enabled:
+        return None, {}
+    text = get_catalog(language).t(cfg.explicit_label_key)
+    label = {"text": text, "mode": cfg.explicit_label} if cfg.explicit_label != "off" else None
+    metadata: dict[str, str] = {}
+    if cfg.implicit_metadata:
+        metadata = {"comment": f"AIGC; generator=storyagent; label={text}", "encoded_by": "storyagent", "title": title}
+    return label, metadata
 
 
 def check_job(

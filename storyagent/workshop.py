@@ -16,11 +16,14 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from storyagent.compose.timeline import AssetRef, ShotInput, TimelineInput, build_timeline
 from storyagent.config import Settings
 from storyagent.db import Database
 from storyagent.domain import MediaKind, QualityTier
-from storyagent.media.contracts import HealthState, JobRecord, MediaJob
-from storyagent.media.ledger import Ledger
+from storyagent.media.compliance import visible_marks
+from storyagent.media.contracts import AssetRecord, HealthState, JobRecord, MediaJob
+from storyagent.media.ledger import Ledger, LedgerError
+from storyagent.media.library import Library
 from storyagent.media.params import resolve_params
 from storyagent.media.registry import AdapterRegistry
 from storyagent.util import new_id, now_iso
@@ -38,7 +41,7 @@ class WorkshopError(ValueError):
 class Field:
     name: str                 # id in the UI and in a run request
     target: str               # where it lands in the job inputs: "prompt", "voice_ref.audio", "refs[]"
-    type: str = "text"        # text | longtext | media | medialist | bool
+    type: str = "text"        # text | longtext | media | medialist | shots | bool
     media: str = ""           # for type == "media": image | audio | video
     required: bool = False
 
@@ -84,6 +87,14 @@ MODULES: tuple[Module, ...] = (
     Module("image", (
         KindSpec(MediaKind.IMAGE_GENERATE, (_P, _NEG, Field("image", "refs[]", "media", "image"), *_LORA)),
         KindSpec(MediaKind.IMAGE_EDIT, (_P, Field("image", "refs[]", "media", "image", required=True), *_LORA)),
+    )),
+    Module("episode", (
+        KindSpec(MediaKind.COMPOSE_ASSEMBLE, (
+            Field("shots", "timeline", "shots", "video", required=True),
+            Field("bgm", "bgm", "media", "audio"),
+            Field("title", "title", "text"),
+            Field("profile", "profile", "text"),
+        )),
     )),
     Module("lora", (
         KindSpec(MediaKind.TRAIN_LORA, (
@@ -150,6 +161,8 @@ def output_media(kind: MediaKind | str) -> str:
     value = MediaKind(kind)
     if value is MediaKind.TRAIN_LORA:
         return "lora"
+    if value is MediaKind.COMPOSE_ASSEMBLE:
+        return "video"
     domain = value.value.split(".")[0]
     return domain if domain in ("image", "audio", "video", "text") else ""
 
@@ -280,6 +293,65 @@ class Workshop:
         return {"base": base, "preset": saved, "effective": {**base, **saved},
                 "schema": dict(adapter.capabilities().param_schema) if adapter else {}}
 
+    # -- episode assembly ----------------------------------------------------------------------
+    def _asset(self, ref: object, what: str) -> AssetRecord | None:
+        """The stored asset behind ``asset:<id>`` / ``library:<role>/<name>`` / ``job:<id>`` (``None`` = not given)."""
+        raw = str(ref or "").strip()
+        if not raw:
+            return None
+        kind, _, rest = raw.partition(":")
+        try:
+            if kind == "asset":
+                return self.ledger.get_asset(rest)
+            if kind == "job":
+                made = [a for a in self.ledger.list_assets(job_id=rest) if not a.trashed_at]
+                if made:
+                    return made[-1]
+            elif kind == "library":
+                role, _, name = rest.partition("/")
+                item = Library(self.db, self.settings, self.ledger).find(role, name)
+                if item is not None and item.asset is not None:
+                    return item.asset
+        except LedgerError:
+            pass
+        raise WorkshopError("workshop_bad_value", f"{what}: {raw}")
+
+    @staticmethod
+    def _ref(a: AssetRecord | None, kind: str) -> AssetRef | None:
+        return AssetRef(a.id, kind, a.duration_sec) if a else None
+
+    def episode_inputs(self, values: Mapping[str, Any]) -> dict[str, Any]:
+        """The timeline of an episode put together by hand: one row per shot (picture, spoken line, its audio).
+        The same builder as a project's compose stage: speech is measured first and sets the length of the shot."""
+        rows = values.get("shots")
+        shots: list[ShotInput] = []
+        for n, row in enumerate(rows if isinstance(rows, list) else [], 1):
+            if not isinstance(row, Mapping):
+                continue
+            video, image = self._asset(row.get("video"), "video"), self._asset(row.get("image"), "image")
+            speech, text = self._asset(row.get("speech"), "speech"), str(row.get("text") or "").strip()
+            narration = str(row.get("narration") or "").strip()
+            if not (video or image or text or narration):
+                continue
+            try:
+                seconds = float(row.get("seconds") or 3.0)
+            except (TypeError, ValueError):
+                raise WorkshopError("workshop_bad_value", f"shots[{n}].seconds") from None
+            shots.append(ShotInput(
+                shot_id=n, label=str(n), planned_sec=seconds, video=self._ref(video, "video.generate"),
+                image=self._ref(image, "image.generate"),
+                lines=[(text, self._ref(speech, "audio.tts"))] if (text or speech) else [], narration=narration))
+        if not shots:
+            raise WorkshopError("workshop_missing_input", "shots")
+        title = str(values.get("title") or "").strip()
+        profile = self.settings.delivery_profile(str(values.get("profile") or "").strip() or None)
+        label, metadata = visible_marks(self.settings, None, self.settings.locale, title)
+        timeline = build_timeline(TimelineInput(
+            shots, profile, self.settings.delivery["mix"], self.settings.delivery["subtitles"],
+            bgm=self._ref(self._asset(values.get("bgm"), "bgm"), "audio.music"), title=title, label=label,
+            metadata=metadata))
+        return {"timeline": timeline}
+
     # -- running -------------------------------------------------------------------------------
     def _job(self, spec: KindSpec, step: Mapping[str, Any], prev: JobRecord | None, *, pipeline_id: str | None,
              step_no: int | None) -> tuple[MediaJob, dict[str, Any]]:
@@ -290,7 +362,10 @@ class Workshop:
         tier = QualityTier(step.get("tier") or preset["tier"] or QualityTier.FINAL.value)
         # the preset's parameters belong to the model it was saved for
         saved = preset["params"] if preset["model_ref"] in ("", model_ref) else {}
-        inputs = build_inputs(spec, step.get("inputs") or {}, prev)
+        if spec.kind is MediaKind.COMPOSE_ASSEMBLE:
+            inputs = self.episode_inputs(step.get("inputs") or {})
+        else:
+            inputs = build_inputs(spec, step.get("inputs") or {}, prev)
         depends_on = prev.id if prev is not None and f"job:{prev.id}" in json.dumps(inputs) else None
         params = dict(step.get("params") or {})
         scale = str(inputs.pop("lora_scale", "") or "").strip()

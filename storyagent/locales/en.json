@@ -1033,5 +1033,20 @@
   "library.role.story": "Story",
   "library.role.script": "Script",
   "library.role.dialogue": "Dialogue",
-  "library.role.image": "Image"
+  "library.role.image": "Image",
+  "workshop.module.episode": "Episode (edit)",
+  "workshop.field.shots": "Shots in order (picture, spoken line, voice)",
+  "workshop.field.bgm": "Background music (optional)",
+  "workshop.field.title": "Title (optional)",
+  "workshop.field.profile": "Delivery profile (empty = default)",
+  "web.workshop.shot_n": "Shot {n}",
+  "web.workshop.add_shot": "Add a shot",
+  "web.workshop.shot.video": "Video clip",
+  "web.workshop.shot.image": "Still picture (used when there is no clip)",
+  "web.workshop.shot.speech": "Voice of the line",
+  "web.workshop.shot.text": "Spoken line / subtitle",
+  "web.workshop.shot.narration": "Narration caption (when nobody speaks)",
+  "web.workshop.shot.seconds": "Planned seconds (the voice may make it longer)",
+  "web.workshop.move_up": "Up",
+  "web.workshop.move_down": "Down"
 }
