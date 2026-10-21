@@ -54,3 +54,18 @@ Migrations only go forward. Before a schema upgrade `storyagent db migrate` copi
 ## What is not audited yet
 
 Destructive actions (project to recycle bin, library removal, asset trash) are reversible and logged in the application log, but there is no separate audit table; jobs keep their full event history (`media show <id>`).
+
+
+## 生产部署与更新
+
+生产 = 主检出目录(分支 `main`,保持干净)+ 自己的 `.venv` + 自己的 `data/`;开发在工作树里,互不影响(详见 HANDOFF.md §6)。
+
+```bash
+cd <主检出>
+scripts/deploy.sh                 # 快进到 origin/main、安装、构建网页、迁移数据库(先自动快照)、检查 i18n;不重启任何东西
+.venv/bin/python -m storyagent media jobs --status running     # 没有重任务在跑再重启(重启会打断它,之后被重投)
+# Ctrl-C 停掉 scripts/start.sh,然后:
+scripts/start.sh                  # 数据库迁移 + worker + server(端口 8765)
+```
+备份:`data/` 不进 Git。至少定期备份 `data/storyagent.db`(用 `sqlite3 data/storyagent.db ".backup 备份路径"`,服务在跑时也安全)和 `data/projects/`、`data/library/`、`data/config/`。
+回滚:`git checkout <上一个提交>`,再 `scripts/deploy.sh` 的安装/构建步骤;数据库迁移前的快照在 `data/storyagent.db.bak-vN`。

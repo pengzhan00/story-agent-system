@@ -143,13 +143,23 @@ docs/          API CONFIGURATION MEDIA_CONTRACT RUNBOOK WORKFLOW USER_GUIDE PARI
 
 ## 6. 本机环境事实(2026-10-21)
 
-- 数据家目录 = 工作树里的 `data/`(默认);`data/config/services.toml` 覆盖 ffmpeg-full 路径。网页 `http://localhost:8765`。
+- **两套环境(别混)**
+  | | 生产 | 开发 |
+  |---|---|---|
+  | 目录 | 主检出 `story-agent-system/`(分支 `main`,必须干净) | 工作树 `.claude/worktrees/init-127186`(分支 `claude/init-127186`) |
+  | 虚拟环境 | `story-agent-system/.venv`(`uv pip install -e .`) | 工作树 `.venv`(带 `[dev]`) |
+  | 数据 | `story-agent-system/data/`(数据库、媒体、`config/`);**不进 Git,要备份** | 工作树 `data/`(沙盒,随时可丢) |
+  | 启动 | `scripts/start.sh`(端口 8765) | `scripts/start.sh --port 8766` |
+  | 更新 | `scripts/deploy.sh`(快进+安装+构建网页+迁移,**不重启**),再重启 start.sh | 直接改代码、测试 |
+  `data/config/services.toml` 覆盖 ffmpeg-full 路径(两套各一份)。网页:生产 `http://localhost:8765`。
+  2026-10-21 已把数据库(含 LongCat/故事/剧本/图片的结果)和 `config/` 迁到生产 `data/`,生产已从主检出启动。
 - Ollama 0.40.6;已装 `gemma4:31b`(默认角色)、`gpt-oss-20b`(结构化 JSON 不稳,已退回)、`nomic-embed-text`。`qwen3.8:27b` 已放弃。
 - ACE-Step 8001(启动台可拉起);Phosphene 在 Pinokio(8198)。
 - ffmpeg-full:`/opt/homebrew/opt/ffmpeg-full/bin`(PATH 里的 ffmpeg 没有 libass,烧字幕/标识必须用它)。
-- LongCat:`~/myworkspace/longcat-avatar-mlx`(自带 py3.11 venv,权重 `LongCat-Video-Avatar-1.5-q4-dmd-merged`);
+- LongCat(已实测通过):`~/myworkspace/longcat-avatar-mlx`(自带 py3.11 venv,权重 `LongCat-Video-Avatar-1.5-q4-dmd-merged`);
   它脚本要从 HF 缓存读 whisper 特征配置(`openai/whisper-large-v3`),陈旧的 `.locks` 文件曾卡死;适配器设了离线环境变量+`PYTHONUNBUFFERED`。
-  **实测:一条 draft(832×480×93 帧)任务跑了 40 分钟以上仍在第 5/5 步(去噪),GPU 满载**——本机视频生成非常慢,是整个规划的约束(见 SERIES.md S4)。
+  **实测:一条 draft(832×480、93 帧 = 3.1 秒、30fps、无音轨)用了 54 分钟,口型和表情会动,首帧有些过饱和/变形**——本机数字人视频极慢,是整个规划的约束(见 SERIES.md S4)。
+- 生产更新流程:在开发工作树改+测+推送 `origin/main` → 主检出 `scripts/deploy.sh` → 确认没有在跑的重任务 → Ctrl-C 停 `scripts/start.sh` 再启动。需要开机自启/崩溃自拉起时再加 launchd(会改系统设置,须先问用户)。
 - 重启服务:server 偶尔忽略 SIGTERM,用明确 PID 先 `kill` 再必要时 `kill -9`(从不 pkill)。
 
 ## 7. 已做 / 未做(诚实清单)
@@ -158,14 +168,14 @@ docs/          API CONFIGURATION MEDIA_CONTRACT RUNBOOK WORKFLOW USER_GUIDE PARI
 合规/溯源、API+SSE、网页(启动台/项目/工坊/资产库/队列/AI 提示词/系统)、工坊九个模块(故事 剧本 图片 成片 LoRA 歌曲 配音 视频 转写)+流水线、
 启动台、目标时长/交付档位。
 
-**没在真实模型上验证过**:LongCat 成片(进行中)、LoRA 训练、工坊"故事→剧本"用 gemma4 实测、h3、多数工坊模块的真实流水线、项目页的新控件。
+**没在真实模型上验证过**:LoRA 训练、h3、多数工坊模块的真实流水线、项目页的新控件。
 **没做**:系列层(S1-S3,S7,S8)、镜头分层/预算(S4)、剪辑(转场/回顾/悬念卡/字幕样式/音效合成,S5)、RIFE 补帧、EDL/FCPXML、
 网页上传项目参考图、AI 改写+变更清单、**云端视频生成接口(用户要求预留,见下)**、API 鉴权(目前仅本机回环)、审计表。
 
 ## 8. 下一步(按这个顺序做)
 
-1. 等 LongCat 任务 `c58d1e158d344c3982ebf4b241abdd13` 结束 → 检查成片(ffprobe + 看帧)→ 记实际耗时;然后重启 worker(它现在还是旧代码,没有 llm 适配器)。
-2. 重启后用 gemma4 实测工坊「故事→剧本」。
+1. (已完成)LongCat 实测 54 分钟/3.1 秒;工坊「故事→剧本」用 gemma4 实测通过(故事 33 秒、剧本 17 秒)。
+2. (已完成)生产环境与数据迁到主检出。
 3. **云端视频接口预留**(用户要求:以后算力可能上云):做成配置驱动的通用 REST 异步作业适配器 `remote_video`——
    模型条目 `remote=true`;密钥只从环境变量名读取(`api_key_env`),不入库不入日志;数据离开本机需显式许可(`allow_remote`,全局或项目);
    提交/轮询/取消/结果地址的路径与字段映射全在 TOML;`external_id` = 云端任务号,天然支持 reattach;不占本机重任务锁、有独立并发上限;
