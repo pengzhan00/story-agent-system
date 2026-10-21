@@ -110,9 +110,9 @@ def test_a_plain_produce_run_only_makes_the_chosen_clips(tmp_path: Path) -> None
 
 
 def test_treatment_is_validated(tmp_path: Path) -> None:
-    import sqlite3
+    from storyagent.story import StoryError
 
     engine, _worker, pid = story(tmp_path)
     shot = engine.store.list_shots(pid)[0]
-    with pytest.raises(sqlite3.IntegrityError):
+    with pytest.raises(StoryError):
         engine.store.update_shot(shot["id"], {"treatment": "bogus"})

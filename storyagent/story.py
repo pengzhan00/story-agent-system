@@ -41,7 +41,7 @@ _FIELDS: dict[str, tuple[str, ...]] = {
                    "prompt_template", "voice_profile", "voice_ref_audio", "voice_ref_text", "voice_ref_consent",
                    "voice_consent_note", "lora_ref", "ref_images", "introduced_episode", "locked"),
     "scenes": ("name", "description", "lighting", "color_palette", "atmosphere", "prompt_template", "lora_ref",
-               "ref_images"),
+               "ref_images", "keyframe_mode"),
     "scripts": ("episode_no", "title", "synopsis", "acts", "total_scenes", "word_count", "status"),
     "shots": ("script_id", "act_number", "scene_number", "shot_number", "location", "shot_type", "mood", "time_of_day",
               "weather", "characters", "narration", "dialogue", "camera_notes", "visual_prompt", "payload_version",
@@ -52,6 +52,8 @@ _FIELDS: dict[str, tuple[str, ...]] = {
     "episodes": ("number", "title", "summary", "status", "season", "number_in_season", "hook", "cliffhanger"),
     "seasons": ("number", "title", "summary", "planned_episodes", "target_sec", "status"),
 }
+_CHOICES = {("shots", "treatment"): ("auto", "video", "still"),
+            ("scenes", "keyframe_mode"): ("auto", "compose", "text")}
 _PARENT_ORDER = {"shots": "act_number, scene_number, shot_number, id", "scripts": "episode_no, id",
                  "episodes": "number", "seasons": "number", "characters": "id", "scenes": "id", "music_themes": "id",
                  "sound_effects": "id"}
@@ -104,6 +106,9 @@ class StoryStore:
         unknown = set(data) - set(_FIELDS[table])
         if unknown:
             raise StoryError(f"unknown {table} fields: {sorted(unknown)}")
+        for (t, col), allowed in _CHOICES.items():
+            if t == table and col in data and data[col] not in allowed:
+                raise StoryError(f"{col} must be one of {list(allowed)}")
         return dict(data)
 
     def _insert(self, table: str, project_id: int, data: Mapping[str, Any], **extra: Any) -> int:

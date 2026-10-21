@@ -161,7 +161,8 @@ def _plan_phase(
 def keyframe_from_references(ctx: Ctx, ledger: Ledger, spec: SpecRecord, job: MediaJob) -> MediaJob:
     """Compose the shot from the approved portraits and the scene image: an image-edit job whose reference images are
     the current assets of the specs this keyframe depends on. Without any (or switched off), the job stays as it was."""
-    if not ctx.settings.workflow.get("keyframe_from_references", True) or spec.kind is not MediaKind.IMAGE_GENERATE:
+    modes = scene_modes(ctx.store, ctx.pid)
+    if not compose_wanted(ctx.settings, modes, spec) or spec.kind is not MediaKind.IMAGE_GENERATE:
         return job
     refs: list[str] = []
     for dep in spec.depends_on:
@@ -191,11 +192,26 @@ FALLBACK_SECONDS = {"image": 45.0, "image.edit": 600.0, "video": 240.0, "audio.t
                     "audio.sfx": 20.0}
 
 
-def keyframe_edit_model(settings: Settings, spec: SpecRecord) -> str:
+def scene_modes(store: StoryStore, project_id: int) -> dict[str, str]:
+    """``keyframe_mode`` of every location, by the id its scene-keyframe spec carries as subject."""
+    return {str(loc["id"]): str(loc.get("keyframe_mode") or "auto") for loc in store.list_locations(project_id)}
+
+
+def compose_wanted(settings: Settings, modes: dict[str, str], spec: SpecRecord) -> bool:
+    """Whether this shot keyframe is composed from reference images: the mode of its location when set, else the
+    project default."""
+    for dep in spec.depends_on:
+        mode = modes.get(str(dep.get("subject_id"))) if dep.get("subject_type") == "scene.keyframe" else None
+        if mode in ("compose", "text"):
+            return mode == "compose"
+    return bool(settings.workflow.get("keyframe_from_references", True))
+
+
+def keyframe_edit_model(settings: Settings, spec: SpecRecord, modes: dict[str, str]) -> str:
     """The image-edit model a shot keyframe will be composed with (``""`` = it is generated from words alone). Mirrors
     ``keyframe_from_references`` without needing the portraits to exist yet, so the plan can state the real cost."""
     if (spec.subject_type != "shot.keyframe" or spec.kind is not MediaKind.IMAGE_GENERATE
-            or not settings.workflow.get("keyframe_from_references", True)):
+            or not compose_wanted(settings, modes, spec)):
         return ""
     if not any(d.get("subject_type") in ("character.portrait", "scene.keyframe") for d in spec.depends_on):
         return ""
@@ -232,6 +248,7 @@ def _expected_seconds(ctx: Ctx, ledger: Ledger, specs: list[SpecRecord], tier: Q
     total = 0.0
     skip = {str(x) for x in ctx.params.get("skip", [])}
     only = {str(x) for x in ctx.params.get("only", [])}
+    modes = scene_modes(ctx.store, ctx.pid)
     picks = video_picks(ctx.settings, ctx.store, ledger, ctx.pid, ctx.project.settings, tier)
     for spec in specs:
         if spec.subject_type in skip or not any(spec.subject_type in p for p in PHASES):
@@ -243,7 +260,7 @@ def _expected_seconds(ctx: Ctx, ledger: Ledger, specs: list[SpecRecord], tier: Q
         if up_to_date(ledger, spec) and not ctx.force():
             continue
         kind = spec.kind.value
-        edit_ref = keyframe_edit_model(ctx.settings, spec)
+        edit_ref = keyframe_edit_model(ctx.settings, spec, modes)
         try:
             model_ref = edit_ref or spec.model_ref or ctx.settings.default_model(spec.kind.value).ref
         except ConfigError:

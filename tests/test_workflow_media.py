@@ -310,6 +310,40 @@ def test_the_plan_names_the_edit_model_and_its_cost_for_keyframes_made_from_refe
     assert {p.kind for p in plain} == {"image.generate"} and all(p.est_seconds < 600 for p in plain)
 
 
+def test_each_location_chooses_how_its_keyframes_are_made(tmp_path: Path) -> None:
+    import pytest
+
+    from storyagent.domain import QualityTier
+    from storyagent.story import StoryError
+    from storyagent.workflow.plan import produce_plan
+
+    engine, worker, _ = story(tmp_path, [FakeAdapter()])
+    ledger: Ledger = engine.spec_store.ledger
+    args = (engine.settings, engine.store, engine.spec_store, ledger, 1, QualityTier.DRAFT)
+    places = engine.store.list_locations(1)
+    assert len(places) >= 2 and {p["keyframe_mode"] for p in places} == {"auto"}
+    with pytest.raises(StoryError):
+        engine.store.update_location(places[0]["id"], {"keyframe_mode": "fast"})
+
+    def kinds_by_place() -> dict[str, set[str]]:
+        out: dict[str, set[str]] = {}
+        for p in produce_plan(*args):
+            if p.subject_type == "shot.keyframe":
+                spec = engine.spec_store.current(1, "shot.keyframe", p.subject_id)
+                where = next(d["subject_id"] for d in spec.depends_on if d["subject_type"] == "scene.keyframe")
+                out.setdefault(where, set()).add(p.kind)
+        return out
+
+    first, second = (str(p["id"]) for p in places[:2])
+    engine.store.update_location(int(first), {"keyframe_mode": "text"})
+    assert kinds_by_place()[first] == {"image.generate"}              # this place: from the prompt alone
+    assert kinds_by_place()[second] == {"image.edit"}                 # the other follows the project default (on)
+    engine.settings.workflow["keyframe_from_references"] = False
+    engine.store.update_location(int(second), {"keyframe_mode": "compose"})
+    assert kinds_by_place()[second] == {"image.edit"}                 # a place can opt in against the default
+    assert kinds_by_place()[first] == {"image.generate"}
+
+
 def test_a_project_voice_unblocks_the_dialogue_in_the_plan(tmp_path: Path) -> None:
     from storyagent.domain import QualityTier
     from storyagent.workflow.plan import produce_plan

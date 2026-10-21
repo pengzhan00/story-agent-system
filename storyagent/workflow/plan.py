@@ -26,6 +26,7 @@ from .media import (
     current_asset,
     default_voice_of,
     keyframe_edit_model,
+    scene_modes,
     up_to_date,
     video_picks,
 )
@@ -80,6 +81,7 @@ def produce_plan(
     names = _labels(store, project_id)
     default_voice = default_voice_of(settings, project_settings)
     picks = video_picks(settings, store, ledger, project_id, project_settings, tier)
+    modes = scene_modes(store, project_id)
     out: list[PlannedTask] = []
     current = specs.list_current(project_id)
     by_key = {(s.subject_type, s.subject_id, s.slot): s for s in current}
@@ -91,7 +93,7 @@ def produce_plan(
             state = "new" if asset is None else "done" if up_to_date(ledger, spec) and not force else "stale"
             reason, model_ref = "", spec.model_ref
             kind = spec.kind.value
-            edit_ref = keyframe_edit_model(settings, spec)       # composed from portraits: another, slower model
+            edit_ref = keyframe_edit_model(settings, spec, modes)       # composed from portraits: another, slower model
             if edit_ref:
                 kind, model_ref = MediaKind.IMAGE_EDIT.value, edit_ref
             try:

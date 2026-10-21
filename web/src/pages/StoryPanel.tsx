@@ -17,7 +17,7 @@ interface Field {
 /** Columns shown in the table and fields offered in the editor, per kind of row. */
 const COLUMNS: Record<StoryPart, string[]> = {
   characters: ["name", "role", "introduced_episode", "appearance", "voice_profile"],
-  locations: ["name", "description", "lighting"],
+  locations: ["name", "description", "lighting", "keyframe_mode"],
   music: ["name", "kind", "mood", "description"],
   sfx: ["name", "category", "description"],
   shots: ["act_number", "scene_number", "shot_number", "location", "narration", "treatment"],
@@ -35,6 +35,7 @@ const EDITABLE: Partial<Record<StoryPart, Field[]>> = {
   locations: [
     { key: "name", type: "text" }, { key: "description", type: "area", rows: 3 }, { key: "lighting", type: "text" },
     { key: "color_palette", type: "text" }, { key: "atmosphere", type: "text" }, { key: "prompt_template", type: "area" },
+    { key: "keyframe_mode", type: "select", options: ["auto", "compose", "text"] },
   ],
   music: [
     { key: "name", type: "text" }, { key: "mood", type: "text" }, { key: "tempo", type: "text" }, { key: "instruments", type: "text" },
