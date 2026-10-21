@@ -100,7 +100,8 @@ class LongCatAdapter(SubprocessAdapter):
         if job.seed is not None:
             argv += ["--seed", str(job.seed)]
         env = {"LONGCAT_IMAGE": str(image), "LONGCAT_AUDIO": str(audio),
-               "LONGCAT_PROMPT": str(job.inputs.get("prompt") or "a person speaking to the camera")}
+               "LONGCAT_PROMPT": str(job.inputs.get("prompt") or "a person speaking to the camera"),
+               "PYTHONUNBUFFERED": "1"}   # redirected output is block-buffered otherwise: no step lines until exit
         if ctx.settings.tools.get("longcat", {}).get("offline", True):
             # the script asks the hub for the Whisper feature-extractor config; without a route to the hub it hangs
             # on that request while "loading model". The config is in the local cache, so use only local files.
