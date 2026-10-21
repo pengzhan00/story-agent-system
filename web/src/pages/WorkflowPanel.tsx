@@ -26,6 +26,9 @@ function Spec({ id }: { id: number }) {
   const voice = project.data?.settings?.["default_voice"];
   const share = project.data?.settings?.["video_share"];
   const budget = project.data?.settings?.["video_budget_hours"];
+  const editRaw = project.data?.settings?.["edit"];
+  const edit: Record<string, unknown> = editRaw && typeof editRaw === "object" ? (editRaw as Record<string, unknown>) : {};
+  const setEdit = (key: string, value: unknown) => settings.mutate({ edit: { ...edit, [key]: value } });
   const [shareDraft, setShareDraft] = useState<string | null>(null);
   const [budgetDraft, setBudgetDraft] = useState<string | null>(null);
   const profiles = meta.data?.delivery_profiles ?? [];
@@ -103,6 +106,27 @@ function Spec({ id }: { id: number }) {
         </label>
       </div>
       <p className="muted small">{t("web.workflow.video_hint")}</p>
+      <div className="row">
+        {(["recap_card", "title_card", "next_card"] as const).map((key) => (
+          <label key={key} className="check">
+            <input type="checkbox" checked={edit[key] === true} onChange={(e) => setEdit(key, e.target.checked)} />
+            <span>{t(`web.edit.${key}`)}</span>
+          </label>
+        ))}
+        <label className="check">
+          <span>{t("web.edit.scene_fade_sec")}</span>
+          <input
+            type="number"
+            min={0}
+            max={2}
+            step={0.1}
+            value={typeof edit["scene_fade_sec"] === "number" ? String(edit["scene_fade_sec"]) : ""}
+            placeholder="0"
+            onChange={(e) => setEdit("scene_fade_sec", e.target.value === "" ? 0 : Number(e.target.value))}
+          />
+        </label>
+      </div>
+      <p className="muted small">{t("web.edit.hint")}</p>
       <p className="muted small">{t("web.workflow.voice_hint")}</p>
       <p className="muted small">{t("web.workflow.target_hint")}</p>
       <div className="row">

@@ -2444,6 +2444,13 @@ export interface components {
              * @description voice (library:voice/<name>) for characters with none; null = the global one
              */
             default_voice?: string | null;
+            /**
+             * Edit
+             * @description cards and fades of the finished episode: title_card / recap_card / next_card (bool), title_sec / recap_sec / next_sec / scene_fade_sec (seconds); null = the delivery defaults
+             */
+            edit?: {
+                [key: string]: unknown;
+            } | null;
             /** Models */
             models?: {
                 [key: string]: {

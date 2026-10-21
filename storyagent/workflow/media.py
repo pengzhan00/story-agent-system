@@ -23,9 +23,10 @@ from typing import Any
 
 from storyagent.compose.pacing import duration_window
 from storyagent.compose.qc import run_qc
-from storyagent.compose.timeline import AssetRef, ShotInput, TimelineInput, build_timeline
+from storyagent.compose.timeline import AssetRef, Card, ShotInput, TimelineInput, build_timeline
 from storyagent.config import ConfigError, Settings
 from storyagent.domain import JobStatus, MediaKind, QualityTier
+from storyagent.i18n import get_catalog
 from storyagent.media.compliance import visible_marks
 from storyagent.media.contracts import AssetRecord, JobRecord, MediaJob
 from storyagent.media.ledger import Ledger
@@ -264,6 +265,37 @@ def _asset_ref(a: AssetRecord | None, kind: str) -> AssetRef | None:
     return AssetRef(a.id, kind, a.duration_sec) if a else None
 
 
+def edit_options(ctx: Ctx) -> dict[str, Any]:
+    """Cards and fades: ``delivery.toml [edit]`` < the project's ``settings.edit`` < the run's ``edit`` parameter."""
+    out = dict(ctx.settings.delivery.get("edit", {}))
+    for layer in (ctx.project.settings.get("edit"), ctx.params.get("edit")):
+        if isinstance(layer, dict):
+            out.update(layer)
+    return out
+
+
+def episode_cards(ctx: Ctx, episode: int, opts: dict[str, Any]) -> tuple[list[Card], list[Card]]:
+    """(cards before the story, cards after it) for this episode, in the project's content language."""
+    tr = get_catalog(ctx.project.content_language).t
+    eps = {e["number"]: e for e in ctx.store.list_episodes(ctx.pid)}
+    me, before, after = eps.get(episode), eps.get(episode - 1), eps.get(episode + 1)
+    intro: list[Card] = []
+    outro: list[Card] = []
+    if opts.get("recap_card") and before and str(before["summary"]).strip():
+        intro.append(Card("recap", (tr("compose.card.recap"), str(before["summary"]).strip()[:240]),
+                          float(opts.get("recap_sec", 3.5))))
+    if opts.get("title_card") and me:
+        heading = tr("compose.card.episode", season=me["season"], n=me["number_in_season"])
+        intro.append(Card("title", (ctx.project.name, f"{heading} {me['title']}".strip()),
+                          float(opts.get("title_sec", 2.0))))
+    if opts.get("next_card"):
+        lines = [tr("compose.card.next")]
+        if after and str(after["title"]).strip():
+            lines.append(tr("compose.card.next_title", title=str(after["title"]).strip()))
+        outro.append(Card("next", tuple(lines), float(opts.get("next_sec", 2.5))))
+    return intro, outro
+
+
 def build_episode_timeline(ctx: Ctx, episode: int) -> dict[str, Any]:
     ledger, store = _ledger(ctx), ctx.spec_store
     ep = next((e for e in ctx.store.list_episodes(ctx.pid) if e["number"] == episode), None)
@@ -289,6 +321,7 @@ def build_episode_timeline(ctx: Ctx, episode: int) -> dict[str, Any]:
             video=_asset_ref(current_asset(ledger, vspec) if vspec else None, "video.generate"),
             image=_asset_ref(current_asset(ledger, kspec) if kspec else None, "image.generate"),
             lines=lines, narration=str(shot.get("narration", "")),
+            scene=f"{shot['act_number']}.{shot['scene_number']}",
         ))
     bgm = None
     cues = [m for m in ctx.store.list_music(ctx.pid) if m["kind"] == "bgm"]
@@ -300,9 +333,12 @@ def build_episode_timeline(ctx: Ctx, episode: int) -> dict[str, Any]:
             break
     profile = ctx.settings.delivery_profile(ctx.project.delivery_profile)
     label, metadata = compliance_marks(ctx)
+    opts = edit_options(ctx)
+    intro, outro = episode_cards(ctx, episode, opts)
     return build_timeline(TimelineInput(
         inputs, profile, ctx.settings.delivery["mix"], ctx.settings.delivery["subtitles"], bgm=bgm,
-        title=ctx.project.name, label=label, metadata=metadata))
+        title=ctx.project.name, label=label, metadata=metadata, intro_cards=intro, outro_cards=outro,
+        scene_fade_sec=float(opts.get("scene_fade_sec", 0) or 0)))
 
 
 def compliance_marks(ctx: Ctx) -> tuple[dict[str, Any] | None, dict[str, str]]:

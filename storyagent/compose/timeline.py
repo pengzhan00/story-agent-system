@@ -20,6 +20,7 @@ GAP_SEC = 0.25          # silence between two lines of one shot
 TAIL_SEC = 0.35         # breathing room after the last line
 MIN_SHOT_SEC = 1.0
 END_CARD_SEC = 2.0
+CARD_FADE_SEC = 0.25
 
 
 @dataclass(frozen=True)
@@ -35,6 +36,15 @@ class AssetRef:
         return f"asset:{self.id}"
 
 
+@dataclass(frozen=True)
+class Card:
+    """A text card shown before or after the story (episode title, "previously", "to be continued")."""
+
+    kind: str                       # title | recap | next
+    lines: tuple[str, ...]          # first line is the heading
+    sec: float = 2.0
+
+
 @dataclass
 class ShotInput:
     shot_id: int
@@ -44,6 +54,7 @@ class ShotInput:
     image: AssetRef | None = None   # the keyframe, used when there is no clip
     lines: list[tuple[str, AssetRef | None]] = field(default_factory=list)   # (text, speech asset or None)
     narration: str = ""
+    scene: str = ""                 # "act.scene": a change of scene gets a short fade when ``scene_fade_sec`` > 0
     sfx: list[tuple[AssetRef, float]] = field(default_factory=list)          # (asset, offset in shot)
 
 
@@ -58,6 +69,9 @@ class TimelineInput:
     title: str = ""
     label: Mapping[str, Any] | None = None       # {"text": ..., "mode": "overlay" | "both"} - the visible AIGC label
     metadata: Mapping[str, str] = field(default_factory=dict)   # container metadata (implicit AIGC marking)
+    intro_cards: Sequence[Card] = ()            # shown before the first shot, in order
+    outro_cards: Sequence[Card] = ()            # shown after the last shot, before the AIGC end card
+    scene_fade_sec: float = 0.0                 # fade out/in at a change of scene (0 = hard cut)
 
 
 Timeline = dict[str, Any]
@@ -86,6 +100,17 @@ def build_timeline(inp: TimelineInput) -> Timeline:
     warnings: list[dict[str, Any]] = []
     cursor = 0.0
 
+    def add_cards(cards: Sequence[Card]) -> None:
+        nonlocal cursor
+        for card in cards:
+            segments.append({"shot_id": 0, "label": card.kind, "start": round(cursor, 3),
+                             "duration": round(card.sec, 3), "fade_in": CARD_FADE_SEC, "fade_out": CARD_FADE_SEC,
+                             "source": {"type": "card", "kind": card.kind, "lines": list(card.lines)}})
+            cursor += card.sec
+
+    add_cards(inp.intro_cards)
+    story_start = len(segments)
+    scene_of: list[str] = []
     for shot in inp.shots:
         t = lead
         lines_out: list[dict[str, Any]] = []
@@ -114,6 +139,7 @@ def build_timeline(inp: TimelineInput) -> Timeline:
             seg["source"] = {"type": "black"}
             warnings.append({"code": "no_picture", "shot_id": shot.shot_id})
         segments.append(seg)
+        scene_of.append(shot.scene)
 
         for ln in lines_out:
             start = cursor + ln["offset"]
@@ -128,6 +154,14 @@ def build_timeline(inp: TimelineInput) -> Timeline:
         for asset, offset in shot.sfx:
             sfx.append({"asset": asset.ref, "start": round(cursor + offset, 3), "duration": asset.duration_sec})
         cursor += duration
+
+    fade = float(inp.scene_fade_sec)
+    if fade > 0:
+        for i in range(1, len(scene_of)):
+            if scene_of[i] != scene_of[i - 1]:       # dip through black at a change of scene (timing is unchanged)
+                segments[story_start + i - 1]["fade_out"] = fade
+                segments[story_start + i]["fade_in"] = fade
+    add_cards(inp.outro_cards)
 
     label_block: dict[str, Any] | None = None
     if inp.label and inp.label.get("text"):

@@ -1123,5 +1123,14 @@
   "web.workflow.default": "default",
   "web.workflow.video_hint": "A clip takes minutes to hours, a keyframe seconds. The hook, the cliffhanger and act openers get clips first; every shot can be set to video or still in the Story tab.",
   "web.field.locked": "Locked (the cast step never redesigns it)",
-  "web.field.introduced_episode": "First seen in episode"
+  "web.field.introduced_episode": "First seen in episode",
+  "compose.card.recap": "Previously",
+  "compose.card.episode": "S{season} E{n}",
+  "compose.card.next": "To be continued",
+  "compose.card.next_title": "Next: {title}",
+  "web.edit.recap_card": "“Previously” card",
+  "web.edit.title_card": "Title card",
+  "web.edit.next_card": "“To be continued” card",
+  "web.edit.scene_fade_sec": "Fade between scenes (s)",
+  "web.edit.hint": "Cards and fades are added when the episode is assembled. Off by default: a series episode usually jumps straight into its hook."
 }

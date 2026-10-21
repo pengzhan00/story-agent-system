@@ -13,7 +13,7 @@ from storyagent.domain import slugify
 
 _PATCHABLE = ("name", "description", "genre", "content_language", "delivery_profile", "aspect_ratio")
 _SETTINGS_KEYS = ("compliance", "models", "allow_restricted_licenses", "target_sec", "allow_remote", "default_voice",
-                  "video_share", "video_budget_hours")
+                  "video_share", "video_budget_hours", "edit")
 
 
 class ProjectNotFound(LookupError):
@@ -47,6 +47,26 @@ class Project:
             aspect_ratio=r["aspect_ratio"], status=r["status"], settings=json.loads(r["settings"] or "{}"),
             created_at=r["created_at"], updated_at=r["updated_at"],
         )
+
+
+EDIT_FLAGS = ("title_card", "recap_card", "next_card")
+EDIT_SECONDS = ("scene_fade_sec", "title_sec", "recap_sec", "next_sec")
+
+
+def _check_edit(edit: Any) -> None:
+    """``settings.edit``: switches for the title / recap / next cards and the lengths and fade in seconds."""
+    if not isinstance(edit, dict):
+        raise ConfigError("edit must be an object")
+    unknown = set(edit) - {*EDIT_FLAGS, *EDIT_SECONDS}
+    if unknown:
+        raise ConfigError(f"unknown edit options {sorted(unknown)}; allowed: {[*EDIT_FLAGS, *EDIT_SECONDS]}")
+    for key in EDIT_FLAGS:
+        if key in edit and not isinstance(edit[key], bool):
+            raise ConfigError(f"edit.{key} must be true or false")
+    for key in EDIT_SECONDS:
+        if key in edit and not (isinstance(edit[key], int | float) and not isinstance(edit[key], bool)
+                                and 0 <= edit[key] <= 30):
+            raise ConfigError(f"edit.{key} must be a number of seconds between 0 and 30")
 
 
 class ProjectStore:
@@ -135,6 +155,9 @@ class ProjectStore:
                     raise ConfigError(f"{key} must be a number >= 0")
             if current.get("video_share", 0) > 1:
                 raise ConfigError("video_share is a fraction between 0 and 1")
+            edit = current.get("edit")
+            if edit is not None:
+                _check_edit(edit)
             voice = current.get("default_voice")
             if voice is not None and not (isinstance(voice, str) and voice.startswith(("library:voice/", "asset:"))):
                 raise ConfigError("default_voice must be a library:voice/<name> or asset:<id> reference")

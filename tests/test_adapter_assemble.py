@@ -136,3 +136,43 @@ def test_a_required_label_without_libass_is_refused_up_front(tmp_path: Path, mon
     rig = make_rig(make_settings(tmp_path), AssembleAdapter(poll_interval_sec=0.02))
     rec, _ = rig.run(job(MediaKind.COMPOSE_ASSEMBLE, "ffmpeg-assemble", {"timeline": tl}, seed=1))
     assert rec.status is JobStatus.FAILED_VALIDATION and rec.error_code == ErrorCode.MISSING_TOOL.value
+
+
+def test_cards_and_scene_fades_render(tmp_path: Path) -> None:
+    from storyagent.compose.timeline import Card
+
+    ff = ffmpeg_of(tmp_path)
+    m = make_media(tmp_path, ff)
+
+    def ref(name: str, kind: str, dur: float | None) -> AssetRef:
+        return AssetRef(str(m[name]), kind, dur)
+
+    shots = [ShotInput(1, "1.1.1", 1.2, video=ref("clip.mp4", "video.generate", 1.0), scene="1.1"),
+             ShotInput(2, "1.2.1", 1.2, image=ref("still.png", "image.generate", None), scene="1.2")]
+    profile = {"width": 72, "height": 128, "fps": 12, "crf": 28, "pix_fmt": "yuv420p"}
+    tl = as_paths(build_timeline(TimelineInput(
+        shots, profile, {"lead_in_sec": 0.3, "loudnorm_i": -16.0}, {"font": "Arial", "font_size": 12,
+        "bold": True, "colour": "FFEE00", "border_style": 3},
+        bgm=ref("bgm.wav", "audio.music", 2.0), scene_fade_sec=0.3,
+        intro_cards=[Card("title", ("Saga", "S1 E1 Rain"), 1.0)],
+        outro_cards=[Card("next", ("To be continued",), 1.0)])))
+    rig = make_rig(make_settings(tmp_path), AssembleAdapter(poll_interval_sec=0.02))
+    rec, assets = rig.run(job(MediaKind.COMPOSE_ASSEMBLE, "ffmpeg-assemble", {"timeline": tl}, seed=3), timeout=120)
+    assert rec.status is JobStatus.COMPLETED, (rec.error_code, rec.error_message)
+    main = next(a for a in assets if a.slot == "main")
+    info = probe(rig.settings, rig.settings.home / main.path)
+    assert info is not None and info.duration_sec is not None and abs(info.duration_sec - tl["total_sec"]) < 0.4
+    assert tl["total_sec"] == pytest.approx(1.0 + 1.2 + 1.2 + 1.0)
+    codes = [w["code"] for w in main.metadata["warnings"]]
+    assert ("card_without_libass" in codes) is (not has_libass(ff))
+
+
+def test_the_subtitle_style_reads_the_config() -> None:
+    from storyagent.media.runners.assemble_episode import ass_colour, subtitle_style
+
+    assert ass_colour("FFEE00", "FFFFFF") == "&H0000EEFF" and ass_colour("zz", "000000") == "&H00000000"
+    style = subtitle_style({"font": "X", "font_size": 20, "bold": True, "colour": "FFEE00", "border_style": 3,
+                            "alignment": 8, "margin_v": 30, "outline": 2})
+    assert "PrimaryColour=&H0000EEFF" in style and "Bold=1" in style and "BorderStyle=3" in style
+    assert "Alignment=8" in style and "MarginV=30" in style
+    assert "Bold=0" in subtitle_style({}) and "BorderStyle=1" in subtitle_style({"border_style": 2})

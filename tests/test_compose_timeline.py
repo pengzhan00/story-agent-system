@@ -68,3 +68,31 @@ def test_music_bed_spans_the_episode_and_sfx_land_in_their_shot() -> None:
     assert t["sfx"][0]["start"] == 2.5
     assert t["audio"]["loudnorm"] == {"i": -16.0, "tp": -1.5, "lra": 11.0} and t["video"]["width"] == 720
     assert "no_bgm" not in {w["code"] for w in t["warnings"]}
+
+
+def test_cards_come_before_and_after_the_story_and_shift_everything_else() -> None:
+    from storyagent.compose.timeline import Card
+
+    shot = ShotInput(1, "1.1.1", 3.0, video=clip("v", 3.0), lines=[("Hi", voice("a", 1.0))])
+    plain = tl(shot)
+    t = build_timeline(TimelineInput(
+        [shot], PROFILE, MIX, {"font": "X"}, bgm=None,
+        intro_cards=[Card("recap", ("Previously", "Things happened"), 3.0), Card("title", ("Saga", "S1 E2 Rain"), 2.0)],
+        outro_cards=[Card("next", ("To be continued",), 2.5)]))
+    assert [s["label"] for s in t["segments"]] == ["recap", "title", "1.1.1", "next"]
+    assert [s["start"] for s in t["segments"]] == [0.0, 3.0, 5.0, 5.0 + plain["total_sec"]]
+    assert t["segments"][0]["source"] == {"type": "card", "kind": "recap", "lines": ["Previously", "Things happened"]}
+    assert t["total_sec"] == plain["total_sec"] + 7.5
+    # speech and subtitles move with the story
+    assert t["speech"][0]["start"] == plain["speech"][0]["start"] + 5.0
+    assert t["subtitles"]["cues"][0]["start"] == plain["subtitles"]["cues"][0]["start"] + 5.0
+
+
+def test_a_change_of_scene_gets_a_fade_and_the_timing_stays() -> None:
+    shots = [ShotInput(i, str(i), 2.0, video=clip(f"v{i}", 2.0), scene=sc)
+             for i, sc in ((1, "1.1"), (2, "1.1"), (3, "1.2"))]
+    hard = build_timeline(TimelineInput(shots, PROFILE, MIX))
+    soft = build_timeline(TimelineInput(shots, PROFILE, MIX, scene_fade_sec=0.3))
+    assert [s["start"] for s in soft["segments"]] == [s["start"] for s in hard["segments"]] and soft["total_sec"] == 6.0
+    assert "fade_out" not in soft["segments"][0] and soft["segments"][1]["fade_out"] == 0.3
+    assert soft["segments"][2]["fade_in"] == 0.3 and "fade_in" not in hard["segments"][2]

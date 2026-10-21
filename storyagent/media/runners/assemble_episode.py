@@ -46,24 +46,82 @@ def write_srt(cues: list[dict[str, Any]], dest: Path) -> None:
     dest.write_text("\n".join(lines), encoding="utf-8")
 
 
-def segment_cmd(ffmpeg: str, seg: dict[str, Any], vid: dict[str, Any], dest: Path) -> list[str]:
+def fades(seg: dict[str, Any]) -> list[str]:
+    """Dip in from / out to black at the segment's ends (never longer than half the segment)."""
+    dur = float(seg["duration"])
+    out: list[str] = []
+    fin = min(float(seg.get("fade_in", 0) or 0), dur / 2)
+    fout = min(float(seg.get("fade_out", 0) or 0), dur / 2)
+    if fin > 0:
+        out.append(f"fade=t=in:st=0:d={fin}")
+    if fout > 0:
+        out.append(f"fade=t=out:st={round(dur - fout, 3)}:d={fout}")
+    return out
+
+
+def segment_cmd(
+    ffmpeg: str, seg: dict[str, Any], vid: dict[str, Any], dest: Path, card_ass: str | None = None,
+) -> list[str]:
     w, h, fps, dur = vid["width"], vid["height"], vid["fps"], float(seg["duration"])
     src = seg["source"]
     fill = f"scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h},setsar=1"
     base = [ffmpeg, "-y", "-loglevel", "error", "-nostdin"]
+    tail = fades(seg)
     if src["type"] == "video":
         chain = [f"setpts={src['speed']}*PTS"] if src["speed"] != 1.0 else []
         chain += [fill, f"fps={fps}"]
         if src.get("hold_after", 0) > 0:
             chain.append(f"tpad=stop_mode=clone:stop_duration={src['hold_after']}")
+        chain += tail
         return [*base, "-i", src["path"], "-vf", ",".join(chain), "-t", f"{dur}", "-an", *INTERMEDIATE, str(dest)]
     if src["type"] == "image":
         frames = max(int(dur * fps), 1)
         zoom = (f"{fill},zoompan=z='min(zoom+0.0004,1.12)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
                 f":d={frames}:s={w}x{h}:fps={fps}")
-        return [*base, "-loop", "1", "-i", src["path"], "-vf", zoom, "-t", f"{dur}", "-an", *INTERMEDIATE, str(dest)]
+        zoomed = ",".join([zoom, *tail])
+        return [*base, "-loop", "1", "-i", src["path"], "-vf", zoomed, "-t", f"{dur}", "-an", *INTERMEDIATE, str(dest)]
     black = f"color=c=black:s={w}x{h}:r={fps}"
-    return [*base, "-f", "lavfi", "-i", black, "-t", f"{dur}", "-an", *INTERMEDIATE, str(dest)]
+    chain = [f"ass=filename='{card_ass}'"] if card_ass else []
+    chain += tail
+    vf = ["-vf", ",".join(chain)] if chain else []
+    return [*base, "-f", "lavfi", "-i", black, *vf, "-t", f"{dur}", "-an", *INTERMEDIATE, str(dest)]
+
+
+def ass_colour(rgb: str, default: str) -> str:
+    """``RRGGBB`` (as written in the config) -> the ``&H00BBGGRR`` libass wants."""
+    text = str(rgb or default).lstrip("#").upper()
+    if len(text) != 6 or any(c not in "0123456789ABCDEF" for c in text):
+        text = default
+    return f"&H00{text[4:6]}{text[2:4]}{text[0:2]}"
+
+
+def subtitle_style(sub: dict[str, Any]) -> str:
+    """The libass ``force_style`` string from ``[subtitles]``: font, size, colours, bold, box or outline, position."""
+    return (f"FontName={sub.get('font', 'Arial')},FontSize={sub.get('font_size', 16)},"
+            f"PrimaryColour={ass_colour(sub.get('colour', ''), 'FFFFFF')},"
+            f"OutlineColour={ass_colour(sub.get('outline_colour', ''), '000000')},"
+            f"BackColour={ass_colour(sub.get('back_colour', ''), '000000')},Bold={1 if sub.get('bold') else 0},"
+            f"BorderStyle={3 if int(sub.get('border_style', 1)) == 3 else 1},MarginV={sub.get('margin_v', 42)},"
+            f"Outline={sub.get('outline', 1)},Alignment={int(sub.get('alignment', 2))}")
+
+
+def write_card_ass(lines: list[str], vid: dict[str, Any], font: str, duration: float, dest: Path) -> None:
+    """A text card: the heading big and bold, the rest smaller, all centred."""
+    w, h = vid["width"], vid["height"]
+    big, small = max(h // 22, 30), max(h // 36, 20)
+    text = "\\N".join(str(x).replace("\n", " ") for x in lines[1:])
+    body = f"{{\\b1\\fs{big}}}{str(lines[0]) if lines else ''}"
+    if text:
+        body += f"{{\\b0\\fs{small}}}\\N\\N{text}"
+    head = [
+        "[Script Info]", "ScriptType: v4.00+", f"PlayResX: {w}", f"PlayResY: {h}", "",
+        "[V4+ Styles]",
+        "Format: Name,Fontname,Fontsize,PrimaryColour,OutlineColour,BackColour,Bold,BorderStyle,Outline,Shadow,"
+        "Alignment,MarginL,MarginR,MarginV",
+        f"Style: Card,{font},{small},&H00FFFFFF,&H00000000,&H00000000,0,1,0,0,5,60,60,60", "",
+        "[Events]", "Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text",
+        f"Dialogue: 0,{ass_time(0)},{ass_time(duration)},Card,,0,0,0,,{body}"]
+    dest.write_text("\n".join(head) + "\n", encoding="utf-8")
 
 
 def audio_cmd(ffmpeg: str, tl: dict[str, Any], dest: Path) -> list[str]:
@@ -151,11 +209,21 @@ def main(config_path: str) -> int:
     segs = tl["segments"]
     total = len(segs) + 3
 
+    libass = has_filter(ffmpeg, "subtitles") and has_filter(ffmpeg, "ass")
+    font = str(tl["subtitles"].get("font", "Arial"))
+    notes: list[dict[str, Any]] = []
     parts: list[Path] = []
     for i, seg in enumerate(segs):
         emit(i, total, f"shot {i + 1}/{len(segs)}")
         dest = work / f"seg_{i:03d}.mp4"
-        run(segment_cmd(ffmpeg, seg, vid, dest))
+        card_ass: str | None = None
+        if seg["source"]["type"] == "card":
+            if libass:
+                card_ass = f"card_{i:03d}.ass"
+                write_card_ass(seg["source"].get("lines", []), vid, font, float(seg["duration"]), work / card_ass)
+            else:
+                notes.append({"code": "card_without_libass", "card": seg["source"].get("kind", "")})
+        run(segment_cmd(ffmpeg, seg, vid, dest, card_ass), cwd=work)
         parts.append(dest)
 
     emit(len(segs), total, "video")
@@ -175,14 +243,12 @@ def main(config_path: str) -> int:
     write_srt(cues, srt)
     final = out / "episode.mp4"
     label = tl.get("label")
-    libass = has_filter(ffmpeg, "subtitles") and has_filter(ffmpeg, "ass")
     if label and not libass:                      # a required label is never silently dropped
         print("this ffmpeg has no libass: cannot burn the visible AIGC label", file=sys.stderr, flush=True)
         return 3
     burn = bool(cfg.get("burn_subtitles", True)) and bool(cues) and libass
     sub = tl["subtitles"]
-    style = (f"FontName={sub.get('font', 'Arial')},FontSize={sub.get('font_size', 16)},"
-             f"MarginV={sub.get('margin_v', 42)},Outline={sub.get('outline', 1)},Alignment=2")
+    style = subtitle_style(sub)
     cmd = [ffmpeg, "-y", "-loglevel", "error", "-nostdin", "-i", str(joined), "-i", str(mixed)]
     filters: list[str] = []
     if burn:
@@ -201,7 +267,7 @@ def main(config_path: str) -> int:
     run(cmd, cwd=out)
     emit(total, total, "done")
     report = {"burned_subtitles": burn, "label": bool(label), "total_sec": tl["total_sec"],
-              "warnings": tl.get("warnings", [])}
+              "warnings": [*tl.get("warnings", []), *notes]}
     (out / "report.json").write_text(json.dumps(report, ensure_ascii=False), "utf-8")
     return 0
 

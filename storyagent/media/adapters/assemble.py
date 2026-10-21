@@ -61,8 +61,9 @@ class AssembleAdapter(SubprocessAdapter):
         if tl.get("label") and ffmpeg is not None and not has_libass(str(ffmpeg)):
             return [ValidationIssue(ErrorCode.MISSING_TOOL, "the visible AIGC label needs an ffmpeg with libass",
                                     {"tool": "ffmpeg-full"})]
+        generated = ("black", "card")                       # made by ffmpeg itself, no file behind them
         missing = [s["shot_id"] for s in tl["segments"]
-                   if s["source"]["type"] != "black" and not Path(str(s["source"].get("asset", ""))).is_file()]
+                   if s["source"]["type"] not in generated and not Path(str(s["source"].get("asset", ""))).is_file()]
         if missing:
             return [ValidationIssue(ErrorCode.INVALID_INPUT, f"picture file missing for shots {missing}",
                                     {"detail": f"shots {missing}"})]

@@ -2353,6 +2353,19 @@
             "description": "voice (library:voice/<name>) for characters with none; null = the global one",
             "title": "Default Voice"
           },
+          "edit": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "cards and fades of the finished episode: title_card / recap_card / next_card (bool), title_sec / recap_sec / next_sec / scene_fade_sec (seconds); null = the delivery defaults",
+            "title": "Edit"
+          },
           "models": {
             "anyOf": [
               {

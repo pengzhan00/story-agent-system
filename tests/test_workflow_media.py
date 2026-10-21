@@ -337,3 +337,30 @@ def test_the_series_board_counts_match_the_shots_and_assets_behind_them(tmp_path
     assert spec is not None
     engine.spec_store.edit(1, "shot.keyframe", str(shot["id"]), prompt="changed")   # now older than its spec
     assert board()["seasons"][0]["episodes"][0]["outdated"] == 1
+
+
+def test_compose_adds_the_cards_the_project_asks_for_in_its_language(tmp_path: Path) -> None:
+    import json
+
+    engine, worker = _episode_rig(tmp_path)
+    engine.store.update_episode(engine.store.ensure_episode(1, 1)["id"], {"title": "Rain Night"})
+    engine.store.ensure_episode(1, 2, title="The Pier", summary="Two people, one case.")
+    engine.db.conn.execute("UPDATE projects SET content_language='zh-CN', name='Saga', settings=? WHERE id=1", (
+        json.dumps({"edit": {"title_card": True, "next_card": True, "scene_fade_sec": 0.2}}),))
+    with serving(worker):
+        out = engine.run_stage(1, "compose", {"burn_subtitles": False})
+    tl = engine.spec_store.ledger.get_job(out["job_id"]).inputs["timeline"]
+    cards = [s for s in tl["segments"] if s["source"]["type"] == "card"]
+    assert [c["label"] for c in cards] == ["title", "next"] and tl["segments"][0]["label"] == "title"
+    assert cards[0]["source"]["lines"] == ["Saga", "第 1 季 第 1 集 Rain Night"]
+    assert cards[1]["source"]["lines"] == ["未完待续", "下一集:The Pier"]
+    assert any("fade_in" in s for s in tl["segments"][1:-1])                    # scene changes dip through black
+    on = {s["label"] for s in tl["segments"]}
+    assert "recap" not in on                                                    # not asked for
+    # a run parameter overrides the project: ask for the recap of episode 1 on episode 2's film
+    from storyagent.workflow.media import edit_options
+
+    assert edit_options(type("C", (), {"settings": engine.settings, "project": engine.projects.get(1),
+                                       "params": {"edit": {"recap_card": True, "next_card": False}}})()
+                        )["recap_card"] is True
+

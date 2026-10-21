@@ -94,6 +94,10 @@ class ProjectSettingsPatch(BaseModel):
         default=None, ge=0, le=1, description="share of an episode's shots that get a video clip (0-1); null = default")
     video_budget_hours: float | None = Field(
         default=None, ge=0, description="machine hours for video clips in the series (0 = no limit); null = default")
+    edit: dict[str, Any] | None = Field(
+        default=None,
+        description="cards and fades of the finished episode: title_card / recap_card / next_card (bool), "
+                    "title_sec / recap_sec / next_sec / scene_fade_sec (seconds); null = the delivery defaults")
     default_voice: str | None = Field(
         default=None, description="voice (library:voice/<name>) for characters with none; null = the global one")
 

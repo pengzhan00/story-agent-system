@@ -1123,5 +1123,14 @@
   "web.workflow.default": "默认",
   "web.workflow.video_hint": "一段视频要几分钟到几小时,关键帧只要几秒。开场钩子、结尾悬念和每幕开头优先做视频;每个镜头都能在「故事」页单独设为视频或静图。",
   "web.field.locked": "锁定(「角色」步骤不会重新设计它)",
-  "web.field.introduced_episode": "首次出场(集)"
+  "web.field.introduced_episode": "首次出场(集)",
+  "compose.card.recap": "前情提要",
+  "compose.card.episode": "第 {season} 季 第 {n} 集",
+  "compose.card.next": "未完待续",
+  "compose.card.next_title": "下一集:{title}",
+  "web.edit.recap_card": "前情提要卡",
+  "web.edit.title_card": "片名卡",
+  "web.edit.next_card": "未完待续卡",
+  "web.edit.scene_fade_sec": "场景之间淡入淡出(秒)",
+  "web.edit.hint": "卡片和淡入淡出在合成成片时加入。默认都关:连续剧每集通常直接从开场钩子开始。"
 }

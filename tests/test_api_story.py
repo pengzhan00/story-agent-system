@@ -355,3 +355,11 @@ def test_the_series_board_lists_seasons_and_planned_episodes(client: TestClient)
     assert board["totals"] == {"episodes": 3, "planned": 3, "scripted": 0, "filmed": 0, "shots": 0, "keyframes": 0,
                                "videos": 0}
     assert client.get("/api/projects/999/series").status_code == 404
+
+
+def test_project_edit_settings_are_validated(client: TestClient) -> None:
+    pid = client.post("/api/projects", json={"name": "Edit"}).json()["id"]
+    ok = client.patch(f"/api/projects/{pid}/settings", json={"edit": {"title_card": True, "scene_fade_sec": 0.3}})
+    assert ok.status_code == 200 and ok.json()["settings"]["edit"]["title_card"] is True
+    for bad in ({"title_card": "yes"}, {"scene_fade_sec": 99}, {"bogus": 1}, {"recap_sec": -1}):
+        assert client.patch(f"/api/projects/{pid}/settings", json={"edit": bad}).status_code == 422

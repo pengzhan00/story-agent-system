@@ -77,11 +77,28 @@ loudnorm_tp = -1.5
 loudnorm_lra = 11.0
 max_slowdown = 2.2
 
+[edit]
+# Cards and transitions of the finished episode (per project: projects.settings.edit with the same keys). Off by
+# default: a series episode usually jumps straight into its hook.
+scene_fade_sec = 0.0     # dip through black at a change of scene (0 = hard cut)
+title_card = false       # "S1 E3" and the episode title before the story
+recap_card = false       # "previously": the last episode's summary before the story
+next_card = false        # "to be continued" (and the next episode's title) after the story
+title_sec = 2.0
+recap_sec = 3.5
+next_sec = 2.5
+
 [subtitles]
 font = "PingFang SC"
 font_size = 16
 margin_v = 42
 outline = 1
+bold = false
+colour = "FFFFFF"            # RRGGBB
+outline_colour = "000000"
+back_colour = "000000"
+border_style = 1             # 1 = outline, 3 = opaque box behind the text
+alignment = 2                # 2 = bottom centre, 8 = top centre, 5 = middle
 
 [qc]
 # Thresholds carried over from the legacy quality gate.
