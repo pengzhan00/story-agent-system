@@ -6,12 +6,13 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
+from storyagent.compose.pacing import PacingError, parse_target
 from storyagent.config import ConfigError, Settings
 from storyagent.db import Database
 from storyagent.domain import slugify
 
 _PATCHABLE = ("name", "description", "genre", "content_language", "delivery_profile", "aspect_ratio")
-_SETTINGS_KEYS = ("compliance", "models", "allow_restricted_licenses")
+_SETTINGS_KEYS = ("compliance", "models", "allow_restricted_licenses", "target_sec")
 
 
 class ProjectNotFound(LookupError):
@@ -124,6 +125,10 @@ class ProjectStore:
                 else:
                     current[key] = value
             self.settings.compliance_for(current)  # validates the compliance group
+            try:
+                parse_target(current.get("target_sec"))
+            except PacingError as exc:
+                raise ConfigError(str(exc)) from exc
             for ref in current.get("models", {}):
                 self.settings.model(ref)  # unknown model ref -> ConfigError
             conn.execute(

@@ -16,6 +16,23 @@ audio_rate = 48000
 min_episode_sec = 180
 max_episode_sec = 480
 
+# Continuous vertical series (many short episodes). The length range is the adjustable target: 90-180 s, and a run or
+# a project may set `target_sec` (a 30 s pilot, say). These numbers are not a platform requirement: edit them here.
+[profiles.series_vertical_720]
+label_key = "delivery.profile.series_vertical_720"
+width = 720
+height = 1280
+fps = 24
+video_codec = "libx264"
+crf = 18
+pix_fmt = "yuv420p"
+audio_codec = "aac"
+audio_bitrate = "192k"
+audio_rate = 48000
+target_sec = 120
+min_episode_sec = 90
+max_episode_sec = 180
+
 [profiles.shortdrama_vertical_1080]
 label_key = "delivery.profile.shortdrama_vertical_1080"
 width = 1080
@@ -43,6 +60,12 @@ audio_bitrate = "192k"
 audio_rate = 48000
 min_episode_sec = 0
 max_episode_sec = 0
+
+[pacing]
+# Average planned shot length: with the target length it decides how many acts, scenes and shots to write.
+avg_shot_sec = 4.0
+# With an explicit target the episode counts as the right length within target +/- tolerance (a fraction).
+tolerance = 0.2
 
 [mix]
 voice_gain = 1.0

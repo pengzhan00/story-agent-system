@@ -1048,5 +1048,16 @@
   "web.workshop.shot.narration": "Narration caption (when nobody speaks)",
   "web.workshop.shot.seconds": "Planned seconds (the voice may make it longer)",
   "web.workshop.move_up": "Up",
-  "web.workshop.move_down": "Down"
+  "web.workshop.move_down": "Down",
+  "delivery.profile.series_vertical_720": "Series episode, vertical 720×1280 (length range adjustable)",
+  "workflow.error.bad_target": "The target length is not valid.",
+  "workflow.error.bad_target.remediation": "Give the wanted length in seconds (for example 30, 120 or 5400).",
+  "web.workflow.target": "Target length",
+  "web.workflow.target_hint": "Seconds, anything from an advert to a feature film. Decides how many acts, scenes and shots are written and how long each shot is planned. Empty = the profile's.",
+  "web.workflow.target_unit": "seconds",
+  "web.workflow.target_pilot": "30 s pilot",
+  "web.workflow.target_clear": "Use the profile's",
+  "web.workflow.profile": "Delivery profile",
+  "web.workflow.profile_range": "{lo}-{hi} s",
+  "web.workflow.profile_open": "any length"
 }

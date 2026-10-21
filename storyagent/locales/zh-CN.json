@@ -1048,5 +1048,16 @@
   "web.workshop.shot.narration": "旁白字幕(没人说话时)",
   "web.workshop.shot.seconds": "预计秒数(配音更长时会自动延长)",
   "web.workshop.move_up": "上移",
-  "web.workshop.move_down": "下移"
+  "web.workshop.move_down": "下移",
+  "delivery.profile.series_vertical_720": "连续剧单集,竖屏 720×1280(时长范围可调)",
+  "workflow.error.bad_target": "目标时长不合法。",
+  "workflow.error.bad_target.remediation": "填想要的时长(秒),例如 30、120 或 5400。",
+  "web.workflow.target": "目标时长",
+  "web.workflow.target_hint": "单位秒,从广告到大电影都可以。它决定写多少幕、场景、镜头,以及每个镜头计划多长。留空 = 用交付档位的默认。",
+  "web.workflow.target_unit": "秒",
+  "web.workflow.target_pilot": "30 秒试播",
+  "web.workflow.target_clear": "用档位默认",
+  "web.workflow.profile": "交付档位",
+  "web.workflow.profile_range": "{lo}-{hi} 秒",
+  "web.workflow.profile_open": "不限时长"
 }

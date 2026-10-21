@@ -86,6 +86,8 @@ class ProjectSettingsPatch(BaseModel):
     models: dict[str, dict[str, Any]] | None = None
     allow_restricted_licenses: bool | None = Field(
         default=None, description="acknowledge models whose licence restricts commercial use or territory")
+    target_sec: float | None = Field(
+        default=None, description="wanted episode length in seconds (advert to feature film); null = the profile's")
 
 
 # -- jobs -------------------------------------------------------------------------------------------
@@ -349,6 +351,17 @@ class QueueState(BaseModel):
     waiting: dict[str, int] = Field(description="queued jobs per wait reason key (wait.<reason>)")
 
 
+class DeliveryProfileOut(Strict):
+    name: str
+    label: str
+    width: int
+    height: int
+    fps: int
+    target_sec: float | None
+    min_episode_sec: float
+    max_episode_sec: float
+
+
 class Meta(BaseModel):
     version: str
     locale: str
@@ -362,6 +375,8 @@ class Meta(BaseModel):
     models: list[ModelOut]
     defaults: dict[str, str]
     recipes: list[RecipeOut]
+    delivery_profiles: list[DeliveryProfileOut]
+    delivery_default: str
     compliance_enabled: bool
     llm_unload_policy: str
     queue: QueueState

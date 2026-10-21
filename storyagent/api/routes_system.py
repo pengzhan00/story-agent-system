@@ -22,6 +22,7 @@ from .context import ApiContext, Translator, ctx_of, translator_of
 from .errors import ApiError
 from .routes_jobs import queue_state
 from .schemas import (
+    DeliveryProfileOut,
     HealthEntry,
     HealthOut,
     JobOut,
@@ -89,6 +90,14 @@ def meta(request: Request) -> Meta:
             )
             for m in s.models.values()
         ],
+        delivery_profiles=[
+            DeliveryProfileOut(
+                name=n, label=t(str(p.get("label_key", ""))) if p.get("label_key") else n, width=int(p["width"]),
+                height=int(p["height"]), fps=int(p["fps"]), target_sec=p.get("target_sec"),
+                min_episode_sec=float(p.get("min_episode_sec", 0)), max_episode_sec=float(p.get("max_episode_sec", 0)))
+            for n, p in s.delivery["profiles"].items()
+        ],
+        delivery_default=str(s.delivery["default"]["profile"]),
         defaults=dict(s.default_models),
         recipes=[
             RecipeOut(

@@ -24,6 +24,7 @@ from typing import Any
 
 from storyagent.agents import AgentRunner
 from storyagent.agents.runner import language_name
+from storyagent.compose.pacing import PacingError, fit_durations, structure_for, target_for
 from storyagent.config import Settings
 from storyagent.db import Database
 from storyagent.projects import Project, ProjectStore
@@ -73,6 +74,14 @@ class Ctx:
 
     def force(self) -> bool:
         return bool(self.params.get("force"))
+
+    def target_sec(self) -> float | None:
+        """Wanted episode length: run parameter > project setting > delivery profile (``None`` = no target)."""
+        profile = self.settings.delivery_profile(self.project.delivery_profile)
+        try:
+            return target_for(self.params, self.project.settings, profile)
+        except PacingError as exc:
+            raise StageError("bad_target", str(exc)) from exc
 
     def hint_weight(self, seconds: float) -> None:
         """Tell the progress bar how long this stage is expected to take (it only reshapes the overall percentage)."""
@@ -183,9 +192,11 @@ def script(ctx: Ctx) -> dict[str, Any]:
     chars = ctx.store.list_characters(ctx.pid)
     if not chars:
         raise StageError("needs_stage", "run the cast stage first", stage="cast")
-    acts_n = int(ctx.params.get("acts") or plan.get("act_count") or 4)
-    per_act = int(ctx.params.get("scenes_per_act") or 3)
-    shots_n = int(ctx.params.get("shots_per_scene") or 3)
+    target = ctx.target_sec()
+    sized = structure_for(target, float(ctx.settings.delivery["pacing"]["avg_shot_sec"])) if target else (None,) * 3
+    acts_n = int(ctx.params.get("acts") or sized[0] or plan.get("act_count") or 4)
+    per_act = int(ctx.params.get("scenes_per_act") or sized[1] or 3)
+    shots_n = int(ctx.params.get("shots_per_scene") or sized[2] or 3)
     existing = ctx.store.get_script(ctx.pid, episode)
     ctx.store.ensure_episode(ctx.pid, episode)
 
@@ -341,6 +352,12 @@ def shotplan(ctx: Ctx) -> dict[str, Any]:
         min_shot_sec=float(ctx.params.get("min_shot_sec", 2.0)),
         max_shot_sec=float(ctx.params.get("max_shot_sec", 8.0)),
     )
+    target = ctx.target_sec()
+    if target and rows:           # planned lengths add up to the wanted length (speech may still extend a shot)
+        fitted = fit_durations([float(r["render_payload"]["camera"]["duration_sec"]) for r in rows], target,
+                               float(ctx.params.get("min_shot_sec", 2.0)), float(ctx.params.get("max_shot_sec", 8.0)))
+        for row, seconds in zip(rows, fitted, strict=True):
+            row["render_payload"]["camera"]["duration_sec"] = seconds
     created, kept = ctx.store.replace_episode_shots(ctx.pid, ep["id"], rows)
     ctx.store.update_episode(ep["id"], {"status": "planned"})
     unresolved = sorted({line["character"] for line in ctx.store.dialogue_lines(ctx.pid, ep["id"])

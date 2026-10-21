@@ -516,6 +516,61 @@
         "title": "CancelResult",
         "type": "object"
       },
+      "DeliveryProfileOut": {
+        "properties": {
+          "fps": {
+            "title": "Fps",
+            "type": "integer"
+          },
+          "height": {
+            "title": "Height",
+            "type": "integer"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "max_episode_sec": {
+            "title": "Max Episode Sec",
+            "type": "number"
+          },
+          "min_episode_sec": {
+            "title": "Min Episode Sec",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "target_sec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Sec"
+          },
+          "width": {
+            "title": "Width",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "label",
+          "width",
+          "height",
+          "fps",
+          "target_sec",
+          "min_episode_sec",
+          "max_episode_sec"
+        ],
+        "title": "DeliveryProfileOut",
+        "type": "object"
+      },
       "FlowOut": {
         "properties": {
           "steps": {
@@ -1456,6 +1511,17 @@
             "title": "Defaults",
             "type": "object"
           },
+          "delivery_default": {
+            "title": "Delivery Default",
+            "type": "string"
+          },
+          "delivery_profiles": {
+            "items": {
+              "$ref": "#/components/schemas/DeliveryProfileOut"
+            },
+            "title": "Delivery Profiles",
+            "type": "array"
+          },
           "kinds": {
             "items": {
               "$ref": "#/components/schemas/LabeledValue"
@@ -1548,6 +1614,8 @@
           "models",
           "defaults",
           "recipes",
+          "delivery_profiles",
+          "delivery_default",
           "compliance_enabled",
           "llm_unload_policy",
           "queue"
@@ -2080,6 +2148,18 @@
               }
             ],
             "title": "Models"
+          },
+          "target_sec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "wanted episode length in seconds (advert to feature film); null = the profile's",
+            "title": "Target Sec"
           }
         },
         "title": "ProjectSettingsPatch",

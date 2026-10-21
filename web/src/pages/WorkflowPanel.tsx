@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useCancelRun, useProject, useReviewScript, useStartRun, useUpdateProject, useWorkflow } from "../api/hooks";
+import { useCancelRun, useMeta, useProject, useProjectSettings, useReviewScript, useStartRun, useUpdateProject, useWorkflow } from "../api/hooks";
 import { ErrorNote } from "../components/ErrorNote";
 import { ProgressBar } from "../components/ProgressBar";
 import { EpisodePlayer } from "../components/EpisodePlayer";
@@ -7,6 +7,68 @@ import { RunError, RunProgress } from "../components/RunProgress";
 import { StatusChip } from "../components/StatusChip";
 import { duration } from "../lib/format";
 import { useT } from "../i18n";
+
+const TARGET_PRESETS = [30, 90, 120, 180];
+
+/** How long the episode should be and in which delivery format: one number steers the story size and the quality check. */
+function Spec({ id }: { id: number }) {
+  const t = useT();
+  const project = useProject(id);
+  const meta = useMeta();
+  const update = useUpdateProject(id);
+  const settings = useProjectSettings(id);
+  const saved = project.data?.settings?.["target_sec"];
+  const [draft, setDraft] = useState<string | null>(null);
+  const profiles = meta.data?.delivery_profiles ?? [];
+  const current = profiles.find((p) => p.name === project.data?.delivery_profile);
+  const shown = draft ?? (typeof saved === "number" ? String(saved) : "");
+  const save = (value: number | null) => settings.mutate({ target_sec: value }, { onSuccess: () => setDraft(null) });
+  return (
+    <section className="card stack">
+      <div className="form-grid">
+        <label className="field">
+          <span>{t("web.workflow.profile")}</span>
+          <select value={project.data?.delivery_profile ?? ""} onChange={(e) => update.mutate({ delivery_profile: e.target.value })}>
+            {profiles.map((p) => (
+              <option key={p.name} value={p.name}>
+                {`${p.label} · ${p.max_episode_sec ? t("web.workflow.profile_range", { lo: p.min_episode_sec, hi: p.max_episode_sec }) : t("web.workflow.profile_open")}`}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          <span>{t("web.workflow.target")}</span>
+          <span className="row">
+            <input
+              type="number"
+              min={1}
+              value={shown}
+              placeholder={current?.target_sec ? String(current.target_sec) : ""}
+              onChange={(e) => setDraft(e.target.value)}
+            />
+            <span className="muted small">{t("web.workflow.target_unit")}</span>
+          </span>
+        </label>
+      </div>
+      <p className="muted small">{t("web.workflow.target_hint")}</p>
+      <div className="row">
+        {TARGET_PRESETS.map((n) => (
+          <button key={n} type="button" className="chip chip-button" onClick={() => setDraft(String(n))}>
+            {n === 30 ? t("web.workflow.target_pilot") : `${n} ${t("web.workflow.target_unit")}`}
+          </button>
+        ))}
+        <span className="spacer" />
+        <button type="button" disabled={settings.isPending || saved === undefined} onClick={() => save(null)}>
+          {t("web.workflow.target_clear")}
+        </button>
+        <button type="button" className="primary" disabled={settings.isPending || draft === null || Number(draft) <= 0} onClick={() => save(Number(draft))}>
+          {t("web.save")}
+        </button>
+      </div>
+      <ErrorNote error={settings.error ?? update.error} />
+    </section>
+  );
+}
 
 export function WorkflowPanel({ id }: { id: number }) {
   const t = useT();
@@ -72,6 +134,8 @@ export function WorkflowPanel({ id }: { id: number }) {
         {dirty ? <p className="hint">{t("web.workflow.save_first")}</p> : null}
         <ErrorNote error={start.error ?? cancel.error ?? update.error ?? wf.error} />
       </section>
+
+      <Spec id={id} />
 
       {active ? <RunProgress run={active} /> : null}
 

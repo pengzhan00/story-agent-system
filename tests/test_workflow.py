@@ -388,3 +388,28 @@ def test_script_review_is_on_demand_and_changes_nothing(tmp_path: Path) -> None:
     assert review["score"] == 7 and review["issues"] == []
     assert client.calls[-1] == "review" and "Rain Night" in client.prompts[-1]
     assert [r["status"] for r in engine.state.stages(pid)] == before
+
+
+def test_the_target_length_sizes_the_story_and_the_planned_shots(tmp_path: Path) -> None:
+    engine, client, _ = make_engine(tmp_path)
+    pid = new_project(engine)
+    engine.projects.set_settings(pid, {"target_sec": 30})               # a 30 s pilot, set on the project
+    run_all(engine, pid)
+    outline = next(p for shape, p in zip(client.calls, client.prompts, strict=True) if shape == "outline")
+    assert "exactly 2 acts" in outline                                  # 30 s: two acts, not the default four
+    planned = sum(s["render_payload"]["camera"]["duration_sec"] for s in engine.store.list_shots(pid))
+    assert 25 <= planned <= 40                                          # shots planned to add up to about 30 s
+    with pytest.raises(StageError) as e:
+        engine.run_stage(pid, "script", {"target_sec": "soon", "force": True})
+    assert e.value.code == "bad_target"
+
+
+def test_a_project_target_is_validated(tmp_path: Path) -> None:
+    from storyagent.config import ConfigError
+
+    engine, _, _ = make_engine(tmp_path)
+    pid = new_project(engine)
+    assert engine.projects.set_settings(pid, {"target_sec": 5400}).settings["target_sec"] == 5400   # a feature film
+    with pytest.raises(ConfigError):
+        engine.projects.set_settings(pid, {"target_sec": -3})
+    assert "target_sec" not in engine.projects.set_settings(pid, {"target_sec": None}).settings

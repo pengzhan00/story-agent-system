@@ -17,6 +17,7 @@ import time
 from collections.abc import Callable
 from typing import Any
 
+from storyagent.compose.pacing import duration_window
 from storyagent.compose.qc import run_qc
 from storyagent.compose.timeline import AssetRef, ShotInput, TimelineInput, build_timeline
 from storyagent.config import ConfigError
@@ -255,8 +256,12 @@ def compose(ctx: Ctx) -> dict[str, Any]:
     assets = ledger.list_assets(project_id=ctx.pid, kind=MediaKind.COMPOSE_ASSEMBLE.value, current_only=True)
     episode_asset = next((a for a in assets if a.job_id == rec.id and a.slot == job.slot), None)
     ctx.step(90, 100, "workflow.progress.qc|")
-    qc = (run_qc(ctx.settings, ctx.settings.home / episode_asset.path, ctx.settings.delivery_profile(
-        ctx.project.delivery_profile)) if episode_asset else None)
+    profile = dict(ctx.settings.delivery_profile(ctx.project.delivery_profile))
+    target = ctx.target_sec()
+    if target:                    # an explicit target replaces the profile's length range
+        profile["min_episode_sec"], profile["max_episode_sec"] = duration_window(
+            target, float(ctx.settings.delivery["pacing"]["tolerance"]))
+    qc = run_qc(ctx.settings, ctx.settings.home / episode_asset.path, profile) if episode_asset else None
     ctx.step(100, 100, "")
     return {"episode": episode, "asset_id": episode_asset.id if episode_asset else None, "job_id": rec.id,
             "duration_sec": timeline["total_sec"], "shots": len(timeline["segments"]),

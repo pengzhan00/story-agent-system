@@ -40,10 +40,19 @@ export function useProjectBin() {
   };
 }
 
+/** Per-project overrides; `target_sec: null` goes back to the delivery profile's length. */
+export function useProjectSettings(id: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { target_sec: number | null }) => patch<Project>(`/api/projects/${id}/settings`, body),
+    onSuccess: (p) => qc.setQueryData(["project", id], p),
+  });
+}
+
 export function useUpdateProject(id: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: Partial<Pick<Project, "name" | "description" | "genre">>) =>
+    mutationFn: (body: Partial<Pick<Project, "name" | "description" | "genre" | "delivery_profile">>) =>
       patch<Project>(`/api/projects/${id}`, body),
     onSuccess: (p) => qc.setQueryData(["project", id], p),
   });

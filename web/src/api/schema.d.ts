@@ -1636,6 +1636,25 @@ export interface components {
         CancelResult: {
             status: components["schemas"]["JobStatus"];
         };
+        /** DeliveryProfileOut */
+        DeliveryProfileOut: {
+            /** Fps */
+            fps: number;
+            /** Height */
+            height: number;
+            /** Label */
+            label: string;
+            /** Max Episode Sec */
+            max_episode_sec: number;
+            /** Min Episode Sec */
+            min_episode_sec: number;
+            /** Name */
+            name: string;
+            /** Target Sec */
+            target_sec: number | null;
+            /** Width */
+            width: number;
+        };
         /** FlowOut */
         FlowOut: {
             /** Steps */
@@ -1971,6 +1990,10 @@ export interface components {
             defaults: {
                 [key: string]: string;
             };
+            /** Delivery Default */
+            delivery_default: string;
+            /** Delivery Profiles */
+            delivery_profiles: components["schemas"]["DeliveryProfileOut"][];
             /** Kinds */
             kinds: components["schemas"]["LabeledValue"][];
             /** Llm Unload Policy */
@@ -2222,6 +2245,11 @@ export interface components {
                     [key: string]: unknown;
                 };
             } | null;
+            /**
+             * Target Sec
+             * @description wanted episode length in seconds (advert to feature film); null = the profile's
+             */
+            target_sec?: number | null;
         };
         /**
          * QualityTier
