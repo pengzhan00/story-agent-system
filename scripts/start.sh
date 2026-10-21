@@ -15,4 +15,6 @@ WORKER=$!
 SERVER=$!
 trap 'kill "$WORKER" "$SERVER" 2>/dev/null || true; wait 2>/dev/null || true' INT TERM EXIT
 echo "worker pid $WORKER, server pid $SERVER - Ctrl-C to stop both"
-wait -n "$WORKER" "$SERVER"
+# macOS ships bash 3.2 (no `wait -n`): poll until either process is gone
+while kill -0 "$WORKER" 2>/dev/null && kill -0 "$SERVER" 2>/dev/null; do sleep 2; done
+echo "one of the two stopped - stopping the other" >&2
