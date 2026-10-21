@@ -39,29 +39,36 @@
 
 每一阶段都要:有测试、i18n、文档,并按全局规则在"基线化"前跑 `software-system-review`。
 
-## 多集改造设计(阶段 1-2 的落地方案,2026-10-21 读代码后确定)
+## 多集改造设计(含 season;阶段 1-2 的落地方案,2026-10-21)
+
+层级:**全剧(项目) → 季(season) → 集(episode)**。一部剧可以有多季(第一季 30 集,第二季换故事线),也可以只有一季。
 
 读代码发现的事实(决定了方案):
 - `workflow_stages` 主键是 (项目, 阶段),只有一份状态;剧本/分镜/规格阶段按 `params.episode` 工作,但状态不分集。
 - 数据本身大多已分集:`scripts.episode_no`、`episodes`、`shots.episode_id`。**项目级**的有:`characters`、`scenes`(场景地点)、`music_themes`、`sound_effects`、`workflow_data`(`plan`、`style`)。
 - 冲突点:`music_themes.scene_ref` 形如 `act01_scene02`,第 2 集会和第 1 集撞名;`music` 阶段按"已有 scene_ref 就跳过"判断,第 2 集的配乐会被当成已做。
 
+**编号约定**:集保持**全剧连续的全局编号** `episodes.number`(作业、参数、素材槽位、文件名都用它,不用改一大片代码)。季是对集的分组:`episodes.season`(季号,默认 1)与 `episodes.number_in_season`(季内序号);对外显示 `S02E03`。
+**季的内容**(新表 `seasons`:项目、季号、标题、梗概/主线弧、计划集数、目标时长 `target_sec` 覆盖、状态):季大纲(每集标题/梗概/钩子/悬念)属于季;**人物圣经**属于全剧但允许按季追加人物与"季内造型/状态"(例如第二季换装、时间跳跃);主题曲可全剧一首也可每季一首(`scene_ref="theme"` / `"s02_theme"`);交付档位与目标时长优先级:运行参数 > 集 > 季 > 项目 > 档位。
+
 阶段的作用域:
 
 | 作用域 | 阶段 | 说明 |
 |---|---|---|
-| 全剧(episode=0) | `analyze`、`cast` | 人物与风格全剧共用(S1 圣经的雏形);新增人物允许,已有人物只读除非明确改 |
-| 每集(episode≥1) | `script`、`scenes`、`music`、`shotplan`、`specs`、`produce`、`compose` | `scenes` 只补本集新出现的地点;`music` 的 scene_ref 加集号前缀 `ep02_act01_scene02`;主题曲全剧一首(`scene_ref="theme"`) |
+| 全剧(season=0, episode=0) | `analyze`、`cast` | 世界观、风格、人物共用(S1 圣经的雏形) |
+| 每季(season=n, episode=0) | `outline`(新)| 写本季的分集大纲(S2),`script` 阶段按它写 |
+| 每集(episode=n) | `script`、`scenes`、`music`、`shotplan`、`specs`、`produce`、`compose` | `scenes` 只补本集新出现的地点;`music` 的 scene_ref 加集号前缀 `ep02_act01_scene02` |
 
 迁移 007:
-1. `workflow_stages` 加 `episode INTEGER NOT NULL DEFAULT 0`,主键改 (project_id, stage, episode);老数据:`analyze/cast` 留 0,其余阶段归第 1 集。
-2. `workflow_runs` 的 `params.episode` 保持,另加 `params.episodes` (列表,批量)——引擎按集顺序逐个跑每集阶段,进度条按"集数 × 阶段"统一计。
-3. `music_themes.scene_ref` 老数据补前缀 `ep01_`(主题曲不动)。
-4. `DOWNSTREAM` 改为带作用域:全剧阶段重跑 → 所有集的下游变 stale;某集阶段重跑 → 只影响该集。
+1. 新表 `seasons`;每个项目补一行第 1 季;`episodes` 加 `season`(默认 1)、`number_in_season`(老数据 = number)。
+2. `workflow_stages` 加 `season`、`episode`(默认 0),主键改 (project_id, stage, season, episode);老数据:`analyze/cast` 留 (0,0),其余阶段归第 1 季第 1 集。
+3. `workflow_runs` 的 `params.episode` 保持,另加 `params.episodes`(列表)与 `params.season`,引擎按集顺序逐个跑每集阶段,进度按"集数 × 阶段"统一计。
+4. `music_themes.scene_ref` 老数据补前缀 `ep01_`(主题曲不动)。
+5. `DOWNSTREAM` 带作用域:全剧阶段重跑 → 所有季所有集的下游变 stale;某季大纲重跑 → 该季各集的 `script` 起变 stale;某集阶段重跑 → 只影响该集。
 
 实现顺序(每步独立可测、可发布):
-- A. 迁移 007 + `WorkflowState` 带 episode 维度(`stages(project, episode)`),API/网页默认看第 1 集,行为不变。
+- A. 迁移 007(`seasons`、季/集维度的阶段状态),`WorkflowState` 带作用域,API/网页默认看第 1 季第 1 集,行为不变。
 - B. `music`/`scenes` 阶段按集;`pending_stages` 按集。
-- C. 引擎批量:`episodes=[1..N]`,进度与 ETA 按集汇总;CLI `workflow run --episodes 1-10`。
-- D. 全剧圣经 + 分集大纲(S1/S2):新的 `series` 阶段(全剧级)写全季每集梗概/钩子/悬念,`script` 阶段读它。
-- E. 系列看板(S8):每集每阶段状态、镜头数、耗时。
+- C. 引擎批量:`season=N` 或 `episodes=[1..N]`,进度与 ETA 按集汇总;CLI `workflow run --season 1`、`--episodes 1-10`。
+- D. 全剧圣经 + 季大纲(S1/S2):新增 `outline` 阶段(季级)。
+- E. 系列看板(S8):按季折叠、每集每阶段状态、镜头数、耗时。
