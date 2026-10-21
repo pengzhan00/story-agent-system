@@ -5,6 +5,7 @@ import { LAUNCH_SEEN, LaunchPage } from "./pages/LaunchPage";
 import { ProjectPage } from "./pages/ProjectPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
 import { PromptsPage } from "./pages/PromptsPage";
+import { WorkshopPage } from "./pages/WorkshopPage";
 import { QueuePage } from "./pages/QueuePage";
 import { SystemPage } from "./pages/SystemPage";
 
@@ -34,6 +35,9 @@ export function App() {
           <NavLink to="/projects" className={link}>
             {t("web.nav.projects")}
           </NavLink>
+          <NavLink to="/workshop" className={link}>
+            {t("web.nav.workshop")}
+          </NavLink>
           <NavLink to="/queue" className={link}>
             {t("web.nav.queue")}
           </NavLink>
@@ -62,6 +66,7 @@ export function App() {
           <Route path="/launch" element={<LaunchPage />} />
           <Route path="/projects" element={<ProjectsPage />} />
           <Route path="/projects/:id/*" element={<ProjectPage />} />
+          <Route path="/workshop" element={<WorkshopPage />} />
           <Route path="/queue" element={<QueuePage />} />
           <Route path="/prompts" element={<PromptsPage />} />
           <Route path="/system" element={<SystemPage />} />

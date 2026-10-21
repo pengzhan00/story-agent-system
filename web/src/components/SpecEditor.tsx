@@ -5,6 +5,7 @@ import type { Spec, SpecEdit } from "../api/types";
 import { fieldsOfKind, textFieldKey } from "../lib/subjects";
 import { useT } from "../i18n";
 import { ErrorNote } from "./ErrorNote";
+import { AddParam } from "./AddParam";
 import { ValueEditor } from "./ValueEditor";
 import { formatValue, useLabel } from "../lib/labels";
 
@@ -125,37 +126,6 @@ export function SpecEditor({ pid, spec, review, onAcknowledge }: { pid: number; 
       </fieldset>
       <ErrorNote error={act.edit.error ?? act.lock.error ?? act.unlock.error} />
       <History pid={pid} spec={spec} />
-    </div>
-  );
-}
-
-/** A parameter that is not there yet: a name and a value (numbers and yes/no are recognised). */
-function AddParam({ onAdd, existing }: { onAdd: (key: string, value: unknown) => void; existing: string[] }) {
-  const t = useT();
-  const [key, setKey] = useState("");
-  const [val, setVal] = useState("");
-  const name = key.trim();
-  const ok = name !== "" && !existing.includes(name);
-  const parse = (raw: string): unknown => {
-    if (raw.trim() !== "" && Number.isFinite(Number(raw))) return Number(raw);
-    if (raw === "true" || raw === "false") return raw === "true";
-    return raw;
-  };
-  return (
-    <div className="row">
-      <input value={key} onChange={(e) => setKey(e.target.value)} placeholder={t("web.creative.param_name")} aria-label={t("web.creative.param_name")} />
-      <input value={val} onChange={(e) => setVal(e.target.value)} placeholder={t("web.creative.param_value")} aria-label={t("web.creative.param_value")} />
-      <button
-        type="button"
-        disabled={!ok}
-        onClick={() => {
-          onAdd(name, parse(val));
-          setKey("");
-          setVal("");
-        }}
-      >
-        {t("web.creative.add_param")}
-      </button>
     </div>
   );
 }

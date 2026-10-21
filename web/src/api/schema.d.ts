@@ -1316,6 +1316,149 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/workshop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Modules
+         * @description Every module with its kinds: the model it starts from (and the alternatives), the effective parameters, the
+         *     parameters the adapter understands, and the inputs it takes.
+         */
+        get: operations["modules_api_workshop_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workshop/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * History
+         * @description Standalone jobs (no project), newest first, with their assets.
+         */
+        get: operations["history_api_workshop_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workshop/params": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Params
+         * @description The parameters a run of this model at this tier would use, to show and edit before running.
+         */
+        get: operations["params_api_workshop_params_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workshop/pipelines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pipeline
+         * @description Queue the steps together. An input set to ``"@prev"`` takes the previous step's output and waits for it.
+         */
+        post: operations["pipeline_api_workshop_pipelines_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workshop/presets/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Save Preset
+         * @description Make the model, quality tier and parameter overrides the starting point of the module (until changed).
+         */
+        put: operations["save_preset_api_workshop_presets__kind__put"];
+        post?: never;
+        /** Reset Preset */
+        delete: operations["reset_preset_api_workshop_presets__kind__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workshop/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run
+         * @description One module on its own. ``count`` > 1 queues several candidates (seed, seed+1, ...).
+         */
+        post: operations["run_api_workshop_run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workshop/upload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload
+         * @description Raw-body upload of an input file (a portrait, a recording) that belongs to no project. Use it as
+         *     ``asset:<id>`` in an input.
+         */
+        post: operations["upload_api_workshop_upload_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1585,6 +1728,8 @@ export interface components {
             commercial_ok: boolean;
             /** Created At */
             created_at: string;
+            /** Depends On */
+            depends_on?: string | null;
             /** Error Code */
             error_code: string | null;
             /** Error Message */
@@ -1616,6 +1761,10 @@ export interface components {
             };
             /** Parent Job Id */
             parent_job_id: string | null;
+            /** Pipeline Id */
+            pipeline_id?: string | null;
+            /** Pipeline Step */
+            pipeline_step?: number | null;
             /** Priority */
             priority: number;
             /** Progress */
@@ -1865,6 +2014,80 @@ export interface components {
             /** Version */
             version: string;
         };
+        /** ParamsOut */
+        ParamsOut: {
+            /** Base */
+            base: {
+                [key: string]: unknown;
+            };
+            /** Effective */
+            effective: {
+                [key: string]: unknown;
+            };
+            /** Preset */
+            preset: {
+                [key: string]: unknown;
+            };
+            /** Schema */
+            schema: {
+                [key: string]: {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        /** PipelineBody */
+        PipelineBody: {
+            /** Steps */
+            steps: components["schemas"]["PipelineStep"][];
+        };
+        /** PipelineOut */
+        PipelineOut: {
+            /** Jobs */
+            jobs: components["schemas"]["JobOut"][];
+            /** Pipeline Id */
+            pipeline_id: string;
+        };
+        /** PipelineStep */
+        PipelineStep: {
+            /** Inputs */
+            inputs?: {
+                [key: string]: unknown;
+            };
+            kind: components["schemas"]["MediaKind"];
+            /**
+             * Model Ref
+             * @default
+             */
+            model_ref: string;
+            /** Params */
+            params?: {
+                [key: string]: unknown;
+            };
+            /** Seed */
+            seed?: number | null;
+            /**
+             * Tier
+             * @default
+             */
+            tier: string;
+        };
+        /** PresetBody */
+        PresetBody: {
+            /**
+             * Model Ref
+             * @default
+             */
+            model_ref: string;
+            /** Params */
+            params?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Tier
+             * @default
+             */
+            tier: string;
+        };
         /**
          * ProjectCard
          * @description One tile of the project list: the project, how far it is, and the finished episode if there is one.
@@ -2098,6 +2321,35 @@ export interface components {
                 [key: string]: unknown;
             }[];
             spec: components["schemas"]["SpecOut"];
+        };
+        /** RunBody */
+        RunBody: {
+            /**
+             * Count
+             * @default 1
+             */
+            count: number;
+            /** Inputs */
+            inputs?: {
+                [key: string]: unknown;
+            };
+            kind: components["schemas"]["MediaKind"];
+            /**
+             * Model Ref
+             * @default
+             */
+            model_ref: string;
+            /** Params */
+            params?: {
+                [key: string]: unknown;
+            };
+            /** Seed */
+            seed?: number | null;
+            /**
+             * Tier
+             * @default
+             */
+            tier: string;
         };
         /**
          * RunProgressOut
@@ -2431,6 +2683,84 @@ export interface components {
             summary: {
                 [key: string]: unknown;
             };
+        };
+        /** WorkshopField */
+        WorkshopField: {
+            /** Media */
+            media: string;
+            /** Name */
+            name: string;
+            /** Required */
+            required: boolean;
+            /** Target */
+            target: string;
+            /** Type */
+            type: string;
+        };
+        /** WorkshopHistoryItem */
+        WorkshopHistoryItem: {
+            /** Assets */
+            assets: components["schemas"]["AssetOut"][];
+            job: components["schemas"]["JobOut"];
+        };
+        /** WorkshopKind */
+        WorkshopKind: {
+            /** Base Params */
+            base_params: {
+                [key: string]: unknown;
+            };
+            /** Default Model */
+            default_model: string;
+            /** Inputs */
+            inputs: components["schemas"]["WorkshopField"][];
+            /** Kind */
+            kind: string;
+            /** Model Ref */
+            model_ref: string;
+            /** Models */
+            models: components["schemas"]["WorkshopModel"][];
+            /** Output */
+            output: string;
+            /** Preset Params */
+            preset_params: {
+                [key: string]: unknown;
+            };
+            /** Schema */
+            schema: {
+                [key: string]: {
+                    [key: string]: unknown;
+                };
+            };
+            /** Tier */
+            tier: string;
+        };
+        /** WorkshopModel */
+        WorkshopModel: {
+            /** Available */
+            available: boolean;
+            /** Commercial Ok */
+            commercial_ok: boolean;
+            /** Est Memory Gib */
+            est_memory_gib: number;
+            /** Heavy */
+            heavy: boolean;
+            /** License Tag */
+            license_tag: string;
+            /** Note */
+            note: string;
+            /** Provider */
+            provider: string;
+            /** Ref */
+            ref: string;
+            /** Version */
+            version: string;
+        };
+        /** WorkshopModuleOut */
+        WorkshopModuleOut: {
+            /** Id */
+            id: string;
+            /** Kinds */
+            kinds: components["schemas"]["WorkshopKind"][];
         };
     };
     responses: never;
@@ -5586,6 +5916,254 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkflowRunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    modules_api_workshop_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkshopModuleOut"][];
+                };
+            };
+        };
+    };
+    history_api_workshop_history_get: {
+        parameters: {
+            query?: {
+                module?: string;
+                kind?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkshopHistoryItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    params_api_workshop_params_get: {
+        parameters: {
+            query: {
+                kind: string;
+                model_ref: string;
+                tier?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParamsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pipeline_api_workshop_pipelines_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PipelineBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PipelineOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_preset_api_workshop_presets__kind__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PresetBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PresetBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_preset_api_workshop_presets__kind__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_api_workshop_run_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RunBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_api_workshop_upload_post: {
+        parameters: {
+            query: {
+                filename: string;
+                slot?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetOut"];
                 };
             };
             /** @description Validation Error */

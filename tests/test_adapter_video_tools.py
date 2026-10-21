@@ -40,7 +40,7 @@ LONGCAT_STUB = textwrap.dedent('''\
     import json, os, sys
     a = sys.argv[1:]
     with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "calls.jsonl"), "a", encoding="utf-8") as fh:
-        env = {k: v for k, v in os.environ.items() if k.startswith("LONGCAT_")}
+        env = {k: v for k, v in os.environ.items() if k.startswith(("LONGCAT_", "HF_", "TRANSFORMERS_"))}
         fh.write(json.dumps({"argv": a, "env": env}) + "\\n")
     for i in range(1, 4):
         print(f"step {i}/3", flush=True)
@@ -220,7 +220,8 @@ def test_longcat_makes_a_talking_head_from_portrait_and_speech(tmp_path: Path) -
         "832", "480", "93")
     assert flag(call["argv"], "--seed") == "4"
     assert call["env"] == {"LONGCAT_IMAGE": str(face), "LONGCAT_AUDIO": str(speech),
-                           "LONGCAT_PROMPT": "she greets the camera"}
+                           "LONGCAT_PROMPT": "she greets the camera",
+                           "HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1", "HF_HUB_DISABLE_XET": "1"}   # no hub
     assert a.kind == "video.avatar" and a.metadata["engine"] == "longcat-avatar-1.5"
 
 

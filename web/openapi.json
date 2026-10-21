@@ -779,6 +779,17 @@
             "title": "Created At",
             "type": "string"
           },
+          "depends_on": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Depends On"
+          },
           "error_code": {
             "anyOf": [
               {
@@ -863,6 +874,28 @@
               }
             ],
             "title": "Parent Job Id"
+          },
+          "pipeline_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pipeline Id"
+          },
+          "pipeline_step": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pipeline Step"
           },
           "priority": {
             "title": "Priority",
@@ -1603,6 +1636,144 @@
         "title": "ModelOut",
         "type": "object"
       },
+      "ParamsOut": {
+        "properties": {
+          "base": {
+            "additionalProperties": true,
+            "title": "Base",
+            "type": "object"
+          },
+          "effective": {
+            "additionalProperties": true,
+            "title": "Effective",
+            "type": "object"
+          },
+          "preset": {
+            "additionalProperties": true,
+            "title": "Preset",
+            "type": "object"
+          },
+          "schema": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Schema",
+            "type": "object"
+          }
+        },
+        "required": [
+          "base",
+          "preset",
+          "effective",
+          "schema"
+        ],
+        "title": "ParamsOut",
+        "type": "object"
+      },
+      "PipelineBody": {
+        "properties": {
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/PipelineStep"
+            },
+            "maxItems": 12,
+            "minItems": 1,
+            "title": "Steps",
+            "type": "array"
+          }
+        },
+        "required": [
+          "steps"
+        ],
+        "title": "PipelineBody",
+        "type": "object"
+      },
+      "PipelineOut": {
+        "properties": {
+          "jobs": {
+            "items": {
+              "$ref": "#/components/schemas/JobOut"
+            },
+            "title": "Jobs",
+            "type": "array"
+          },
+          "pipeline_id": {
+            "title": "Pipeline Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pipeline_id",
+          "jobs"
+        ],
+        "title": "PipelineOut",
+        "type": "object"
+      },
+      "PipelineStep": {
+        "properties": {
+          "inputs": {
+            "additionalProperties": true,
+            "title": "Inputs",
+            "type": "object"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/MediaKind"
+          },
+          "model_ref": {
+            "default": "",
+            "title": "Model Ref",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": true,
+            "title": "Params",
+            "type": "object"
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seed"
+          },
+          "tier": {
+            "default": "",
+            "title": "Tier",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "PipelineStep",
+        "type": "object"
+      },
+      "PresetBody": {
+        "properties": {
+          "model_ref": {
+            "default": "",
+            "title": "Model Ref",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": true,
+            "title": "Params",
+            "type": "object"
+          },
+          "tier": {
+            "default": "",
+            "title": "Tier",
+            "type": "string"
+          }
+        },
+        "title": "PresetBody",
+        "type": "object"
+      },
       "ProjectCard": {
         "description": "One tile of the project list: the project, how far it is, and the finished episode if there is one.",
         "properties": {
@@ -2134,6 +2305,56 @@
           "changed_dependencies"
         ],
         "title": "ReviewItemOut",
+        "type": "object"
+      },
+      "RunBody": {
+        "properties": {
+          "count": {
+            "default": 1,
+            "maximum": 8.0,
+            "minimum": 1.0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "inputs": {
+            "additionalProperties": true,
+            "title": "Inputs",
+            "type": "object"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/MediaKind"
+          },
+          "model_ref": {
+            "default": "",
+            "title": "Model Ref",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": true,
+            "title": "Params",
+            "type": "object"
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seed"
+          },
+          "tier": {
+            "default": "",
+            "title": "Tier",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "RunBody",
         "type": "object"
       },
       "RunProgressOut": {
@@ -2989,6 +3210,203 @@
           "attempts"
         ],
         "title": "WorkflowStageOut",
+        "type": "object"
+      },
+      "WorkshopField": {
+        "properties": {
+          "media": {
+            "title": "Media",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "required": {
+            "title": "Required",
+            "type": "boolean"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "target",
+          "type",
+          "media",
+          "required"
+        ],
+        "title": "WorkshopField",
+        "type": "object"
+      },
+      "WorkshopHistoryItem": {
+        "properties": {
+          "assets": {
+            "items": {
+              "$ref": "#/components/schemas/AssetOut"
+            },
+            "title": "Assets",
+            "type": "array"
+          },
+          "job": {
+            "$ref": "#/components/schemas/JobOut"
+          }
+        },
+        "required": [
+          "job",
+          "assets"
+        ],
+        "title": "WorkshopHistoryItem",
+        "type": "object"
+      },
+      "WorkshopKind": {
+        "properties": {
+          "base_params": {
+            "additionalProperties": true,
+            "title": "Base Params",
+            "type": "object"
+          },
+          "default_model": {
+            "title": "Default Model",
+            "type": "string"
+          },
+          "inputs": {
+            "items": {
+              "$ref": "#/components/schemas/WorkshopField"
+            },
+            "title": "Inputs",
+            "type": "array"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "model_ref": {
+            "title": "Model Ref",
+            "type": "string"
+          },
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/WorkshopModel"
+            },
+            "title": "Models",
+            "type": "array"
+          },
+          "output": {
+            "title": "Output",
+            "type": "string"
+          },
+          "preset_params": {
+            "additionalProperties": true,
+            "title": "Preset Params",
+            "type": "object"
+          },
+          "schema": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Schema",
+            "type": "object"
+          },
+          "tier": {
+            "title": "Tier",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "model_ref",
+          "default_model",
+          "tier",
+          "models",
+          "base_params",
+          "preset_params",
+          "schema",
+          "inputs",
+          "output"
+        ],
+        "title": "WorkshopKind",
+        "type": "object"
+      },
+      "WorkshopModel": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "commercial_ok": {
+            "title": "Commercial Ok",
+            "type": "boolean"
+          },
+          "est_memory_gib": {
+            "title": "Est Memory Gib",
+            "type": "number"
+          },
+          "heavy": {
+            "title": "Heavy",
+            "type": "boolean"
+          },
+          "license_tag": {
+            "title": "License Tag",
+            "type": "string"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "ref": {
+            "title": "Ref",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ref",
+          "provider",
+          "version",
+          "heavy",
+          "est_memory_gib",
+          "license_tag",
+          "commercial_ok",
+          "available",
+          "note"
+        ],
+        "title": "WorkshopModel",
+        "type": "object"
+      },
+      "WorkshopModuleOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kinds": {
+            "items": {
+              "$ref": "#/components/schemas/WorkshopKind"
+            },
+            "title": "Kinds",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "kinds"
+        ],
+        "title": "WorkshopModuleOut",
         "type": "object"
       }
     }
@@ -8200,6 +8618,393 @@
         "summary": "Cancel Run",
         "tags": [
           "workflow"
+        ]
+      }
+    },
+    "/api/workshop": {
+      "get": {
+        "description": "Every module with its kinds: the model it starts from (and the alternatives), the effective parameters, the\nparameters the adapter understands, and the inputs it takes.",
+        "operationId": "modules_api_workshop_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/WorkshopModuleOut"
+                  },
+                  "title": "Response Modules Api Workshop Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Modules",
+        "tags": [
+          "workshop"
+        ]
+      }
+    },
+    "/api/workshop/history": {
+      "get": {
+        "description": "Standalone jobs (no project), newest first, with their assets.",
+        "operationId": "history_api_workshop_history_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "module",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Module",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Kind",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 40,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/WorkshopHistoryItem"
+                  },
+                  "title": "Response History Api Workshop History Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "History",
+        "tags": [
+          "workshop"
+        ]
+      }
+    },
+    "/api/workshop/params": {
+      "get": {
+        "description": "The parameters a run of this model at this tier would use, to show and edit before running.",
+        "operationId": "params_api_workshop_params_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "title": "Kind",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "model_ref",
+            "required": true,
+            "schema": {
+              "title": "Model Ref",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tier",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Tier",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParamsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Params",
+        "tags": [
+          "workshop"
+        ]
+      }
+    },
+    "/api/workshop/pipelines": {
+      "post": {
+        "description": "Queue the steps together. An input set to ``\"@prev\"`` takes the previous step's output and waits for it.",
+        "operationId": "pipeline_api_workshop_pipelines_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PipelineBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PipelineOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Pipeline",
+        "tags": [
+          "workshop"
+        ]
+      }
+    },
+    "/api/workshop/presets/{kind}": {
+      "delete": {
+        "operationId": "reset_preset_api_workshop_presets__kind__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "title": "Kind",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reset Preset",
+        "tags": [
+          "workshop"
+        ]
+      },
+      "put": {
+        "description": "Make the model, quality tier and parameter overrides the starting point of the module (until changed).",
+        "operationId": "save_preset_api_workshop_presets__kind__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "title": "Kind",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresetBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresetBody"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Preset",
+        "tags": [
+          "workshop"
+        ]
+      }
+    },
+    "/api/workshop/run": {
+      "post": {
+        "description": "One module on its own. ``count`` > 1 queues several candidates (seed, seed+1, ...).",
+        "operationId": "run_api_workshop_run_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/JobOut"
+                  },
+                  "title": "Response Run Api Workshop Run Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run",
+        "tags": [
+          "workshop"
+        ]
+      }
+    },
+    "/api/workshop/upload": {
+      "post": {
+        "description": "Raw-body upload of an input file (a portrait, a recording) that belongs to no project. Use it as\n``asset:<id>`` in an input.",
+        "operationId": "upload_api_workshop_upload_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "filename",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "title": "Filename",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "slot",
+            "required": false,
+            "schema": {
+              "default": "main",
+              "title": "Slot",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload",
+        "tags": [
+          "workshop"
         ]
       }
     }
