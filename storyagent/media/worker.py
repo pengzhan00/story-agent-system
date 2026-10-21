@@ -31,7 +31,7 @@ from storyagent.util import new_id
 
 from . import compliance
 from .assetrefs import RefError, Resolver
-from .broker import CaffeinateGuard, select_next
+from .broker import CaffeinateGuard, select_next, system_available_gib
 from .contracts import (
     AdapterError,
     ArtifactSpec,
@@ -99,7 +99,9 @@ class Worker:
                 break
             policy = self.settings.llm_unload_policy
             resident = self._resident() if policy == "ask" and any(j.heavy for j in queued) else []
-            job, waiting = select_next(queued, led.running(), self.settings, resident_llms=resident)
+            available = system_available_gib() if self.settings.runtime.get("check_system_memory", True) else None
+            job, waiting = select_next(queued, led.running(), self.settings, resident_llms=resident,
+                                       available_gib=available)
             for jid, reason in waiting.items():
                 led.note_waiting(jid, reason.value)
             if job is None:

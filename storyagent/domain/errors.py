@@ -68,4 +68,5 @@ class WaitReason(StrEnum):
     LIGHT_LIMIT = "light_limit"
     QUEUE_LIMIT = "queue_limit"
     MEMORY_BUDGET = "memory_budget"
+    SYSTEM_MEMORY = "system_memory"
     LLM_RESIDENT = "llm_resident"

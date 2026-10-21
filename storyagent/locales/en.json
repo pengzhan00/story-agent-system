@@ -86,6 +86,7 @@
   "wait.light_limit": "Waiting for a light-job slot",
   "wait.queue_limit": "Waiting for its turn in the queue (one job at a time)",
   "wait.memory_budget": "Waiting for enough memory budget",
+  "wait.system_memory": "Waiting for free memory on this computer (close other apps)",
   "wait.llm_resident": "An LLM is still resident in memory; run storyagent ops llm-unload and the job will continue",
   "media.kind.train.lora": "LoRA training",
   "spec.subject.character.portrait": "Character portrait",

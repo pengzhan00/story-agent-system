@@ -84,7 +84,7 @@ adapter built-ins < `[models.X.params]` < `[models.X.tiers.<tier>]` < `projects.
 
 ## Broker (`media/broker.py`)
 
-`max_concurrent_jobs` local jobs in all (default 1: a strictly linear queue, one model in memory at a time; 0 = no overall cap); then one heavy job at a time; at most `max_light_jobs` light jobs; `memory_budget_gib` (a lone oversized job may still run); `llm_unload_policy`: `never` (default; job waits with reason `llm_resident`), `ask` (waits, operator runs `ops llm-unload`), `auto` (worker unloads resident LLMs). Waiting is visible: `progress_msg` carries a `WaitReason` (`heavy_busy | light_limit | queue_limit | memory_budget | llm_resident`). No head-of-line blocking.
+`max_concurrent_jobs` local jobs in all (default 1: a strictly linear queue, one model in memory at a time; 0 = no overall cap); then one heavy job at a time; at most `max_light_jobs` light jobs; `memory_budget_gib` (a lone oversized job may still run); `llm_unload_policy`: `never` (default; job waits with reason `llm_resident`), `ask` (waits, operator runs `ops llm-unload`), `auto` (worker unloads resident LLMs). Waiting is visible: `progress_msg` carries a `WaitReason` (`heavy_busy | light_limit | queue_limit | memory_budget | system_memory | llm_resident`). No head-of-line blocking.
 
 ## Compliance (`media/compliance.py`)
 

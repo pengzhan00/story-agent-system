@@ -1,7 +1,8 @@
 """Scheduling policy: which queued job may start now. Pure functions, no I/O.
 
-Rules (in order): at most ``max_concurrent_jobs`` local jobs in all (1 = a linear queue, 0 = no overall cap);
-at most one heavy job at a time; a cap on concurrent light jobs; a memory budget
+Rules (in order): the machine as a whole must have the job's memory free plus a headroom (the operator's other
+apps count; ``available_gib`` comes from the caller); at most ``max_concurrent_jobs`` local jobs in all (1 = a
+linear queue, 0 = no overall cap); at most one heavy job at a time; a cap on concurrent light jobs; a memory budget
 (a job that alone exceeds the budget still runs when nothing else does, so it can't deadlock);
 and, when ``llm_unload_policy = ask``, heavy jobs wait while any LLM is resident.
 Blocked jobs do not hold up later ones (no head-of-line blocking).
@@ -10,6 +11,7 @@ from __future__ import annotations
 
 import logging
 import platform
+import re
 import shutil
 import subprocess
 from collections.abc import Sequence
@@ -30,6 +32,31 @@ class Gate:
     reason: WaitReason | None = None
 
 
+_VM_PAGE = re.compile(r"page size of (\d+) bytes")
+_VM_COUNT = re.compile(r"^Pages (free|inactive|speculative|purgeable):\s+(\d+)\.", re.MULTILINE)
+
+
+def parse_vm_stat(text: str) -> float | None:
+    """GiB the system could give a new job right now (free + inactive + speculative + purgeable pages), from the
+    output of macOS ``vm_stat``; ``None`` when it cannot be read."""
+    size = _VM_PAGE.search(text)
+    counts = {k: int(v) for k, v in _VM_COUNT.findall(text)}
+    if size is None or len(counts) < 4:
+        return None
+    return sum(counts.values()) * int(size.group(1)) / 2**30
+
+
+def system_available_gib() -> float | None:
+    """Memory the whole machine has left (other apps included); ``None`` off macOS or when ``vm_stat`` fails."""
+    if platform.system() != "Darwin" or shutil.which("vm_stat") is None:
+        return None
+    try:
+        out = subprocess.run(["vm_stat"], capture_output=True, text=True, timeout=5, check=False).stdout  # noqa: S603, S607
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return parse_vm_stat(out)
+
+
 def _remote(job: JobRecord, settings: Settings) -> bool:
     model = settings.models.get(job.model_ref)
     return bool(model and model.remote)
@@ -41,12 +68,16 @@ def can_start(
     settings: Settings,
     *,
     resident_llms: Sequence[str] = (),
+    available_gib: float | None = None,
 ) -> Gate:
     if _remote(job, settings):
         # a cloud job uses no local memory or GPU: it runs next to anything, up to its own limit
         if sum(1 for r in running if _remote(r, settings)) >= int(settings.runtime.get("max_remote_jobs", 4)):
             return Gate(False, WaitReason.LIGHT_LIMIT)
         return Gate(True)
+    headroom = float(settings.runtime.get("memory_headroom_gib", 8))
+    if available_gib is not None and job.est_memory_gib and job.est_memory_gib + headroom > available_gib:
+        return Gate(False, WaitReason.SYSTEM_MEMORY)       # other apps hold the memory it needs: wait, do not swap
     cap = int(settings.runtime.get("max_concurrent_jobs", 0))
     if cap and sum(1 for r in running if not _remote(r, settings)) >= cap:       # a strictly linear queue (cap 1)
         return Gate(False, WaitReason.QUEUE_LIMIT)
@@ -71,11 +102,12 @@ def select_next(
     settings: Settings,
     *,
     resident_llms: Sequence[str] = (),
+    available_gib: float | None = None,
 ) -> tuple[JobRecord | None, dict[str, WaitReason]]:
     """First queued job (already in priority order) that may start, plus why each earlier one waits."""
     waiting: dict[str, WaitReason] = {}
     for job in queued:
-        gate = can_start(job, running, settings, resident_llms=resident_llms)
+        gate = can_start(job, running, settings, resident_llms=resident_llms, available_gib=available_gib)
         if gate.allowed:
             return job, waiting
         assert gate.reason is not None

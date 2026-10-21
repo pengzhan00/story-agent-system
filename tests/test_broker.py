@@ -104,3 +104,30 @@ def test_default_config_has_sane_scheduling_values(tmp_path) -> None:  # noqa: A
 def test_ollama_lets_go_of_the_model_soon_after_our_last_call(tmp_path) -> None:  # noqa: ANN001
     s = load_settings({"STORY_AGENT_HOME": str(tmp_path)})
     assert s.llm_backends["ollama"].options["keep_alive"] == "30s"
+
+
+VM_STAT = """Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                  1000000.
+Pages active:                                1022746.
+Pages inactive:                              500000.
+Pages speculative:                           100000.
+Pages throttled:                                   0.
+Pages wired down:                             341613.
+Pages purgeable:                              50000.
+"""
+
+
+def test_vm_stat_is_read_as_the_memory_the_machine_can_still_give() -> None:
+    from storyagent.media.broker import parse_vm_stat
+
+    assert round(parse_vm_stat(VM_STAT) or 0, 1) == round((1000000 + 500000 + 100000 + 50000) * 16384 / 2**30, 1)
+    assert parse_vm_stat("nonsense") is None
+
+
+def test_a_job_waits_while_other_apps_hold_the_memory_it_needs(led: Ledger, fsettings: Settings) -> None:
+    big = led.enqueue(MediaJob(MediaKind.VIDEO_GENERATE, {}, project_id=1, model_ref="fake-heavy", seed=1))[0]
+    assert big.est_memory_gib > 0
+    gate = can_start(big, [], fsettings, available_gib=big.est_memory_gib + 1)          # room, but not the headroom
+    assert not gate.allowed and gate.reason is WaitReason.SYSTEM_MEMORY
+    assert can_start(big, [], fsettings, available_gib=big.est_memory_gib + 100).allowed
+    assert can_start(big, [], fsettings, available_gib=None).allowed                   # unknown (not macOS): no check

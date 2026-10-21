@@ -86,6 +86,7 @@
   "wait.light_limit": "等待轻任务名额",
   "wait.queue_limit": "排队中,等待前一个任务完成(一次只跑一个)",
   "wait.memory_budget": "等待足够的内存预算",
+  "wait.system_memory": "等待电脑腾出足够内存(请关闭其它占内存的程序)",
   "wait.llm_resident": "语言模型仍驻留内存;请运行 storyagent ops llm-unload 后自动继续",
   "media.kind.train.lora": "LoRA 训练",
   "spec.subject.character.portrait": "人物形象",

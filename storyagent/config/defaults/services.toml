@@ -121,6 +121,10 @@ auto_adopt = true
 # Local jobs running at the same time, of any kind: 1 = a strictly linear queue (one model in memory at a time, the
 # default), 0 = no overall cap (then max_light_jobs and one heavy job apply).
 max_concurrent_jobs = 1
+# Before a job starts, the machine as a whole (the operator's other apps included) must have its memory free plus this
+# headroom, else the job waits (reason `system_memory`) instead of pushing the system into swap. macOS only.
+check_system_memory = true
+memory_headroom_gib = 8
 # Concurrent non-heavy jobs the worker may run next to (at most) one heavy job (when max_concurrent_jobs allows).
 max_light_jobs = 2
 # Cloud (remote) models: concurrent jobs they may run, and whether prompts and reference files may leave this machine
