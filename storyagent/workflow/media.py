@@ -78,8 +78,17 @@ def slot_asset(
 
 
 def up_to_date(ledger: Ledger, spec: SpecRecord) -> bool:
+    """Made from this version of the spec, and not older than what it was built on: a clip whose keyframe has been
+    made again since is outdated even though its own spec did not change."""
     asset = current_asset(ledger, spec)
-    return asset is not None and (asset.spec_version or 0) >= spec.version
+    if asset is None or (asset.spec_version or 0) < spec.version:
+        return False
+    for dep in spec.depends_on:
+        base = slot_asset(ledger, spec.project_id, str(dep.get("subject_type", "")), str(dep.get("subject_id", "")),
+                          str(dep.get("slot", "main")))
+        if base is not None and base.created_at > asset.created_at:
+            return False
+    return True
 
 
 def wait_for_jobs(

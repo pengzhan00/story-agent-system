@@ -4,6 +4,7 @@ from __future__ import annotations
 import shutil
 import subprocess
 import threading
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -447,3 +448,22 @@ def test_an_edited_spec_keeps_its_old_asset_in_use_and_shows_as_outdated(tmp_pat
     produce = steps["produce"]["media"]
     counts = next(m for m in produce if m["subject"] == "shot.keyframe")["counts"]
     assert counts["stale"] == 1 and counts["made"] == counts["specs"]                  # all made, one of them outdated
+
+
+def test_an_asset_is_outdated_once_what_it_was_built_on_has_been_made_again(tmp_path: Path) -> None:
+    from storyagent.domain import QualityTier
+    from storyagent.workflow.plan import produce_plan
+
+    engine, worker, _ = story(tmp_path, [FakeAdapter()])
+    ledger: Ledger = engine.spec_store.ledger
+    args = (engine.settings, engine.store, engine.spec_store, ledger, 1, QualityTier.DRAFT)
+    portrait = engine.spec_store.current(1, "character.portrait", str(engine.store.list_characters(1)[0]["id"]))
+    with serving(worker):
+        engine.run_stage(1, "produce", {"skip": ["dialogue.line"]})
+        assert {p.state for p in produce_plan(*args) if p.state != "blocked"} == {"done"}
+        time.sleep(0.01)
+        engine.run_stage(1, "produce", {"only": [portrait.id], "force": True})     # the portrait is made again
+    plan = produce_plan(*args)
+    stale = {p.subject_type for p in plan if p.state == "stale"}
+    assert stale == {"shot.keyframe"}           # built on that portrait; the clips wait until their keyframes change
+    assert all(p.state == "done" for p in plan if p.subject_type == "character.portrait")
