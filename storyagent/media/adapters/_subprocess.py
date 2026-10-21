@@ -31,6 +31,12 @@ class Command:
     env: dict[str, str] = field(default_factory=dict)  # added to the worker's environment
 
 
+def clean_env(extra: dict[str, str]) -> dict[str, str]:
+    """The tool runs in its own virtualenv: another interpreter's PYTHONPATH/PYTHONHOME must not leak into it."""
+    inherited = {k: v for k, v in os.environ.items() if k not in ("PYTHONPATH", "PYTHONHOME")}
+    return {**inherited, **extra}
+
+
 class SubprocessAdapter(AdapterBase):
     poll_interval_sec = 2.0
 
@@ -60,7 +66,7 @@ class SubprocessAdapter(AdapterBase):
         log = self.log_path(ctx).open("ab")
         try:
             proc = subprocess.Popen(  # noqa: S603 - argv list, no shell
-                cmd.argv, cwd=cmd.cwd, env={**os.environ, **cmd.env}, stdout=log, stderr=subprocess.STDOUT,
+                cmd.argv, cwd=cmd.cwd, env=clean_env(cmd.env), stdout=log, stderr=subprocess.STDOUT,
                 stdin=subprocess.DEVNULL, start_new_session=True,
             )
         except FileNotFoundError as exc:

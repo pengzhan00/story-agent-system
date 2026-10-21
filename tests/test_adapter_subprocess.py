@@ -270,3 +270,12 @@ def test_registered_and_configured_by_default(tmp_path: Path) -> None:
     assert {"acestep", "phosphene", "cosyvoice", "whisper"} <= set(reg.providers())
     assert s.default_model("text.asr").provider == "whisper" and s.default_model("audio.tts").provider == "cosyvoice"
     assert s.model("cosyvoice2-0.5b").params["ref_min_sec"] == 3
+
+
+def test_a_tool_never_inherits_another_interpreters_python_path(monkeypatch: pytest.MonkeyPatch) -> None:
+    from storyagent.media.adapters._subprocess import clean_env
+
+    monkeypatch.setenv("PYTHONPATH", "/other/site-packages")
+    monkeypatch.setenv("PYTHONHOME", "/other")
+    env = clean_env({"X": "1"})
+    assert "PYTHONPATH" not in env and "PYTHONHOME" not in env and env["X"] == "1" and "PATH" in env
