@@ -964,6 +964,27 @@ export interface paths {
         patch: operations["update_season_api_projects__project_id__seasons__number__patch"];
         trace?: never;
     };
+    "/api/projects/{project_id}/series": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Series
+         * @description The dashboard: every season and episode with stage states and how much media is made (counts reconcile with the
+         *     shot and asset lists).
+         */
+        get: operations["get_series_api_projects__project_id__series_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{project_id}/settings": {
         parameters: {
             query?: never;
@@ -2643,6 +2664,92 @@ export interface components {
              * @default
              */
             summary: string;
+        };
+        /** SeriesBoardOut */
+        SeriesBoardOut: {
+            /** Seasons */
+            seasons: components["schemas"]["SeriesSeasonOut"][];
+            totals: components["schemas"]["SeriesTotals"];
+        };
+        /** SeriesEpisodeOut */
+        SeriesEpisodeOut: {
+            /** Cliffhanger */
+            cliffhanger: string;
+            /**
+             * Exists
+             * @description false = planned by the season but not started
+             */
+            exists: boolean;
+            /** Film Asset Id */
+            film_asset_id: string | null;
+            /** Film Seconds */
+            film_seconds: number | null;
+            /** Hook */
+            hook: string;
+            /**
+             * Keyframes
+             * @description shots that have a keyframe (outdated ones included; see outdated)
+             */
+            keyframes: number;
+            /**
+             * Number
+             * @description series-wide episode number (the key everything uses)
+             */
+            number: number;
+            /** Number In Season */
+            number_in_season: number;
+            /**
+             * Outdated
+             * @description shots whose keyframe or video was made from an older spec
+             */
+            outdated: number;
+            /** Shots */
+            shots: number;
+            /**
+             * Stages
+             * @description stage -> pending | running | completed | failed | stale
+             */
+            stages: {
+                [key: string]: string;
+            };
+            /** Summary */
+            summary: string;
+            /** Title */
+            title: string;
+            /** Videos */
+            videos: number;
+        };
+        /** SeriesSeasonOut */
+        SeriesSeasonOut: {
+            /** Episodes */
+            episodes: components["schemas"]["SeriesEpisodeOut"][];
+            /** Filmed */
+            filmed: number;
+            /** Number */
+            number: number;
+            /** Planned Episodes */
+            planned_episodes: number;
+            /** Summary */
+            summary: string;
+            /** Title */
+            title: string;
+        };
+        /** SeriesTotals */
+        SeriesTotals: {
+            /** Episodes */
+            episodes: number;
+            /** Filmed */
+            filmed: number;
+            /** Keyframes */
+            keyframes: number;
+            /** Planned */
+            planned: number;
+            /** Scripted */
+            scripted: number;
+            /** Shots */
+            shots: number;
+            /** Videos */
+            videos: number;
         };
         /** SpeakerBody */
         SpeakerBody: {
@@ -5220,6 +5327,37 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_series_api_projects__project_id__series_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SeriesBoardOut"];
                 };
             };
             /** @description Validation Error */

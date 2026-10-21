@@ -1101,5 +1101,13 @@
   "web.season.write": "生成本季分集大纲",
   "web.season.rewrite": "重写本季分集大纲",
   "web.season.episode_label": "第 {season} 季 第 {n} 集",
-  "web.season.hint": "单集或单部影片可以不填。计划了多集时会先写分集大纲:每集的标题、梗概、开场钩子和结尾悬念,之后每一集的剧本都按它来写。"
+  "web.season.hint": "单集或单部影片可以不填。计划了多集时会先写分集大纲:每集的标题、梗概、开场钩子和结尾悬念,之后每一集的剧本都按它来写。",
+  "web.tab.series": "全剧",
+  "web.series.filmed": "已成片 {done} / {total} 集",
+  "web.series.counts": "已写剧本 {scripted} 集 · {shots} 个镜头 · {keyframes} 张关键帧 · {videos} 段视频",
+  "web.series.empty": "还没有集。先在「制作流程」页给这一季填计划集数。",
+  "web.series.not_started": "未开始",
+  "web.series.film": "成片 {time}",
+  "web.series.media": "{shots} 镜头 · {keyframes} 关键帧 · {videos} 视频",
+  "web.series.outdated": "{n} 项已过期"
 }

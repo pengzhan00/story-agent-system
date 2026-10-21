@@ -343,3 +343,15 @@ def test_a_project_can_choose_its_default_voice(client: TestClient) -> None:
     assert client.patch(f"/api/projects/{pid}/settings", json={"default_voice": "/etc/passwd"}).status_code == 422
     cleared = client.patch(f"/api/projects/{pid}/settings", json={"default_voice": None})
     assert "default_voice" not in cleared.json()["settings"]
+
+
+def test_the_series_board_lists_seasons_and_planned_episodes(client: TestClient) -> None:
+    pid = client.post("/api/projects", json={"name": "Saga"}).json()["id"]
+    client.patch(f"/api/projects/{pid}/seasons/1", json={"planned_episodes": 3})
+    board = client.get(f"/api/projects/{pid}/series").json()
+    eps = board["seasons"][0]["episodes"]
+    assert [(e["number"], e["number_in_season"], e["exists"]) for e in eps] == [
+        (1, 1, False), (2, 2, False), (3, 3, False)]
+    assert board["totals"] == {"episodes": 3, "planned": 3, "scripted": 0, "filmed": 0, "shots": 0, "keyframes": 0,
+                               "videos": 0}
+    assert client.get("/api/projects/999/series").status_code == 404

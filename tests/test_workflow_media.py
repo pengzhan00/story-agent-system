@@ -306,3 +306,34 @@ def test_a_project_voice_unblocks_the_dialogue_in_the_plan(tmp_path: Path) -> No
     lines = lambda plan: [p for p in plan if p.subject_type == "dialogue.line"]  # noqa: E731
     assert any(p.reason == "no_voice" for p in lines(before))
     assert not any(p.reason == "no_voice" for p in lines(after))
+
+
+def test_the_series_board_counts_match_the_shots_and_assets_behind_them(tmp_path: Path) -> None:
+    from storyagent.workflow.series import series_board
+
+    fake = FakeAdapter()
+    engine, worker, _ = story(tmp_path, [fake])
+    engine.store.update_season(1, 1, {"planned_episodes": 3})
+    ledger: Ledger = engine.spec_store.ledger
+
+    def board() -> dict[str, Any]:
+        return series_board(engine.store, engine.state, engine.spec_store, ledger, 1)
+
+    before = board()
+    eps = before["seasons"][0]["episodes"]
+    assert [(e["number"], e["exists"]) for e in eps] == [(1, True), (2, False), (3, False)]
+    assert eps[0]["shots"] == len(engine.store.list_shots(1)) == 8 and eps[0]["keyframes"] == 0
+    assert eps[0]["stages"]["script"] == "completed" and eps[1]["stages"] == {}
+    with serving(worker):
+        engine.run_stage(1, "produce", {})
+    after = board()
+    ep1 = after["seasons"][0]["episodes"][0]
+    made = ledger.list_assets(project_id=1, current_only=True, limit=1000)
+    assert ep1["keyframes"] == sum(1 for a in made if a.kind.startswith("image.") and a.shot_id) == 8
+    assert ep1["videos"] == sum(1 for a in made if a.kind == "video.generate") == 8
+    assert ep1["outdated"] == 0 and after["totals"]["planned"] == 3 and after["totals"]["episodes"] == 3
+    shot = engine.store.list_shots(1)[0]
+    spec = engine.spec_store.current(1, "shot.keyframe", str(shot["id"]))
+    assert spec is not None
+    engine.spec_store.edit(1, "shot.keyframe", str(shot["id"]), prompt="changed")   # now older than its spec
+    assert board()["seasons"][0]["episodes"][0]["outdated"] == 1

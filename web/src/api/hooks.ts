@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, del, patch, post, put } from "./client";
-import type { Agent, AgentEdit, AiCallDetail, AiCallRow, FlowStep, Health, Launch, ProjectCard, ProducePlan, ProjectFromText, ScriptReview, Job, Meta, Project, QueueState, Row, WorkflowOverview, WorkflowRun } from "./types";
+import type { Agent, AgentEdit, AiCallDetail, AiCallRow, FlowStep, Health, Launch, ProjectCard, ProducePlan, SeriesBoard, ProjectFromText, ScriptReview, Job, Meta, Project, QueueState, Row, WorkflowOverview, WorkflowRun } from "./types";
 import { useI18n } from "../i18n";
 
 /** Polling is the fallback; the SSE feed (``events.ts``) pushes the same data much sooner. */
@@ -235,3 +235,7 @@ export function useUpdateSeason(id: number) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["seasons", id] }),
   });
 }
+
+/** The dashboard: every season and episode with stage states and how much media is made. */
+export const useSeries = (id: number) =>
+  useQuery({ queryKey: ["series", id], queryFn: () => api<SeriesBoard>(`/api/projects/${id}/series`), refetchInterval: 5000 });

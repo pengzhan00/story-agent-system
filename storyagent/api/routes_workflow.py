@@ -14,6 +14,7 @@ from storyagent.domain import QualityTier
 from storyagent.llm import LLMError
 from storyagent.workflow import STAGES, WorkflowEngine, WorkflowStateError
 from storyagent.workflow.plan import produce_plan, totals
+from storyagent.workflow.series import series_board
 
 from .context import ctx_of
 from .errors import ApiError
@@ -22,6 +23,7 @@ from .schemas import (
     PlanTotals,
     ProducePlanOut,
     ScriptReviewOut,
+    SeriesBoardOut,
     WorkflowOut,
     WorkflowRunCreate,
     WorkflowRunOut,
@@ -63,6 +65,15 @@ def start_run(project_id: int, body: WorkflowRunCreate, request: Request) -> Wor
         params["resume"] = True                 # every episode picks up where it stopped when the worker gets to it
     stages = [s for s in STAGES if any(s == name for _, name in plan)]
     return run_out(ctx.workflow.enqueue(project_id, stages, params))
+
+
+@router.get("/projects/{project_id}/series", response_model=SeriesBoardOut)
+def get_series(project_id: int, request: Request) -> SeriesBoardOut:
+    """The dashboard: every season and episode with stage states and how much media is made (counts reconcile with the
+    shot and asset lists)."""
+    ctx = ctx_of(request)
+    ctx.projects.get(project_id)
+    return SeriesBoardOut.model_validate(series_board(ctx.story, ctx.workflow, ctx.specs, ctx.ledger, project_id))
 
 
 @router.get("/projects/{project_id}/produce/plan", response_model=ProducePlanOut)

@@ -1101,5 +1101,13 @@
   "web.season.write": "Write the season outline",
   "web.season.rewrite": "Rewrite the season outline",
   "web.season.episode_label": "S{season} E{n}",
-  "web.season.hint": "Leave it unplanned for a single film or episode. With several episodes planned the outline is written first: a title, summary, opening hook and closing cliffhanger for each episode, and every script follows it."
+  "web.season.hint": "Leave it unplanned for a single film or episode. With several episodes planned the outline is written first: a title, summary, opening hook and closing cliffhanger for each episode, and every script follows it.",
+  "web.tab.series": "Series",
+  "web.series.filmed": "{done} of {total} episodes finished",
+  "web.series.counts": "{scripted} scripted · {shots} shots · {keyframes} keyframes · {videos} clips",
+  "web.series.empty": "No episodes yet. Plan the season on the Workflow tab.",
+  "web.series.not_started": "Not started",
+  "web.series.film": "Film {time}",
+  "web.series.media": "{shots} shots · {keyframes} keyframes · {videos} clips",
+  "web.series.outdated": "{n} out of date"
 }

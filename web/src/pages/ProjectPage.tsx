@@ -8,6 +8,7 @@ import { FlowChain } from "../components/FlowChain";
 import { CreativePanel } from "./CreativePanel";
 import { ProcessPanel } from "./ProcessPanel";
 import { JobsPanel } from "./QueuePage";
+import { SeriesPanel } from "./SeriesPanel";
 import { StoryPanel } from "./StoryPanel";
 import { WorkflowPanel } from "./WorkflowPanel";
 
@@ -73,6 +74,9 @@ export function ProjectPage() {
         <NavLink to="workflow" className={({ isActive }) => (isActive ? "tab active" : "tab")}>
           {t("web.tab.workflow")}
         </NavLink>
+        <NavLink to="series" className={({ isActive }) => (isActive ? "tab active" : "tab")}>
+          {t("web.tab.series")}
+        </NavLink>
         <NavLink to="story" className={({ isActive }) => (isActive ? "tab active" : "tab")}>
           {t("web.tab.story")}
         </NavLink>
@@ -92,6 +96,7 @@ export function ProjectPage() {
       <Routes>
         <Route index element={<Navigate to="workflow" replace />} />
         <Route path="workflow" element={<WorkflowPanel id={id} />} />
+        <Route path="series" element={<SeriesPanel id={id} />} />
         <Route path="story" element={<StoryPanel id={id} />} />
         <Route path="creative" element={<CreativePanel id={id} />} />
         <Route path="flow" element={<FlowChain projectId={id} />} />

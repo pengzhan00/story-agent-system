@@ -499,6 +499,47 @@ class ProducePlanOut(Strict):
     totals: PlanTotals
 
 
+class SeriesEpisodeOut(Strict):
+    number: int = Field(description="series-wide episode number (the key everything uses)")
+    number_in_season: int
+    title: str
+    summary: str
+    hook: str
+    cliffhanger: str
+    exists: bool = Field(description="false = planned by the season but not started")
+    stages: dict[str, str] = Field(description="stage -> pending | running | completed | failed | stale")
+    shots: int
+    keyframes: int = Field(description="shots that have a keyframe (outdated ones included; see outdated)")
+    videos: int
+    outdated: int = Field(description="shots whose keyframe or video was made from an older spec")
+    film_asset_id: str | None
+    film_seconds: float | None
+
+
+class SeriesSeasonOut(Strict):
+    number: int
+    title: str
+    summary: str
+    planned_episodes: int
+    episodes: list[SeriesEpisodeOut]
+    filmed: int
+
+
+class SeriesTotals(Strict):
+    episodes: int
+    planned: int
+    scripted: int
+    filmed: int
+    shots: int
+    keyframes: int
+    videos: int
+
+
+class SeriesBoardOut(Strict):
+    seasons: list[SeriesSeasonOut]
+    totals: SeriesTotals
+
+
 class ProjectFromText(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     asset_id: str | None = Field(default=None, description="a text asset (story, script, transcript, uploaded text)")

@@ -2776,6 +2776,210 @@
         "title": "ScriptReviewOut",
         "type": "object"
       },
+      "SeriesBoardOut": {
+        "properties": {
+          "seasons": {
+            "items": {
+              "$ref": "#/components/schemas/SeriesSeasonOut"
+            },
+            "title": "Seasons",
+            "type": "array"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/SeriesTotals"
+          }
+        },
+        "required": [
+          "seasons",
+          "totals"
+        ],
+        "title": "SeriesBoardOut",
+        "type": "object"
+      },
+      "SeriesEpisodeOut": {
+        "properties": {
+          "cliffhanger": {
+            "title": "Cliffhanger",
+            "type": "string"
+          },
+          "exists": {
+            "description": "false = planned by the season but not started",
+            "title": "Exists",
+            "type": "boolean"
+          },
+          "film_asset_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Film Asset Id"
+          },
+          "film_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Film Seconds"
+          },
+          "hook": {
+            "title": "Hook",
+            "type": "string"
+          },
+          "keyframes": {
+            "description": "shots that have a keyframe (outdated ones included; see outdated)",
+            "title": "Keyframes",
+            "type": "integer"
+          },
+          "number": {
+            "description": "series-wide episode number (the key everything uses)",
+            "title": "Number",
+            "type": "integer"
+          },
+          "number_in_season": {
+            "title": "Number In Season",
+            "type": "integer"
+          },
+          "outdated": {
+            "description": "shots whose keyframe or video was made from an older spec",
+            "title": "Outdated",
+            "type": "integer"
+          },
+          "shots": {
+            "title": "Shots",
+            "type": "integer"
+          },
+          "stages": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "stage -> pending | running | completed | failed | stale",
+            "title": "Stages",
+            "type": "object"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "videos": {
+            "title": "Videos",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "number",
+          "number_in_season",
+          "title",
+          "summary",
+          "hook",
+          "cliffhanger",
+          "exists",
+          "stages",
+          "shots",
+          "keyframes",
+          "videos",
+          "outdated",
+          "film_asset_id",
+          "film_seconds"
+        ],
+        "title": "SeriesEpisodeOut",
+        "type": "object"
+      },
+      "SeriesSeasonOut": {
+        "properties": {
+          "episodes": {
+            "items": {
+              "$ref": "#/components/schemas/SeriesEpisodeOut"
+            },
+            "title": "Episodes",
+            "type": "array"
+          },
+          "filmed": {
+            "title": "Filmed",
+            "type": "integer"
+          },
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          },
+          "planned_episodes": {
+            "title": "Planned Episodes",
+            "type": "integer"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "number",
+          "title",
+          "summary",
+          "planned_episodes",
+          "episodes",
+          "filmed"
+        ],
+        "title": "SeriesSeasonOut",
+        "type": "object"
+      },
+      "SeriesTotals": {
+        "properties": {
+          "episodes": {
+            "title": "Episodes",
+            "type": "integer"
+          },
+          "filmed": {
+            "title": "Filmed",
+            "type": "integer"
+          },
+          "keyframes": {
+            "title": "Keyframes",
+            "type": "integer"
+          },
+          "planned": {
+            "title": "Planned",
+            "type": "integer"
+          },
+          "scripted": {
+            "title": "Scripted",
+            "type": "integer"
+          },
+          "shots": {
+            "title": "Shots",
+            "type": "integer"
+          },
+          "videos": {
+            "title": "Videos",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "episodes",
+          "planned",
+          "scripted",
+          "filmed",
+          "shots",
+          "keyframes",
+          "videos"
+        ],
+        "title": "SeriesTotals",
+        "type": "object"
+      },
       "SpeakerBody": {
         "properties": {
           "character": {
@@ -7318,6 +7522,49 @@
         "summary": "Update Season",
         "tags": [
           "story"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/series": {
+      "get": {
+        "description": "The dashboard: every season and episode with stage states and how much media is made (counts reconcile with the\nshot and asset lists).",
+        "operationId": "get_series_api_projects__project_id__series_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeriesBoardOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Series",
+        "tags": [
+          "workflow"
         ]
       }
     },

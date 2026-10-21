@@ -26,6 +26,7 @@ export type SpecDiffItem = S["SpecDiffItem"];
 export type ReviewItem = S["ReviewItemOut"];
 export type Asset = S["AssetOut"];
 export type ProducePlan = S["ProducePlanOut"];
+export type SeriesBoard = S["SeriesBoardOut"];
 export type PlannedTask = S["PlannedTaskOut"];
 export type ProjectFromText = S["ProjectFromTextOut"];
 export type LibraryItem = S["LibraryItemOut"];
