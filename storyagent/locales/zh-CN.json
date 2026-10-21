@@ -84,6 +84,7 @@
   "error.internal.remediation": "把作业事件日志附给开发者;可先重试一次。",
   "wait.heavy_busy": "等待其它重任务结束",
   "wait.light_limit": "等待轻任务名额",
+  "wait.queue_limit": "排队中,等待前一个任务完成(一次只跑一个)",
   "wait.memory_budget": "等待足够的内存预算",
   "wait.llm_resident": "语言模型仍驻留内存;请运行 storyagent ops llm-unload 后自动继续",
   "media.kind.train.lora": "LoRA 训练",

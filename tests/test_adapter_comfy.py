@@ -51,6 +51,7 @@ def server() -> Any:
         srv.route("POST", "/prompt", {"prompt_id": "p-1"})
         srv.route("GET", "/history/p-1", [{}, history(done=False, status=""), history()])
         srv.route("GET", "/view", wav_bytes())
+        srv.route("POST", "/free", {})
         yield srv
 
 
@@ -71,6 +72,9 @@ def test_makes_a_sound_effect_from_the_template_and_registers_it(tmp_path: Path,
     assert graph["3"]["inputs"]["text"] == "door knock, dry foley"       # prompt lands in the bound node input
     assert graph["5"]["inputs"]["seconds"] == 3.0 and graph["6"]["inputs"]["seed"] == 11
     assert graph["6"]["inputs"]["steps"] == 8 and graph["6"]["inputs"]["sampler_name"] == "lcm"   # model param
+    assert "dry" in graph["4"]["inputs"]["text"] or "muffled" in graph["4"]["inputs"]["text"]       # template default
+    freed = next(q.json for q in server.requests if q.path == "/free")
+    assert freed == {"unload_models": True, "free_memory": True}                 # memory is handed back after the clip
 
 
 def test_a_missing_checkpoint_fails_validation_before_anything_is_queued(tmp_path: Path, server: FakeServer) -> None:

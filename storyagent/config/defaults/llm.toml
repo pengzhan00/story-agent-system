@@ -6,6 +6,9 @@
 [llm.backends.ollama]
 kind = "ollama"
 service = "ollama"
+# How long Ollama keeps the model in memory after our last request. Short on purpose: calls inside one stage follow
+# each other and reuse it, then the (25+ GiB) model is released so the media models have the memory. "0" = at once.
+keep_alive = "30s"
 
 [llm.backends.llamacpp]
 kind = "llamacpp"

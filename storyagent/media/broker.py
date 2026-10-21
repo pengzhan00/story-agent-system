@@ -1,6 +1,7 @@
 """Scheduling policy: which queued job may start now. Pure functions, no I/O.
 
-Rules (in order): at most one heavy job at a time; a cap on concurrent light jobs; a memory budget
+Rules (in order): at most ``max_concurrent_jobs`` local jobs in all (1 = a linear queue, 0 = no overall cap);
+at most one heavy job at a time; a cap on concurrent light jobs; a memory budget
 (a job that alone exceeds the budget still runs when nothing else does, so it can't deadlock);
 and, when ``llm_unload_policy = ask``, heavy jobs wait while any LLM is resident.
 Blocked jobs do not hold up later ones (no head-of-line blocking).
@@ -46,6 +47,9 @@ def can_start(
         if sum(1 for r in running if _remote(r, settings)) >= int(settings.runtime.get("max_remote_jobs", 4)):
             return Gate(False, WaitReason.LIGHT_LIMIT)
         return Gate(True)
+    cap = int(settings.runtime.get("max_concurrent_jobs", 0))
+    if cap and sum(1 for r in running if not _remote(r, settings)) >= cap:       # a strictly linear queue (cap 1)
+        return Gate(False, WaitReason.QUEUE_LIMIT)
     if job.heavy:
         if any(r.heavy for r in running):
             return Gate(False, WaitReason.HEAVY_BUSY)

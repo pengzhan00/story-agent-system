@@ -84,6 +84,7 @@
   "error.internal.remediation": "Send the job event log to the developer; try once more first.",
   "wait.heavy_busy": "Waiting for another heavy job to finish",
   "wait.light_limit": "Waiting for a light-job slot",
+  "wait.queue_limit": "Waiting for its turn in the queue (one job at a time)",
   "wait.memory_budget": "Waiting for enough memory budget",
   "wait.llm_resident": "An LLM is still resident in memory; run storyagent ops llm-unload and the job will continue",
   "media.kind.train.lora": "LoRA training",

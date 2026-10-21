@@ -163,6 +163,13 @@ class ComfyAdapter(AdapterBase):
             return False
         return external_id in json.dumps(queue)
 
+    def _release(self) -> None:
+        """Ask ComfyUI to drop its cached models once the clip is made: it keeps them in memory otherwise."""
+        try:
+            self.client.request("POST", "/free", json={"unload_models": True, "free_memory": True}, timeout=15)
+        except AdapterError:
+            pass          # best effort: the clip is made; a server without /free just keeps its cache
+
     def fetch(self, external_id: str, job: JobRecord, ctx: JobContext) -> list[ArtifactSpec]:
         entry = self._history(external_id) or {}
         out_node = str(self.template(job).get("output", ""))
@@ -173,5 +180,6 @@ class ComfyAdapter(AdapterBase):
         query = urllib.parse.urlencode({"filename": first["filename"], "subfolder": first.get("subfolder", ""),
                                         "type": first.get("type", "output")})
         dest = self.client.download(f"/view?{query}", ctx.work_dir / f"sfx{Path(first['filename']).suffix}")
+        self._release()
         return [ArtifactSpec(dest, metadata={"prompt_id": external_id, "workflow": self._workflows.get(job.model_ref),
                                              "prompt": str(job.inputs.get("prompt", ""))[:500]})]

@@ -82,7 +82,25 @@ def test_caffeinate_guard_is_safe_when_disabled_and_cleans_up() -> None:
     assert not g.active
 
 
+def test_a_linear_queue_runs_one_local_job_at_a_time_whatever_its_kind(led: Ledger, fsettings: Settings) -> None:
+    s = replace(fsettings, runtime={**fsettings.runtime, "max_concurrent_jobs": 1})
+    heavy, light = rec(led, "fake-heavy", 1), rec(led, "fake-video", 2)
+    assert can_start(heavy, [], s).allowed and can_start(light, [], s).allowed
+    for running, waiting in (([heavy], light), ([light], heavy), ([light], rec(led, "fake-video", 3))):
+        gate = can_start(waiting, running, s)
+        assert not gate.allowed and gate.reason is WaitReason.QUEUE_LIMIT
+
+
+def test_default_config_is_a_linear_queue(tmp_path) -> None:  # noqa: ANN001
+    assert load_settings({"STORY_AGENT_HOME": str(tmp_path)}).runtime["max_concurrent_jobs"] == 1
+
+
 def test_default_config_has_sane_scheduling_values(tmp_path) -> None:  # noqa: ANN001
     s = load_settings({"STORY_AGENT_HOME": str(tmp_path)})
     assert s.runtime["max_light_jobs"] >= 1 and s.runtime["memory_budget_gib"] > 0
     assert s.runtime["heartbeat_seconds"] < s.runtime["lease_seconds"]
+
+
+def test_ollama_lets_go_of_the_model_soon_after_our_last_call(tmp_path) -> None:  # noqa: ANN001
+    s = load_settings({"STORY_AGENT_HOME": str(tmp_path)})
+    assert s.llm_backends["ollama"].options["keep_alive"] == "30s"
