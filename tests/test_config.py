@@ -15,7 +15,7 @@ def test_defaults(tmp_path: Path) -> None:
     s = load_settings(env(tmp_path))
     assert s.home == tmp_path / "home"
     assert s.db_path == tmp_path / "home" / "storyagent.db"
-    assert s.service("comfy").url == "http://127.0.0.1:8188"
+    assert s.service("ollama").url == "http://127.0.0.1:11434"
     assert s.service("acestep").health_url == "http://127.0.0.1:8001/v1/models"
     assert s.default_model("video.generate").ref == "ltx-2.5-video"
     assert s.default_model("video.av").ref == "ltx-2.5-av"
@@ -24,22 +24,16 @@ def test_defaults(tmp_path: Path) -> None:
     assert s.locale == "zh-CN"
 
 
-def test_fastvideo_never_uses_nodus_port(tmp_path: Path) -> None:
-    s = load_settings(env(tmp_path))
-    assert s.service("fastvideo").url != s.service("nodus").url
-    assert s.service("nodus").probe_only is True
-
-
 def test_env_overrides(tmp_path: Path) -> None:
     s = load_settings(
         env(
             tmp_path,
-            STORY_AGENT_COMFY_URL="http://10.0.0.5:9999/",
+            STORY_AGENT_OLLAMA_URL="http://10.0.0.5:9999/",
             STORY_AGENT_LOCALE="en",
             STORY_AGENT_LLM_UNLOAD_POLICY="ask",
         )
     )
-    assert s.service("comfy").url == "http://10.0.0.5:9999"
+    assert s.service("ollama").url == "http://10.0.0.5:9999"
     assert s.locale == "en"
     assert s.llm_unload_policy == "ask"
 
@@ -48,11 +42,11 @@ def test_user_override_file_merges_deeply(tmp_path: Path) -> None:
     cfg = tmp_path / "home" / "config"
     cfg.mkdir(parents=True)
     (cfg / "models.toml").write_text('[defaults]\n"audio.music" = "acestep-1.5-xl-sft"\n')
-    (cfg / "services.toml").write_text('[services.comfy]\nurl = "http://127.0.0.1:1234"\n')
+    (cfg / "services.toml").write_text('[services.ollama]\nurl = "http://127.0.0.1:1234"\n')
     s = load_settings(env(tmp_path))
     assert s.default_model("audio.music").ref == "acestep-1.5-xl-sft"  # swap model = config only
-    assert s.service("comfy").url == "http://127.0.0.1:1234"
-    assert s.service("comfy").health_path == "/system_stats"  # untouched sibling key survives
+    assert s.service("ollama").url == "http://127.0.0.1:1234"
+    assert s.service("ollama").health_path == "/api/tags"  # untouched sibling key survives
     assert s.default_model("audio.tts").ref == "cosyvoice3-0.5b"
 
 
@@ -116,14 +110,6 @@ def test_default_must_match_model_kind(tmp_path: Path) -> None:
 def test_unknown_kind_rejected(tmp_path: Path) -> None:
     cfg = tmp_path / "home" / "config"
     cfg.mkdir(parents=True)
-    (cfg / "models.toml").write_text('[models.x]\nkind = "video"\nprovider = "comfy"\n')
+    (cfg / "models.toml").write_text('[models.x]\nkind = "video"\nprovider = "fake"\n')
     with pytest.raises(ConfigError, match="unknown kind"):
         load_settings(env(tmp_path))
-
-
-def test_one_family_many_runtimes(tmp_path: Path) -> None:
-    s = load_settings(env(tmp_path))
-    h3, fv = s.model("minimax-h3"), s.model("fastvideo-fasth3")
-    assert h3.family == fv.family == "minimax-h3"
-    assert h3.provider != fv.provider
-    assert h3.commercial_ok is fv.commercial_ok is False

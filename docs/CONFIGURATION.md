@@ -16,7 +16,7 @@ Nothing is hard-wired: pipelines differ, so defaults are layered and every layer
 
 | File | Purpose |
 |---|---|
-| `services.toml` | `[services.<name>]` url/health_path/enabled/probe_only (comfy 8188, acestep 8001, ollama, llamacpp (off), fastvideo, nodus probe-only); `[tools.<name>]` binaries and model dirs (h3, longcat, cosyvoice, fastvideo, lora_train, mflux, whisper, seedvc, ffmpeg); `[runtime]` worker knobs; `[healthcheck]` required + min_free_gib |
+| `services.toml` | `[services.<name>]` url/health_path/enabled/probe_only (acestep 8001, ollama, phosphene 8198, llamacpp (off)); `[tools.<name>]` binaries and model dirs (h3, longcat, cosyvoice, lora_train, mflux, whisper, seedvc, ffmpeg); `[runtime]` worker knobs; `[healthcheck]` required + min_free_gib |
 | `models.toml` | `[models.<ref>]`: kind, provider, family, version, heavy, est_memory_gib, license_tag, commercial_ok, attribution, prompt_profile, timeout_sec, `params`, `tiers.draft/preview/final`, extra (e.g. `train_template`); `[defaults]` kind -> default model |
 | `recipes.toml` | `[recipes.<name>]` ordered `[[steps]]` (kind, model, tier, slot, params, when). Validated at load and listed in `/api/meta`; the workflow does **not** execute them (`produce` derives its steps from the specs) |
 | `compliance.toml` | `enabled`, `implicit_metadata`, `explicit_label` (`off|overlay|both`), `require_voice_consent`, `require_likeness_consent`, `require_restricted_license_ack` |
@@ -32,7 +32,7 @@ Nothing is hard-wired: pipelines differ, so defaults are layered and every layer
 | `STORY_AGENT_HOME` | Data/config root |
 | `STORY_AGENT_CONFIG_DIR` | Override the config directory |
 | `STORY_AGENT_LOCALE` | `zh-CN` or `en` |
-| `STORY_AGENT_<SERVICE>_URL` | Override a service URL, e.g. `STORY_AGENT_COMFY_URL`, `STORY_AGENT_OLLAMA_URL` |
+| `STORY_AGENT_<SERVICE>_URL` | Override a service URL, e.g. `STORY_AGENT_OLLAMA_URL`, `STORY_AGENT_ACESTEP_URL` |
 | `STORY_AGENT_LLM_UNLOAD_POLICY` | `never|ask|auto` |
 | `STORY_AGENT_COMPLIANCE` | `on|off` (also `1/0/true/false`); anything else is a config error |
 | `STORY_AGENT_LEGACY_DB` | Source for the optional `db import-legacy` |

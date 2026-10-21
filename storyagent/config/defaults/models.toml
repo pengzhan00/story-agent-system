@@ -2,9 +2,9 @@
 #
 #   kind     : a MediaKind value (storyagent/domain/enums.py), e.g. "video.generate"
 #   provider : the runtime/adapter that executes it:
-#              mflux | comfy | phosphene | acestep | cosyvoice | h3 | longcat | fastvideo | lora_train | ffmpeg
+#              mflux | phosphene | acestep | cosyvoice | seedvc | whisper | h3 | longcat | lora_train | ffmpeg
 #   family   : the underlying model family — the same weights may have several runtimes
-#              (MiniMax H3 runs via h3.c or FastVideo-MLX); licence applies per family
+#              (e.g. one model through several runtimes); licence applies per family
 #   heavy    : true => the broker runs at most one heavy job at a time
 #   license_tag / commercial_ok / attribution : copied into the ledger for every artifact
 #   params   : model defaults;  tiers.<draft|preview|final> : per-tier overrides on top of params
@@ -186,34 +186,6 @@ frame_rate = 24
 quality = "high"
 enhance = false
 
-[models."ltx-2.3-22b-distilled"]
-kind = "video.generate"
-provider = "comfy"
-version = "distilled-1.1"
-heavy = true
-est_memory_gib = 60
-license_tag = "ltx-community"
-commercial_ok = true
-prompt_profile = "cinematic_en"
-timeout_sec = 7200
-[models."ltx-2.3-22b-distilled".params]
-fps = 16
-frames = 49
-cfg = 3.0
-shift = 8.0
-steps = 9
-lora_strength = 0.35
-[models."ltx-2.3-22b-distilled".tiers.draft]
-width = 288
-height = 512
-frames = 9
-fps = 8
-[models."ltx-2.3-22b-distilled".tiers.preview]
-width = 384
-height = 672
-[models."ltx-2.3-22b-distilled".tiers.final]
-width = 720
-height = 1280
 
 [models."acestep-1.5-turbo"]
 kind = "audio.music"
@@ -397,23 +369,6 @@ frames = 22
 layers = 40
 reuse = 3
 
-[models."fastvideo-fasth3"]
-kind = "video.av"
-provider = "fastvideo"
-version = "FastH3-8step-V2"
-family = "minimax-h3"
-heavy = true
-est_memory_gib = 27
-license_tag = "minimax-h3-community"
-commercial_ok = false
-attribution = "MiniMax H3"
-prompt_profile = "h3_structured"
-timeout_sec = 7200
-[models."fastvideo-fasth3".params]
-width = 832
-height = 480
-num_frames = 124
-fps = 24
 
 [models."longcat-avatar-1.5-q4"]
 kind = "video.avatar"

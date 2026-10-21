@@ -75,4 +75,4 @@
 
 ## 已知缺口(诚实清单)
 
-音效合成(C7)、RIFE 补帧(C9)、EDL/FCPXML(D3)、转场(D2)、参考图 Web 上传入口(B3)、AI 改写 + 变更清单(A11)、FastVideo 适配器(权重未下载、接口未核实)、longcat 尚未 live 验证(仅桩与契约测试;Phosphene、h3 视频已于 2026-10-21 实机验证)。
+音效合成(C7)、RIFE 补帧(C9)、EDL/FCPXML(D3)、转场(D2)、参考图 Web 上传入口(B3)、AI 改写 + 变更清单(A11)、FastVideo(已移除:没有适配器,权重也没装;要用时从 git 历史找回配置)、longcat 尚未 live 验证(仅桩与契约测试;Phosphene、h3 视频已于 2026-10-21 实机验证)。

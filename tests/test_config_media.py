@@ -55,9 +55,8 @@ def test_compliance_validation(tmp_path: Path) -> None:
 # ---- models ---------------------------------------------------------------------------------------
 def test_model_params_tiers_and_template_are_loaded(tmp_path: Path) -> None:
     s = load_settings(home_with(tmp_path))
-    ltx = s.model("ltx-2.3-22b-distilled")
-    assert ltx.tiers["draft"]["width"] == 288 and ltx.tiers["final"]["height"] == 1280
-    assert ltx.params["fps"] == 16 and ltx.timeout_sec == 7200 and ltx.prompt_profile == "cinematic_en"
+    ltx = s.model("ltx-2.5-video")
+    assert ltx.tiers and ltx.params["frame_rate"] == 24 and ltx.timeout_sec > 0 and ltx.prompt_profile
     trainer = s.default_model("train.lora")
     assert trainer.heavy and trainer.provider == "lora_train"
     tpl = trainer.extra["train_template"]
@@ -66,7 +65,7 @@ def test_model_params_tiers_and_template_are_loaded(tmp_path: Path) -> None:
 
 
 def test_unknown_tier_rejected(tmp_path: Path) -> None:
-    bad = '[models.x]\nkind="video.generate"\nprovider="comfy"\n[models.x.tiers.ultra]\nwidth=1\n'
+    bad = '[models.x]\nkind="video.generate"\nprovider="fake"\n[models.x.tiers.ultra]\nwidth=1\n'
     with pytest.raises(ConfigError, match="unknown tiers"):
         load_settings(home_with(tmp_path, models=bad))
 
@@ -104,11 +103,11 @@ def test_recipe_validation(tmp_path: Path, toml: str, msg: str) -> None:
 
 
 def test_user_recipe_with_explicit_model_and_params(tmp_path: Path) -> None:
-    toml = ('[recipes.mine]\n[[recipes.mine.steps]]\nkind = "video.av"\nmodel = "fastvideo-fasth3"\n'
+    toml = ('[recipes.mine]\n[[recipes.mine.steps]]\nkind = "video.av"\nmodel = "minimax-h3"\n'
             'tier = "draft"\nparams = { num_frames = 30 }\n')
     s = load_settings(home_with(tmp_path, recipes=toml))
     st = s.recipe("mine").steps[0]
-    assert st.model == "fastvideo-fasth3" and st.params == {"num_frames": 30}
+    assert st.model == "minimax-h3" and st.params == {"num_frames": 30}
 
 
 # ---- llm ------------------------------------------------------------------------------------------

@@ -10,7 +10,7 @@ Code: `storyagent/media/`. Config: [CONFIGURATION.md](CONFIGURATION.md). Operati
 | **Spec** (`gen_specs`) | What the creator edits: prompt, negative prompt, text payload (dialogue / lyrics), model, seed, params, refs. One per *subject* (`character.portrait`, `character.voice`, `dialogue.line`, `scene.keyframe`, `shot.keyframe`, `shot.video`, `music.bgm`, `music.theme_song`, `sfx.cue`, `style.guide`, `lora.training`) + slot. | Append-only: an edit is a new version; revert = new version copying an old one; `locked` blocks edits |
 | **Job** (`media_jobs`) | One execution, a frozen snapshot of the resolved prompt / params / seed / refs. Survives restarts. | State only |
 | **Asset** (`media_assets`) | A produced file: relative path, sha256, size, ffprobe facts, provenance, version. At most one `is_current` per (project, shot, kind, slot); the rest are candidates. | Only `is_current` / `trashed_at` |
-| **Adapter** | Wrapper around one runtime (ComfyUI, ACE-Step, CosyVoice, h3, ...). Never touches the DB. | n/a |
+| **Adapter** | Wrapper around one runtime (ACE-Step, Phosphene, CosyVoice, h3, ...). Never touches the DB. | n/a |
 
 `MediaKind` is `<domain>.<operation>`: `image.generate image.edit video.generate video.av video.avatar video.lipsync video.enhance audio.tts audio.convert audio.music audio.sfx audio.enhance text.asr compose.assemble analyze.qc train.lora`.
 `QualityTier`: `draft | preview | final`.

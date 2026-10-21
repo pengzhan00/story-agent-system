@@ -1,6 +1,6 @@
 """The media job contract: request, record, and the adapter protocol.
 
-Every provider (ComfyUI, ACE-Step, CosyVoice, h3.c, ...) is wrapped by an ``Adapter``.
+Every provider (ACE-Step, Phosphene, CosyVoice, h3.c, ...) is wrapped by an ``Adapter``.
 Adapters never touch the database; the worker drives them and the ledger records the outcome.
 """
 from __future__ import annotations

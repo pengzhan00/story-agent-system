@@ -144,13 +144,6 @@ def _check_tools(settings: Settings, run: Runner) -> list[Entry]:
         [] if find_whisper(settings) else ["whisper-cli"],
         [] if wh_model and wh_model.is_file() else ["whisper model"],
     )
-    fv_w = tp("fastvideo", "weights_dir")
-    entry(
-        "fastvideo",
-        [] if _exists(tp("fastvideo", "python"), executable=True) and _exists(tp("fastvideo", "root"))
-        else ["fastvideo runtime"],
-        [] if fv_w and _exists(fv_w) else ["FastH3 weights (not downloaded/converted)"],
-    )
     entry(
         "lora_train",
         [] if _exists(tp("lora_train", "command"), executable=True) else ["mflux-train"],

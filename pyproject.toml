@@ -31,7 +31,7 @@ norecursedirs = [".venv", "data", "web"]
 addopts = "-q -m 'not live'"
 filterwarnings = ["ignore:Using .httpx. with .starlette.testclient"]
 markers = [
-    "live: needs real local services/models (ComfyUI, ACE-Step, Ollama, ...); run with -m live",
+    "live: needs real local services/models (ACE-Step, Phosphene, Ollama, ...); run with -m live",
 ]
 
 [tool.ruff]

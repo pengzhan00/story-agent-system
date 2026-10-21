@@ -5,7 +5,7 @@ workers may share one database because every state change is an atomic ledger tr
 
 Durability: a running job holds a time-limited lease that a heartbeat thread renews. If the process
 dies, the lease expires, ``Ledger.requeue_expired`` hands the job to the next worker, which re-attaches
-to the external work (e.g. a ComfyUI prompt) when the adapter supports it, or resubmits.
+to the external work (e.g. a Phosphene queue entry) when the adapter supports it, or resubmits.
 """
 from __future__ import annotations
 

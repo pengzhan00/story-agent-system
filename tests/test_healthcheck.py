@@ -54,14 +54,14 @@ def test_service_states(tmp_path: Path) -> None:
         up.route("GET", "/health", {"ok": True})
         sick.route("GET", "/health", (503, {"error": "x"}))
         s = cfg(tmp_path, services_toml(
-            {"comfy": up.url, "acestep": sick.url, "ollama": "http://127.0.0.1:9", "nodus": up.url},
-            ["comfy"]))
+            {"demo": up.url, "acestep": sick.url, "ollama": "http://127.0.0.1:9"},
+            ["demo"]) + f'\n[services.watch]\nurl = "{up.url}"\nhealth_path = "/health"\nprobe_only = true\n')
         rep = run_checks(s, probes=NO_LLM)
     e = by_name(rep)
-    assert e["comfy"].state is HealthState.OK
+    assert e["demo"].state is HealthState.OK
     assert e["acestep"].state is HealthState.DEGRADED and "503" in e["acestep"].detail
     assert e["ollama"].state is HealthState.NOT_RUNNING
-    assert e["nodus"].state is HealthState.PROBE_ONLY  # alive, but we never manage it
+    assert e["watch"].state is HealthState.PROBE_ONLY  # alive, but we never manage it
     assert e["llamacpp"].state is HealthState.DISABLED
     assert rep.exit_code == 0
 
@@ -69,11 +69,11 @@ def test_service_states(tmp_path: Path) -> None:
 def test_required_entries_drive_the_exit_code(tmp_path: Path) -> None:
     with FakeServer() as up:
         up.route("GET", "/health", {})
-        s = cfg(tmp_path, services_toml({"comfy": up.url, "acestep": "http://127.0.0.1:9"}, ["comfy", "acestep"]))
+        s = cfg(tmp_path, services_toml({"demo": up.url, "acestep": "http://127.0.0.1:9"}, ["demo", "acestep"]))
         rep = run_checks(s, probes=NO_LLM)
         assert rep.exit_code == 1 and [e.name for e in rep.failing_required] == ["acestep"]
-        assert run_checks(s, probes=NO_LLM, require=["comfy"]).exit_code == 1
-        s2 = cfg(tmp_path / "b", services_toml({"comfy": up.url, "acestep": "http://127.0.0.1:9"}, ["comfy"]))
+        assert run_checks(s, probes=NO_LLM, require=["demo"]).exit_code == 1
+        s2 = cfg(tmp_path / "b", services_toml({"demo": up.url, "acestep": "http://127.0.0.1:9"}, ["demo"]))
         assert run_checks(s2, probes=NO_LLM).exit_code == 0  # acestep down but not required
 
 
@@ -105,7 +105,6 @@ def test_tool_states_distinguish_missing_tool_from_missing_model(tmp_path: Path)
     assert e["tool.longcat"].state is HealthState.MISSING_TOOL
     assert e["tool.cosyvoice"].state is HealthState.MISSING_MODEL and "missing_model" in e["tool.cosyvoice"].missing
     assert e["tool.lora_train"].state is HealthState.OK
-    assert e["tool.fastvideo"].state in (HealthState.MISSING_TOOL, HealthState.MISSING_MODEL)
 
 
 def test_ffmpeg_needs_libass_filter(tmp_path: Path) -> None:
@@ -153,12 +152,12 @@ def test_report_formats_and_serialises(tmp_path: Path) -> None:
     from storyagent.i18n import set_locale
 
     set_locale("en")
-    s = cfg(tmp_path, services_toml({"comfy": "http://127.0.0.1:9"}, ["comfy"]))
+    s = cfg(tmp_path, services_toml({"demo": "http://127.0.0.1:9"}, ["demo"]))
     rep = run_checks(s, probes=NO_LLM)
     text = format_report(rep)
-    assert "Pipeline health" in text and "Not running" in text and "Required entries not available: comfy" in text
+    assert "Pipeline health" in text and "Not running" in text and "Required entries not available: demo" in text
     data = rep.to_dict()
-    assert data["exit_code"] == 1 and any(x["name"] == "comfy" and x["required"] for x in data["entries"])
+    assert data["exit_code"] == 1 and any(x["name"] == "demo" and x["required"] for x in data["entries"])
     json.dumps(data)  # fully serialisable
 
 
@@ -169,7 +168,7 @@ def test_main_exit_codes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys
         up.route("GET", "/health", {})
         home = tmp_path / "home"
         (home / "config").mkdir(parents=True)
-        (home / "config" / "services.toml").write_text(services_toml({"comfy": up.url}, ["comfy"]))
+        (home / "config" / "services.toml").write_text(services_toml({"demo": up.url}, ["demo"]))
         monkeypatch.setenv("STORY_AGENT_HOME", str(home))
         monkeypatch.setenv("STORY_AGENT_LOCALE", "en")
         monkeypatch.setattr("storyagent.media.healthcheck.build_probes", lambda s: [])
@@ -186,4 +185,4 @@ def test_http_failure_modes_do_not_crash(tmp_path: Path) -> None:
 
     s = cfg(tmp_path)
     e = by_name(run_checks(s, http_get=boom, probes=NO_LLM))
-    assert e["comfy"].state is HealthState.NOT_RUNNING
+    assert e["ollama"].state is HealthState.NOT_RUNNING

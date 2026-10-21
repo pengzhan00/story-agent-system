@@ -138,13 +138,13 @@ def test_launch_screen_state(api: TestClient) -> None:
     ace = by["acestep"]
     assert ace["startable"] and ace["state"] == "stopped" and ace["label"] == "Not running"
     assert by["acestep"]["hint"]                                     # the localized note
-    assert not by["nodus"]["startable"]
+    assert not by["llamacpp"]["startable"]
     assert [i["name"] for i in body["issues"]] == ["tool.h3"]
     assert body["ready"] is False and "acestep" in body["startable"]
 
 
 def test_start_errors_use_the_envelope(api: TestClient) -> None:
-    r = api.post("/api/launch/nodus/start", headers={"Accept-Language": "en"})
+    r = api.post("/api/launch/llamacpp/start", headers={"Accept-Language": "en"})
     assert r.status_code == 409 and r.json()["error"]["code"] == "launch_not_startable"
     assert api.post("/api/launch/ghost/start").status_code == 404
 

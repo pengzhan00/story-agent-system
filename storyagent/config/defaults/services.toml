@@ -1,11 +1,7 @@
 # Service endpoints and local tool locations.
 # Override any key in <STORY_AGENT_HOME>/config/services.toml or via env
-# (STORY_AGENT_<NAME>_URL, e.g. STORY_AGENT_COMFY_URL).
+# (STORY_AGENT_<NAME>_URL, e.g. STORY_AGENT_OLLAMA_URL).
 # Paths may start with "~". Nothing in the code base may hard-code these.
-
-[services.comfy]
-url = "http://127.0.0.1:8188"
-health_path = "/system_stats"
 
 [services.acestep]
 url = "http://127.0.0.1:8001"
@@ -20,25 +16,14 @@ health_path = "/api/tags"
 url = "http://127.0.0.1:8198"
 health_path = "/status"
 
-# FastVideo MLX server. NOT 8000: that port is taken by Nodus/CollabOS.
-[services.fastvideo]
-url = "http://127.0.0.1:8002"
-health_path = "/health"
-
-# Read-only probe target; never started, restarted or modified by this system.
 # llama.cpp llama-server (OpenAI-compatible). Off by default: probed only when enabled.
 [services.llamacpp]
 url = "http://127.0.0.1:8080"
 health_path = "/health"
 enabled = false
 
-[services.nodus]
-url = "http://127.0.0.1:8000"
-health_path = "/"
-probe_only = true
-
 # How the launch screen starts a service ("Start" button, `storyagent ops launch`). Only services listed here can be
-# started from the system; the rest (comfy, nodus, llamacpp, fastvideo) are probed only. The command is an argv list
+# started from the system; the rest (llamacpp) are probed only. The command is an argv list
 # (no shell), run detached with its output in <home>/logs/launch_<name>.log. Nothing is ever stopped or killed.
 #   argv           command; a bare name is looked up on PATH, "~" is expanded
 #   cwd            working directory ("" = the data home)
@@ -95,11 +80,6 @@ python = "~/venvs/seedvc/bin/python"
 # Use only local checkpoints: a missing one would otherwise hang inside the hub downloader.
 offline = true
 
-[tools.fastvideo]
-root = "~/myworkspace/FastVideo"
-python = "~/myworkspace/FastVideo/.venv/bin/python"
-# Converted FastH3 weights (not downloaded yet; downloading/converting needs the operator's go-ahead).
-weights_dir = ""
 
 # LoRA training (mflux-train). Paths only; the training recipe lives in models.toml (train_template).
 [tools.lora_train]
@@ -170,7 +150,7 @@ poll_seconds = 1.0
 takes = 1
 
 [healthcheck]
-# Entries that must be "ok" for the healthcheck exit code to be 0. Names: a service (comfy), or tool.<name>.
+# Entries that must be "ok" for the healthcheck exit code to be 0. Names: a service (ollama), or tool.<name>.
 required = ["ollama", "acestep", "phosphene", "tool.ffmpeg"]
 # Below this much free disk (GiB) on the data home the system entry reports "degraded".
 min_free_gib = 50
