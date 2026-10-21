@@ -29,7 +29,7 @@ IMAGE = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
 VIDEO = {".mp4", ".mov", ".mkv", ".webm"}
 TEXT = {".txt", ".md", ".markdown"}
 MODEL = {".safetensors", ".gguf", ".ckpt", ".pt"}
-ROLES = ("voice", "portrait", "lora", "music", "sfx", "reference", "video")
+ROLES = ("voice", "portrait", "lora", "music", "sfx", "reference", "video", "story", "script", "dialogue", "image")
 _SAFE = re.compile(r"^[^/\\\x00]{1,80}$")
 
 

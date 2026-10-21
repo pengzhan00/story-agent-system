@@ -1433,6 +1433,8 @@
           "audio.sfx",
           "audio.convert",
           "audio.enhance",
+          "text.story",
+          "text.script",
           "text.asr",
           "compose.assemble",
           "analyze.qc",
@@ -3682,6 +3684,57 @@
             }
           },
           {
+            "description": "comma-separated kinds, e.g. text.story,text.script",
+            "in": "query",
+            "name": "kinds",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "comma-separated kinds, e.g. text.story,text.script",
+              "title": "Kinds"
+            }
+          },
+          {
+            "description": "only assets that belong to no project (workshop results)",
+            "in": "query",
+            "name": "standalone",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "only assets that belong to no project (workshop results)",
+              "title": "Standalone",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "newest_first",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Newest First",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
             "in": "query",
             "name": "limit",
             "required": false,
@@ -4638,6 +4691,32 @@
           }
         },
         "summary": "Publish",
+        "tags": [
+          "library"
+        ]
+      }
+    },
+    "/api/library/roles": {
+      "get": {
+        "description": "The names an asset can be filed under (``library:<role>/<name>``).",
+        "operationId": "library_roles_api_library_roles_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "title": "Response Library Roles Api Library Roles Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Library Roles",
         "tags": [
           "library"
         ]

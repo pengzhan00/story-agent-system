@@ -205,5 +205,6 @@ class AceStepAdapter(AdapterBase):
         meta: dict[str, Any] = {k: v for k, v in (metas if isinstance(metas, dict) else {}).items() if v != "N/A"}
         if files[0].get("prompt"):
             meta["server_caption"] = str(files[0]["prompt"])[:500]  # the LM-expanded caption actually used
-        meta.update(task_id=external_id, api_model=self.api_model(job))
+        meta.update(task_id=external_id, api_model=self.api_model(job),
+                    vocals=bool(str(job.inputs.get("text", "")).strip()))   # a song (lyrics) or an accompaniment
         return [ArtifactSpec(dest, metadata=meta)]

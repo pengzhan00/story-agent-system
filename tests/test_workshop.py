@@ -77,13 +77,13 @@ def test_every_module_kind_has_a_default_model_and_an_output() -> None:
     for m in MODULES:
         for k in m.kinds:
             assert k.kind.value in s.default_models, k.kind
-            assert output_media(k.kind) in ("image", "audio", "video", "text")
+            assert output_media(k.kind) in ("image", "audio", "video", "text", "lora")
 
 
 # ---- API ----------------------------------------------------------------------------------------
 def test_modules_describe_models_params_and_inputs(api: TestClient) -> None:
     mods = {m["id"]: m for m in api.get("/api/workshop").json()}
-    assert set(mods) == {"story", "script", "image", "song", "voice", "video", "transcript"}
+    assert set(mods) == {"story", "script", "image", "lora", "song", "voice", "video", "transcript"}
     gen = next(k for k in mods["image"]["kinds"] if k["kind"] == "image.generate")
     assert any(m["ref"] == "fake-image" for m in gen["models"])
     assert [f["name"] for f in gen["inputs"]][:2] == ["prompt", "negative_prompt"] and gen["output"] == "image"
@@ -263,3 +263,37 @@ def test_a_script_can_start_from_pasted_text_and_needs_some_story(api: TestClien
     failed = [j for j in states.values() if j["status"] != "completed"]
     assert len(done) == 1 and "Once upon a time." in writer.prompts[0]
     assert empty.status_code in (200, 201) and len(failed) == 1 and failed[0]["error_code"] == "invalid_input"
+
+
+# ---- LoRA: trained in the workshop, attached to the image module -------------------------------------
+def test_lora_training_takes_a_list_of_photos_and_a_trigger() -> None:
+    spec = kind_spec("train.lora")
+    got = build_inputs(spec, {"images": ["asset:a", " asset:b ", ""], "trigger": "lwx woman", "likeness_consent": True})
+    assert got == {"images": ["asset:a", "asset:b"], "trigger": "lwx woman", "consent": True}
+    with pytest.raises(WorkshopError) as e:
+        build_inputs(spec, {"trigger": "lwx woman"})
+    assert e.value.code == "workshop_missing_input"
+    assert output_media("train.lora") == "lora"
+
+
+def test_a_lora_picked_in_the_image_form_becomes_a_job_parameter(api: TestClient) -> None:
+    job = api.post("/api/workshop/run", json={
+        "kind": "image.generate", "model_ref": "fake-image",
+        "inputs": {"prompt": "lwx woman at a window", "lora": "library:lora/mara", "lora_scale": "0.7"},
+    }).json()[0]
+    assert job["params"]["loras"] == [{"path": "library:lora/mara", "scale": 0.7}] and "loras" not in job["inputs"]
+    bad = api.post("/api/workshop/run", json={"kind": "image.generate", "model_ref": "fake-image",
+                                              "inputs": {"prompt": "x", "lora": "asset:z", "lora_scale": "strong"}})
+    assert bad.status_code == 422 and bad.json()["error"]["code"] == "workshop_bad_value"
+
+
+def test_assets_can_be_listed_by_kind_and_scope(api: TestClient, wsettings: Settings) -> None:
+    api.post("/api/workshop/run", json={"kind": "image.generate", "inputs": {"prompt": "x"}, "model_ref": "fake-image"})
+    api.post("/api/workshop/run", json={"kind": "audio.music", "inputs": {"prompt": "x"}, "model_ref": "fake-music"})
+    drain(wsettings)
+    both = api.get("/api/assets?standalone=true&newest_first=true").json()
+    assert {a["kind"] for a in both} == {"image.generate", "audio.music"}
+    only = api.get("/api/assets?kinds=audio.music,text.story").json()
+    assert [a["kind"] for a in only] == ["audio.music"]
+    first = api.get("/api/assets?standalone=true&limit=1").json()
+    assert api.get("/api/assets?standalone=true&limit=1&offset=1").json() != first

@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useJobActions } from "../api/hooks";
 import type { Asset, Job, WorkshopField, WorkshopHistoryItem, WorkshopKind, WorkshopModule } from "../api/types";
 import { type Step, useWorkshop, useWorkshopActions, useWorkshopHistory, useWorkshopParams } from "../api/workshop";
@@ -10,31 +11,25 @@ import { StatusChip } from "../components/StatusChip";
 import { ValueEditor } from "../components/ValueEditor";
 import { ValueView } from "../components/ValueView";
 import { useT } from "../i18n";
+import { mediaOfAsset, targetsFor } from "../lib/assets";
 import { duration } from "../lib/format";
 
 type Values = Record<string, unknown>;
 const PIPELINE = "pipeline";
 const PREV = "@prev";
 
-const mediaOfAsset = (a: Asset): string => (a.kind.startsWith("upload.") ? a.kind.slice(7) : a.kind.split(".")[0] ?? "");
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
-
-/** Where an asset can go next: every kind that takes a file of its media type. */
-function targetsFor(modules: WorkshopModule[], media: string) {
-  const out: { module: string; kind: string; field: string }[] = [];
-  for (const m of modules)
-    for (const k of m.kinds) {
-      const f = k.inputs.find((i) => i.type === "media" && i.media === media);
-      if (f) out.push({ module: m.id, kind: k.kind, field: f.name });
-    }
-  return out;
-}
 
 /** The form values a finished job was started with (for "run again"). */
 function valuesFromInputs(kind: WorkshopKind, inputs: Record<string, unknown>): Values {
   const out: Values = {};
   const used: Record<string, number> = {};
   for (const f of kind.inputs) {
+    if (f.type === "medialist") {
+      const list = inputs[f.target.replace("[]", "")];
+      if (Array.isArray(list)) out[f.name] = list;
+      continue;
+    }
     const parts = f.target.replace("[]", "").split(".");
     let v: unknown = inputs;
     for (const p of parts) v = (v as Record<string, unknown> | undefined)?.[p];
@@ -47,6 +42,63 @@ function valuesFromInputs(kind: WorkshopKind, inputs: Record<string, unknown>): 
     if (v !== undefined && v !== null) out[f.name] = v;
   }
   return out;
+}
+
+const acceptOf = (media: string) =>
+  media === "text" ? "text/*,.md,.markdown" : media === "lora" ? ".safetensors" : `${media}/*`;
+
+/** Several files of one media type (the photos of a LoRA training set): upload, pick from earlier results, remove. */
+function MediaList({ field, value, onChange, recents }: { field: WorkshopField; value: string[]; onChange: (v: string[]) => void; recents: Asset[] }) {
+  const t = useT();
+  const { upload } = useWorkshopActions();
+  const file = useRef<HTMLInputElement>(null);
+  const choices = recents.filter((a) => mediaOfAsset(a) === field.media && !value.includes(`asset:${a.id}`));
+  const add = (refs: string[]) => onChange([...value, ...refs]);
+  return (
+    <div className="stack">
+      <div className="row">
+        <button type="button" onClick={() => file.current?.click()} disabled={upload.isPending}>
+          {t("web.workshop.upload_many")}
+        </button>
+        <input
+          ref={file}
+          type="file"
+          multiple
+          hidden
+          accept={acceptOf(field.media)}
+          onChange={async (e) => {
+            const files = Array.from(e.target.files ?? []);
+            e.target.value = "";
+            const refs: string[] = [];
+            for (const f of files) refs.push(`asset:${(await upload.mutateAsync(f)).id}`);
+            add(refs);
+          }}
+        />
+        {choices.length > 0 ? (
+          <select value="" aria-label={t("web.workshop.history")} onChange={(e) => e.target.value && add([`asset:${e.target.value}`])}>
+            <option value="">{t("web.workshop.history")}</option>
+            {choices.slice(0, 20).map((a) => (
+              <option key={a.id} value={a.id}>
+                {`${a.created_at.replace("T", " ").slice(5, 16)} ${a.kind}`}
+              </option>
+            ))}
+          </select>
+        ) : null}
+        <span className="muted small">{t("web.workshop.count_selected", { n: value.length })}</span>
+      </div>
+      <div className="thumbs">
+        {value.map((ref, i) => (
+          <figure key={`${ref}-${i}`} className="thumb">
+            {field.media === "image" && ref.startsWith("asset:") ? <img src={`/api/assets/${ref.slice(6)}/file`} alt="" loading="lazy" /> : <code>{ref}</code>}
+            <button type="button" className="link" onClick={() => onChange(value.filter((_, j) => j !== i))}>
+              {t("web.workshop.remove")}
+            </button>
+          </figure>
+        ))}
+      </div>
+      <ErrorNote error={upload.error} />
+    </div>
+  );
 }
 
 function MediaInput({
@@ -78,7 +130,7 @@ function MediaInput({
           ref={file}
           type="file"
           hidden
-          accept={field.media === "text" ? "text/*,.md,.markdown" : `${field.media}/*`}
+          accept={acceptOf(field.media)}
           onChange={(e) => {
             const f = e.target.files?.[0];
             if (f) upload.mutate(f, { onSuccess: (a) => onChange(`asset:${a.id}`) });
@@ -128,6 +180,13 @@ function Inputs({
               <span>{label}</span>
             </label>
           );
+        if (f.type === "medialist")
+          return (
+            <div key={f.name} className="field wide">
+              <span>{label}</span>
+              <MediaList field={f} value={Array.isArray(v) ? (v as string[]) : []} onChange={(x) => set(f.name, x)} recents={recents} />
+            </div>
+          );
         if (f.type === "media")
           return (
             <div key={f.name} className="field wide">
@@ -174,17 +233,25 @@ function KindPanel({
   }, [q.data]);
   useEffect(() => {
     if (prefill) {
-      setValues((v) => ({ ...v, ...prefill.values }));
+      setValues((v) => {
+        const next = { ...v };
+        for (const [name, val] of Object.entries(prefill.values)) {
+          const f = kind.inputs.find((i) => i.name === name);
+          next[name] = f?.type === "medialist" && Array.isArray(val) ? [...(Array.isArray(v[name]) ? (v[name] as string[]) : []), ...val] : val;
+        }
+        return next;
+      });
       onPrefillDone();
     }
-  }, [prefill, onPrefillDone]);
+  }, [prefill, onPrefillDone, kind.inputs]);
   const chosen = kind.models.find((m) => m.ref === model);
   const effective = q.data?.effective ?? {};
   const changed = Object.fromEntries(Object.entries(params).filter(([k, v]) => !same(v, effective[k])));
   const asDefault = Object.fromEntries(Object.entries(params).filter(([k, v]) => !same(v, q.data?.base?.[k])));
-  const missing = kind.inputs.some((f) => f.required && (values[f.name] === undefined || values[f.name] === ""));
+  const empty = (v: unknown) => v === undefined || v === "" || (Array.isArray(v) && v.length === 0);
+  const missing = kind.inputs.some((f) => f.required && empty(values[f.name]));
   const run = () => {
-    const inputs = Object.fromEntries(Object.entries(values).filter(([, v]) => v !== "" && v !== undefined));
+    const inputs = Object.fromEntries(Object.entries(values).filter(([, v]) => !empty(v)));
     act.run.mutate({ kind: kind.kind, inputs, model_ref: model, tier, params: changed, count }, { onSuccess: onRan });
   };
   return (
@@ -444,11 +511,24 @@ export function WorkshopPage() {
   const kind = current ? (current.kinds.find((k) => k.kind === kindPick[current.id]) ?? current.kinds[0]) : undefined;
   const recents = useMemo(() => (all.data ?? []).flatMap((i) => i.assets), [all.data]);
   const clear = useMemo(() => () => setPrefill(null), []);
-  const goTo = (target: { module: string; kind: string; field: string }, assetId: string) => {
-    setTab(target.module);
-    setKindPick((p) => ({ ...p, [target.module]: target.kind }));
-    setPrefill({ kind: target.kind, values: { [target.field]: `asset:${assetId}` } });
-  };
+  const goTo = useCallback(
+    (target: { module: string; kind: string; field: string }, assetId: string) => {
+      const field = modules.find((m) => m.id === target.module)?.kinds.find((k) => k.kind === target.kind)?.inputs.find((i) => i.name === target.field);
+      setTab(target.module);
+      setKindPick((p) => ({ ...p, [target.module]: target.kind }));
+      setPrefill({ kind: target.kind, values: { [target.field]: field?.type === "medialist" ? [`asset:${assetId}`] : `asset:${assetId}` } });
+    },
+    [modules],
+  );
+  // "Use as..." from the asset library: /workshop?use=<module>:<kind>:<field>:<asset id>
+  const [search, setSearch] = useSearchParams();
+  useEffect(() => {
+    const use = search.get("use");
+    if (!use || modules.length === 0) return;
+    const [module, kindId, field, assetId] = use.split(":");
+    if (module && kindId && field && assetId) goTo({ module, kind: kindId, field }, assetId);
+    setSearch({}, { replace: true });
+  }, [search, setSearch, modules, goTo]);
   const again = (job: Job) => {
     const m = modules.find((x) => x.kinds.some((k) => k.kind === job.kind));
     const k = m?.kinds.find((x) => x.kind === job.kind);

@@ -23,12 +23,16 @@ def list_assets(
     spec_id: str | None = None,
     current_only: bool = False,
     include_trashed: bool = False,
+    kinds: Annotated[str | None, Query(description="comma-separated kinds, e.g. text.story,text.script")] = None,
+    standalone: Annotated[bool, Query(description="only assets that belong to no project (workshop results)")] = False,
+    newest_first: bool = False,
+    offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=1000)] = 200,
 ) -> list[AssetOut]:
     rows = ctx_of(request).ledger.list_assets(
         project_id=project_id, shot_id=shot_id, kind=kind, slot=slot, spec_id=spec_id,
-        current_only=current_only,
-        include_trashed=include_trashed, limit=limit,
+        current_only=current_only, include_trashed=include_trashed, limit=limit, offset=offset,
+        kinds=[k for k in (kinds or "").split(",") if k], standalone=standalone, newest_first=newest_first,
     )
     return [AssetOut.model_validate(a) for a in rows]
 

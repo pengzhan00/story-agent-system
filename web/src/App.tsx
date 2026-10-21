@@ -2,6 +2,7 @@ import { NavLink, Navigate, Route, Routes } from "react-router-dom";
 import { useEventFeed } from "./api/events";
 import { useI18n } from "./i18n";
 import { LAUNCH_SEEN, LaunchPage } from "./pages/LaunchPage";
+import { LibraryPage } from "./pages/LibraryPage";
 import { ProjectPage } from "./pages/ProjectPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
 import { PromptsPage } from "./pages/PromptsPage";
@@ -38,6 +39,9 @@ export function App() {
           <NavLink to="/workshop" className={link}>
             {t("web.nav.workshop")}
           </NavLink>
+          <NavLink to="/library" className={link}>
+            {t("web.nav.library")}
+          </NavLink>
           <NavLink to="/queue" className={link}>
             {t("web.nav.queue")}
           </NavLink>
@@ -67,6 +71,7 @@ export function App() {
           <Route path="/projects" element={<ProjectsPage />} />
           <Route path="/projects/:id/*" element={<ProjectPage />} />
           <Route path="/workshop" element={<WorkshopPage />} />
+          <Route path="/library" element={<LibraryPage />} />
           <Route path="/queue" element={<QueuePage />} />
           <Route path="/prompts" element={<PromptsPage />} />
           <Route path="/system" element={<SystemPage />} />

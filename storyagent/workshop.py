@@ -38,7 +38,7 @@ class WorkshopError(ValueError):
 class Field:
     name: str                 # id in the UI and in a run request
     target: str               # where it lands in the job inputs: "prompt", "voice_ref.audio", "refs[]"
-    type: str = "text"        # text | longtext | media | bool
+    type: str = "text"        # text | longtext | media | medialist | bool
     media: str = ""           # for type == "media": image | audio | video
     required: bool = False
 
@@ -57,6 +57,8 @@ class Module:
 
 _P = Field("prompt", "prompt", "longtext", required=True)
 _NEG = Field("negative_prompt", "negative_prompt", "text")
+# A LoRA is a model input in the form: it becomes `params.loras = [{path, scale}]` of the job.
+_LORA = (Field("lora", "loras[]", "media", "lora"), Field("lora_scale", "lora_scale", "text"))
 
 MODULES: tuple[Module, ...] = (
     Module("story", (
@@ -80,8 +82,16 @@ MODULES: tuple[Module, ...] = (
         )),
     )),
     Module("image", (
-        KindSpec(MediaKind.IMAGE_GENERATE, (_P, _NEG, Field("image", "refs[]", "media", "image"))),
-        KindSpec(MediaKind.IMAGE_EDIT, (_P, Field("image", "refs[]", "media", "image", required=True))),
+        KindSpec(MediaKind.IMAGE_GENERATE, (_P, _NEG, Field("image", "refs[]", "media", "image"), *_LORA)),
+        KindSpec(MediaKind.IMAGE_EDIT, (_P, Field("image", "refs[]", "media", "image", required=True), *_LORA)),
+    )),
+    Module("lora", (
+        KindSpec(MediaKind.TRAIN_LORA, (
+            Field("images", "images[]", "medialist", "image", required=True),
+            Field("trigger", "trigger", "text", required=True),
+            Field("description", "description", "text"),
+            Field("likeness_consent", "consent", "bool"),
+        )),
     )),
     Module("song", (
         KindSpec(MediaKind.AUDIO_MUSIC, (
@@ -136,8 +146,11 @@ def kind_spec(kind: MediaKind | str) -> KindSpec:
 
 
 def output_media(kind: MediaKind | str) -> str:
-    """What a kind produces, for matching it to the next step's media input: image | audio | video | text."""
-    domain = MediaKind(kind).value.split(".")[0]
+    """What a kind produces, for matching it to the next step's media input: image | audio | video | text | lora."""
+    value = MediaKind(kind)
+    if value is MediaKind.TRAIN_LORA:
+        return "lora"
+    domain = value.value.split(".")[0]
     return domain if domain in ("image", "audio", "video", "text") else ""
 
 
@@ -146,6 +159,14 @@ def build_inputs(spec: KindSpec, values: Mapping[str, Any], prev: JobRecord | No
     out: dict[str, Any] = {}
     for f in spec.inputs:
         raw = values.get(f.name)
+        if f.type == "medialist":
+            items = [str(x).strip() for x in (raw if isinstance(raw, list) else [raw]) if x and str(x).strip()]
+            if not items:
+                if f.required:
+                    raise WorkshopError("workshop_missing_input", f.name)
+                continue
+            out.setdefault(f.target[:-2], []).extend(items)
+            continue
         if isinstance(raw, str):
             raw = raw.strip()
         if raw in (None, "", False) and not (f.type == "bool" and raw is False):
@@ -270,10 +291,19 @@ class Workshop:
         # the preset's parameters belong to the model it was saved for
         saved = preset["params"] if preset["model_ref"] in ("", model_ref) else {}
         inputs = build_inputs(spec, step.get("inputs") or {}, prev)
+        depends_on = prev.id if prev is not None and f"job:{prev.id}" in json.dumps(inputs) else None
+        params = dict(step.get("params") or {})
+        scale = str(inputs.pop("lora_scale", "") or "").strip()
+        if inputs.get("loras") and "loras" not in params:
+            try:
+                weight = float(scale) if scale else 1.0
+            except ValueError:
+                raise WorkshopError("workshop_bad_value", "lora_scale") from None
+            params["loras"] = [{"path": ref, "scale": weight} for ref in inputs["loras"]]
+        inputs.pop("loras", None)
         job = MediaJob(
-            kind=spec.kind, inputs=inputs, model_ref=model_ref, tier=tier, params=dict(step.get("params") or {}),
-            seed=step.get("seed"), depends_on=prev.id if prev is not None and f"job:{prev.id}" in json.dumps(inputs)
-            else None, pipeline_id=pipeline_id, pipeline_step=step_no,
+            kind=spec.kind, inputs=inputs, model_ref=model_ref, tier=tier, params=params, seed=step.get("seed"),
+            depends_on=depends_on, pipeline_id=pipeline_id, pipeline_step=step_no,
         )
         return job, {"models": {model_ref: saved}}
 

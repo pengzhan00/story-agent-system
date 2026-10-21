@@ -469,9 +469,18 @@ class Ledger:
         current_only: bool = False,
         include_trashed: bool = False,
         limit: int = 200,
+        kinds: Sequence[str] | None = None,
+        standalone: bool = False,
+        offset: int = 0,
+        newest_first: bool = False,
     ) -> list[AssetRecord]:
         where: list[str] = ["1=1"]
         args: list[Any] = []
+        if kinds:
+            where.append(f"kind IN ({','.join('?' * len(kinds))})")
+            args.extend(kinds)
+        if standalone:
+            where.append("project_id IS NULL")
         for col, val in (("project_id", project_id), ("shot_id", shot_id), ("kind", kind), ("slot", slot),
                          ("spec_id", spec_id), ("job_id", job_id)):
             if val is not None:
@@ -481,9 +490,10 @@ class Ledger:
             where.append("is_current=1")
         if not include_trashed:
             where.append("trashed_at IS NULL")
+        order = "created_at DESC, rowid DESC" if newest_first else "version DESC, rowid DESC"
         rows = self.db.conn.execute(
-            f"SELECT * FROM media_assets WHERE {' AND '.join(where)} ORDER BY version DESC, rowid DESC LIMIT ?",
-            (*args, limit),
+            f"SELECT * FROM media_assets WHERE {' AND '.join(where)} ORDER BY {order} LIMIT ? OFFSET ?",
+            (*args, limit, max(offset, 0)),
         ).fetchall()
         return [AssetRecord.from_row(r) for r in rows]
 

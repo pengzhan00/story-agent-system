@@ -400,6 +400,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/library/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Library Roles
+         * @description The names an asset can be filed under (``library:<role>/<name>``).
+         */
+        get: operations["library_roles_api_library_roles_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/library/upload": {
         parameters: {
             query?: never;
@@ -1942,7 +1962,7 @@ export interface components {
          *     i18n keys: ``media.kind.<value>``.
          * @enum {string}
          */
-        MediaKind: "image.generate" | "image.edit" | "video.generate" | "video.av" | "video.avatar" | "video.lipsync" | "video.enhance" | "audio.tts" | "audio.music" | "audio.sfx" | "audio.convert" | "audio.enhance" | "text.asr" | "compose.assemble" | "analyze.qc" | "train.lora";
+        MediaKind: "image.generate" | "image.edit" | "video.generate" | "video.av" | "video.avatar" | "video.lipsync" | "video.enhance" | "audio.tts" | "audio.music" | "audio.sfx" | "audio.convert" | "audio.enhance" | "text.story" | "text.script" | "text.asr" | "compose.assemble" | "analyze.qc" | "train.lora";
         /** Meta */
         Meta: {
             /** Compliance Enabled */
@@ -2898,6 +2918,12 @@ export interface operations {
                 spec_id?: string | null;
                 current_only?: boolean;
                 include_trashed?: boolean;
+                /** @description comma-separated kinds, e.g. text.story,text.script */
+                kinds?: string | null;
+                /** @description only assets that belong to no project (workshop results) */
+                standalone?: boolean;
+                newest_first?: boolean;
+                offset?: number;
                 limit?: number;
             };
             header?: never;
@@ -3494,6 +3520,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    library_roles_api_library_roles_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": string[];
                 };
             };
         };

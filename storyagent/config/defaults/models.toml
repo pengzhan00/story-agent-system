@@ -442,6 +442,15 @@ est_memory_gib = 64   # estimate; adjust after the first real run
 license_tag = "flux2-klein-4b-apache-2.0"
 commercial_ok = true
 timeout_sec = 86400
+# The knobs shown (and editable) in the workshop; they equal the template below and win over it. Any other
+# mflux-train key goes through params.train (deep-merged last).
+[models."flux2-klein-4b-lora-trainer".params]
+epochs = 60
+learning_rate = 0.0001
+max_resolution = 1024
+seed = 42
+save_frequency = 5
+min_images = 4
 [models."flux2-klein-4b-lora-trainer".train_template]
 model = "flux2-klein-base-4b"
 seed = 42

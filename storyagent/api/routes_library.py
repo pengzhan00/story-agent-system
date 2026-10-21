@@ -9,7 +9,7 @@ from typing import Annotated
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import FileResponse
 
-from storyagent.media.library import LibraryItem, import_file
+from storyagent.media.library import ROLES, LibraryItem, import_file
 
 from .context import ApiContext, ctx_of
 from .errors import ApiError
@@ -65,6 +65,12 @@ async def upload_asset(
         )
     finally:
         shutil.rmtree(tmp.parent, ignore_errors=True)
+
+
+@router.get("/library/roles", response_model=list[str])
+def library_roles() -> list[str]:
+    """The names an asset can be filed under (``library:<role>/<name>``)."""
+    return list(ROLES)
 
 
 @router.get("/library", response_model=list[LibraryItemOut])

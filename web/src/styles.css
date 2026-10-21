@@ -156,3 +156,9 @@ ol.flow { list-style: none; margin: 0; padding: 0; display: flex; flex-direction
 .vitem { border-top: 1px dashed var(--line); padding: 8px 0; }
 .vitem:first-of-type { border-top: 0; }
 .field.check { flex-direction: row; align-items: center; gap: 8px; }
+
+.thumbs { display: flex; flex-wrap: wrap; gap: 8px; } .thumb { margin: 0; width: 96px; display: grid; gap: 4px; justify-items: center; }
+.thumb img { width: 96px; height: 96px; object-fit: cover; border-radius: 6px; background: var(--track); }
+
+.card code { word-break: break-all; overflow-wrap: anywhere; }
+.card dd { margin: 0 0 8px; }

@@ -25,6 +25,7 @@ export type SpecEdit = S["SpecEdit"];
 export type SpecDiffItem = S["SpecDiffItem"];
 export type ReviewItem = S["ReviewItemOut"];
 export type Asset = S["AssetOut"];
+export type LibraryItem = S["LibraryItemOut"];
 export type StaleAsset = S["StaleAsset"];
 export type ProjectCard = S["ProjectCard"];
 export type Agent = S["AgentOut"];
