@@ -12,6 +12,8 @@ STAGES = ("analyze", "cast", "script", "scenes", "music", "shotplan", "specs", "
 # What a plain "resume" runs: the story and its editable specs. Producing media and assembling the episode spend
 # GPU hours, so they only run when asked for.
 DEFAULT_STAGES = STAGES[:7]
+# Stages that belong to the whole series (kept once); every other stage is kept per episode.
+SERIES_STAGES = ("analyze", "cast")
 # What becomes stale when a stage is (re)run.
 DOWNSTREAM: dict[str, tuple[str, ...]] = {
     "analyze": ("cast", "script", "scenes", "music", "shotplan", "specs", "produce", "compose"),
@@ -39,12 +41,21 @@ class WorkflowState:
         self.db = db
 
     # -- stages -------------------------------------------------------------------------------
-    def stages(self, project_id: int) -> list[dict[str, Any]]:
-        rows = {r["stage"]: r for r in self.db.conn.execute(
+    def scope(self, project_id: int, stage: str, episode: int = 1) -> tuple[int, int]:
+        """(season, episode) a stage's state is kept under: (0, 0) for the whole series, else the episode's."""
+        if stage in SERIES_STAGES:
+            return 0, 0
+        row = self.db.conn.execute(
+            "SELECT season FROM episodes WHERE project_id=? AND number=?", (project_id, episode)).fetchone()
+        return (int(row["season"]) if row else 1), episode
+
+    def stages(self, project_id: int, episode: int = 1) -> list[dict[str, Any]]:
+        """Every stage with its state as seen from ``episode`` (series stages are shared by all episodes)."""
+        rows = {(r["stage"], r["season"], r["episode"]): r for r in self.db.conn.execute(
             "SELECT * FROM workflow_stages WHERE project_id=?", (project_id,)).fetchall()}
         out = []
         for name in STAGES:
-            r = rows.get(name)
+            r = rows.get((name, *self.scope(project_id, name, episode)))
             out.append({
                 "stage": name, "status": r["status"] if r else "pending",
                 "started_at": r["started_at"] if r else None, "finished_at": r["finished_at"] if r else None,
@@ -55,36 +66,42 @@ class WorkflowState:
 
     def set_stage(
         self, project_id: int, stage: str, status: str, *, summary: dict[str, Any] | None = None,
-        error_code: str | None = None, error_message: str | None = None,
+        error_code: str | None = None, error_message: str | None = None, episode: int = 1,
     ) -> None:
         if stage not in STAGES:
             raise WorkflowStateError(f"unknown stage {stage!r}")
         now = now_iso()
+        season, ep = self.scope(project_id, stage, episode)
+        key = (project_id, stage, season, ep)
         with self.db.transaction() as conn:
-            conn.execute("INSERT OR IGNORE INTO workflow_stages(project_id, stage) VALUES (?,?)", (project_id, stage))
+            conn.execute(
+                "INSERT OR IGNORE INTO workflow_stages(project_id, stage, season, episode) VALUES (?,?,?,?)", key)
             if status == "running":
                 conn.execute(
                     "UPDATE workflow_stages SET status='running', started_at=?, finished_at=NULL, error_code=NULL,"
-                    " error_message=NULL, attempts=attempts+1 WHERE project_id=? AND stage=?", (now, project_id, stage))
+                    " error_message=NULL, attempts=attempts+1"
+                    " WHERE project_id=? AND stage=? AND season=? AND episode=?",
+                    (now, *key))
             else:
                 conn.execute(
                     "UPDATE workflow_stages SET status=?, finished_at=?, summary=COALESCE(?, summary), error_code=?,"
-                    " error_message=? WHERE project_id=? AND stage=?",
+                    " error_message=? WHERE project_id=? AND stage=? AND season=? AND episode=?",
                     (status, now, json.dumps(summary, ensure_ascii=False) if summary is not None else None,
-                     error_code, error_message, project_id, stage))
+                     error_code, error_message, *key))
             if status == "completed":
+                # a series stage outdates the later stages of every episode, an episode stage only its own
+                where, extra = ("", ()) if stage in SERIES_STAGES else (" AND episode=?", (ep,))
                 for later in DOWNSTREAM[stage]:
                     conn.execute(
-                        "UPDATE workflow_stages SET status='stale' "
-                        "WHERE project_id=? AND stage=? AND status='completed'",
-                        (project_id, later))
+                        "UPDATE workflow_stages SET status='stale'"
+                        " WHERE project_id=? AND stage=? AND status='completed'" + where, (project_id, later, *extra))
 
-    def pending_stages(self, project_id: int, requested: list[str] | None = None) -> list[str]:
-        """``requested`` in pipeline order; ``None`` = resume: every story stage that is not completed (stale
-        included). Producing media and composing only run when requested."""
+    def pending_stages(self, project_id: int, requested: list[str] | None = None, episode: int = 1) -> list[str]:
+        """``requested`` in pipeline order; ``None`` = resume: every story stage of ``episode`` that is not completed
+        (stale included). Producing media and composing only run when requested."""
         if requested:
             return [s for s in STAGES if s in requested]
-        done = {s["stage"] for s in self.stages(project_id) if s["status"] == "completed"}
+        done = {s["stage"] for s in self.stages(project_id, episode) if s["status"] == "completed"}
         return [s for s in DEFAULT_STAGES if s not in done]
 
     # -- data ---------------------------------------------------------------------------------

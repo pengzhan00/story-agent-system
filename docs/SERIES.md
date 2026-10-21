@@ -63,11 +63,11 @@
 1. 新表 `seasons`;每个项目补一行第 1 季;`episodes` 加 `season`(默认 1)、`number_in_season`(老数据 = number)。
 2. `workflow_stages` 加 `season`、`episode`(默认 0),主键改 (project_id, stage, season, episode);老数据:`analyze/cast` 留 (0,0),其余阶段归第 1 季第 1 集。
 3. `workflow_runs` 的 `params.episode` 保持,另加 `params.episodes`(列表)与 `params.season`,引擎按集顺序逐个跑每集阶段,进度按"集数 × 阶段"统一计。
-4. `music_themes.scene_ref` 老数据补前缀 `ep01_`(主题曲不动)。
+4. (留到步骤 B 的迁移 008)`music_themes.scene_ref` 老数据补前缀 `ep01_`(主题曲不动)。
 5. `DOWNSTREAM` 带作用域:全剧阶段重跑 → 所有季所有集的下游变 stale;某季大纲重跑 → 该季各集的 `script` 起变 stale;某集阶段重跑 → 只影响该集。
 
 实现顺序(每步独立可测、可发布):
-- A. 迁移 007(`seasons`、季/集维度的阶段状态),`WorkflowState` 带作用域,API/网页默认看第 1 季第 1 集,行为不变。
+- A. ✅ 已做:迁移 007(`seasons`、`episodes.season/number_in_season`、阶段状态带季/集维度),`WorkflowState` 带作用域;`GET /workflow?episode=N`、`GET/PATCH /seasons`、`workflow run --param episode=N [--param season=M]`;网页暂时只看第 1 集。
 - B. `music`/`scenes` 阶段按集;`pending_stages` 按集。
 - C. 引擎批量:`season=N` 或 `episodes=[1..N]`,进度与 ETA 按集汇总;CLI `workflow run --season 1`、`--episodes 1-10`。
 - D. 全剧圣经 + 季大纲(S1/S2):新增 `outline` 阶段(季级)。

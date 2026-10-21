@@ -526,11 +526,11 @@ def _cmd_workflow_run(s: Settings, a: argparse.Namespace) -> int:
     unknown = [x for x in a.stage or [] if x not in STAGES]
     if unknown:
         raise CliError("cli.error.bad_kv", 2, item=",".join(unknown))
-    stages = state.pending_stages(a.project, a.stage)
+    params = _kv(a.param or [])
+    stages = state.pending_stages(a.project, a.stage, int(params.get("episode") or 1))
     if not stages:
         print(t("cli.workflow.nothing"))
         return 0
-    params = _kv(a.param or [])
     if a.force:
         params["force"] = True
     run = state.enqueue(a.project, stages, params)
@@ -559,7 +559,7 @@ def _cmd_workflow_status(s: Settings, a: argparse.Namespace) -> int:
     if runs and runs[0]["status"] in ("queued", "running"):
         print(render_run(runs[0]))
         print("\n".join(render_stages(runs[0])))
-    for st in state.stages(a.project):
+    for st in state.stages(a.project, a.episode):
         print(f"{t('workflow.stage.' + st['stage']):<14} {t('workflow.status.' + st['status'])}"
               + (f"  ({st['error_code']})" if st["error_code"] else ""))
     return 0
@@ -747,6 +747,7 @@ def build_parser() -> argparse.ArgumentParser:
     wp.add_argument("--episode", type=int, default=1)
     wp = add(wf, "status", _cmd_workflow_status)
     wp.add_argument("--project", type=int, required=True)
+    wp.add_argument("--episode", type=int, default=1)
     wp = add(wf, "watch", _cmd_workflow_watch)
     wp.add_argument("run", nargs="?")
     wp.add_argument("--project", type=int)

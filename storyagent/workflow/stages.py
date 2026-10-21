@@ -75,6 +75,11 @@ class Ctx:
     def force(self) -> bool:
         return bool(self.params.get("force"))
 
+    def season_of(self, episode: int) -> int:
+        """Season for an episode: run parameter ``season``, else the one it already belongs to (1 for a new one)."""
+        given = self.params.get("season")
+        return int(given) if given else self.store.season_of(self.pid, episode)
+
     def target_sec(self) -> float | None:
         """Wanted episode length: run parameter > project setting > delivery profile (``None`` = no target)."""
         profile = self.settings.delivery_profile(self.project.delivery_profile)
@@ -198,7 +203,7 @@ def script(ctx: Ctx) -> dict[str, Any]:
     per_act = int(ctx.params.get("scenes_per_act") or sized[1] or 3)
     shots_n = int(ctx.params.get("shots_per_scene") or sized[2] or 3)
     existing = ctx.store.get_script(ctx.pid, episode)
-    ctx.store.ensure_episode(ctx.pid, episode)
+    ctx.store.ensure_episode(ctx.pid, episode, season=ctx.season_of(episode))
 
     if existing and existing["acts"] and not ctx.force():
         outline = {"title": existing["title"], "synopsis": existing["synopsis"], "acts": existing["acts"]}
@@ -243,7 +248,8 @@ def script(ctx: Ctx) -> dict[str, Any]:
         done += 1
     unknown = sorted({str(line.get("character", "")).strip() for _, sc in scenes for sh in sc.get("shots", [])
                       for line in sh.get("dialogue", []) if str(line.get("character", "")).strip() not in names})
-    ctx.store.ensure_episode(ctx.pid, episode, title=outline["title"], summary=outline.get("synopsis", ""))
+    ctx.store.ensure_episode(ctx.pid, episode, title=outline["title"], summary=outline.get("synopsis", ""),
+                             season=ctx.season_of(episode))
     ctx.step(len(scenes), len(scenes), "done")
     return {"episode": episode, "acts": len(outline["acts"]), "scenes": len(scenes),
             "shots": sum(len(sc.get("shots", [])) for _, sc in scenes), "unknown_speakers": unknown}
@@ -345,7 +351,7 @@ def shotplan(ctx: Ctx) -> dict[str, Any]:
     if script_row is None or not script_row["acts"]:
         raise StageError("needs_stage", "run the script stage first", stage="script")
     profile = ctx.settings.delivery_profile(ctx.project.delivery_profile)
-    ep = ctx.store.ensure_episode(ctx.pid, episode)
+    ep = ctx.store.ensure_episode(ctx.pid, episode, season=ctx.season_of(episode))
     rows = build_shot_rows(
         script_row, characters=ctx.store.list_characters(ctx.pid), locations=ctx.store.list_locations(ctx.pid),
         style=_style(ctx), profile=profile,

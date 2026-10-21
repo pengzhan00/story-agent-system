@@ -90,7 +90,7 @@ docs/          API CONFIGURATION MEDIA_CONTRACT RUNBOOK WORKFLOW USER_GUIDE PARI
 - **适配器缺模型/缺工具 → `missing_*` 错误,绝不静默降级**。
 - **合规**默认开(AIGC 标识、授权、受限许可闸),可全局/项目/环境变量关;**溯源始终记录**。
 
-### 3.2 表(001-006)
+### 3.2 表(001-007)
 
 | 表 | 关键列 |
 |---|---|
@@ -98,14 +98,16 @@ docs/          API CONFIGURATION MEDIA_CONTRACT RUNBOOK WORKFLOW USER_GUIDE PARI
 | scripts | project_id episode_no title synopsis acts(JSON) total_scenes |
 | characters | project_id name role appearance personality voice_profile voice_ref_audio/text voice_ref_consent lora_ref ref_images |
 | scenes(场景设计) / music_themes / sound_effects | 各自属于 project;music_themes 有 kind(bgm/theme) lyrics duration_sec scene_ref |
-| episodes | project_id number title summary status,UNIQUE(project,number) |
+| seasons | project_id number title summary planned_episodes target_sec status(每个项目都有第 1 季) |
+| episodes | project_id number(全剧连续编号,各处的键) season number_in_season title summary status,UNIQUE(project,number) |
 | shots | project_id episode_id act/scene/shot_number dialogue(JSON) narration render_payload(shot.v3 JSON) locked status |
 | gen_specs / gen_spec_locks | subject_type subject_id slot version kind model_ref prompt negative_prompt text_payload params seed refs depends_on author |
 | media_jobs | kind provider model_ref tier status inputs params seed idempotency_key heavy est_memory_gib lease_* external_id progress error_* attempt **depends_on pipeline_id pipeline_step** |
 | media_assets | job_id project_id shot_id spec_id/version kind slot path sha256 duration_sec width height fps has_audio metadata provenance version is_current trashed_at |
 | job_events | job_id ts level event data |
 | library_items | role name asset_id description tags meta source_asset_id |
-| workflow_stages / workflow_runs / workflow_data | 见 §1 |
+| workflow_stages | 主键 (project, stage, **season, episode**):`analyze`/`cast` 记在 (0,0)(全剧共用),其余阶段按集各记一份;全剧阶段重跑使所有集的下游 stale,某集阶段只影响该集 |
+| workflow_runs / workflow_data | 见 §1 |
 | workshop_presets | kind model_ref tier params |
 | generation_logs | project_id agent model prompt response tokens duration_ms system label |
 
@@ -177,6 +179,7 @@ docs/          API CONFIGURATION MEDIA_CONTRACT RUNBOOK WORKFLOW USER_GUIDE PARI
 
 ## 8. 下一步(按这个顺序做)
 
+0. (已完成)多集改造步骤 A(`docs/SERIES.md`):迁移 007、季表、按集的阶段状态;`workflow run --param episode=2` 能接着做第 2 集而不动第 1 集。下一步 B:`music`/`scenes` 按集(配乐 scene_ref 加集号前缀),再 C 批量、D 圣经/大纲、E 看板。
 0. (已完成)「剧本→人物/场景图→关键帧」断链修复 + 生产计划确认队列 + 从文字建项目。项目级默认声音已做(`projects.settings.default_voice`,制作流程页可选)。仍未覆盖:口型头像步骤不在项目流程内、每集只用一首配乐、工坊成片模块要手工拼镜头。
 
 1. (已完成)LongCat 实测 54 分钟/3.1 秒;工坊「故事→剧本」用 gemma4 实测通过(故事 33 秒、剧本 17 秒)。

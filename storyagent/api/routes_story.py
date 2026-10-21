@@ -89,6 +89,20 @@ def update_episode(project_id: int, episode_id: int, body: Row, request: Request
     return story.update_episode(episode_id, body)
 
 
+@router.get("/seasons")
+def list_seasons(project_id: int, request: Request) -> list[Row]:
+    """Seasons (a project always has season 1) with how many episodes each holds."""
+    ctx_of(request).projects.get(project_id)
+    return ctx_of(request).story.list_seasons(project_id)
+
+
+@router.patch("/seasons/{number}")
+def update_season(project_id: int, number: int, body: Row, request: Request) -> Row:
+    """Edit a season (title, summary, planned_episodes, target_sec); creates it when it does not exist yet."""
+    ctx_of(request).projects.get(project_id)
+    return ctx_of(request).story.update_season(project_id, number, body)
+
+
 @router.get("/scripts")
 def list_scripts(project_id: int, request: Request) -> list[Row]:
     ctx_of(request).projects.get(project_id)

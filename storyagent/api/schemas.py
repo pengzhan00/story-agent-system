@@ -463,6 +463,7 @@ class WorkflowOut(Strict):
     stages: list[WorkflowStageOut]
     active_run: WorkflowRunOut | None = None
     recent_runs: list[WorkflowRunOut] = Field(default_factory=list)
+    episode: int = Field(default=1, description="the episode these stage states are for (series stages are shared)")
 
 
 class WorkflowRunCreate(BaseModel):

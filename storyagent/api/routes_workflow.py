@@ -36,14 +36,14 @@ def run_out(run: dict[str, Any]) -> WorkflowRunOut:
 
 
 @router.get("/projects/{project_id}/workflow", response_model=WorkflowOut)
-def get_workflow(project_id: int, request: Request) -> WorkflowOut:
-    """Stage states plus the active run (with its live progress) and the last few runs."""
+def get_workflow(project_id: int, request: Request, episode: int = 1) -> WorkflowOut:
+    """Stage states of one episode (series-wide stages are shared) plus the active run and the last few runs."""
     ctx = ctx_of(request)
     ctx.projects.get(project_id)
     runs = [run_out(r) for r in ctx.workflow.list_runs(project_id, 6)]
     active = next((r for r in runs if r.status in ("queued", "running")), None)
-    return WorkflowOut(stages=[WorkflowStageOut.model_validate(s) for s in ctx.workflow.stages(project_id)],
-                       active_run=active, recent_runs=runs)
+    return WorkflowOut(stages=[WorkflowStageOut.model_validate(s) for s in ctx.workflow.stages(project_id, episode)],
+                       active_run=active, recent_runs=runs, episode=episode)
 
 
 @router.post("/projects/{project_id}/workflow/runs", response_model=WorkflowRunOut, status_code=201)
@@ -52,7 +52,7 @@ def start_run(project_id: int, body: WorkflowRunCreate, request: Request) -> Wor
     ctx = ctx_of(request)
     if ctx.projects.get(project_id).status == "trashed":
         raise ApiError(409, "conflict", "the project is in the recycle bin; restore it first")
-    stages = ctx.workflow.pending_stages(project_id, body.stages)
+    stages = ctx.workflow.pending_stages(project_id, body.stages, int(body.params.get("episode") or 1))
     if not stages:
         raise ApiError(409, "nothing_to_do", "every stage is already completed")
     return run_out(ctx.workflow.enqueue(project_id, stages, body.params))

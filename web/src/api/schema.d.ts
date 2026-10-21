@@ -924,6 +924,46 @@ export interface paths {
         patch: operations["update_scene_api_projects__project_id__scripts__episode_no__acts__act_number__scenes__scene_number__patch"];
         trace?: never;
     };
+    "/api/projects/{project_id}/seasons": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Seasons
+         * @description Seasons (a project always has season 1) with how many episodes each holds.
+         */
+        get: operations["list_seasons_api_projects__project_id__seasons_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/seasons/{number}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Season
+         * @description Edit a season (title, summary, planned_episodes, target_sec); creates it when it does not exist yet.
+         */
+        patch: operations["update_season_api_projects__project_id__seasons__number__patch"];
+        trace?: never;
+    };
     "/api/projects/{project_id}/settings": {
         parameters: {
             query?: never;
@@ -1274,7 +1314,7 @@ export interface paths {
         };
         /**
          * Get Workflow
-         * @description Stage states plus the active run (with its live progress) and the last few runs.
+         * @description Stage states of one episode (series-wide stages are shared) plus the active run and the last few runs.
          */
         get: operations["get_workflow_api_projects__project_id__workflow_get"];
         put?: never;
@@ -2800,6 +2840,12 @@ export interface components {
         /** WorkflowOut */
         WorkflowOut: {
             active_run: components["schemas"]["WorkflowRunOut"] | null;
+            /**
+             * Episode
+             * @description the episode these stage states are for (series stages are shared)
+             * @default 1
+             */
+            episode: number;
             /** Recent Runs */
             recent_runs: components["schemas"]["WorkflowRunOut"][];
             /** Stages */
@@ -5107,6 +5153,79 @@ export interface operations {
             };
         };
     };
+    list_seasons_api_projects__project_id__seasons_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_season_api_projects__project_id__seasons__number__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     patch_project_settings_api_projects__project_id__settings_patch: {
         parameters: {
             query?: never;
@@ -6003,7 +6122,9 @@ export interface operations {
     };
     get_workflow_api_projects__project_id__workflow_get: {
         parameters: {
-            query?: never;
+            query?: {
+                episode?: number;
+            };
             header?: never;
             path: {
                 project_id: number;

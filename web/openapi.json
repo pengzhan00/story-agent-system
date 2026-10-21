@@ -3269,6 +3269,12 @@
               }
             ]
           },
+          "episode": {
+            "default": 1,
+            "description": "the episode these stage states are for (series stages are shared)",
+            "title": "Episode",
+            "type": "integer"
+          },
           "recent_runs": {
             "items": {
               "$ref": "#/components/schemas/WorkflowRunOut"
@@ -3287,7 +3293,8 @@
         "required": [
           "stages",
           "active_run",
-          "recent_runs"
+          "recent_runs",
+          "episode"
         ],
         "title": "WorkflowOut",
         "type": "object"
@@ -7175,6 +7182,120 @@
         ]
       }
     },
+    "/api/projects/{project_id}/seasons": {
+      "get": {
+        "description": "Seasons (a project always has season 1) with how many episodes each holds.",
+        "operationId": "list_seasons_api_projects__project_id__seasons_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response List Seasons Api Projects  Project Id  Seasons Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Seasons",
+        "tags": [
+          "story"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/seasons/{number}": {
+      "patch": {
+        "description": "Edit a season (title, summary, planned_episodes, target_sec); creates it when it does not exist yet.",
+        "operationId": "update_season_api_projects__project_id__seasons__number__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "number",
+            "required": true,
+            "schema": {
+              "title": "Number",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "title": "Body",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Update Season Api Projects  Project Id  Seasons  Number  Patch",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Season",
+        "tags": [
+          "story"
+        ]
+      }
+    },
     "/api/projects/{project_id}/settings": {
       "patch": {
         "description": "Per-project overrides: ``compliance`` (on/off, labels) and ``models.<ref>`` parameter overrides.",
@@ -8796,7 +8917,7 @@
     },
     "/api/projects/{project_id}/workflow": {
       "get": {
-        "description": "Stage states plus the active run (with its live progress) and the last few runs.",
+        "description": "Stage states of one episode (series-wide stages are shared) plus the active run and the last few runs.",
         "operationId": "get_workflow_api_projects__project_id__workflow_get",
         "parameters": [
           {
@@ -8805,6 +8926,16 @@
             "required": true,
             "schema": {
               "title": "Project Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "episode",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "title": "Episode",
               "type": "integer"
             }
           }

@@ -34,6 +34,7 @@ _JSON = {
     "music_themes": (),
     "sound_effects": (),
     "episodes": (),
+    "seasons": (),
 }
 _FIELDS: dict[str, tuple[str, ...]] = {
     "characters": ("name", "role", "age", "gender", "appearance", "personality", "background", "relationships",
@@ -48,12 +49,13 @@ _FIELDS: dict[str, tuple[str, ...]] = {
     "music_themes": ("name", "kind", "mood", "tempo", "instruments", "key_signature", "description", "gen_prompt",
                      "lyrics", "duration_sec", "scene_ref"),
     "sound_effects": ("name", "category", "description", "tags"),
-    "episodes": ("number", "title", "summary", "status"),
+    "episodes": ("number", "title", "summary", "status", "season", "number_in_season"),
+    "seasons": ("number", "title", "summary", "planned_episodes", "target_sec", "status"),
 }
 _PARENT_ORDER = {"shots": "act_number, scene_number, shot_number, id", "scripts": "episode_no, id",
-                 "episodes": "number", "characters": "id", "scenes": "id", "music_themes": "id",
+                 "episodes": "number", "seasons": "number", "characters": "id", "scenes": "id", "music_themes": "id",
                  "sound_effects": "id"}
-_HAS_UPDATED = {"characters", "scenes", "scripts", "shots", "episodes"}
+_HAS_UPDATED = {"characters", "scenes", "scripts", "shots", "episodes", "seasons"}
 
 
 def _decode(table: str, row: Any) -> dict[str, Any]:
@@ -224,13 +226,47 @@ class StoryStore:
     def list_episodes(self, project_id: int) -> list[dict[str, Any]]:
         return self._list("episodes", project_id)
 
-    def ensure_episode(self, project_id: int, number: int, *, title: str = "", summary: str = "") -> dict[str, Any]:
+    def list_seasons(self, project_id: int) -> list[dict[str, Any]]:
+        """Seasons with how many episodes each holds (a project always has season 1)."""
+        self.ensure_season(project_id, 1)
+        counts = {r["season"]: r["n"] for r in self.db.conn.execute(
+            "SELECT season, COUNT(*) n FROM episodes WHERE project_id=? GROUP BY season", (project_id,))}
+        return [{**s, "episodes": counts.get(s["number"], 0)} for s in self._list("seasons", project_id)]
+
+    def ensure_season(self, project_id: int, number: int, *, title: str = "", summary: str = "") -> dict[str, Any]:
+        row = self.db.conn.execute(
+            "SELECT id FROM seasons WHERE project_id=? AND number=?", (project_id, number)).fetchone()
+        if row is None:
+            return self._get("seasons", self._insert("seasons", project_id, {
+                "number": number, "title": title, "summary": summary}))
+        if title or summary:
+            self._update("seasons", row["id"], {k: v for k, v in (("title", title), ("summary", summary)) if v})
+        return self._get("seasons", row["id"])
+
+    def update_season(self, project_id: int, number: int, data: Mapping[str, Any]) -> dict[str, Any]:
+        season = self.ensure_season(project_id, number)
+        self._update("seasons", season["id"], data)
+        return self._get("seasons", season["id"])
+
+    def season_of(self, project_id: int, episode: int) -> int:
+        """The season an episode belongs to (season 1 while the episode does not exist yet)."""
+        row = self.db.conn.execute(
+            "SELECT season FROM episodes WHERE project_id=? AND number=?", (project_id, episode)).fetchone()
+        return int(row["season"]) if row else 1
+
+    def ensure_episode(
+        self, project_id: int, number: int, *, title: str = "", summary: str = "", season: int = 1,
+    ) -> dict[str, Any]:
         row = self.db.conn.execute(
             "SELECT id FROM episodes WHERE project_id=? AND number=?", (project_id, number)
         ).fetchone()
         if row is None:
+            self.ensure_season(project_id, season)
+            in_season = self.db.conn.execute(
+                "SELECT COUNT(*) n FROM episodes WHERE project_id=? AND season=?", (project_id, season)).fetchone()["n"]
             return self._get("episodes", self._insert("episodes", project_id, {
-                "number": number, "title": title, "summary": summary, "status": "draft"}))
+                "number": number, "title": title, "summary": summary, "status": "draft",
+                "season": season, "number_in_season": in_season + 1}))
         if title or summary:
             self._update("episodes", row["id"], {k: v for k, v in (("title", title), ("summary", summary)) if v})
         return self._get("episodes", row["id"])

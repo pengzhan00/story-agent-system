@@ -37,9 +37,9 @@ class WorkflowEngine:
         self.store, self.state, self.projects = StoryStore(db), WorkflowState(db), ProjectStore(db, settings)
         self.spec_store = spec_store or SpecStore(db, settings, Ledger(db, settings))
 
-    def stages_to_run(self, project_id: int, requested: list[str] | None) -> list[str]:
+    def stages_to_run(self, project_id: int, requested: list[str] | None, episode: int = 1) -> list[str]:
         """``None`` = resume: every stage that is not completed (stale ones included), in pipeline order."""
-        return self.state.pending_stages(project_id, requested)
+        return self.state.pending_stages(project_id, requested, episode)
 
     def review_script(self, project_id: int, episode: int = 1) -> dict[str, Any]:
         """Ask the script editor agent to critique the current script (on demand; nothing is stored or changed)."""
@@ -59,30 +59,34 @@ class WorkflowEngine:
         self, project_id: int, stage: str, params: dict[str, Any] | None = None, *, progress: Progress | None = None,
         cancelled: Callable[[], bool] | None = None,
     ) -> dict[str, Any]:
+        episode = int((params or {}).get("episode") or 1)
         ctx = Ctx(
             self.settings, self.db, self.store, self.state, self.agents, self.projects, self.projects.get(project_id),
             dict(params or {}), progress or (lambda *_: None), cancelled or (lambda: False), self.spec_store, stage,
         )
-        self.state.set_stage(project_id, stage, "running")
+        self.state.set_stage(project_id, stage, "running", episode=episode)
         if progress:
             progress(stage, 0, 0, "")           # the stage is visibly running before its first item completes
         try:
             summary = STAGE_FUNCS[stage](ctx)
         except WorkflowCancelled:
-            self.state.set_stage(project_id, stage, "failed", error_code="cancelled")
+            self.state.set_stage(project_id, stage, "failed", error_code="cancelled", episode=episode)
             raise
         except LLMError as exc:
-            self.state.set_stage(project_id, stage, "failed", error_code=f"llm.{exc.code}", error_message=exc.message)
+            self.state.set_stage(project_id, stage, "failed", error_code=f"llm.{exc.code}", error_message=exc.message,
+                                 episode=episode)
             raise
         except (StageError, AgentSpecError) as exc:
             code = exc.code if isinstance(exc, StageError) else "agent_spec"
-            self.state.set_stage(project_id, stage, "failed", error_code=f"workflow.{code}", error_message=str(exc))
+            self.state.set_stage(project_id, stage, "failed", error_code=f"workflow.{code}", error_message=str(exc),
+                                 episode=episode)
             raise
         except Exception as exc:
             log.exception("workflow stage %s failed", stage)
-            self.state.set_stage(project_id, stage, "failed", error_code="internal", error_message=str(exc))
+            self.state.set_stage(project_id, stage, "failed", error_code="internal", error_message=str(exc),
+                                 episode=episode)
             raise
-        self.state.set_stage(project_id, stage, "completed", summary=summary)
+        self.state.set_stage(project_id, stage, "completed", summary=summary, episode=episode)
         return summary
 
     def run(
@@ -90,14 +94,15 @@ class WorkflowEngine:
         progress: Progress | None = None, cancelled: Callable[[], bool] | None = None,
     ) -> dict[str, dict[str, Any]]:
         out: dict[str, dict[str, Any]] = {}
-        for stage in self.stages_to_run(project_id, stages):
+        episode = int((params or {}).get("episode") or 1)
+        for stage in self.stages_to_run(project_id, stages, episode):
             out[stage] = self.run_stage(project_id, stage, params, progress=progress, cancelled=cancelled)
         return out
 
     # -- queue execution (called by the worker) -------------------------------------------------------
     def execute_run(self, run: dict[str, Any], owner: str, lease_seconds: float, beat_seconds: float) -> None:
         run_id, pid = run["id"], run["project_id"]
-        tracker = RunProgress(self.stages_to_run(pid, run["stages"] or None))
+        tracker = RunProgress(self.stages_to_run(pid, run["stages"] or None, int(run["params"].get("episode") or 1)))
         cancel, lost, stop = threading.Event(), threading.Event(), threading.Event()
 
         def beat() -> None:
