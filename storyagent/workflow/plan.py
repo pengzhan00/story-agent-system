@@ -15,12 +15,20 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from storyagent.config import ConfigError, Settings
-from storyagent.domain import QualityTier
+from storyagent.domain import MediaKind, QualityTier
 from storyagent.media.ledger import Ledger
 from storyagent.media.specs import SpecRecord, SpecStore
 from storyagent.story import StoryStore
 
-from .media import FALLBACK_SECONDS, PHASES, current_asset, default_voice_of, up_to_date, video_picks
+from .media import (
+    FALLBACK_SECONDS,
+    PHASES,
+    current_asset,
+    default_voice_of,
+    keyframe_edit_model,
+    up_to_date,
+    video_picks,
+)
 
 
 @dataclass
@@ -82,6 +90,10 @@ def produce_plan(
             asset = current_asset(ledger, spec)
             state = "new" if asset is None else "done" if up_to_date(ledger, spec) and not force else "stale"
             reason, model_ref = "", spec.model_ref
+            kind = spec.kind.value
+            edit_ref = keyframe_edit_model(settings, spec)       # composed from portraits: another, slower model
+            if edit_ref:
+                kind, model_ref = MediaKind.IMAGE_EDIT.value, edit_ref
             try:
                 model_ref = model_ref or settings.default_model(spec.kind.value).ref
                 settings.model(model_ref)
@@ -91,14 +103,14 @@ def produce_plan(
                 state, reason = "blocked", "no_voice"
             if spec.subject_type == "shot.video" and state == "new" and spec.subject_id not in picks:
                 state, reason = "skip", "still"
-            guess = FALLBACK_SECONDS.get(spec.kind.value) or FALLBACK_SECONDS.get(spec.kind.value.split(".")[0], 60.0)
+            guess = FALLBACK_SECONDS.get(kind) or FALLBACK_SECONDS.get(kind.split(".")[0], 60.0)
             known = ledger.estimate_seconds(model_ref, tier.value) if model_ref else 0
             needs = [by_key[(d["subject_type"], d["subject_id"], d.get("slot", "main"))].id
                      for d in spec.depends_on
                      if (d.get("subject_type"), d.get("subject_id"), d.get("slot", "main")) in by_key]
             out.append(PlannedTask(
                 spec_id=spec.id, subject_type=spec.subject_type, subject_id=spec.subject_id,
-                label=_label(spec, names), kind=spec.kind.value, model_ref=model_ref, phase=phase, state=state,
+                label=_label(spec, names), kind=kind, model_ref=model_ref, phase=phase, state=state,
                 reason=reason, est_seconds=int(known or guess), needs=needs))
     return out
 

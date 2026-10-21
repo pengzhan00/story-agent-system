@@ -294,6 +294,22 @@ def test_the_plan_lists_what_would_be_made_and_only_the_confirmed_part_runs(tmp_
     assert totals(after)["count"] == MADE - 2
 
 
+def test_the_plan_names_the_edit_model_and_its_cost_for_keyframes_made_from_references(tmp_path: Path) -> None:
+    from storyagent.domain import QualityTier
+    from storyagent.workflow.plan import produce_plan
+
+    engine, _worker, _ = story(tmp_path, [FakeAdapter()])
+    ledger: Ledger = engine.spec_store.ledger
+    args = (engine.settings, engine.store, engine.spec_store, ledger, 1, QualityTier.DRAFT)
+    frames = lambda plan: [p for p in plan if p.subject_type == "shot.keyframe"]  # noqa: E731
+    composed = frames(produce_plan(*args))
+    assert composed and {p.kind for p in composed} == {"image.edit"} and {p.model_ref for p in composed} == {"f-edit"}
+    assert all(p.est_seconds >= 600 for p in composed)               # what a composed keyframe really costs
+    engine.settings.workflow["keyframe_from_references"] = False
+    plain = frames(produce_plan(*args))
+    assert {p.kind for p in plain} == {"image.generate"} and all(p.est_seconds < 600 for p in plain)
+
+
 def test_a_project_voice_unblocks_the_dialogue_in_the_plan(tmp_path: Path) -> None:
     from storyagent.domain import QualityTier
     from storyagent.workflow.plan import produce_plan

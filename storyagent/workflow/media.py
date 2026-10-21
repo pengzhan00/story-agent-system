@@ -185,8 +185,26 @@ def keyframe_from_references(ctx: Ctx, ledger: Ledger, spec: SpecRecord, job: Me
                        "inputs": {**job.inputs, "refs": [*refs, *job.inputs.get("refs", [])]}})
 
 
-# Seconds per job when the ledger has no history for the model yet (only used to shape the progress bar).
-FALLBACK_SECONDS = {"image": 45.0, "video": 240.0, "audio.tts": 12.0, "audio.music": 90.0, "audio.sfx": 20.0}
+# Seconds per job when the ledger has no history for the model yet (only used to shape the progress bar and the plan).
+# image.edit (a keyframe composed from reference images) was measured at about 11 minutes, plain generation at 1.5.
+FALLBACK_SECONDS = {"image": 45.0, "image.edit": 600.0, "video": 240.0, "audio.tts": 12.0, "audio.music": 90.0,
+                    "audio.sfx": 20.0}
+
+
+def keyframe_edit_model(settings: Settings, spec: SpecRecord) -> str:
+    """The image-edit model a shot keyframe will be composed with (``""`` = it is generated from words alone). Mirrors
+    ``keyframe_from_references`` without needing the portraits to exist yet, so the plan can state the real cost."""
+    if (spec.subject_type != "shot.keyframe" or spec.kind is not MediaKind.IMAGE_GENERATE
+            or not settings.workflow.get("keyframe_from_references", True)):
+        return ""
+    if not any(d.get("subject_type") in ("character.portrait", "scene.keyframe") for d in spec.depends_on):
+        return ""
+    try:
+        if spec.model_ref and settings.model(spec.model_ref).kind == MediaKind.IMAGE_EDIT.value:
+            return spec.model_ref
+        return settings.default_model(MediaKind.IMAGE_EDIT.value).ref
+    except ConfigError:
+        return ""
 
 
 def clip_seconds(settings: Settings, ledger: Ledger, tier: QualityTier) -> float:
@@ -224,12 +242,15 @@ def _expected_seconds(ctx: Ctx, ledger: Ledger, specs: list[SpecRecord], tier: Q
             continue
         if up_to_date(ledger, spec) and not ctx.force():
             continue
+        kind = spec.kind.value
+        edit_ref = keyframe_edit_model(ctx.settings, spec)
         try:
-            model_ref = spec.model_ref or ctx.settings.default_model(spec.kind.value).ref
+            model_ref = edit_ref or spec.model_ref or ctx.settings.default_model(spec.kind.value).ref
         except ConfigError:
             continue
+        if edit_ref:
+            kind = MediaKind.IMAGE_EDIT.value
         known = ledger.estimate_seconds(model_ref, tier.value)
-        kind = spec.kind.value
         guess = FALLBACK_SECONDS.get(kind) or FALLBACK_SECONDS.get(kind.split(".")[0], 60.0)
         total += float(known or guess)
     return total
