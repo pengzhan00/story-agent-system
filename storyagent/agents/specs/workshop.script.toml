@@ -1,0 +1,23 @@
+name = "workshop.script"
+role = "writer"
+temperature = 0.7
+max_tokens = 8000
+description = "Workshop: a story becomes a script (scenes with action and dialogue)."
+inputs = ["story", "language", "format", "scenes", "notes"]
+system = """You are a screenwriter of short vertical dramas. You turn a story into a shootable script: every scene one
+location and time, visible action, short spoken lines. Write all content in $language. No commentary outside the
+script."""
+prompt = """Turn this story into a script.
+
+Story:
+\"\"\"
+$story
+\"\"\"
+
+Format: $format
+Number of scenes: about $scenes
+Notes from the author (follow them, may be empty): $notes
+
+For every scene write: the scene heading (number, location, time of day), a short description of what we see, then the
+dialogue as `NAME: line` (add a delivery hint in brackets only when it matters). Keep the story's names and the order of
+events; do not invent new plot."""

@@ -59,6 +59,26 @@ _P = Field("prompt", "prompt", "longtext", required=True)
 _NEG = Field("negative_prompt", "negative_prompt", "text")
 
 MODULES: tuple[Module, ...] = (
+    Module("story", (
+        KindSpec(MediaKind.TEXT_STORY, (
+            Field("idea", "idea", "longtext", required=True),
+            Field("genre", "genre", "text"),
+            Field("tone", "tone", "text"),
+            Field("language", "language", "text"),
+            Field("length", "length", "text"),
+            Field("notes", "notes", "longtext"),
+        )),
+    )),
+    Module("script", (
+        KindSpec(MediaKind.TEXT_SCRIPT, (
+            Field("story", "story", "media", "text"),
+            Field("story_text", "story_text", "longtext"),
+            Field("format", "format", "text"),
+            Field("scenes", "scenes", "text"),
+            Field("language", "language", "text"),
+            Field("notes", "notes", "longtext"),
+        )),
+    )),
     Module("image", (
         KindSpec(MediaKind.IMAGE_GENERATE, (_P, _NEG, Field("image", "refs[]", "media", "image"))),
         KindSpec(MediaKind.IMAGE_EDIT, (_P, Field("image", "refs[]", "media", "image", required=True))),

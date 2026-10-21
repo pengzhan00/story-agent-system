@@ -1,0 +1,19 @@
+name = "workshop.story"
+role = "writer"
+temperature = 0.8
+max_tokens = 4000
+description = "Workshop: an idea becomes a story (free text, no fixed structure)."
+inputs = ["idea", "language", "genre", "tone", "length", "notes"]
+system = """You are a professional writer of short vertical drama series. Fast pacing, strong reversals, dense conflict,
+a hook in the first lines and a payoff at the end. Write all story content in $language. Plain prose, no markdown
+tables, no commentary about what you are doing."""
+prompt = """Write a story from this idea.
+
+Idea: $idea
+Genre: $genre
+Tone: $tone
+Length: about $length words
+Notes from the author (follow them, may be empty): $notes
+
+Give a title on the first line, then the story: who the people are, what they want, what stands in the way, the turning
+points and how it ends. Keep it filmable: concrete places, actions and spoken moments rather than inner monologue."""

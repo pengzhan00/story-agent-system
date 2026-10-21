@@ -78,7 +78,7 @@ function MediaInput({
           ref={file}
           type="file"
           hidden
-          accept={`${field.media}/*`}
+          accept={field.media === "text" ? "text/*,.md,.markdown" : `${field.media}/*`}
           onChange={(e) => {
             const f = e.target.files?.[0];
             if (f) upload.mutate(f, { onSuccess: (a) => onChange(`asset:${a.id}`) });

@@ -51,6 +51,12 @@ def _cosyvoice(settings: Settings) -> Adapter:
     return CosyVoiceAdapter()
 
 
+def _llm(settings: Settings) -> Adapter:
+    from .adapters.llm import LlmAdapter
+
+    return LlmAdapter()
+
+
 def _whisper(settings: Settings) -> Adapter:
     from .adapters.whisper import WhisperAdapter
 
@@ -94,7 +100,7 @@ def _longcat(settings: Settings) -> Adapter:
 
 
 _BUILTIN: list[Callable[[Settings], Adapter]] = [
-    _acestep, _phosphene, _cosyvoice, _whisper, _mflux, _lora_train, _seedvc, _ffmpeg, _h3, _longcat,
+    _acestep, _phosphene, _cosyvoice, _whisper, _llm, _mflux, _lora_train, _seedvc, _ffmpeg, _h3, _longcat,
 ]
 
 

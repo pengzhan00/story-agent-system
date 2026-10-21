@@ -83,7 +83,7 @@ def test_every_module_kind_has_a_default_model_and_an_output() -> None:
 # ---- API ----------------------------------------------------------------------------------------
 def test_modules_describe_models_params_and_inputs(api: TestClient) -> None:
     mods = {m["id"]: m for m in api.get("/api/workshop").json()}
-    assert set(mods) == {"image", "song", "voice", "video", "transcript"}
+    assert set(mods) == {"story", "script", "image", "song", "voice", "video", "transcript"}
     gen = next(k for k in mods["image"]["kinds"] if k["kind"] == "image.generate")
     assert any(m["ref"] == "fake-image" for m in gen["models"])
     assert [f["name"] for f in gen["inputs"]][:2] == ["prompt", "negative_prompt"] and gen["output"] == "image"
@@ -204,3 +204,62 @@ def test_upload_of_an_input_file_without_a_project(api: TestClient) -> None:
     job = api.post("/api/workshop/run", json={"kind": "image.edit",
                                                  "inputs": {"prompt": "x", "image": f"asset:{a['id']}"}}).json()[0]
     assert job["inputs"]["refs"] == [f"asset:{a['id']}"]
+
+
+# ---- story and script (a language model writes; the result is a text file) ----------------------------
+class _Writer:
+    name = "writer"
+
+    def __init__(self) -> None:
+        self.prompts: list[str] = []
+
+    def chat(self, model: str, system: str, prompt: str, **kw: Any) -> Any:
+        from storyagent.llm.backends import ChatResult
+
+        self.prompts.append(prompt)
+        text = "# The Lighthouse\nMara waits." if "Idea:" in prompt else "SCENE 1. LIGHTHOUSE - NIGHT\nMARA: Come back."
+        return ChatResult(text, model, 3, 4, 5)
+
+    def list_models(self) -> list[str]:
+        return ["m"]
+
+
+def _text_worker(settings: Settings, writer: _Writer) -> Worker:
+    from storyagent.llm import LLMRouter
+    from storyagent.media.adapters.llm import LlmAdapter
+
+    reg = AdapterRegistry()
+    reg.register(LlmAdapter(LLMRouter(settings, Database(settings.db_path), clients={"ollama": writer}), 0.01))
+    return Worker(settings, Database(settings.db_path), reg, probes=[])
+
+
+def test_story_then_script_as_a_pipeline(api: TestClient, wsettings: Settings) -> None:
+    body = {"steps": [
+        {"kind": "text.story", "inputs": {"idea": "a keeper waits for a ship", "genre": "melodrama"}},
+        {"kind": "text.script", "inputs": {"story": "@prev", "scenes": "3"}},
+    ]}
+    r = api.post("/api/workshop/pipelines", json=body)
+    assert r.status_code in (200, 201), r.text
+    writer = _Writer()
+    assert _text_worker(wsettings, writer).drain(30)
+    hist = {h["job"]["kind"]: h for h in api.get("/api/workshop/history").json()}
+    assert hist["text.story"]["job"]["status"] == "completed" and hist["text.script"]["job"]["status"] == "completed"
+    assets = hist["text.script"]["assets"]
+    assert assets and assets[0]["kind"] == "text.script"
+    script_prompt = next(p for p in writer.prompts if "Story:" in p)
+    assert "The Lighthouse" in script_prompt and "melodrama" not in script_prompt   # the story text, read from step 1
+    shown = api.get(f"/api/assets/{assets[0]['id']}/file")
+    assert shown.status_code == 200 and "MARA: Come back." in shown.text
+
+
+def test_a_script_can_start_from_pasted_text_and_needs_some_story(api: TestClient, wsettings: Settings) -> None:
+    ok = api.post("/api/workshop/run", json={"kind": "text.script", "inputs": {"story_text": "Once upon a time."}})
+    assert ok.status_code in (200, 201)
+    empty = api.post("/api/workshop/run", json={"kind": "text.script", "inputs": {}})
+    writer = _Writer()
+    assert _text_worker(wsettings, writer).drain(30)
+    states = {h["job"]["id"]: h["job"] for h in api.get("/api/workshop/history").json()}
+    done = [j for j in states.values() if j["status"] == "completed"]
+    failed = [j for j in states.values() if j["status"] != "completed"]
+    assert len(done) == 1 and "Once upon a time." in writer.prompts[0]
+    assert empty.status_code in (200, 201) and len(failed) == 1 and failed[0]["error_code"] == "invalid_input"

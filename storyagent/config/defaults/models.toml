@@ -2,7 +2,7 @@
 #
 #   kind     : a MediaKind value (storyagent/domain/enums.py), e.g. "video.generate"
 #   provider : the runtime/adapter that executes it:
-#              mflux | phosphene | acestep | cosyvoice | seedvc | whisper | h3 | longcat | lora_train | ffmpeg
+#              llm | mflux | phosphene | acestep | cosyvoice | seedvc | whisper | h3 | longcat | lora_train | ffmpeg
 #   family   : the underlying model family — the same weights may have several runtimes
 #              (e.g. one model through several runtimes); licence applies per family
 #   heavy    : true => the broker runs at most one heavy job at a time
@@ -25,6 +25,8 @@
 "video.avatar" = "longcat-avatar-1.5-q4"
 "audio.tts" = "cosyvoice3-0.5b"
 "audio.convert" = "seed-vc-v2"
+"text.story" = "llm-story"
+"text.script" = "llm-script"
 "text.asr" = "whisper-large-v3-turbo"
 "audio.music" = "acestep-1.5-turbo"
 "compose.assemble" = "ffmpeg-assemble"
@@ -332,6 +334,38 @@ ref_max_sec = 60
 diffusion_steps = 15
 [models."seed-vc".tiers.final]
 diffusion_steps = 50
+
+# Language-model writing (story, script). Runs in the worker through the LLM roles of llm.toml, so the model is picked
+# there (role) or pinned here (params.model). `agent` names the prompt (agents/specs, editable on the Prompts page).
+[models."llm-story"]
+kind = "text.story"
+provider = "llm"
+version = "role"
+heavy = false
+est_memory_gib = 0   # the language model is already resident for the workflow; heavy media jobs hold it back
+license_tag = "local-llm"
+commercial_ok = true
+timeout_sec = 900
+[models."llm-story".params]
+agent = "workshop.story"
+role = "writer"
+temperature = 0.8
+max_tokens = 4000
+
+[models."llm-script"]
+kind = "text.script"
+provider = "llm"
+version = "role"
+heavy = false
+est_memory_gib = 0
+license_tag = "local-llm"
+commercial_ok = true
+timeout_sec = 900
+[models."llm-script".params]
+agent = "workshop.script"
+role = "writer"
+temperature = 0.7
+max_tokens = 8000
 
 [models."whisper-large-v3-turbo"]
 kind = "text.asr"

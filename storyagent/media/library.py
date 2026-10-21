@@ -27,6 +27,7 @@ from .probe import probe
 AUDIO = {".wav", ".mp3", ".m4a", ".flac", ".ogg", ".aac"}
 IMAGE = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
 VIDEO = {".mp4", ".mov", ".mkv", ".webm"}
+TEXT = {".txt", ".md", ".markdown"}
 MODEL = {".safetensors", ".gguf", ".ckpt", ".pt"}
 ROLES = ("voice", "portrait", "lora", "music", "sfx", "reference", "video")
 _SAFE = re.compile(r"^[^/\\\x00]{1,80}$")
@@ -38,7 +39,7 @@ class LibraryError(ValueError):
 
 def upload_kind(path: Path) -> str:
     ext = path.suffix.lower()
-    for group, name in ((AUDIO, "audio"), (IMAGE, "image"), (VIDEO, "video"), (MODEL, "model")):
+    for group, name in ((AUDIO, "audio"), (IMAGE, "image"), (VIDEO, "video"), (TEXT, "text"), (MODEL, "model")):
         if ext in group:
             return f"upload.{name}"
     return "upload.file"
@@ -56,7 +57,7 @@ def import_file(
     settings: Settings, ledger: Ledger, src: Path, *, project_id: int | None, slot: str = "main",
     shot_id: int | None = None, metadata: Mapping[str, Any] | None = None, adopt: bool = True,
 ) -> AssetRecord:
-    """Copy ``src`` into the project's media tree and register it (kind ``upload.<audio|image|video|model|file>``)."""
+    """Copy ``src`` into the project's media tree and register it (kind ``upload.<audio|image|video|text|...>``)."""
     if not src.is_file():
         raise LibraryError(f"file not found: {src}")
     kind = upload_kind(src)

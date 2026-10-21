@@ -18,8 +18,13 @@ const STAGE_OF: Record<string, string> = {
   "screenwriter.shots": "shotplan",
   "shot.visual": "specs",
   "reviewer.script": "review",
+  "workshop.story": "workshop",
+  "workshop.script": "workshop",
 };
-const STAGE_ORDER = ["analyze", "cast", "script", "scenes", "music", "shotplan", "specs", "review"];
+const STAGE_ORDER = ["analyze", "cast", "script", "scenes", "music", "shotplan", "specs", "review", "workshop"];
+
+const stageLabel = (stage: string) =>
+  stage === "review" ? "web.prompts.stage_review" : stage === "workshop" ? "web.prompts.stage_workshop" : `workflow.stage.${stage}`;
 
 function Editor({ agent }: { agent: Agent }) {
   const t = useT();
@@ -145,8 +150,8 @@ export function PromptsPage() {
           if (group.length === 0) return null;
           return (
             <div key={stage} className="row">
-              <strong className="small stage-label">{t(stage === "review" ? "web.prompts.stage_review" : `workflow.stage.${stage}`)}</strong>
-              <nav className="tabs" aria-label={t(stage === "review" ? "web.prompts.stage_review" : `workflow.stage.${stage}`)}>
+              <strong className="small stage-label">{t(stageLabel(stage))}</strong>
+              <nav className="tabs" aria-label={t(stageLabel(stage))}>
                 {group.map((a) => (
                   <button key={a.name} className={a.name === current?.name ? "tab active" : "tab"} onClick={() => setPick(a.name)}>
                     {t(`agent.${a.name}.title`)}

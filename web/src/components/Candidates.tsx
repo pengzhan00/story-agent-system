@@ -1,14 +1,38 @@
+import { useQuery } from "@tanstack/react-query";
 import type { Asset, Job, Spec } from "../api/types";
 import { duration } from "../lib/format";
 import { useT } from "../i18n";
 import { ProgressBar } from "./ProgressBar";
 import { StatusChip } from "./StatusChip";
 
+/** A written text (story, script, transcript): shown in full, with a link to the file. */
+function TextPreview({ asset, src }: { asset: Asset; src: string }) {
+  const t = useT();
+  const body = useQuery({
+    queryKey: ["asset-text", asset.id],
+    queryFn: async () => {
+      const res = await fetch(src);
+      if (!res.ok) throw new Error(String(res.status));
+      return res.text();
+    },
+    staleTime: Infinity,
+  });
+  return (
+    <div className="stack">
+      <pre className="transcript">{body.data ?? (body.isError ? t("web.error.generic") : "")}</pre>
+      <a className="small" href={src} download>
+        {t("web.workshop.download")}
+      </a>
+    </div>
+  );
+}
+
 export function AssetPreview({ asset }: { asset: Asset }) {
   const src = `/api/assets/${asset.id}/file`;
   if (asset.kind.startsWith("image")) return <img className="preview" src={src} alt={asset.slot} loading="lazy" />;
   if (asset.kind.startsWith("video")) return <video className="preview" src={src} controls preload="metadata" />;
   if (asset.kind.startsWith("audio") || asset.kind.startsWith("upload.audio")) return <audio className="audio" src={src} controls preload="none" />;
+  if (asset.kind.startsWith("text") || asset.kind === "upload.text") return <TextPreview asset={asset} src={src} />;
   return <a href={src}>{asset.path}</a>;
 }
 
