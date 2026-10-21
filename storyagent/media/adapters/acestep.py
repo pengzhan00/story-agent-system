@@ -1,5 +1,4 @@
-"""ACE-Step 1.5 standalone API adapter (music, with or without vocals; also short sound effects - same model,
-prompted as non-musical sound).
+"""ACE-Step 1.5 standalone API adapter (music, with or without vocals).
 
 Vocals must come from this service, not from ComfyUI's native nodes (those lack the 5Hz LM and render
 silence). Protocol: ``POST /release_task`` -> poll ``POST /query_result`` -> ``GET /v1/audio?path=``.
@@ -85,8 +84,8 @@ class AceStepAdapter(AdapterBase):
     # -- contract -----------------------------------------------------------------------------
     def capabilities(self) -> Capabilities:
         return Capabilities(
-            kinds=(MediaKind.AUDIO_MUSIC, MediaKind.AUDIO_SFX), heavy=False, supports_cancel=False,
-            supports_reattach=True, param_schema=SCHEMA, poll_interval_sec=self.poll_interval_sec,
+            kinds=(MediaKind.AUDIO_MUSIC,), heavy=False, supports_cancel=False, supports_reattach=True,
+            param_schema=SCHEMA, poll_interval_sec=self.poll_interval_sec,
         )
 
     def api_model(self, job: JobRecord) -> str:

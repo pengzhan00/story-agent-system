@@ -30,7 +30,6 @@ FAKE_MODELS = """
 "video.generate" = "f-vid"
 "audio.tts" = "f-tts"
 "audio.music" = "f-mus"
-"audio.sfx" = "f-sfx"
 [models."f-img"]
 kind = "image.generate"
 provider = "fake"
@@ -51,10 +50,6 @@ timeout_sec = 30
 kind = "audio.music"
 provider = "fake"
 timeout_sec = 30
-[models."f-sfx"]
-kind = "audio.sfx"
-provider = "fake"
-timeout_sec = 30
 [models."f-bad"]
 kind = "video.generate"
 provider = "fake"
@@ -62,7 +57,7 @@ commercial_ok = false
 license_tag = "restricted"
 timeout_sec = 30
 """
-MADE = 2 + 2 + 2 + 8 + 8 + 1    # portraits, locations, bgm + theme, keyframes, videos, one sound effect
+MADE = 2 + 2 + 2 + 8 + 8        # portraits, locations, bgm + theme, keyframes, videos
 SERVICES = FAST + '\n[workflow]\npoll_seconds = 0.02\ndefault_voice = ""\nvideo_share = 1.0\n'
 
 
@@ -96,10 +91,10 @@ def test_produce_makes_every_spec_in_dependency_order_and_is_resumable(tmp_path:
     seen: list[tuple[str, int, int, str]] = []
     with serving(worker):
         out = engine.run_stage(1, "produce", {}, progress=lambda *a: seen.append(a))
-    # 2 portraits, 2 locations, music + theme, 8 keyframes, 8 videos, 1 sfx; dialogue has no voice
+    # 2 portraits, 2 locations, music + theme, 8 keyframes, 8 videos; sfx has no model, dialogue has no voice
     assert out["made"] == MADE and out["failed"] == 0 and out["tier"] == "draft"
     reasons = sorted({s["reason"] for s in out["skipped_detail"]})
-    assert reasons == ["no_voice"]
+    assert reasons == ["no_model", "no_voice"]
     ledger: Ledger = engine.spec_store.ledger
     jobs = {j.spec_id: j for j in ledger.list_jobs(project_id=1, limit=500)}
     shot = engine.store.list_shots(1)[0]
@@ -287,7 +282,7 @@ def test_the_plan_lists_what_would_be_made_and_only_the_confirmed_part_runs(tmp_
     assert len(by_type["character.portrait"]) == 2 and len(by_type["shot.video"]) == 8
     assert all(p.state in ("new", "blocked") for p in plan) and totals(plan)["count"] == MADE
     blocked = {p.reason for p in plan if p.state == "blocked"}
-    assert blocked == {"no_voice"}                       # said up front, not discovered at run time
+    assert blocked == {"no_model", "no_voice"}                       # said up front, not discovered at run time
     assert all(p.label for p in plan)
     assert all(p.needs for p in by_type["shot.keyframe"])             # a keyframe builds on portraits and scene image
     only = [p.spec_id for p in plan if p.subject_type == "character.portrait"]
