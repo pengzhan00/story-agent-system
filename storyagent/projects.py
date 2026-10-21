@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
@@ -73,15 +74,36 @@ class ProjectStore:
     def __init__(self, db: Database, settings: Settings) -> None:
         self.db, self.settings = db, settings
 
-    def create(self, name: str, *, genre: str = "", description: str = "", content_language: str = "") -> Project:
+    def _frame(self, profile: str) -> tuple[int, int]:
+        p = self.settings.delivery_profile(profile or None)
+        return int(p["width"]), int(p["height"])
+
+    @staticmethod
+    def _orientation(frame: tuple[int, int]) -> str:
+        w, h = frame
+        return "square" if w == h else "landscape" if w > h else "vertical"
+
+    @staticmethod
+    def _ratio(frame: tuple[int, int]) -> str:
+        g = math.gcd(*frame)
+        return f"{frame[0] // g}:{frame[1] // g}"
+
+    def create(
+        self, name: str, *, genre: str = "", description: str = "", content_language: str = "",
+        delivery_profile: str = "",
+    ) -> Project:
+        """``delivery_profile`` is the picture frame (vertical, landscape, ...): chosen here, it is the one direction of
+        every picture, video and the film. The aspect ratio follows from it."""
+        ratio = self._ratio(self._frame(delivery_profile))       # also rejects an unknown profile
         base = slugify(name)
         with self.db.transaction() as conn:
             slug, n = base, 2
             while conn.execute("SELECT 1 FROM projects WHERE slug=?", (slug,)).fetchone():
                 slug, n = f"{base}-{n}", n + 1
             cur = conn.execute(
-                "INSERT INTO projects(slug, name, genre, description, content_language) VALUES (?,?,?,?,?)",
-                (slug, name, genre, description, content_language or self.settings.locale),
+                "INSERT INTO projects(slug, name, genre, description, content_language, delivery_profile, aspect_ratio)"
+                " VALUES (?,?,?,?,?,?,?)",
+                (slug, name, genre, description, content_language or self.settings.locale, delivery_profile, ratio),
             )
             assert cur.lastrowid is not None
             return self.get(cur.lastrowid)
@@ -123,6 +145,16 @@ class ProjectStore:
         unknown = set(changes) - set(_PATCHABLE)
         if unknown:
             raise ConfigError(f"cannot update {sorted(unknown)}")
+        if "delivery_profile" in changes:
+            before = self.get(project_id)
+            old, new = self._frame(before.delivery_profile), self._frame(str(changes["delivery_profile"]))
+            if self._orientation(old) != self._orientation(new) and self.db.conn.execute(
+                    "SELECT 1 FROM media_assets WHERE project_id=? AND trashed_at IS NULL LIMIT 1",
+                    (project_id,)).fetchone():
+                raise ProjectStateError(
+                    f"project {project_id} already has pictures in a {self._orientation(old)} frame; "
+                    "the direction is decided at the start (a frame of the same direction can still change)")
+            changes["aspect_ratio"] = self._ratio(new)
         if changes:
             sets = ", ".join(f"{k}=?" for k in changes)
             with self.db.transaction() as conn:

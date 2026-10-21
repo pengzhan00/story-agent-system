@@ -105,10 +105,11 @@ def test_text_to_video_with_sound(tmp_path: Path, panel: FakeServer) -> None:
     assert a.kind == "video.av" and a.has_audio and a.width == 64 and a.duration_sec
     f = form(next(q for q in panel.requests if q.path == "/queue/add"))
     assert f["mode"] == "t2v" and f["prompt"] == "a knight rides" and f["negative_prompt"] == "blurry"
-    assert f["seed"] == "42" and f["width"] == "1024" and f["frames"] == "121" and f["quality"] == "high"
+    assert f["seed"] == "42" and f["width"] == "576" and f["frames"] == "121" and f["quality"] == "high"
     assert a.metadata["panel_job_id"] == "pj-1"
-    # the panel clamped 1024x576 down to 64x64: surfaced, not silent
-    assert a.metadata["requested_size"] == [1024, 576] and a.metadata["actual_size"] == [64, 64]
+    # the model lists 1024x576; the project frame is vertical, so 576x1024 is asked for - and the panel clamped it
+    # down to 64x64: surfaced, not silent
+    assert a.metadata["requested_size"] == [576, 1024] and a.metadata["actual_size"] == [64, 64]
     assert "resolution_clamped" in [e["event"] for e in r.ledger.events(rec.id)]
 
 
@@ -270,5 +271,5 @@ def test_registered_and_default_models_resolve(tmp_path: Path) -> None:
     for kind in ("video.av", "video.generate", "video.lipsync"):
         assert s.default_model(kind).provider == "phosphene"
     final = s.model("ltx-2.5-av")
-    assert (final.params["width"], final.params["height"], final.params["stage1_steps"]) == (1536, 832, 16)
+    assert (final.params["width"], final.params["height"], final.params["stage1_steps"]) == (832, 1536, 16)
     assert final.tiers["draft"]["quality"] == "balanced" and final.license_tag == "ltx-community"

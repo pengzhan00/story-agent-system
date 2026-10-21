@@ -54,20 +54,21 @@ negative_prompt = false   # FLUX.2 has no negative prompt: describe what you wan
 
 # Measured on a fixed seed (640x896): 20 steps at 512x768 gave a distorted face and a tangled weapon; 30-50 steps
 # with guidance 3.5-5 gave clean faces and hands. Guidance is the only quality knob besides steps.
+# Sizes are 9:16 (the target is a vertical 720x1280 drama); multiples of 16. Landscape projects override them.
 [models."flux2-klein-base-4b".params]
-width = 768
-height = 1024
+width = 720
+height = 1280
 steps = 30
 guidance = 4.0
 [models."flux2-klein-base-4b".tiers.draft]
-width = 640
-height = 896
+width = 576
+height = 1024
 steps = 24
 [models."flux2-klein-base-4b".tiers.preview]
 steps = 30
 [models."flux2-klein-base-4b".tiers.final]
-width = 896
-height = 1280
+width = 864
+height = 1536
 steps = 50
 
 [models."flux2-klein-base-4b-edit"]
@@ -87,15 +88,27 @@ base_model = "flux2-klein-base-4b"
 negative_prompt = false
 
 [models."flux2-klein-base-4b-edit".params]
+width = 720
+height = 1280
 steps = 30
 guidance = 4.0
+[models."flux2-klein-base-4b-edit".tiers.draft]
+width = 576
+height = 1024
+steps = 24
+[models."flux2-klein-base-4b-edit".tiers.final]
+width = 864
+height = 1536
+steps = 50
 
 # LTX-2.5 through the Phosphene panel (Pinokio app). One model, three kinds: picture+sound, picture only
 # (sound stripped) and audio-driven lip-sync. Values are the operator's measured best recipe (see the notes in
 # Obsidian "本机模型能力矩阵"); the panel silently clamps oversized resolutions, so jobs verify the rendered size.
-#   draft   = balanced 1024x576, 5 s: 108 s measured
-#   preview = high 1280x704 12+4 steps, no upscale: not measured on its own
-#   final   = high 1536x832 16+5 steps + fit_1080p/pipersr: ~590 s measured
+#   Sizes are portrait (width x height) for a vertical drama; the measurements below were taken in landscape with the
+#   same pixel counts.
+#   draft   = balanced 576x1024, 5 s: ~110-126 s measured
+#   preview = high 704x1280 12+4 steps, no upscale: not measured on its own
+#   final   = high 832x1536 16+5 steps + fit_1080p/pipersr: ~590 s measured
 # frames must satisfy frames % 8 == 1 (121 = 5 s at 24 fps); above 121 frames only quality=high keeps identity.
 [models."ltx-2.5-av"]
 kind = "video.av"
@@ -109,8 +122,8 @@ commercial_ok = true
 prompt_profile = "ltx_av"
 timeout_sec = 3600
 [models."ltx-2.5-av".params]
-width = 1536
-height = 832
+width = 832
+height = 1536
 frames = 121
 frame_rate = 24
 quality = "high"
@@ -122,13 +135,13 @@ upscale_method = "pipersr"
 enhance = false
 negative_prompt = "extra swords, duplicate weapons, multiple blades, deformed hands, extra fingers, fused fingers, blurry, soft focus, low detail, underexposed, dark, heavy fog, plastic skin, text, watermark, subtitles, logo"
 [models."ltx-2.5-av".tiers.draft]
-width = 1024
-height = 576
+width = 576
+height = 1024
 quality = "balanced"
 upscale = "off"
 [models."ltx-2.5-av".tiers.preview]
-width = 1280
-height = 704
+width = 704
+height = 1280
 stage1_steps = 12
 stage2_steps = 4
 upscale = "off"
@@ -145,8 +158,8 @@ commercial_ok = true
 prompt_profile = "ltx_av"
 timeout_sec = 3600
 [models."ltx-2.5-video".params]
-width = 1536
-height = 832
+width = 832
+height = 1536
 frames = 121
 frame_rate = 24
 quality = "high"
@@ -158,13 +171,13 @@ upscale_method = "pipersr"
 enhance = false
 negative_prompt = "extra swords, duplicate weapons, multiple blades, deformed hands, extra fingers, fused fingers, blurry, soft focus, low detail, underexposed, dark, heavy fog, plastic skin, text, watermark, subtitles, logo"
 [models."ltx-2.5-video".tiers.draft]
-width = 1024
-height = 576
+width = 576
+height = 1024
 quality = "balanced"
 upscale = "off"
 [models."ltx-2.5-video".tiers.preview]
-width = 1280
-height = 704
+width = 704
+height = 1280
 stage1_steps = 12
 stage2_steps = 4
 upscale = "off"
@@ -182,8 +195,8 @@ commercial_ok = true
 prompt_profile = "ltx_av"
 timeout_sec = 3600
 [models."ltx-2.5-lipsync".params]
-width = 1024
-height = 576
+width = 576
+height = 1024
 frames = 121
 frame_rate = 24
 quality = "high"

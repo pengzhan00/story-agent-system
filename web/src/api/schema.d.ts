@@ -2328,6 +2328,12 @@ export interface components {
              */
             content_language: string;
             /**
+             * Delivery Profile
+             * @description the picture frame (vertical / landscape ...), decided now
+             * @default
+             */
+            delivery_profile: string;
+            /**
              * Description
              * @default
              */
@@ -2352,6 +2358,12 @@ export interface components {
              * @default
              */
             content_language: string;
+            /**
+             * Delivery Profile
+             * @description the picture frame (vertical / landscape ...), decided now
+             * @default
+             */
+            delivery_profile: string;
             /**
              * Genre
              * @default

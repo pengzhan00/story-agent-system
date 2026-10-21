@@ -82,6 +82,11 @@ class Ctx:
         given = self.params.get("season")
         return int(given) if given else self.store.season_of(self.pid, episode)
 
+    def frame_vertical(self) -> bool:
+        """Whether the project's picture frame (its delivery profile) is taller than wide."""
+        profile = self.settings.delivery_profile(self.project.delivery_profile)
+        return int(profile["height"]) > int(profile["width"])
+
     def target_sec(self) -> float | None:
         """Wanted episode length: run parameter > project setting > delivery profile (``None`` = no target)."""
         profile = self.settings.delivery_profile(self.project.delivery_profile)
@@ -135,8 +140,9 @@ def _character_brief(chars: list[dict[str, Any]]) -> list[dict[str, str]]:
 def analyze(ctx: Ctx) -> dict[str, Any]:
     acts = int(ctx.params.get("acts") or 4)
     ctx.step(0, 2, "plan")
+    shape = "vertical" if ctx.frame_vertical() else "landscape"
     plan = ctx.run_agent("director.analyze", {
-        "premise": _premise(ctx), "format": ctx.project.aspect_ratio + " vertical short drama", "acts": acts})
+        "premise": _premise(ctx), "format": f"{ctx.project.aspect_ratio} {shape} short drama", "acts": acts})
     plan["act_count"] = acts
     ctx.state.put_data(ctx.pid, "plan", plan)
     ctx.step(1, 2, "style")

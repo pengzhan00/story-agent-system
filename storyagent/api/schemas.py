@@ -68,6 +68,7 @@ class ProjectCreate(BaseModel):
     genre: str = ""
     description: str = ""
     content_language: str = ""
+    delivery_profile: str = Field(default="", description="the picture frame (vertical / landscape ...), decided now")
 
 
 class ProjectPatch(BaseModel):
@@ -562,6 +563,7 @@ class ProjectFromText(BaseModel):
     text: str = ""
     genre: str = ""
     content_language: str = ""
+    delivery_profile: str = Field(default="", description="the picture frame (vertical / landscape ...), decided now")
     start: bool = Field(default=True, description="queue the story stages (no media) right away")
 
 

@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useCreateProject, useProjectBin, useProjectCards } from "../api/hooks";
+import { useCreateProject, useMeta, useProjectBin, useProjectCards } from "../api/hooks";
 import type { ProjectCard } from "../api/types";
 import { PreviewDialog } from "../components/PreviewDialog";
 import { ProgressBar } from "../components/ProgressBar";
@@ -18,11 +18,13 @@ export function ProjectsPage() {
   const nav = useNavigate();
   const [name, setName] = useState("");
   const [premise, setPremise] = useState("");
+  const profiles = useMeta().data?.delivery_profiles ?? [];
+  const [frame, setFrame] = useState("");
 
   function submit(e: FormEvent) {
     e.preventDefault();
     create.mutate(
-      { name: name.trim(), description: premise.trim(), content_language: locale },
+      { name: name.trim(), description: premise.trim(), content_language: locale, delivery_profile: frame },
       { onSuccess: (p) => nav(`/projects/${p.id}`) },
     );
   }
@@ -46,6 +48,18 @@ export function ProjectsPage() {
         <label className="field">
           <span>{t("web.projects.premise")}</span>
           <textarea value={premise} onChange={(e) => setPremise(e.target.value)} rows={3} placeholder={t("web.projects.premise_hint")} />
+        </label>
+        <label className="field">
+          <span>{t("web.projects.frame")}</span>
+          <select value={frame} onChange={(e) => setFrame(e.target.value)}>
+            <option value="">{t("web.projects.frame_default")}</option>
+            {profiles.map((p) => (
+              <option key={p.name} value={p.name}>
+                {`${p.label} · ${p.width}×${p.height}`}
+              </option>
+            ))}
+          </select>
+          <span className="muted small">{t("web.projects.frame_hint")}</span>
         </label>
         <div className="row">
           <button className="primary" type="submit" disabled={!name.trim() || create.isPending}>

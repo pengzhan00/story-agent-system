@@ -171,3 +171,4 @@ def test_api_defaults_and_overrides(tmp_path: Path) -> None:
 def test_api_validation(tmp_path: Path, toml: str) -> None:
     with pytest.raises(ConfigError, match=r"\[api\]"):
         load_settings(home_with(tmp_path, services=toml))
+

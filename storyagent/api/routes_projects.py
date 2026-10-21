@@ -49,7 +49,8 @@ def overview(request: Request, trashed: bool = False) -> list[ProjectCard]:
 @router.post("", response_model=ProjectOut, status_code=201)
 def create_project(body: ProjectCreate, request: Request) -> ProjectOut:
     p = ctx_of(request).projects.create(
-        body.name, genre=body.genre, description=body.description, content_language=body.content_language
+        body.name, genre=body.genre, description=body.description, content_language=body.content_language,
+        delivery_profile=body.delivery_profile,
     )
     return ProjectOut.model_validate(p)
 
@@ -77,7 +78,7 @@ def create_project_from_text(body: ProjectFromText, request: Request) -> Project
         raise ApiError(422, "invalid", "no text: give asset_id or text")
     premise = " ".join(text.split())[:400]
     project = ctx.projects.create(body.name, genre=body.genre, description=premise,
-                                  content_language=body.content_language)
+                                  content_language=body.content_language, delivery_profile=body.delivery_profile)
     run = None
     if body.start:
         run = ctx.workflow.enqueue(project.id, ctx.workflow.pending_stages(project.id, None),

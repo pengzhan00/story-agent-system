@@ -137,7 +137,7 @@ def _cmd_i18n_check(_s: Settings, _a: argparse.Namespace) -> int:
 
 # -- project ----------------------------------------------------------------------------------------
 def _cmd_project_create(s: Settings, a: argparse.Namespace) -> int:
-    p = ProjectStore(_ctx(s).db, s).create(a.name, genre=a.genre or "")
+    p = ProjectStore(_ctx(s).db, s).create(a.name, genre=a.genre or "", delivery_profile=a.profile or "")
     print(t("cli.project.created", id=p.id, slug=p.slug))
     return 0
 
@@ -643,6 +643,7 @@ def build_parser() -> argparse.ArgumentParser:
     pc = add(pr, "create", _cmd_project_create)
     pc.add_argument("name")
     pc.add_argument("--genre")
+    pc.add_argument("--profile", help="delivery profile = the picture frame (vertical / landscape), fixed at the start")
     pl = add(pr, "list", _cmd_project_list)
     pl.add_argument("--trashed", action="store_true", help="list the recycle bin")
     pt = add(pr, "trash", _cmd_project_trash)

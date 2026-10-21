@@ -116,6 +116,14 @@ class Ledger:
         ).fetchall()
         return int(statistics.median(r[0] for r in rows)) if rows else 0
 
+    def frame_of(self, project_id: int | None) -> tuple[int, int] | None:
+        """(width, height) of the project's delivery profile: the one direction every picture of it follows."""
+        row = self.db.conn.execute("SELECT delivery_profile FROM projects WHERE id=?", (project_id,)).fetchone() \
+            if project_id else None
+        profile = self.settings.delivery_profile((row["delivery_profile"] if row else "") or None)
+        w, h = int(profile.get("width", 0)), int(profile.get("height", 0))
+        return (w, h) if w and h else None
+
     # -- enqueue ------------------------------------------------------------------------------
     def enqueue(
         self, job: MediaJob, project_settings: Mapping[str, Any] | None = None
@@ -128,7 +136,7 @@ class Ledger:
             raise ConfigError(f"model {model_ref!r} is {model.kind!r}, cannot run {job.kind.value!r}")
         params = resolve_params(
             self.settings, model_ref, job.tier,
-            project_settings=project_settings, job_params=job.params,
+            project_settings=project_settings, job_params=job.params, frame=self.frame_of(job.project_id),
         )
         key = job.idempotency_key or digest({
             "p": job.project_id, "s": job.shot_id, "spec": [job.spec_id, job.spec_version],

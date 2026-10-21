@@ -24,7 +24,7 @@ export const useProject = (id: number) =>
 export function useCreateProject() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { name: string; description: string; content_language: string }) =>
+    mutationFn: (body: { name: string; description: string; content_language: string; delivery_profile?: string }) =>
       post<Project>("/api/projects", body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["projects"] }),
   });
@@ -216,7 +216,7 @@ export const useProducePlan = (id: number, tier: string, enabled: boolean) =>
 export function useProjectFromText() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { name: string; asset_id: string }) => post<ProjectFromText>("/api/projects/from-text", body),
+    mutationFn: (body: { name: string; asset_id: string; delivery_profile?: string }) => post<ProjectFromText>("/api/projects/from-text", body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["projects"] }),
   });
 }

@@ -2065,6 +2065,12 @@
             "title": "Content Language",
             "type": "string"
           },
+          "delivery_profile": {
+            "default": "",
+            "description": "the picture frame (vertical / landscape ...), decided now",
+            "title": "Delivery Profile",
+            "type": "string"
+          },
           "description": {
             "default": "",
             "title": "Description",
@@ -2105,6 +2111,12 @@
           "content_language": {
             "default": "",
             "title": "Content Language",
+            "type": "string"
+          },
+          "delivery_profile": {
+            "default": "",
+            "description": "the picture frame (vertical / landscape ...), decided now",
+            "title": "Delivery Profile",
             "type": "string"
           },
           "genre": {

@@ -26,6 +26,33 @@ _TYPES: dict[str, tuple[type, ...]] = {
 }
 
 
+def orient_size(params: Mapping[str, Any], frame: tuple[int, int], multiple: int) -> dict[str, Any]:
+    """The same pixel budget (``width * height``) in the shape of the project's frame, rounded to ``multiple``.
+
+    The picture and video models list their sizes once; the frame (the delivery profile's width x height, chosen when
+    the project starts) decides whether that is a vertical, a landscape or a square picture, so every picture of a
+    project has one direction. Parameters without both a width and a height are returned unchanged.
+    """
+    out = dict(params)
+    w, h = params.get("width"), params.get("height")
+    fw, fh = frame
+    if not (isinstance(w, int | float) and isinstance(h, int | float) and w > 0 and h > 0 and fw > 0 and fh > 0):
+        return out
+    area = float(w) * float(h)
+    width = (area * fw / fh) ** 0.5
+
+    def snap(x: float) -> int:
+        return max(multiple, int(round(x / multiple)) * multiple)
+
+    out["width"], out["height"] = snap(width), snap(width * fh / fw)
+    return out
+
+
+def size_multiple(kind: str) -> int:
+    """Pictures are made on a 16 px grid, video on a 32 px grid."""
+    return 32 if kind.startswith("video.") else 16
+
+
 def resolve_params(
     settings: Settings,
     model_ref: str,
@@ -34,18 +61,17 @@ def resolve_params(
     project_settings: Mapping[str, Any] | None = None,
     job_params: Mapping[str, Any] | None = None,
     adapter_defaults: Mapping[str, Any] | None = None,
+    frame: tuple[int, int] | None = None,
 ) -> dict[str, Any]:
     spec = settings.model(model_ref)
     tier_key = QualityTier(tier).value
-    layers = [
-        adapter_defaults or {},
-        spec.params,
-        spec.tiers.get(tier_key, {}),
-        ((project_settings or {}).get("models") or {}).get(model_ref, {}),
-        job_params or {},
-    ]
-    out: dict[str, Any] = {}
-    for layer in layers:
+    base: dict[str, Any] = {}
+    for layer in (adapter_defaults or {}, spec.params, spec.tiers.get(tier_key, {})):
+        base = deep_merge(base, layer)
+    if frame:                                   # the shape comes from the project; explicit sizes below still win
+        base = orient_size(base, frame, size_multiple(spec.kind))
+    out = base
+    for layer in (((project_settings or {}).get("models") or {}).get(model_ref, {}), job_params or {}):
         out = deep_merge(out, layer)
     return out
 
