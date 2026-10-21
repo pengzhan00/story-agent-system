@@ -49,7 +49,7 @@ _FIELDS: dict[str, tuple[str, ...]] = {
     "music_themes": ("name", "kind", "mood", "tempo", "instruments", "key_signature", "description", "gen_prompt",
                      "lyrics", "duration_sec", "scene_ref"),
     "sound_effects": ("name", "category", "description", "tags"),
-    "episodes": ("number", "title", "summary", "status", "season", "number_in_season"),
+    "episodes": ("number", "title", "summary", "status", "season", "number_in_season", "hook", "cliffhanger"),
     "seasons": ("number", "title", "summary", "planned_episodes", "target_sec", "status"),
 }
 _PARENT_ORDER = {"shots": "act_number, scene_number, shot_number, id", "scripts": "episode_no, id",

@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Request
 
-from storyagent.workflow import STAGES
-
 from .context import ctx_of
 from .errors import ApiError
 from .schemas import (
@@ -32,8 +30,7 @@ def overview(request: Request, trashed: bool = False) -> list[ProjectCard]:
     ctx = ctx_of(request)
     cards: list[ProjectCard] = []
     for p in ctx.projects.list(trashed=trashed):
-        done = ctx.db.conn.execute(
-            "SELECT COUNT(*) AS n FROM workflow_stages WHERE project_id=? AND status='completed'", (p.id,)).fetchone()
+        states = [s for s in ctx.workflow.stages(p.id, 1) if s["stage"] != "outline" or s["status"] != "pending"]
         running = ctx.db.conn.execute(
             "SELECT 1 FROM workflow_runs WHERE project_id=? AND status IN ('queued','running')", (p.id,)).fetchone()
         film = ctx.db.conn.execute(
@@ -42,7 +39,8 @@ def overview(request: Request, trashed: bool = False) -> list[ProjectCard]:
             " ORDER BY slot DESC LIMIT 1", (p.id,)).fetchone()
         cards.append(ProjectCard(
             id=p.id, name=p.name, description=p.description, genre=p.genre, status=p.status,
-            stages_done=int(done["n"]), stages_total=len(STAGES), running=running is not None,
+            stages_done=sum(s["status"] == "completed" for s in states), stages_total=len(states),
+            running=running is not None,
             episode_asset_id=film["id"] if film else None, episode_seconds=film["duration_sec"] if film else None,
             episode_number=int(str(film["slot"]).split("_")[1]) if film else None, updated_at=p.updated_at))
     return cards

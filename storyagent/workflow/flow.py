@@ -23,6 +23,8 @@ CHAIN: tuple[dict[str, Any], ...] = (
      "reads": ["premise"], "writes": ["plan", "style"]},
     {"stage": "cast", "how": "llm", "agents": ["character.design"], "optional": [],
      "reads": ["plan", "style"], "writes": ["characters"]},
+    {"stage": "outline", "how": "llm", "agents": ["screenwriter.season"], "optional": [],
+     "reads": ["plan", "characters"], "writes": ["season_outline"]},
     {"stage": "script", "how": "llm", "agents": ["screenwriter.outline", "screenwriter.shots"],
      "optional": ["screenwriter.adapt"], "reads": ["plan", "characters"], "writes": ["outline", "shot_drafts"]},
     {"stage": "scenes", "how": "llm", "agents": ["scene.design"], "optional": [],

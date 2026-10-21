@@ -13,8 +13,8 @@ from typing import Any
 # Rough shares of one episode run (measured live: analyze 49 s, cast 68 s, script 766 s on gemma4:31b, i.e. one unit
 # is about 14 s). ``produce`` and ``compose`` replace their weight at run time from the ledger's duration estimates.
 STAGE_WEIGHTS: dict[str, float] = {
-    "analyze": 4, "cast": 5, "script": 50, "scenes": 8, "music": 8, "shotplan": 1, "specs": 24, "produce": 60,
-    "compose": 4,
+    "analyze": 4, "cast": 5, "outline": 12, "script": 50, "scenes": 8, "music": 8, "shotplan": 1, "specs": 24,
+    "produce": 60, "compose": 4,
 }
 SECONDS_PER_UNIT = 14.0
 

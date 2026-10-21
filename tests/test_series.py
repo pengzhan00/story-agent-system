@@ -27,7 +27,7 @@ def test_migration_007_moves_the_old_stage_rows_to_season_1_episode_1(
     for stage in ("analyze", "cast", "script", "shotplan"):
         db.conn.execute("INSERT INTO workflow_stages(project_id, stage, status) VALUES (1, ?, 'completed')", (stage,))
     monkeypatch.setattr(migrate_mod, "discover", lambda: real)
-    assert migrate(db) == (6, 8)
+    assert migrate(db) == (6, 9)
     found = db.conn.execute("SELECT * FROM workflow_stages")
     rows = {r["stage"]: (r["season"], r["episode"], r["status"]) for r in found}
     assert rows == {"analyze": (0, 0, "completed"), "cast": (0, 0, "completed"),
@@ -184,3 +184,39 @@ def test_a_season_run_covers_the_planned_episodes_and_the_api_validates(fsetting
         client.patch(f"/api/projects/{pid}/seasons/2", json={"planned_episodes": 3})
         ok = client.post(f"/api/projects/{pid}/workflow/runs", json={"params": {"season": 2}})
         assert ok.status_code == 201 and ok.json()["params"]["resume"] is True
+
+
+def test_the_season_outline_plans_every_episode_and_the_script_follows_it(tmp_path: Path) -> None:
+    engine, client, _ = make_engine(tmp_path)
+    pid = new_project(engine)
+    assert "outline" not in engine.stages_to_run(pid, None)                  # a one-episode project skips it
+    engine.run(pid, ["analyze", "cast"])
+    with pytest.raises(Exception, match="planned_episodes"):
+        engine.run(pid, ["outline"])                                        # nothing says how long the season is
+    engine.store.update_season(pid, 1, {"planned_episodes": 4})
+    assert engine.stages_to_run(pid, None)[:1] == ["outline"]               # a planned season is outlined first
+    engine.run(pid, ["outline"])
+    eps = {e["number"]: e for e in engine.store.list_episodes(pid)}
+    assert sorted(eps) == [1, 2, 3, 4] and eps[3]["hook"] == "hook 3" and eps[3]["cliffhanger"] == "cliff 3"
+    assert eps[2]["summary"] == "Things escalate 2." and eps[4]["number_in_season"] == 4
+    season = engine.store.list_seasons(pid)[0]
+    assert season["summary"].startswith("A secret") and season["title"] == "Season" and season["episodes"] == 4
+    assert {s["stage"]: s["status"] for s in engine.state.stages(pid, 2)}["outline"] == "completed"
+    engine.run(pid, ["script"], {"visual_prompts": False, "episode": 2})
+    prompt = next(p for p in client.prompts if "Open on this hook: hook 2" in p)
+    assert "End on this: cliff 2" in prompt and "next episode (Episode 3)" in prompt and "Season arc:" in prompt
+    assert engine.store.get_script(pid, 2) is not None
+    engine.run(pid, ["outline"], {"force": True})                            # a new outline outdates every script
+    assert {s["stage"]: s["status"] for s in engine.state.stages(pid, 2)}["script"] == "stale"
+
+
+def test_a_second_season_numbers_its_episodes_after_the_first(tmp_path: Path) -> None:
+    engine, _client, _ = make_engine(tmp_path)
+    pid = new_project(engine)
+    engine.run(pid, ["analyze", "cast"])
+    engine.store.update_season(pid, 1, {"planned_episodes": 3})
+    engine.store.update_season(pid, 2, {"planned_episodes": 2})
+    engine.run(pid, ["outline"], {"season": 1})
+    engine.run(pid, ["outline"], {"season": 2})
+    got = {e["number"]: (e["season"], e["number_in_season"]) for e in engine.store.list_episodes(pid)}
+    assert got == {1: (1, 1), 2: (1, 2), 3: (1, 3), 4: (2, 1), 5: (2, 2)}

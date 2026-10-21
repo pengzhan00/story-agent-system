@@ -3,6 +3,7 @@ saves after every LLM call, so an interrupted or failed run continues where it s
 
     analyze   premise -> production plan + visual style            (director.analyze, art.style)
     cast      plan -> characters                                    (character.design)
+    outline   season outline: every episode's synopsis, hook and cliffhanger (screenwriter.season; per season)
     script    outline -> per-scene shots with dialogue              (screenwriter.outline|adapt, .shots)
     scenes    script locations -> location designs                  (scene.design)
     music     theme song + scene BGM + sound effects                (composer.*, sound.design)
@@ -11,7 +12,8 @@ saves after every LLM call, so an interrupted or failed run continues where it s
     produce   specs -> pictures, voices, music, video (waits for the media worker; see workflow/media.py)
     compose   media -> the episode file (timeline + ffmpeg)
 
-Params (all optional): ``premise``, ``episode`` (default 1), ``acts``, ``scenes_per_act``, ``shots_per_scene``,
+Params (all optional): ``premise``, ``episode`` (default 1), ``season``, ``episode_count`` (outline: how many episodes),
+``acts``, ``scenes_per_act``, ``shots_per_scene``,
 ``source_text`` (adapt an existing text instead of inventing), ``force`` (redo even if present), ``skip_sfx``,
 ``theme_song`` (default true), ``max_bgm``, ``visual_prompts`` (LLM image/video prompts per shot, default true).
 """
@@ -191,6 +193,76 @@ def _renumber(outline: dict[str, Any]) -> None:
             scene["number"] = s
 
 
+OUTLINE_CHUNK = 15      # episodes planned per request; later chunks see what the earlier ones decided
+
+
+def outline(ctx: Ctx) -> dict[str, Any]:
+    """Plan a whole season: title/synopsis/hook/cliffhanger per episode, so the scripts that follow stay on one arc."""
+    plan = _plan(ctx)
+    season_no = ctx.season_of(int(ctx.params.get("episode") or 1))
+    ctx.store.ensure_season(ctx.pid, season_no)
+    season = next(s for s in ctx.store.list_seasons(ctx.pid) if s["number"] == season_no)
+    count = int(ctx.params.get("episode_count") or season["planned_episodes"] or 0)
+    if count < 1:
+        raise StageError("season_unplanned", "set how many episodes the season has (planned_episodes)")
+    seasons = ctx.store.list_seasons(ctx.pid)
+    first = 1 + sum(max(s["planned_episodes"], s["episodes"]) for s in seasons if s["number"] < season_no)
+    target = ctx.target_sec()
+    length = f"about {int(target)} seconds" if target else "not fixed"
+    scripted = {s["episode_no"] for s in ctx.store.list_scripts(ctx.pid)}
+    brief = _character_brief(ctx.store.list_characters(ctx.pid))
+    made: list[dict[str, Any]] = []
+    arc = season["summary"] if season["summary"] and not ctx.force() else ""
+    season_title = ""
+    for start in range(0, count, OUTLINE_CHUNK):
+        n = min(OUTLINE_CHUNK, count - start)
+        ctx.step(start, count, f"episodes {first + start}-{first + start + n - 1}")
+        so_far = "; ".join(f"{e['number']}. {e['title']}: {e['synopsis']}" for e in made) or "(none)"
+        data = ctx.run_agent("screenwriter.season", {
+            "premise": _premise(ctx), "genre": plan.get("genre", ctx.project.genre), "tone": plan.get("tone", ""),
+            "season": season_no, "episode_count": n, "first_episode": first + start, "characters": brief,
+            "plan": plan.get("summary", ""), "so_far": so_far, "length": length})
+        arc = arc or str(data.get("summary", ""))
+        season_title = season_title or str(data.get("title", ""))
+        for i, ep in enumerate(data["episodes"][:n]):
+            number = first + start + i
+            made.append({"number": number, "title": ep["title"], "synopsis": ep["synopsis"],
+                         "hook": str(ep.get("hook", "")), "cliffhanger": str(ep.get("cliffhanger", ""))})
+    for ep in made:
+        row = ctx.store.ensure_episode(ctx.pid, ep["number"], season=season_no)
+        fields: dict[str, Any] = {"hook": ep["hook"], "cliffhanger": ep["cliffhanger"]}
+        if ep["number"] not in scripted:               # a written script owns its episode's title and summary
+            fields.update(title=ep["title"], summary=ep["synopsis"])
+        ctx.store.update_episode(row["id"], fields)
+    changes: dict[str, Any] = {"summary": arc, "planned_episodes": count}
+    if not season["title"] and season_title:
+        changes["title"] = season_title
+    ctx.store.update_season(ctx.pid, season_no, changes)
+    ctx.step(count, count, "done")
+    return {"season": season_no, "episodes": len(made), "first_episode": first}
+
+
+def _episode_brief(ctx: Ctx, episode: int) -> str:
+    """What the season outline says about this episode and its neighbours (empty when there is no outline)."""
+    eps = {e["number"]: e for e in ctx.store.list_episodes(ctx.pid)}
+    me = eps.get(episode)
+    if not me or not (me["hook"] or me["cliffhanger"]):
+        return ""
+    season = next((s for s in ctx.store.list_seasons(ctx.pid) if s["number"] == me["season"]), None)
+    lines = []
+    if season and season["summary"]:
+        lines.append(f"Season arc: {season['summary']}")
+    lines.append(f"This is episode {me['number_in_season']} of season {me['season']}: {me['title']}. {me['summary']}")
+    if me["hook"]:
+        lines.append(f"Open on this hook: {me['hook']}")
+    if me["cliffhanger"]:
+        lines.append(f"End on this: {me['cliffhanger']}")
+    nxt = eps.get(episode + 1)
+    if nxt and nxt["summary"]:
+        lines.append(f"The next episode ({nxt['title']}) is about: {nxt['summary']}")
+    return "\n".join(lines)
+
+
 def script(ctx: Ctx) -> dict[str, Any]:
     plan = _plan(ctx)
     episode = int(ctx.params.get("episode") or 1)
@@ -216,6 +288,9 @@ def script(ctx: Ctx) -> dict[str, Any]:
                                                            "scenes_per_act": per_act, "characters": brief})
         else:
             premise = _premise(ctx)
+            brief_ep = _episode_brief(ctx, episode)
+            if brief_ep:
+                premise += "\n\n" + brief_ep
             if episode > 1:
                 before = [s["synopsis"] for s in ctx.store.list_scripts(ctx.pid) if s["episode_no"] < episode]
                 premise += f"\n\nThis is episode {episode} of a series. Earlier episodes: {' / '.join(before)}"
@@ -394,8 +469,8 @@ def compose(ctx: Ctx) -> dict[str, Any]:
 
 
 STAGE_FUNCS: dict[str, Callable[[Ctx], dict[str, Any]]] = {
-    "analyze": analyze, "cast": cast, "script": script, "scenes": scenes, "music": music, "shotplan": shotplan,
-    "specs": specs, "produce": produce, "compose": compose,
+    "analyze": analyze, "cast": cast, "outline": outline, "script": script, "scenes": scenes, "music": music,
+    "shotplan": shotplan, "specs": specs, "produce": produce, "compose": compose,
 }
 
 

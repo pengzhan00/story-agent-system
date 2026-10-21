@@ -38,7 +38,7 @@ def test_full_pipeline_builds_the_whole_story(tmp_path: Path) -> None:
     assert p["scene_id"] == "act01_scene01_shot01" and p["output_spec"]["width"] == 720
     assert p["subject"]["characters"][0]["appearance"].startswith("short black hair")
     assert p["camera"]["duration_sec"] >= 2.0 and p["audio"]["tts_required"] is True
-    expected = {**{s: "completed" for s in STORY}, "produce": "pending", "compose": "pending"}
+    expected = {**{s: "completed" for s in STORY}, "outline": "pending", "produce": "pending", "compose": "pending"}
     assert {s["stage"]: s["status"] for s in engine.state.stages(pid)} == expected
     assert engine.projects.get(pid).genre == "mystery"
 

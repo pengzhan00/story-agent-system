@@ -220,3 +220,18 @@ export function useProjectFromText() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["projects"] }),
   });
 }
+
+/** Seasons of a project (season 1 always exists) with how many episodes each holds. */
+export const useSeasons = (id: number) =>
+  useQuery({ queryKey: ["seasons", id], queryFn: () => api<Row[]>(`/api/projects/${id}/seasons`) });
+
+export const useEpisodes = (id: number) =>
+  useQuery({ queryKey: ["episodes", id], queryFn: () => api<Row[]>(`/api/projects/${id}/episodes`), refetchInterval: LIVE_MS });
+
+export function useUpdateSeason(id: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { number: number; body: Record<string, unknown> }) => patch<Row>(`/api/projects/${id}/seasons/${v.number}`, v.body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["seasons", id] }),
+  });
+}

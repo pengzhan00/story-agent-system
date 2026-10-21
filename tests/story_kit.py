@@ -29,8 +29,9 @@ class StoryClient:
     @staticmethod
     def shape(schema: dict[str, Any] | None) -> str:
         keys = set((schema or {}).get("properties", {}))
-        for marker, name in (("project_name", "plan"), ("primary_colors", "style"), ("acts", "outline"),
-                             ("shots", "shots"), ("appearance", "character"), ("sound_effects", "sound"),
+        for marker, name in (("project_name", "plan"), ("primary_colors", "style"), ("episodes", "season"),
+                             ("acts", "outline"), ("shots", "shots"), ("appearance", "character"),
+                             ("sound_effects", "sound"),
                              ("music_prompt", "music"), ("video_prompt", "visual"), ("score", "review"),
                              ("image_prompt", "location")):
             if marker in keys:
@@ -62,6 +63,14 @@ class StoryClient:
                 {"number": s, "location": locs[(a + s) % 2], "time_of_day": "night", "weather": "rain",
                  "characters": NAMES, "mood": "tense", "narration": "", "beat": f"beat {a}.{s}"}
                 for s in range(1, self.scenes_per_act + 1)]} for a in (1, 2)]}
+
+    def _season(self, prompt: str) -> dict[str, Any]:
+        import re
+        n = int(re.search(r"as exactly (\d+) episodes", prompt).group(1))                   # type: ignore[union-attr]
+        first = int(re.search(r"start at (\d+)", prompt).group(1))                          # type: ignore[union-attr]
+        return {"title": "Season", "summary": "A secret unravels across the season.", "episodes": [
+            {"number": first + i, "title": f"Episode {first + i}", "synopsis": f"Things escalate {first + i}.",
+             "hook": f"hook {first + i}", "cliffhanger": f"cliff {first + i}"} for i in range(n)]}
 
     def _shots(self, prompt: str) -> dict[str, Any]:
         who = "Nobody" if self.unknown_speaker else NAMES[0]

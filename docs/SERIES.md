@@ -70,5 +70,5 @@
 - A. ✅ 已做:迁移 007(`seasons`、`episodes.season/number_in_season`、阶段状态带季/集维度),`WorkflowState` 带作用域;`GET /workflow?episode=N`、`GET/PATCH /seasons`、`workflow run --param episode=N [--param season=M]`;网页暂时只看第 1 集。
 - B. ✅ 已做:`music` 阶段按集(配乐 scene_ref 加集号前缀 `ep02_...`,主题曲全剧一首,迁移 008 把老数据归第 1 集),成片优先用本集的配乐;`scenes` 本来就只补缺的地点,`pending_stages` 按集。
 - C. ✅ 已做:`params.episodes`("1-10"、"1,3" 或列表)与 `params.season`(该季已有的集,没有则按 `planned_episodes` 新建);全剧阶段只做一次,每集各自接着做(`params.resume`);进度条按"阶段 × 集"一条,总进度与 ETA 统一计;CLI `workflow run --project N --param episodes=1-10`;网页「制作流程」页有「第几集」和「批量」。
-- D. 全剧圣经 + 季大纲(S1/S2):新增 `outline` 阶段(季级)。
+- D. ✅ 季大纲(S2)已做:新阶段 `outline`(每季一份,`screenwriter.season` 一次最多 15 集,分批时后一批能看到前面的),写每集标题/梗概/开场钩子/结尾悬念,存进 `episodes`(迁移 009 加 `hook`、`cliffhanger`)和 `seasons.summary`;计划集数 > 1 的季,普通"继续"会先做它;`script` 阶段按该集的大纲(含下一集预告)写;重写大纲会让该季各集的剧本及以后变"已过期"。网页「制作流程」页有"季"卡片。全剧圣经(S1,人物锁定/按季追加)还没做。
 - E. 系列看板(S8):按季折叠、每集每阶段状态、镜头数、耗时。

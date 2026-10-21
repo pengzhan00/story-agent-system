@@ -1,0 +1,25 @@
+name = "screenwriter.season"
+role = "writer"
+temperature = 0.75
+max_tokens = 9000
+schema = "season"
+inputs = ["premise", "language", "genre", "tone", "season", "episode_count", "first_episode", "characters", "plan",
+          "so_far", "length"]
+system = """You are the head writer of a serialised vertical short drama. You plan a whole season before anyone writes
+a script: every episode advances the story, opens on a hook that makes the viewer stay, and ends on a reversal or an
+unanswered question that makes them press play on the next one. Write all story content in $language."""
+prompt = """Plan season $season of a $genre short drama as exactly $episode_count episodes
+(episode numbers start at $first_episode and are consecutive).
+
+Idea: $premise
+Tone: $tone
+Production plan: $plan
+Characters (use these names exactly): $characters
+Wanted length of one episode: $length
+Episodes already planned in this season (continue from them, do not repeat): $so_far
+
+Rules:
+- `summary` is the arc of the season in at most 120 words: where it starts, the midpoint turn, where it ends
+- every episode has: number, title, synopsis (at most 60 words: what happens), hook (the first beat that grabs the
+  viewer, one sentence) and cliffhanger (how it ends, one sentence; the last episode may resolve instead)
+- escalate: each episode must change something (a secret out, an alliance broken, a stake raised)"""

@@ -18,7 +18,7 @@ from storyagent.media.ledger import Ledger, NewAsset
 from storyagent.media.probe import find_tool, probe
 from storyagent.media.registry import AdapterRegistry
 from storyagent.media.worker import Worker
-from storyagent.workflow import STAGES, StageError, WorkflowCancelled, WorkflowEngine
+from storyagent.workflow import DEFAULT_STAGES, STAGES, StageError, WorkflowCancelled, WorkflowEngine
 
 from .adapter_kit import FAST, wav_bytes
 from .story_kit import make_engine, new_project
@@ -151,7 +151,7 @@ def test_stage_order_and_what_a_plain_resume_runs() -> None:
 def test_resume_runs_the_story_only(tmp_path: Path) -> None:
     engine, _, _ = make_engine(tmp_path)
     pid = new_project(engine)
-    assert engine.stages_to_run(pid, None) == list(STAGES[:7])
+    assert engine.stages_to_run(pid, None) == list(DEFAULT_STAGES)
     engine.run(pid, None, {"visual_prompts": False})
     assert engine.stages_to_run(pid, None) == []
     assert engine.stages_to_run(pid, ["compose", "produce"]) == ["produce", "compose"]

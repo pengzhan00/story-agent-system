@@ -8,16 +8,19 @@ from typing import Any
 from storyagent.db import Database
 from storyagent.util import iso_at, loads, new_id, now_iso
 
-STAGES = ("analyze", "cast", "script", "scenes", "music", "shotplan", "specs", "produce", "compose")
+STAGES = ("analyze", "cast", "outline", "script", "scenes", "music", "shotplan", "specs", "produce", "compose")
 # What a plain "resume" runs: the story and its editable specs. Producing media and assembling the episode spend
 # GPU hours, so they only run when asked for.
-DEFAULT_STAGES = STAGES[:7]
+DEFAULT_STAGES = tuple(s for s in STAGES if s not in ("outline", "produce", "compose"))
 # Stages that belong to the whole series (kept once); every other stage is kept per episode.
 SERIES_STAGES = ("analyze", "cast")
+# Kept once per season: the outline of its episodes (only part of a plain resume when the season plans several).
+SEASON_STAGES = ("outline",)
 # What becomes stale when a stage is (re)run.
 DOWNSTREAM: dict[str, tuple[str, ...]] = {
-    "analyze": ("cast", "script", "scenes", "music", "shotplan", "specs", "produce", "compose"),
-    "cast": ("script", "scenes", "shotplan", "specs", "produce", "compose"),
+    "analyze": ("cast", "outline", "script", "scenes", "music", "shotplan", "specs", "produce", "compose"),
+    "cast": ("outline", "script", "scenes", "shotplan", "specs", "produce", "compose"),
+    "outline": ("script", "scenes", "music", "shotplan", "specs", "produce", "compose"),
     "script": ("scenes", "music", "shotplan", "specs", "produce", "compose"),
     "scenes": ("shotplan", "specs", "produce", "compose"),
     "music": ("specs", "produce", "compose"),
@@ -68,7 +71,8 @@ class WorkflowState:
             return 0, 0
         row = self.db.conn.execute(
             "SELECT season FROM episodes WHERE project_id=? AND number=?", (project_id, episode)).fetchone()
-        return (int(row["season"]) if row else 1), episode
+        season = int(row["season"]) if row else 1
+        return (season, 0) if stage in SEASON_STAGES else (season, episode)
 
     def stages(self, project_id: int, episode: int = 1) -> list[dict[str, Any]]:
         """Every stage with its state as seen from ``episode`` (series stages are shared by all episodes)."""
@@ -111,7 +115,8 @@ class WorkflowState:
                      error_code, error_message, *key))
             if status == "completed":
                 # a series stage outdates the later stages of every episode, an episode stage only its own
-                where, extra = ("", ()) if stage in SERIES_STAGES else (" AND episode=?", (ep,))
+                where, extra = (("", ()) if stage in SERIES_STAGES else
+                                (" AND season=?", (season,)) if stage in SEASON_STAGES else (" AND episode=?", (ep,)))
                 for later in DOWNSTREAM[stage]:
                     conn.execute(
                         "UPDATE workflow_stages SET status='stale'"
@@ -142,14 +147,16 @@ class WorkflowState:
     def plan(
         self, project_id: int, requested: list[str] | None, params: dict[str, Any] | None = None,
     ) -> list[tuple[int, str]]:
-        """What a run does, in order: (episode, stage) pairs. Series stages (analyze, cast) appear once, with episode 0.
+        """What a run does, in order: (episode, stage) pairs. Series and season stages (analyze, cast, outline) appear
+        once, with episode 0.
         Without ``requested`` (or with ``params.resume``) each episode resumes where it stopped."""
         params = params or {}
         resume = requested is None or bool(params.get("resume"))
         out: list[tuple[int, str]] = []
         for ep in self.episodes_for(project_id, params):
             for stage in self.pending_stages(project_id, None if resume else requested, ep):
-                if stage in SERIES_STAGES:
+                if stage in SERIES_STAGES or stage in SEASON_STAGES:
+                    # kept once per series / season: once per run (a run's outline is the first episode's season)
                     if (0, stage) not in out:
                         out.append((0, stage))
                 else:
@@ -162,7 +169,11 @@ class WorkflowState:
         if requested:
             return [s for s in STAGES if s in requested]
         done = {s["stage"] for s in self.stages(project_id, episode) if s["status"] == "completed"}
-        return [s for s in DEFAULT_STAGES if s not in done]
+        season = self.scope(project_id, "script", episode)[0]
+        planned = self.db.conn.execute(
+            "SELECT planned_episodes FROM seasons WHERE project_id=? AND number=?", (project_id, season)).fetchone()
+        outlined = planned is not None and int(planned["planned_episodes"]) > 1      # a planned season: outline first
+        return [s for s in STAGES if (s in DEFAULT_STAGES or (s == "outline" and outlined)) and s not in done]
 
     # -- data ---------------------------------------------------------------------------------
     def get_data(self, project_id: int, key: str, default: Any = None) -> Any:

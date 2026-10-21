@@ -3,7 +3,7 @@
 One sentence in, an editable production out: characters, locations, script, shots, music/theme/sfx and — for every one of them — a **generation spec** (prompt, parameters, seed, references) that a person can edit and regenerate. The workflow writes the story and drafts the specs; the media layer (`docs/MEDIA_CONTRACT.md`) turns specs into pictures, voices, music and video.
 
 ```
-analyze → cast → script → scenes → music → shotplan → specs → produce → compose
+analyze → cast → (outline) → script → scenes → music → shotplan → specs → produce → compose
 └────────────── story (default run) ───────────────────┘  └─ media ─┘ └ episode ┘
 ```
 
@@ -13,6 +13,7 @@ A plain resume runs the seven story stages only; `produce` and `compose` are sta
 |---|---|---|
 | `analyze` | premise → production plan (genre, tone, acts, cast and place lists) and visual style | `director.analyze`, `art.style` |
 | `cast` | one design per character (look, voice profile, image prompt, voice sample text) | `character.design` |
+| `outline` | season: one request plans every episode (title, synopsis, opening hook, cliffhanger); optional, part of a plain resume only when the season plans more than one episode; the script stage then follows the episode's entry | `screenwriter.season` |
 | `script` | outline of acts and scenes, then a shot breakdown per scene; or `source_text` adapted into the same structure | `screenwriter.outline` / `screenwriter.adapt`, `screenwriter.shots` |
 | `scenes` | one design per location | `scene.design` |
 | `music` | background cues, a theme song with lyrics, sound-effect list | `composer.bgm`, `composer.theme`, `sound.design` |

@@ -52,7 +52,7 @@ def started(client: TestClient, pid: int, **body: Any) -> dict[str, Any]:
 def test_queue_a_run_and_read_its_progress(client: TestClient, fsettings: Settings) -> None:
     pid = new_project(client)
     wf = client.get(f"/api/projects/{pid}/workflow").json()
-    assert [s["status"] for s in wf["stages"]] == ["pending"] * 9 and wf["active_run"] is None
+    assert [s["status"] for s in wf["stages"]] == ["pending"] * 10 and wf["active_run"] is None
     run = started(client, pid)
     # a plain run is the story, not the media
     assert run["status"] == "queued" and run["stages"][0] == "analyze" and len(run["stages"]) == 7
@@ -65,7 +65,8 @@ def test_queue_a_run_and_read_its_progress(client: TestClient, fsettings: Settin
     assert [s["status"] for s in done["progress"]["stages"]] == ["completed"] * 7
     assert done["progress"]["stage_count"] == 7 and done["progress"]["elapsed_sec"] >= 0
     wf = client.get(f"/api/projects/{pid}/workflow").json()
-    done_then_pending = ["completed"] * 7 + ["pending"] * 2
+    # cast, analyze done, the optional season outline pending, the rest of the story done, media and film pending
+    done_then_pending = ["completed"] * 2 + ["pending"] + ["completed"] * 5 + ["pending"] * 2
     assert [s["status"] for s in wf["stages"]] == done_then_pending and wf["active_run"] is None
     nothing = client.post(f"/api/projects/{pid}/workflow/runs", json={})
     assert nothing.status_code == 409 and nothing.json()["error"]["code"] == "nothing_to_do"

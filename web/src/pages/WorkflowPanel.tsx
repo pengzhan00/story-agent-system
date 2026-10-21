@@ -4,6 +4,7 @@ import { useCancelRun, useMeta, useProject, useProjectSettings, useReviewScript,
 import { ErrorNote } from "../components/ErrorNote";
 import { ProgressBar } from "../components/ProgressBar";
 import { ProducePlan } from "../components/ProducePlan";
+import { SeasonCard } from "../components/SeasonCard";
 import { EpisodePlayer } from "../components/EpisodePlayer";
 import { RunError, RunProgress } from "../components/RunProgress";
 import { StatusChip } from "../components/StatusChip";
@@ -105,9 +106,10 @@ export function WorkflowPanel({ id }: { id: number }) {
 
   const active = wf.data?.active_run ?? null;
   const last = wf.data?.recent_runs.find((r) => r.status !== "queued" && r.status !== "running") ?? null;
-  const STORY = 7;
-  const storyStages = wf.data?.stages.slice(0, STORY) ?? [];
-  const storyDone = storyStages.length === STORY && storyStages.every((s) => s.status === "completed");
+  const MEDIA_STAGES = ["produce", "compose"];
+  // the season outline is optional: it only counts once it has been run
+  const storyStages = (wf.data?.stages ?? []).filter((s) => !MEDIA_STAGES.includes(s.stage) && (s.stage !== "outline" || s.status !== "pending"));
+  const storyDone = storyStages.length > 0 && storyStages.every((s) => s.status === "completed");
   const allDone = storyDone;
   const stage = (name: string) => wf.data?.stages.find((s) => s.stage === name);
   const compose = stage("compose");
@@ -166,6 +168,8 @@ export function WorkflowPanel({ id }: { id: number }) {
       </section>
 
       <Spec id={id} />
+
+      <SeasonCard id={id} busy={active !== null} />
 
       {active ? <RunProgress run={active} /> : null}
 

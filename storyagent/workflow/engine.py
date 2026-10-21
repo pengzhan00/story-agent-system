@@ -19,7 +19,7 @@ from storyagent.story import StoryStore
 
 from .progress import RunProgress, stage_key
 from .stages import STAGE_FUNCS, Ctx, Progress, StageError, WorkflowCancelled
-from .state import SERIES_STAGES, WorkflowState, WorkflowStateError
+from .state import SEASON_STAGES, SERIES_STAGES, WorkflowState, WorkflowStateError
 
 log = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ class _EpisodeProgress:
         self.inner, self.episode, self.several = inner, episode, several
 
     def key(self, stage: str) -> str:
-        return stage_key(stage, self.episode) if self.several and stage not in SERIES_STAGES else stage
+        return stage_key(stage, self.episode) if self.several and stage not in SERIES_STAGES + SEASON_STAGES else stage
 
     def __call__(self, stage: str, done: int, total: int, msg: str) -> None:
         self.inner(self.key(stage), done, total, msg)
