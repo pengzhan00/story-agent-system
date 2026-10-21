@@ -1,7 +1,7 @@
 # 交接手册:真相源、数据结构、架构、如何接着做
 
 > 给"换一个人(或换一个 AI 会话)接着做"用。读完这一份,加上 `CLAUDE.md`,就能继续。
-> 最后更新:2026-10-21,main 分支 `8497b5d` 之后。数值/行为以代码为准;这里写的是**在哪里找真相**。
+> 最后更新:2026-10-21,main 分支 `f386a2d` 之后。数值/行为以代码为准;这里写的是**在哪里找真相**。
 
 ## 0. 一句话
 
@@ -58,7 +58,7 @@ storyagent/
                engine.py 执行;stages.py/media.py/seed.py/shotplan.py 各阶段;progress.py 进度/ETA;flow.py "流程说明"
   media/       contracts(Adapter 协议)、ledger(作业/资产台账)、specs(规格存储)、worker、broker(并发/内存/互斥)、
                assetrefs(asset:/job:/library: 解析)、library、compliance、healthcheck、registry、params(参数分层)
-    adapters/  acestep mflux phosphene cosyvoice seedvc whisper h3 longcat lora_train llm assemble fake(+_http/_subprocess 公共件)
+    adapters/  acestep mflux phosphene cosyvoice seedvc whisper h3 longcat lora_train llm assemble remote_video fake(+_http/_subprocess 公共件)
     runners/   assemble_episode.py(仅标准库,子进程跑 ffmpeg)
   compose/     timeline.py(纯函数 EDL)、pacing.py(目标时长→结构/镜头时长/QC窗口)、qc.py、export.py(交付包)
   workshop.py  工坊:模块(story script image episode lora song voice video transcript)= 单独可用,或串成流水线
@@ -164,7 +164,7 @@ docs/          API CONFIGURATION MEDIA_CONTRACT RUNBOOK WORKFLOW USER_GUIDE PARI
 
 ## 7. 已做 / 未做(诚实清单)
 
-**已做且有测试**:故事全流程(analyze…compose)、规格/作业/资产台账与 worker、全部适配器(acestep mflux phosphene cosyvoice seedvc whisper h3 longcat lora_train llm assemble)、
+**已做且有测试**:故事全流程(analyze…compose)、规格/作业/资产台账与 worker、全部适配器(acestep mflux phosphene cosyvoice seedvc whisper h3 longcat lora_train llm assemble remote_video)、
 合规/溯源、API+SSE、网页(启动台/项目/工坊/资产库/队列/AI 提示词/系统)、工坊九个模块(故事 剧本 图片 成片 LoRA 歌曲 配音 视频 转写)+流水线、
 启动台、目标时长/交付档位、**生产计划(先列清单、确认后才生成)**、**从文字建项目**。
 链路:剧本/故事 → 人物与场景 → 人物像/场景图 → 镜头关键帧(`image.edit`,以已做好的人物像+场景图为参考,`[workflow] keyframe_from_references`)→ 镜头视频。
@@ -181,7 +181,7 @@ docs/          API CONFIGURATION MEDIA_CONTRACT RUNBOOK WORKFLOW USER_GUIDE PARI
 
 1. (已完成)LongCat 实测 54 分钟/3.1 秒;工坊「故事→剧本」用 gemma4 实测通过(故事 33 秒、剧本 17 秒)。
 2. (已完成)生产环境与数据迁到主检出。
-3. (已完成)**云端视频接口预留**:`media/adapters/remote_video.py` 配置驱动的通用 REST 异步作业适配器,说明与完整配置示例见 `docs/CLOUD.md`;云端模型 `remote=true`,数据离开本机要 `allow_remote`,密钥只读环境变量,任务号即 `external_id`(重启不重复付费),不占本机重任务锁。没接具体厂商(不知道用哪家):给出厂商后只需填一段 TOML,差异大的写个小子类。
+3. (已完成)**云端视频接口预留**:`media/adapters/remote_video.py` 配置驱动的通用 REST 异步作业适配器,说明与完整配置示例见 `docs/CLOUD.md`;云端模型 `remote=true`,数据离开本机要 `allow_remote`(默认关),密钥只读环境变量名(`api_key_env`,不入库不入日志),任务号即 `external_id`(重启不重复付费),不占本机重任务锁、并发上限 `[runtime] max_remote_jobs`(默认 4),结果下载只对厂商域名带密钥,填了 `price_per_second` 则资产元数据带估算费用;7 个测试(`tests/test_remote_video.py` 用本地假服务)覆盖提交/轮询/下载/许可/密钥/接管/并行。没接具体厂商(不知道用哪家):给出厂商后只需填一段 TOML,差异大的写个小子类。
 4. 试播集(30 秒)在真实模型上端到端跑一遍,记各环节耗时画质 → 决定镜头分层策略。
 5. 系列层:迁移 007(阶段状态加 episode 维度)→ 全剧圣经+分集大纲 → 批量跑多集 → 镜头分层/预算 → 剪辑增强 → 系列看板。
 6. 每个阶段:测试、i18n、文档(本文件 §7/§8 同步更新)、最后跑 `software-system-review` 再谈"可交付"。
