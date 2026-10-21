@@ -8,6 +8,7 @@ import { ErrorNote } from "./ErrorNote";
 const PHASES = [1, 2, 3];
 const VIDEO = "shot.video";
 const runnable = (t: PlannedTask) => t.state === "new" || t.state === "stale";
+const optional = (t: PlannedTask) => t.state === "skip";       // a shot the policy leaves as a still: tick it for a clip
 
 /**
  * The production plan: every image, voice, song and video that producing would make, with its model and an estimate.
@@ -61,6 +62,9 @@ export function ProducePlan({ id, onClose }: { id: number; onClose: () => void }
         <button type="button" className="chip chip-button" onClick={() => setWhere((x) => x.subject_type !== VIDEO)}>
           {t("web.plan.pick_no_video")}
         </button>
+        <button type="button" className="chip chip-button" onClick={() => setPicked(new Set(tasks.filter((x) => runnable(x) || optional(x)).map((x) => x.spec_id)))}>
+          {t("web.plan.pick_every_clip")}
+        </button>
         <button type="button" className="chip chip-button" onClick={() => setPicked(new Set())}>
           {t("web.plan.pick_none")}
         </button>
@@ -77,7 +81,7 @@ export function ProducePlan({ id, onClose }: { id: number; onClose: () => void }
                   <input
                     type="checkbox"
                     aria-label={x.label}
-                    disabled={!runnable(x)}
+                    disabled={!runnable(x) && !optional(x)}
                     checked={picked.has(x.spec_id)}
                     onChange={(e) => toggle(x.spec_id, e.target.checked)}
                   />
@@ -88,7 +92,7 @@ export function ProducePlan({ id, onClose }: { id: number; onClose: () => void }
                   <span className={x.state === "blocked" ? "chip chip-failed" : x.state === "done" ? "chip chip-completed" : "chip"}>
                     {x.state === "blocked" ? t(`web.plan.reason.${x.reason}`) : t(`web.plan.state.${x.state}`)}
                   </span>
-                  {runnable(x) ? <span className="muted">{`~${duration(x.est_seconds)}`}</span> : null}
+                  {runnable(x) || optional(x) ? <span className="muted">{`~${duration(x.est_seconds)}`}</span> : null}
                 </li>
               ))}
             </ul>
@@ -102,6 +106,12 @@ export function ProducePlan({ id, onClose }: { id: number; onClose: () => void }
           {t("web.plan.confirm")}
         </button>
       </div>
+      {plan.data && plan.data.video.shots > 0 ? (
+        <p className="small">
+          {t("web.plan.clips", { chosen: plan.data.video.chosen, shots: plan.data.video.shots, eta: duration(plan.data.video.est_seconds) })}
+          {plan.data.video.budget_seconds !== null ? ` · ${t("web.plan.budget", { time: duration(plan.data.video.budget_seconds) })}` : ""}
+        </p>
+      ) : null}
       <p className="muted small">{t("web.plan.video_hint")}</p>
     </section>
   );

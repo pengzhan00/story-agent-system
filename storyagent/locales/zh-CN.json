@@ -1109,5 +1109,17 @@
   "web.series.not_started": "未开始",
   "web.series.film": "成片 {time}",
   "web.series.media": "{shots} 镜头 · {keyframes} 关键帧 · {videos} 视频",
-  "web.series.outdated": "{n} 项已过期"
+  "web.series.outdated": "{n} 项已过期",
+  "web.field.treatment": "呈现方式",
+  "web.treatment.auto": "自动",
+  "web.treatment.video": "视频片段",
+  "web.treatment.still": "静图+缓慢推拉",
+  "web.plan.state.skip": "静图",
+  "web.plan.pick_every_clip": "全部(含所有视频)",
+  "web.plan.clips": "视频:{chosen} / {shots} 个镜头会做视频(还需约 {eta});其余用关键帧加缓慢推拉。",
+  "web.plan.budget": "预算 {time}",
+  "web.workflow.video_share": "做视频的镜头比例(%)",
+  "web.workflow.video_budget": "视频预算(机器小时,0 = 不限)",
+  "web.workflow.default": "默认",
+  "web.workflow.video_hint": "一段视频要几分钟到几小时,关键帧只要几秒。开场钩子、结尾悬念和每幕开头优先做视频;每个镜头都能在「故事」页单独设为视频或静图。"
 }

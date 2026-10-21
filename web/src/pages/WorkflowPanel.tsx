@@ -24,6 +24,10 @@ function Spec({ id }: { id: number }) {
   const [draft, setDraft] = useState<string | null>(null);
   const voices = (useLibraryItems().data ?? []).filter((i) => i.role === "voice");
   const voice = project.data?.settings?.["default_voice"];
+  const share = project.data?.settings?.["video_share"];
+  const budget = project.data?.settings?.["video_budget_hours"];
+  const [shareDraft, setShareDraft] = useState<string | null>(null);
+  const [budgetDraft, setBudgetDraft] = useState<string | null>(null);
   const profiles = meta.data?.delivery_profiles ?? [];
   const current = profiles.find((p) => p.name === project.data?.delivery_profile);
   const shown = draft ?? (typeof saved === "number" ? String(saved) : "");
@@ -69,6 +73,36 @@ function Spec({ id }: { id: number }) {
           </select>
         </label>
       </div>
+      <div className="form-grid">
+        <label className="field">
+          <span>{t("web.workflow.video_share")}</span>
+          <input
+            type="number"
+            min={0}
+            max={100}
+            value={shareDraft ?? (typeof share === "number" ? String(Math.round(share * 100)) : "")}
+            placeholder={t("web.workflow.default")}
+            onChange={(e) => setShareDraft(e.target.value)}
+            onBlur={() => {
+              if (shareDraft !== null) settings.mutate({ video_share: shareDraft.trim() === "" ? null : Number(shareDraft) / 100 }, { onSuccess: () => setShareDraft(null) });
+            }}
+          />
+        </label>
+        <label className="field">
+          <span>{t("web.workflow.video_budget")}</span>
+          <input
+            type="number"
+            min={0}
+            value={budgetDraft ?? (typeof budget === "number" ? String(budget) : "")}
+            placeholder={t("web.workflow.default")}
+            onChange={(e) => setBudgetDraft(e.target.value)}
+            onBlur={() => {
+              if (budgetDraft !== null) settings.mutate({ video_budget_hours: budgetDraft.trim() === "" ? null : Number(budgetDraft) }, { onSuccess: () => setBudgetDraft(null) });
+            }}
+          />
+        </label>
+      </div>
+      <p className="muted small">{t("web.workflow.video_hint")}</p>
       <p className="muted small">{t("web.workflow.voice_hint")}</p>
       <p className="muted small">{t("web.workflow.target_hint")}</p>
       <div className="row">

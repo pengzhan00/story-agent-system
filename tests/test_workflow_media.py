@@ -58,7 +58,7 @@ license_tag = "restricted"
 timeout_sec = 30
 """
 MADE = 2 + 2 + 2 + 8 + 8        # portraits, locations, bgm + theme, keyframes, videos
-SERVICES = FAST + '\n[workflow]\npoll_seconds = 0.02\ndefault_voice = ""\n'
+SERVICES = FAST + '\n[workflow]\npoll_seconds = 0.02\ndefault_voice = ""\nvideo_share = 1.0\n'
 
 
 @contextmanager

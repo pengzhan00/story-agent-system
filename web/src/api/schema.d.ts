@@ -2256,7 +2256,7 @@ export interface components {
             spec_id: string;
             /**
              * State
-             * @description new | stale | done | blocked
+             * @description new | stale | done | blocked | skip
              */
             state: string;
             /** Subject Id */
@@ -2288,6 +2288,7 @@ export interface components {
             /** Tier */
             tier: string;
             totals: components["schemas"]["PlanTotals"];
+            video: components["schemas"]["VideoSummary"];
         };
         /**
          * ProjectCard
@@ -2454,6 +2455,16 @@ export interface components {
              * @description wanted episode length in seconds (advert to feature film); null = the profile's
              */
             target_sec?: number | null;
+            /**
+             * Video Budget Hours
+             * @description machine hours for video clips in the series (0 = no limit); null = default
+             */
+            video_budget_hours?: number | null;
+            /**
+             * Video Share
+             * @description share of an episode's shots that get a video clip (0-1); null = default
+             */
+            video_share?: number | null;
         };
         /**
          * QualityTier
@@ -2950,6 +2961,29 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** VideoSummary */
+        VideoSummary: {
+            /**
+             * Budget Seconds
+             * @description series-wide clip budget, null = none
+             */
+            budget_seconds: number | null;
+            /**
+             * Chosen
+             * @description of those, the ones the tiering policy (or the creator) gives a clip
+             */
+            chosen: number;
+            /**
+             * Est Seconds
+             * @description estimated machine time of the clips still to make
+             */
+            est_seconds: number;
+            /**
+             * Shots
+             * @description shots that have a clip task
+             */
+            shots: number;
         };
         /** WorkflowOut */
         WorkflowOut: {

@@ -6,11 +6,12 @@ import { ScriptOutline } from "../components/ScriptOutline";
 import { VoiceUpload } from "../components/VoiceUpload";
 import { useT } from "../i18n";
 
-type FieldType = "text" | "area" | "number";
+type FieldType = "text" | "area" | "number" | "select";
 interface Field {
   key: string;
   type: FieldType;
   rows?: number;
+  options?: string[];
 }
 
 /** Columns shown in the table and fields offered in the editor, per kind of row. */
@@ -19,7 +20,7 @@ const COLUMNS: Record<StoryPart, string[]> = {
   locations: ["name", "description", "lighting"],
   music: ["name", "kind", "mood", "description"],
   sfx: ["name", "category", "description"],
-  shots: ["act_number", "scene_number", "shot_number", "location", "narration"],
+  shots: ["act_number", "scene_number", "shot_number", "location", "narration", "treatment"],
   dialogue: ["character", "line", "emotion"],
   scripts: ["episode_no", "title", "synopsis"],
 };
@@ -43,6 +44,7 @@ const EDITABLE: Partial<Record<StoryPart, Field[]>> = {
   shots: [
     { key: "location", type: "text" }, { key: "narration", type: "area", rows: 2 }, { key: "mood", type: "text" },
     { key: "time_of_day", type: "text" }, { key: "weather", type: "text" }, { key: "camera_notes", type: "area", rows: 2 },
+    { key: "treatment", type: "select", options: ["auto", "video", "still"] },
   ],
 };
 
@@ -176,7 +178,15 @@ function RowEditor({ pid, part, row, onDone }: { pid: number; part: StoryPart; r
         {fields.map((f) => (
           <label key={f.key} className={f.type === "area" ? "field wide" : "field"}>
             <span>{t(`web.field.${f.key}`)}</span>
-            {f.type === "area" ? (
+            {f.type === "select" ? (
+              <select value={draft[f.key] ?? ""} disabled={locked} onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })}>
+                {(f.options ?? []).map((o) => (
+                  <option key={o} value={o}>
+                    {t(`web.${f.key}.${o}`)}
+                  </option>
+                ))}
+              </select>
+            ) : f.type === "area" ? (
               <textarea rows={f.rows ?? 2} value={draft[f.key] ?? ""} disabled={locked} onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })} />
             ) : (
               <input value={draft[f.key] ?? ""} disabled={locked} inputMode={f.type === "number" ? "decimal" : undefined} onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })} />

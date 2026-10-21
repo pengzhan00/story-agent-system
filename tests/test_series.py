@@ -27,7 +27,7 @@ def test_migration_007_moves_the_old_stage_rows_to_season_1_episode_1(
     for stage in ("analyze", "cast", "script", "shotplan"):
         db.conn.execute("INSERT INTO workflow_stages(project_id, stage, status) VALUES (1, ?, 'completed')", (stage,))
     monkeypatch.setattr(migrate_mod, "discover", lambda: real)
-    assert migrate(db) == (6, 9)
+    assert migrate(db) == (6, 10)
     found = db.conn.execute("SELECT * FROM workflow_stages")
     rows = {r["stage"]: (r["season"], r["episode"], r["status"]) for r in found}
     assert rows == {"analyze": (0, 0, "completed"), "cast": (0, 0, "completed"),

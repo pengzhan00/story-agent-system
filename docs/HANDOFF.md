@@ -90,7 +90,7 @@ docs/          API CONFIGURATION MEDIA_CONTRACT RUNBOOK WORKFLOW USER_GUIDE PARI
 - **适配器缺模型/缺工具 → `missing_*` 错误,绝不静默降级**。
 - **合规**默认开(AIGC 标识、授权、受限许可闸),可全局/项目/环境变量关;**溯源始终记录**。
 
-### 3.2 表(001-009)
+### 3.2 表(001-010)
 
 | 表 | 关键列 |
 |---|---|
@@ -100,7 +100,7 @@ docs/          API CONFIGURATION MEDIA_CONTRACT RUNBOOK WORKFLOW USER_GUIDE PARI
 | scenes(场景设计) / music_themes / sound_effects | 各自属于 project;music_themes 有 kind(bgm/theme) lyrics duration_sec scene_ref |
 | seasons | project_id number title summary planned_episodes target_sec status(每个项目都有第 1 季) |
 | episodes | project_id number(全剧连续编号,各处的键) season number_in_season title summary hook cliffhanger status,UNIQUE(project,number) |
-| shots | project_id episode_id act/scene/shot_number dialogue(JSON) narration render_payload(shot.v3 JSON) locked status |
+| shots | project_id episode_id act/scene/shot_number dialogue(JSON) narration render_payload(shot.v3 JSON) locked status **treatment(auto/video/still,迁移 010)** |
 | gen_specs / gen_spec_locks | subject_type subject_id slot version kind model_ref prompt negative_prompt text_payload params seed refs depends_on author |
 | media_jobs | kind provider model_ref tier status inputs params seed idempotency_key heavy est_memory_gib lease_* external_id progress error_* attempt **depends_on pipeline_id pipeline_step** |
 | media_assets | job_id project_id shot_id spec_id/version kind slot path sha256 duration_sec width height fps has_audio metadata provenance version is_current trashed_at |
@@ -179,7 +179,7 @@ docs/          API CONFIGURATION MEDIA_CONTRACT RUNBOOK WORKFLOW USER_GUIDE PARI
 
 ## 8. 下一步(按这个顺序做)
 
-0. (已完成)多集改造步骤 A(`docs/SERIES.md`):迁移 007、季表、按集的阶段状态;`workflow run --param episode=2` 能接着做第 2 集而不动第 1 集。步骤 B 也已做(配乐按集,迁移 008)。步骤 C 也已做(批量跑多集/一季,进度按集)。步骤 D 季大纲也已做(`outline` 阶段,迁移 009)。系列看板(E)也已做(网页「全剧」页)。下一步:全剧圣经(人物锁定、按季追加)、镜头分层/预算、剪辑增强。
+0. (已完成)多集改造步骤 A(`docs/SERIES.md`):迁移 007、季表、按集的阶段状态;`workflow run --param episode=2` 能接着做第 2 集而不动第 1 集。步骤 B 也已做(配乐按集,迁移 008)。步骤 C 也已做(批量跑多集/一季,进度按集)。步骤 D 季大纲也已做(`outline` 阶段,迁移 009)。系列看板(E)也已做(网页「全剧」页)。镜头分层与预算(S4)也已做:`produce` 默认只给被选中的镜头做视频,其余是关键帧+推拉(`[workflow] video_share/video_min_per_episode/video_budget_hours`,项目可覆盖,镜头可单独指定)。下一步:全剧圣经(人物锁定、按季追加)、剪辑增强、试播集实测。
 0. (已完成)「剧本→人物/场景图→关键帧」断链修复 + 生产计划确认队列 + 从文字建项目。项目级默认声音已做(`projects.settings.default_voice`,制作流程页可选)。仍未覆盖:口型头像步骤不在项目流程内、每集只用一首配乐、工坊成片模块要手工拼镜头。
 
 1. (已完成)LongCat 实测 54 分钟/3.1 秒;工坊「故事→剧本」用 gemma4 实测通过(故事 33 秒、剧本 17 秒)。

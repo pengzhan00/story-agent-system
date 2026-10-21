@@ -45,7 +45,7 @@ _FIELDS: dict[str, tuple[str, ...]] = {
     "scripts": ("episode_no", "title", "synopsis", "acts", "total_scenes", "word_count", "status"),
     "shots": ("script_id", "act_number", "scene_number", "shot_number", "location", "shot_type", "mood", "time_of_day",
               "weather", "characters", "narration", "dialogue", "camera_notes", "visual_prompt", "payload_version",
-              "render_payload", "status", "locked", "error"),
+              "render_payload", "status", "locked", "error", "treatment"),
     "music_themes": ("name", "kind", "mood", "tempo", "instruments", "key_signature", "description", "gen_prompt",
                      "lyrics", "duration_sec", "scene_ref"),
     "sound_effects": ("name", "category", "description", "tags"),

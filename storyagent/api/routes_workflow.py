@@ -13,8 +13,9 @@ from storyagent.compose.export import ExportError, build_package
 from storyagent.domain import QualityTier
 from storyagent.llm import LLMError
 from storyagent.workflow import STAGES, WorkflowEngine, WorkflowStateError
-from storyagent.workflow.plan import produce_plan, totals
+from storyagent.workflow.plan import produce_plan, totals, video_summary
 from storyagent.workflow.series import series_board
+from storyagent.workflow.tiering import policy_from
 
 from .context import ctx_of
 from .errors import ApiError
@@ -24,6 +25,7 @@ from .schemas import (
     ProducePlanOut,
     ScriptReviewOut,
     SeriesBoardOut,
+    VideoSummary,
     WorkflowOut,
     WorkflowRunCreate,
     WorkflowRunOut,
@@ -89,8 +91,10 @@ def get_produce_plan(project_id: int, request: Request, tier: str = "draft", for
         raise ApiError(422, "invalid", f"unknown tier {tier!r}") from None
     tasks = produce_plan(ctx.settings, ctx.story, ctx.specs, ctx.ledger, project_id, level, force=force,
                          project_settings=project.settings)
+    budget = policy_from(ctx.settings.workflow, project.settings, 1.0).budget_sec
     return ProducePlanOut(tier=level.value, tasks=[PlannedTaskOut.model_validate(t.__dict__) for t in tasks],
-                          totals=PlanTotals.model_validate(totals(tasks)))
+                          totals=PlanTotals.model_validate(totals(tasks)),
+                          video=VideoSummary.model_validate(video_summary(tasks, budget)))
 
 
 @router.get("/projects/{project_id}/workflow/runs", response_model=list[WorkflowRunOut])

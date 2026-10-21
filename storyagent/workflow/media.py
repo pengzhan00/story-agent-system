@@ -30,8 +30,10 @@ from storyagent.media.compliance import visible_marks
 from storyagent.media.contracts import AssetRecord, JobRecord, MediaJob
 from storyagent.media.ledger import Ledger
 from storyagent.media.specs import SpecRecord, SpecStore
+from storyagent.story import StoryStore
 
 from .stages import Ctx, StageError, WorkflowCancelled
+from .tiering import policy_from, video_shots
 
 PHASES: tuple[tuple[str, ...], ...] = (
     ("character.portrait", "scene.keyframe", "music.bgm", "music.theme_song", "sfx.cue", "dialogue.line"),
@@ -100,6 +102,7 @@ def _plan_phase(
     store: SpecStore = ctx.spec_store
     out: list[tuple[SpecRecord, MediaJob]] = []
     default_voice = default_voice_of(ctx.settings, ctx.project.settings)
+    picks = video_picks(ctx.settings, ctx.store, ledger, ctx.pid, ctx.project.settings, tier)
     skip = {str(x) for x in ctx.params.get("skip", [])}      # e.g. ["shot.video"]: stills only
     only = {str(x) for x in ctx.params.get("only", [])}      # the confirmed plan: just these specs
     for spec in specs:
@@ -107,6 +110,9 @@ def _plan_phase(
             continue
         if up_to_date(ledger, spec) and not ctx.force():
             counts["reused"] += 1
+            continue
+        if spec.subject_type == "shot.video" and spec.subject_id not in picks and spec.id not in only:
+            skipped.append({"subject": spec.subject_type, "id": spec.subject_id, "reason": "still"})
             continue
         try:
             ctx.settings.model(spec.model_ref) if spec.model_ref else ctx.settings.default_model(spec.kind.value)
@@ -165,14 +171,38 @@ def keyframe_from_references(ctx: Ctx, ledger: Ledger, spec: SpecRecord, job: Me
 FALLBACK_SECONDS = {"image": 45.0, "video": 240.0, "audio.tts": 12.0, "audio.music": 90.0, "audio.sfx": 20.0}
 
 
+def clip_seconds(settings: Settings, ledger: Ledger, tier: QualityTier) -> float:
+    """What one video clip is expected to cost on this machine (measured when there is history)."""
+    try:
+        ref = settings.default_model("video.generate").ref
+    except ConfigError:
+        return FALLBACK_SECONDS["video"]
+    return float(ledger.estimate_seconds(ref, tier.value) or FALLBACK_SECONDS["video"])
+
+
+def video_picks(
+    settings: Settings, store: StoryStore, ledger: Ledger, project_id: int, project_settings: dict[str, Any] | None,
+    tier: QualityTier,
+) -> set[str]:
+    """Shot ids (as spec subject ids) that get a video clip under the tiering policy and the creator's overrides."""
+    episodes: dict[int, list[dict[str, Any]]] = {}
+    for shot in store.list_shots(project_id):
+        episodes.setdefault(shot["episode_id"], []).append(shot)
+    policy = policy_from(settings.workflow, project_settings, clip_seconds(settings, ledger, tier))
+    return {str(i) for i in video_shots(episodes, policy)}
+
+
 def _expected_seconds(ctx: Ctx, ledger: Ledger, specs: list[SpecRecord], tier: QualityTier) -> float:
     total = 0.0
     skip = {str(x) for x in ctx.params.get("skip", [])}
     only = {str(x) for x in ctx.params.get("only", [])}
+    picks = video_picks(ctx.settings, ctx.store, ledger, ctx.pid, ctx.project.settings, tier)
     for spec in specs:
         if spec.subject_type in skip or not any(spec.subject_type in p for p in PHASES):
             continue
         if only and spec.id not in only:
+            continue
+        if spec.subject_type == "shot.video" and spec.subject_id not in picks and spec.id not in only:
             continue
         if up_to_date(ledger, spec) and not ctx.force():
             continue

@@ -90,6 +90,10 @@ class ProjectSettingsPatch(BaseModel):
         default=None, description="allow models that run in the cloud (prompts and reference files leave this machine)")
     target_sec: float | None = Field(
         default=None, description="wanted episode length in seconds (advert to feature film); null = the profile's")
+    video_share: float | None = Field(
+        default=None, ge=0, le=1, description="share of an episode's shots that get a video clip (0-1); null = default")
+    video_budget_hours: float | None = Field(
+        default=None, ge=0, description="machine hours for video clips in the series (0 = no limit); null = default")
     default_voice: str | None = Field(
         default=None, description="voice (library:voice/<name>) for characters with none; null = the global one")
 
@@ -481,7 +485,7 @@ class PlannedTaskOut(Strict):
     kind: str
     model_ref: str
     phase: int
-    state: str = Field(description="new | stale | done | blocked")
+    state: str = Field(description="new | stale | done | blocked | skip")
     reason: str = Field(description="why a blocked task cannot be made (no_model | no_voice)")
     est_seconds: int
     needs: list[str]
@@ -493,10 +497,18 @@ class PlanTotals(Strict):
     by_state: dict[str, int]
 
 
+class VideoSummary(Strict):
+    shots: int = Field(description="shots that have a clip task")
+    chosen: int = Field(description="of those, the ones the tiering policy (or the creator) gives a clip")
+    est_seconds: int = Field(description="estimated machine time of the clips still to make")
+    budget_seconds: int | None = Field(description="series-wide clip budget, null = none")
+
+
 class ProducePlanOut(Strict):
     tier: str
     tasks: list[PlannedTaskOut]
     totals: PlanTotals
+    video: VideoSummary
 
 
 class SeriesEpisodeOut(Strict):

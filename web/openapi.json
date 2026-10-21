@@ -1889,7 +1889,7 @@
             "type": "string"
           },
           "state": {
-            "description": "new | stale | done | blocked",
+            "description": "new | stale | done | blocked | skip",
             "title": "State",
             "type": "string"
           },
@@ -1954,12 +1954,16 @@
           },
           "totals": {
             "$ref": "#/components/schemas/PlanTotals"
+          },
+          "video": {
+            "$ref": "#/components/schemas/VideoSummary"
           }
         },
         "required": [
           "tier",
           "tasks",
-          "totals"
+          "totals",
+          "video"
         ],
         "title": "ProducePlanOut",
         "type": "object"
@@ -2375,6 +2379,33 @@
             ],
             "description": "wanted episode length in seconds (advert to feature film); null = the profile's",
             "title": "Target Sec"
+          },
+          "video_budget_hours": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "machine hours for video clips in the series (0 = no limit); null = default",
+            "title": "Video Budget Hours"
+          },
+          "video_share": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "share of an episode's shots that get a video clip (0-1); null = default",
+            "title": "Video Share"
           }
         },
         "title": "ProjectSettingsPatch",
@@ -3484,6 +3515,45 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "VideoSummary": {
+        "properties": {
+          "budget_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "series-wide clip budget, null = none",
+            "title": "Budget Seconds"
+          },
+          "chosen": {
+            "description": "of those, the ones the tiering policy (or the creator) gives a clip",
+            "title": "Chosen",
+            "type": "integer"
+          },
+          "est_seconds": {
+            "description": "estimated machine time of the clips still to make",
+            "title": "Est Seconds",
+            "type": "integer"
+          },
+          "shots": {
+            "description": "shots that have a clip task",
+            "title": "Shots",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "shots",
+          "chosen",
+          "est_seconds",
+          "budget_seconds"
+        ],
+        "title": "VideoSummary",
         "type": "object"
       },
       "WorkflowOut": {

@@ -1109,5 +1109,17 @@
   "web.series.not_started": "Not started",
   "web.series.film": "Film {time}",
   "web.series.media": "{shots} shots · {keyframes} keyframes · {videos} clips",
-  "web.series.outdated": "{n} out of date"
+  "web.series.outdated": "{n} out of date",
+  "web.field.treatment": "Shown as",
+  "web.treatment.auto": "Automatic",
+  "web.treatment.video": "Video clip",
+  "web.treatment.still": "Still + slow move",
+  "web.plan.state.skip": "still",
+  "web.plan.pick_every_clip": "Everything incl. every clip",
+  "web.plan.clips": "Clips: {chosen} of {shots} shots get one (~{eta} still to make); the rest are a keyframe with a slow move.",
+  "web.plan.budget": "budget {time}",
+  "web.workflow.video_share": "Shots with a video clip (%)",
+  "web.workflow.video_budget": "Clip budget (machine hours, 0 = none)",
+  "web.workflow.default": "default",
+  "web.workflow.video_hint": "A clip takes minutes to hours, a keyframe seconds. The hook, the cliffhanger and act openers get clips first; every shot can be set to video or still in the Story tab."
 }

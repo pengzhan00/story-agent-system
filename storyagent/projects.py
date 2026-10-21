@@ -12,7 +12,8 @@ from storyagent.db import Database
 from storyagent.domain import slugify
 
 _PATCHABLE = ("name", "description", "genre", "content_language", "delivery_profile", "aspect_ratio")
-_SETTINGS_KEYS = ("compliance", "models", "allow_restricted_licenses", "target_sec", "allow_remote", "default_voice")
+_SETTINGS_KEYS = ("compliance", "models", "allow_restricted_licenses", "target_sec", "allow_remote", "default_voice",
+                  "video_share", "video_budget_hours")
 
 
 class ProjectNotFound(LookupError):
@@ -129,6 +130,11 @@ class ProjectStore:
                 parse_target(current.get("target_sec"))
             except PacingError as exc:
                 raise ConfigError(str(exc)) from exc
+            for key in ("video_share", "video_budget_hours"):
+                if key in current and not (isinstance(current[key], int | float) and current[key] >= 0):
+                    raise ConfigError(f"{key} must be a number >= 0")
+            if current.get("video_share", 0) > 1:
+                raise ConfigError("video_share is a fraction between 0 and 1")
             voice = current.get("default_voice")
             if voice is not None and not (isinstance(voice, str) and voice.startswith(("library:voice/", "asset:"))):
                 raise ConfigError("default_voice must be a library:voice/<name> or asset:<id> reference")
