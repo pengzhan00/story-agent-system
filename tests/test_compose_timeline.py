@@ -70,6 +70,13 @@ def test_music_bed_spans_the_episode_and_sfx_land_in_their_shot() -> None:
     assert "no_bgm" not in {w["code"] for w in t["warnings"]}
 
 
+def test_an_effect_longer_than_its_shot_is_cut_at_the_shot_end() -> None:
+    long_sfx = AssetRef("s", "audio.sfx", 5.0)
+    t = tl(ShotInput(1, "a", 2.0, video=clip("v", 2.0), sfx=[(long_sfx, 0.0)]), ShotInput(2, "b", 3.0,
+                                                                                         video=clip("w", 3.0)))
+    assert t["sfx"] == [{"asset": "asset:s", "start": 0.0, "duration": 2.0}]
+
+
 def test_cards_come_before_and_after_the_story_and_shift_everything_else() -> None:
     from storyagent.compose.timeline import Card
 

@@ -151,8 +151,10 @@ def build_timeline(inp: TimelineInput) -> Timeline:
         if shot.narration.strip() and not lines_out:
             subtitles.append({"start": round(cursor + lead, 3), "end": round(cursor + min(duration, lead + 3.5), 3),
                               "text": shot.narration})
-        for asset, offset in shot.sfx:
-            sfx.append({"asset": asset.ref, "start": round(cursor + offset, 3), "duration": asset.duration_sec})
+        for asset, offset in shot.sfx:            # an effect ends with its shot (the mixer trims it to ``duration``)
+            room = max(duration - offset, 0.0)
+            length = min(asset.duration_sec, room) if asset.duration_sec else room
+            sfx.append({"asset": asset.ref, "start": round(cursor + offset, 3), "duration": round(length, 3)})
         cursor += duration
 
     fade = float(inp.scene_fade_sec)

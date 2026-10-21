@@ -50,6 +50,7 @@ class SubjectType(StrEnum):
     MUSIC_BGM = "music.bgm"
     MUSIC_THEME_SONG = "music.theme_song"
     SFX_CUE = "sfx.cue"
+    SHOT_SFX = "shot.sfx"
     STYLE_GUIDE = "style.guide"
     LORA_TRAINING = "lora.training"
 

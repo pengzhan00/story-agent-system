@@ -32,7 +32,7 @@ class StoryClient:
         keys = set((schema or {}).get("properties", {}))
         for marker, name in (("project_name", "plan"), ("primary_colors", "style"), ("episodes", "season"),
                              ("acts", "outline"), ("shots", "shots"), ("appearance", "character"),
-                             ("sound_effects", "sound"),
+                             ("sound_effects", "sound"), ("effects", "sound_cue"),
                              ("music_prompt", "music"), ("video_prompt", "visual"), ("score", "review"),
                              ("image_prompt", "location")):
             if marker in keys:
@@ -104,6 +104,10 @@ class StoryClient:
     def _sound(self, prompt: str) -> dict[str, Any]:
         return {"sound_effects": [{"name": "rain", "category": "ambience", "description": "steady rain",
                                    "tags": "rain, ambience", "timing": "all"}]}
+
+    def _sound_cue(self, prompt: str) -> dict[str, Any]:
+        return {"effects": [{"cue": "door", "prompt": "a heavy wooden door knocked, crisp, dry foley",
+                             "duration_sec": 2.5}]}
 
     def _visual(self, prompt: str) -> dict[str, Any]:
         return {"image_prompt": "a woman in a grey coat walks into a neon office",

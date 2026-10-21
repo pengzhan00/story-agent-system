@@ -62,7 +62,7 @@ def test_specs_are_seeded_with_dependencies(tmp_path: Path) -> None:
         s.subject_type == "music.theme_song" for s in sp.list_current(pid))
     types = {s.subject_type for s in sp.list_current(pid)}
     assert {"character.portrait", "character.voice", "scene.keyframe", "shot.keyframe", "shot.video",
-            "dialogue.line", "music.theme_song", "music.bgm", "sfx.cue"} <= types
+            "dialogue.line", "music.theme_song", "music.bgm", "shot.sfx"} <= types
 
 
 def test_a_second_run_does_nothing_and_asks_the_llm_nothing(tmp_path: Path) -> None:
@@ -414,3 +414,18 @@ def test_a_project_target_is_validated(tmp_path: Path) -> None:
     with pytest.raises(ConfigError):
         engine.projects.set_settings(pid, {"target_sec": -3})
     assert "target_sec" not in engine.projects.set_settings(pid, {"target_sec": None}).settings
+
+
+def test_each_sound_cue_of_a_shot_becomes_an_english_effect_spec(tmp_path: Path) -> None:
+    engine, client, _ = make_engine(tmp_path)
+    pid = new_project(engine)
+    engine.run(pid, None, {})
+    sp = engine.spec_store
+    cued = [s for s in engine.store.list_shots(pid) if s["render_payload"]["audio"]["sfx_cues"]]
+    assert cued
+    for shot in cued:
+        spec = sp.current(pid, "shot.sfx", f"{shot['id']}#0")
+        assert spec is not None and spec.kind.value == "audio.sfx"
+        assert spec.text_payload == "door"                                   # the creator's wording is kept
+        assert spec.prompt == "a heavy wooden door knocked, crisp, dry foley" and spec.params == {"duration": 2.5}
+    assert not any(s.subject_type == "sfx.cue" for s in sp.list_current(pid))   # the old list is no longer made

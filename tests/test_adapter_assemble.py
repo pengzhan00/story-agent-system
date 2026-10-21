@@ -176,3 +176,17 @@ def test_the_subtitle_style_reads_the_config() -> None:
     assert "PrimaryColour=&H0000EEFF" in style and "Bold=1" in style and "BorderStyle=3" in style
     assert "Alignment=8" in style and "MarginV=30" in style
     assert "Bold=0" in subtitle_style({}) and "BorderStyle=1" in subtitle_style({"border_style": 2})
+
+
+def test_a_sound_effect_is_trimmed_to_its_shot_but_speech_is_not() -> None:
+    from storyagent.media.runners.assemble_episode import audio_cmd
+
+    tl = {"total_sec": 6.0, "audio": {"rate": 48000, "voice_gain": 1.0, "sfx_gain": 0.5,
+                                      "loudnorm": {"i": -16.0, "tp": -1.5, "lra": 11.0}, "codec": "aac",
+                                      "bitrate": "128k"},
+          "speech": [{"path": "v.wav", "start": 0.4, "duration": 2.0}],
+          "sfx": [{"path": "s.flac", "start": 1.0, "duration": 2.0}], "music": []}
+    cmd = audio_cmd("ffmpeg", tl, Path("out.m4a"))
+    graph = cmd[cmd.index("-filter_complex") + 1]
+    assert "atrim=0:2.0,afade=t=out:st=1.900:d=0.1,adelay=1000|1000,volume=0.5[x0]" in graph
+    assert "atrim=0:2.0" not in graph.split("[x0]")[0].split("[v0]")[0]            # the voice chain has no cut

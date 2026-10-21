@@ -132,18 +132,22 @@ def audio_cmd(ffmpeg: str, tl: dict[str, Any], dest: Path) -> list[str]:
     chains: list[str] = []
     n = 1
 
-    def delayed(item: dict[str, Any], gain: float, label: str) -> str:
+    def delayed(item: dict[str, Any], gain: float, label: str, trim: bool = False) -> str:
         nonlocal n
         cmd.extend(["-i", item["path"]])
         ms = int(round(float(item["start"]) * 1000))
-        chains.append(f"[{n}:a]aresample={rate},aformat=channel_layouts=stereo,adelay={ms}|{ms},"
+        cut = ""
+        if trim and item.get("duration"):          # end with the shot: cut, with a short fade so it does not click
+            length = float(item["duration"])
+            cut = f"atrim=0:{length},afade=t=out:st={max(length - 0.1, 0):.3f}:d=0.1,"
+        chains.append(f"[{n}:a]aresample={rate},aformat=channel_layouts=stereo,{cut}adelay={ms}|{ms},"
                       f"volume={gain}[{label}]")
         n += 1
         return f"[{label}]"
 
     voice = ["[0:a]"] + [delayed(s, a["voice_gain"], f"v{i}") for i, s in enumerate(tl["speech"])]
     chains.append(f"{''.join(voice)}amix=inputs={len(voice)}:duration=first:normalize=0[voice]")
-    sfx = [delayed(s, a["sfx_gain"], f"x{i}") for i, s in enumerate(tl["sfx"])]
+    sfx = [delayed(s, a["sfx_gain"], f"x{i}", trim=True) for i, s in enumerate(tl["sfx"])]
     mixed = ["[vmix]"]
     chains.append("[voice]asplit=2[vmix][vkey]")
     if tl["music"]:

@@ -297,7 +297,7 @@ def test_the_flow_names_the_default_model_for_specs_that_have_none(client: TestC
     steps = {s["stage"]: s for s in client.get("/api/flow", params={"project_id": pid}).json()["steps"]}
     refs = {m["subject"]: [x["ref"] for x in m["models"]] for m in steps["produce"]["media"]}
     assert refs["shot.video"] and refs["shot.video"][0] and refs["dialogue.line"][0]
-    assert refs["sfx.cue"] == ["stable-audio-3-medium"]  # sound effects come from Stable Audio via ComfyUI
+    assert refs["shot.sfx"] == ["stable-audio-3-medium"]  # sound effects come from Stable Audio via ComfyUI
 
 
 def test_script_review_is_refused_while_a_heavy_job_runs(client: TestClient, fsettings: Settings) -> None:

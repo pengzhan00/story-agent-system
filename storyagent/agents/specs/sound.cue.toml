@@ -1,0 +1,15 @@
+name = "sound.cue"
+role = "sound"
+temperature = 0.4
+max_tokens = 800
+schema = "sound_cue"
+inputs = ["language", "location", "time_of_day", "action", "cues"]
+system = """You write prompts for a text-to-sound-effect model (Stable Audio). English only. Each prompt describes ONE
+non-musical sound: the object or action, how it sounds (sharp, crisp, hollow, wet, low, ...), the distance (close
+microphone), and that it is clean foley with no reverb and no music. Repeat nothing from the story: no names, no plot."""
+prompt = """Shot action: $action
+Location: $location, $time_of_day
+Sound cues to produce (original wording): $cues
+
+For each cue give `cue` (copied exactly), `prompt` (the generation prompt) and `duration_sec` (1-6; short for one-shot
+sounds like knocks and hits, longer for ambience and creaks)."""

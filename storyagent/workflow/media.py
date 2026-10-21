@@ -37,7 +37,8 @@ from .stages import Ctx, StageError, WorkflowCancelled
 from .tiering import policy_from, video_shots
 
 PHASES: tuple[tuple[str, ...], ...] = (
-    ("character.portrait", "scene.keyframe", "music.bgm", "music.theme_song", "sfx.cue", "dialogue.line"),
+    ("character.portrait", "scene.keyframe", "music.bgm", "music.theme_song", "shot.sfx",
+     "dialogue.line"),
     ("shot.keyframe",),
     ("shot.video",),
 )
@@ -368,6 +369,12 @@ def build_episode_timeline(ctx: Ctx, episode: int) -> dict[str, Any]:
             dspec = store.current(ctx.pid, "dialogue.line", f"{sid}#{idx}")
             speech = _asset_ref(current_asset(ledger, dspec) if dspec else None, "audio.tts")
             lines.append((str(line.get("line", "")), speech))
+        effects = []
+        for idx in range(len((shot["render_payload"].get("audio") or {}).get("sfx_cues", []))):
+            espec = store.current(ctx.pid, "shot.sfx", f"{sid}#{idx}")
+            effect = _asset_ref(current_asset(ledger, espec) if espec else None, "audio.sfx")
+            if effect:
+                effects.append((effect, 0.0))                       # an effect starts with its shot
         camera = (shot["render_payload"] or {}).get("camera", {})
         planned = float(camera.get("duration_sec", 3.0))
         inputs.append(ShotInput(
@@ -375,7 +382,7 @@ def build_episode_timeline(ctx: Ctx, episode: int) -> dict[str, Any]:
             planned_sec=planned,
             video=_asset_ref(current_asset(ledger, vspec) if vspec else None, "video.generate"),
             image=_asset_ref(current_asset(ledger, kspec) if kspec else None, "image.generate"),
-            lines=lines, narration=str(shot.get("narration", "")),
+            lines=lines, sfx=effects, narration=str(shot.get("narration", "")),
             scene=f"{shot['act_number']}.{shot['scene_number']}",
         ))
     bgm = None

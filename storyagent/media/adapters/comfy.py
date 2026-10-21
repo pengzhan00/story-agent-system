@@ -117,8 +117,9 @@ class ComfyAdapter(AdapterBase):
         graph = copy.deepcopy(tpl["graph"])
         bindings: dict[str, list[str]] = tpl["bindings"]
         values: dict[str, Any] = {"prompt": str(job.inputs.get("prompt", "")),
-                                  "negative_prompt": str(job.inputs.get("negative_prompt", "")),
                                   "seed": job.seed if job.seed is not None else random.randint(0, 2**32 - 1)}
+        if str(job.inputs.get("negative_prompt", "")).strip():       # else the template's own default stays
+            values["negative_prompt"] = str(job.inputs["negative_prompt"])
         for key, value in job.params.items():
             values[_RENAME.get(key, key)] = value
         for name, value in values.items():

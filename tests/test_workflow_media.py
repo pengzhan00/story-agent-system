@@ -62,7 +62,7 @@ commercial_ok = false
 license_tag = "restricted"
 timeout_sec = 30
 """
-MADE = 2 + 2 + 2 + 8 + 8 + 1    # portraits, locations, bgm + theme, keyframes, videos, one sound effect
+MADE = 2 + 2 + 2 + 8 + 8 + 4    # portraits, locations, bgm + theme, keyframes, videos, one sound effect per cue
 SERVICES = FAST + '\n[workflow]\npoll_seconds = 0.02\ndefault_voice = ""\nvideo_share = 1.0\n'
 
 
@@ -96,7 +96,7 @@ def test_produce_makes_every_spec_in_dependency_order_and_is_resumable(tmp_path:
     seen: list[tuple[str, int, int, str]] = []
     with serving(worker):
         out = engine.run_stage(1, "produce", {}, progress=lambda *a: seen.append(a))
-    # 2 portraits, 2 locations, music + theme, 8 keyframes, 8 videos, 1 sfx; dialogue has no voice
+    # 2 portraits, 2 locations, music + theme, 8 keyframes, 8 videos, 4 sfx (one per cue); dialogue has no voice
     assert out["made"] == MADE and out["failed"] == 0 and out["tier"] == "draft"
     reasons = sorted({s["reason"] for s in out["skipped_detail"]})
     assert reasons == ["no_voice"]

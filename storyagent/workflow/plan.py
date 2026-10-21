@@ -64,12 +64,12 @@ def _label(spec: SpecRecord, names: dict[str, dict[str, str]]) -> str:
     if spec.subject_type == "dialogue.line":
         text = spec.text_payload.strip()
         return f"{names['shot'].get(head, head)} #{int(line) + 1 if line.isdigit() else line}: {text[:40]}"
+    if spec.subject_type == "shot.sfx":
+        return f"{names['shot'].get(head, head)} #{int(line) + 1 if line.isdigit() else line}: {spec.text_payload[:40]}"
     if spec.subject_type.startswith("shot."):
         return names["shot"].get(head, head)
     if spec.subject_type.startswith("music."):
         return names["music"].get(head, head)
-    if spec.subject_type == "sfx.cue":
-        return names["sfx"].get(head, head)
     table = "character" if kind == "character" else "location"
     return names[table].get(head, head)
 
