@@ -24,6 +24,8 @@ class ErrorCode(StrEnum):
     INVALID_INPUT = "invalid_input"
     CONSENT_REQUIRED = "consent_required"
     LICENSE_ACK_REQUIRED = "license_ack_required"
+    REMOTE_NOT_ALLOWED = "remote_not_allowed"      # the model runs in the cloud: data would leave this machine
+    MISSING_CREDENTIALS = "missing_credentials"    # a cloud model whose API key is not in the environment
     OUTPUT_MISSING = "output_missing"
     OUTPUT_INVALID = "output_invalid"
     CANCELLED = "cancelled"
@@ -48,6 +50,8 @@ _STATUS: dict[ErrorCode, JobStatus] = {
     ErrorCode.INVALID_INPUT: JobStatus.FAILED_VALIDATION,
     ErrorCode.CONSENT_REQUIRED: JobStatus.FAILED_VALIDATION,
     ErrorCode.LICENSE_ACK_REQUIRED: JobStatus.FAILED_VALIDATION,
+    ErrorCode.REMOTE_NOT_ALLOWED: JobStatus.FAILED_VALIDATION,
+    ErrorCode.MISSING_CREDENTIALS: JobStatus.FAILED_VALIDATION,
     ErrorCode.OUTPUT_MISSING: JobStatus.FAILED_VALIDATION,
     ErrorCode.OUTPUT_INVALID: JobStatus.FAILED_VALIDATION,
     ErrorCode.CANCELLED: JobStatus.CANCELLED,

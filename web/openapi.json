@@ -2110,6 +2110,18 @@
       "ProjectSettingsPatch": {
         "description": "Merged into ``projects.settings``; a key set to null is removed.",
         "properties": {
+          "allow_remote": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "allow models that run in the cloud (prompts and reference files leave this machine)",
+            "title": "Allow Remote"
+          },
           "allow_restricted_licenses": {
             "anyOf": [
               {

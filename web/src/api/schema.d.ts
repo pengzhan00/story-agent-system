@@ -2231,6 +2231,11 @@ export interface components {
          */
         ProjectSettingsPatch: {
             /**
+             * Allow Remote
+             * @description allow models that run in the cloud (prompts and reference files leave this machine)
+             */
+            allow_remote?: boolean | null;
+            /**
              * Allow Restricted Licenses
              * @description acknowledge models whose licence restricts commercial use or territory
              */

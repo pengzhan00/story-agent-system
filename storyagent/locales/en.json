@@ -1059,5 +1059,9 @@
   "web.workflow.target_clear": "Use the profile's",
   "web.workflow.profile": "Delivery profile",
   "web.workflow.profile_range": "{lo}-{hi} s",
-  "web.workflow.profile_open": "any length"
+  "web.workflow.profile_open": "any length",
+  "error.remote_not_allowed": "{model} runs in the cloud ({service}): your prompts and files would leave this machine",
+  "error.remote_not_allowed.remediation": "Allow cloud models for this project (project setting allow_remote) or globally ([runtime] allow_remote = true in services.toml), then retry.",
+  "error.missing_credentials": "The API key is missing: environment variable {env} is not set",
+  "error.missing_credentials.remediation": "Set that environment variable for the worker (the key is never stored in a config file), restart the worker and retry."
 }

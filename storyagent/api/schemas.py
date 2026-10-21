@@ -86,6 +86,8 @@ class ProjectSettingsPatch(BaseModel):
     models: dict[str, dict[str, Any]] | None = None
     allow_restricted_licenses: bool | None = Field(
         default=None, description="acknowledge models whose licence restricts commercial use or territory")
+    allow_remote: bool | None = Field(
+        default=None, description="allow models that run in the cloud (prompts and reference files leave this machine)")
     target_sec: float | None = Field(
         default=None, description="wanted episode length in seconds (advert to feature film); null = the profile's")
 

@@ -255,7 +255,7 @@ class Worker:
         caps = adapter.capabilities()
 
         # 1) gates: compliance, parameters, adapter-specific validation
-        issues = compliance.check_job(s, job, project_settings)
+        issues = compliance.check_job(s, job, project_settings) + compliance.check_remote(s, job, project_settings)
         p_issues, warnings = validate_params(job.params, caps.param_schema, strict=s.strict_params)
         issues += p_issues + adapter.validate(job, ctx)
         for w in warnings:

@@ -29,6 +29,11 @@ class Gate:
     reason: WaitReason | None = None
 
 
+def _remote(job: JobRecord, settings: Settings) -> bool:
+    model = settings.models.get(job.model_ref)
+    return bool(model and model.remote)
+
+
 def can_start(
     job: JobRecord,
     running: Sequence[JobRecord],
@@ -36,11 +41,16 @@ def can_start(
     *,
     resident_llms: Sequence[str] = (),
 ) -> Gate:
+    if _remote(job, settings):
+        # a cloud job uses no local memory or GPU: it runs next to anything, up to its own limit
+        if sum(1 for r in running if _remote(r, settings)) >= int(settings.runtime.get("max_remote_jobs", 4)):
+            return Gate(False, WaitReason.LIGHT_LIMIT)
+        return Gate(True)
     if job.heavy:
         if any(r.heavy for r in running):
             return Gate(False, WaitReason.HEAVY_BUSY)
     else:
-        light = sum(1 for r in running if not r.heavy)
+        light = sum(1 for r in running if not r.heavy and not _remote(r, settings))
         if light >= int(settings.runtime.get("max_light_jobs", 2)):
             return Gate(False, WaitReason.LIGHT_LIMIT)
     budget = float(settings.runtime.get("memory_budget_gib", 0))

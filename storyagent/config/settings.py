@@ -75,6 +75,11 @@ class ModelSpec:
     tiers: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
     extra: Mapping[str, Any] = field(default_factory=dict)  # e.g. train_template
 
+    @property
+    def remote(self) -> bool:
+        """Runs at a vendor: prompts and reference files leave this machine (needs ``allow_remote``)."""
+        return bool(self.extra.get("remote", False))
+
 
 @dataclass(frozen=True)
 class ComplianceConfig:

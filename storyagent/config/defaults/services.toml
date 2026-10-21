@@ -115,6 +115,10 @@ strict_params = false
 auto_adopt = true
 # Concurrent non-heavy jobs the worker may run next to (at most) one heavy job.
 max_light_jobs = 2
+# Cloud (remote) models: concurrent jobs they may run, and whether prompts and reference files may leave this machine
+# at all. Off until you switch it on here or per project (projects.settings.allow_remote). See docs/CLOUD.md.
+max_remote_jobs = 4
+allow_remote = false
 # A language-model call never starts while a heavy media job is running (a 30B model plus a 50 GiB video model
 # does not fit in memory). Workflow stages wait up to this many seconds for the heavy job to finish, then fail with
 # `heavy_busy`; interactive requests (script review) fail at once. 0 = do not wait.

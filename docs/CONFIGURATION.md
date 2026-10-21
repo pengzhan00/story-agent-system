@@ -50,3 +50,8 @@ A project can switch compliance off or on regardless of the global value; unspec
 ## Exit codes (CLI)
 
 0 ok · 1 not found / health failing · 2 configuration · 3 migration · 4 legacy import · 5 spec locked · 6 export: a blocking QC check failed.
+
+
+## 云端模型相关开关
+
+`[runtime] allow_remote`(默认 false;项目设置 `allow_remote` 覆盖)、`max_remote_jobs`(默认 4)。云端模型条目与适配器配置见 `docs/CLOUD.md`。

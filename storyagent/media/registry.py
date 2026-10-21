@@ -57,6 +57,12 @@ def _llm(settings: Settings) -> Adapter:
     return LlmAdapter()
 
 
+def _remote_video(settings: Settings) -> Adapter:
+    from .adapters.remote_video import RemoteVideoAdapter
+
+    return RemoteVideoAdapter(settings)
+
+
 def _whisper(settings: Settings) -> Adapter:
     from .adapters.whisper import WhisperAdapter
 
@@ -100,7 +106,8 @@ def _longcat(settings: Settings) -> Adapter:
 
 
 _BUILTIN: list[Callable[[Settings], Adapter]] = [
-    _acestep, _phosphene, _cosyvoice, _whisper, _llm, _mflux, _lora_train, _seedvc, _ffmpeg, _h3, _longcat,
+    _acestep, _phosphene, _cosyvoice, _whisper, _llm, _remote_video, _mflux, _lora_train, _seedvc, _ffmpeg, _h3,
+    _longcat,
 ]
 
 

@@ -36,6 +36,25 @@ def visible_marks(
     return label, metadata
 
 
+def remote_allowed(settings: Settings, project_settings: Mapping[str, Any] | None = None) -> bool:
+    """Sending prompts and reference files to a cloud service is off until the operator allows it (globally in
+    ``[runtime] allow_remote`` or per project). Independent of the compliance switch: it is about privacy."""
+    if project_settings and "allow_remote" in project_settings:
+        return bool(project_settings["allow_remote"])
+    return bool(settings.runtime.get("allow_remote", False))
+
+
+def check_remote(
+    settings: Settings, job: JobRecord, project_settings: Mapping[str, Any] | None = None
+) -> list[ValidationIssue]:
+    model = settings.models.get(job.model_ref)
+    if model is None or not model.remote or remote_allowed(settings, project_settings):
+        return []
+    service = str(model.extra.get("service", model.provider))
+    message = f"{job.model_ref} runs at {service}: data leaves this machine"
+    return [ValidationIssue(ErrorCode.REMOTE_NOT_ALLOWED, message, {"model": job.model_ref, "service": service})]
+
+
 def check_job(
     settings: Settings, job: JobRecord, project_settings: Mapping[str, Any] | None = None
 ) -> list[ValidationIssue]:
@@ -91,6 +110,7 @@ def build_provenance(
             "attribution": model.attribution if model else "",
         },
         "seed": job.seed,
+        "remote": bool(model and model.remote),
         "params": job.params,
         "spec": {"id": job.spec_id, "version": job.spec_version},
         "inputs": job.inputs,  # may contain prompts: stripped for exports
