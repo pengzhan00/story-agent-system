@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useCancelRun, useMeta, useProject, useProjectSettings, useReviewScript, useStartRun, useUpdateProject, useWorkflow } from "../api/hooks";
 import { ErrorNote } from "../components/ErrorNote";
 import { ProgressBar } from "../components/ProgressBar";
+import { ProducePlan } from "../components/ProducePlan";
 import { EpisodePlayer } from "../components/EpisodePlayer";
 import { RunError, RunProgress } from "../components/RunProgress";
 import { StatusChip } from "../components/StatusChip";
@@ -80,6 +81,7 @@ export function WorkflowPanel({ id }: { id: number }) {
   const review = useReviewScript(id);
   const [premise, setPremise] = useState<string | null>(null);
   const [force, setForce] = useState(false);
+  const [planning, setPlanning] = useState(false);
 
   const active = wf.data?.active_run ?? null;
   const last = wf.data?.recent_runs.find((r) => r.status !== "queued" && r.status !== "running") ?? null;
@@ -89,7 +91,6 @@ export function WorkflowPanel({ id }: { id: number }) {
   const allDone = storyDone;
   const stage = (name: string) => wf.data?.stages.find((s) => s.stage === name);
   const compose = stage("compose");
-  const pendingAll = (wf.data?.stages ?? []).filter((s) => s.status !== "completed").map((s) => s.stage);
   const text = premise ?? project.data?.description ?? "";
   const dirty = premise !== null && premise !== (project.data?.description ?? "");
 
@@ -142,17 +143,15 @@ export function WorkflowPanel({ id }: { id: number }) {
       {storyDone && !active ? (
         <section className="card stack">
           <div className="row">
-            <button className="primary" disabled={start.isPending} onClick={() => start.mutate({ stages: ["produce"], params: force ? { force: true } : {} })}>
+            <button className="primary" disabled={start.isPending} onClick={() => setPlanning(!planning)}>
               {t("web.workflow.make_media")}
             </button>
             <button disabled={start.isPending} onClick={() => start.mutate({ stages: ["compose"] })}>
               {t("web.workflow.make_episode")}
             </button>
-            <button disabled={start.isPending || pendingAll.length === 0} onClick={() => start.mutate({ stages: pendingAll })}>
-              {t("web.workflow.make_everything")}
-            </button>
           </div>
           <p className="muted small">{t("web.workflow.make_media_hint")} {t("web.workflow.needs_worker")}</p>
+          {planning ? <ProducePlan id={id} onClose={() => setPlanning(false)} /> : null}
           <div className="row">
             <button disabled={review.isPending} onClick={() => review.mutate()}>
               {review.isPending ? t("web.review.running") : t("web.review.run")}

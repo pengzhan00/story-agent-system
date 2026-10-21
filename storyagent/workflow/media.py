@@ -8,7 +8,11 @@ Phases (each waits for the one before, because a video starts from its keyframe)
     1  portraits, scene keyframes, music, theme song, sound effects, dialogue lines
     2  shot keyframes
     3  shot videos (first frame = the keyframe)
-Params: ``tier``, ``skip`` (subject types not to make), ``force``.
+Params: ``tier``, ``skip`` (subject types not to make), ``only`` (spec ids: make just these - the confirmed
+production plan, see ``workflow/plan.py``), ``force``.
+A shot keyframe is composed from what the earlier phase made: the portraits of the characters in the shot and the
+scene keyframe go in as reference images of an image-edit job (``[workflow] keyframe_from_references``), so the faces
+and the place stay the ones that were approved instead of being re-imagined from words.
 Progress messages are ``<i18n key>|<detail>``; clients translate the part before ``|``.
 """
 from __future__ import annotations
@@ -91,8 +95,9 @@ def _plan_phase(
     out: list[tuple[SpecRecord, MediaJob]] = []
     default_voice = str(ctx.settings.workflow.get("default_voice", "")).strip()
     skip = {str(x) for x in ctx.params.get("skip", [])}      # e.g. ["shot.video"]: stills only
+    only = {str(x) for x in ctx.params.get("only", [])}      # the confirmed plan: just these specs
     for spec in specs:
-        if spec.subject_type not in types or spec.subject_type in skip:
+        if spec.subject_type not in types or spec.subject_type in skip or (only and spec.id not in only):
             continue
         if up_to_date(ledger, spec) and not ctx.force():
             counts["reused"] += 1
@@ -116,8 +121,38 @@ def _plan_phase(
                 skipped.append({"subject": spec.subject_type, "id": spec.subject_id, "reason": "no_keyframe"})
                 continue
             extra["refs"] = [f"asset:{frame.id}"]
-        out.append((spec, store.build_job(spec, tier=tier, seed=spec.seed, shot_id=_shot_id(spec), extra_inputs=extra)))
+        job = store.build_job(spec, tier=tier, seed=spec.seed, shot_id=_shot_id(spec), extra_inputs=extra)
+        if spec.subject_type == "shot.keyframe":
+            job = keyframe_from_references(ctx, ledger, spec, job)
+        out.append((spec, job))
     return out
+
+
+def keyframe_from_references(ctx: Ctx, ledger: Ledger, spec: SpecRecord, job: MediaJob) -> MediaJob:
+    """Compose the shot from the approved portraits and the scene image: an image-edit job whose reference images are
+    the current assets of the specs this keyframe depends on. Without any (or switched off), the job stays as it was."""
+    if not ctx.settings.workflow.get("keyframe_from_references", True) or spec.kind is not MediaKind.IMAGE_GENERATE:
+        return job
+    refs: list[str] = []
+    for dep in spec.depends_on:
+        if dep.get("subject_type") not in ("character.portrait", "scene.keyframe"):
+            continue
+        found = ctx.spec_store.current(spec.project_id, str(dep["subject_type"]), str(dep["subject_id"]),
+                                       str(dep.get("slot", "main")))
+        asset = current_asset(ledger, found) if found else None
+        if asset is not None:
+            refs.append(f"asset:{asset.id}")
+    if not refs:
+        return job
+    try:
+        model = ctx.settings.model(spec.model_ref) if spec.model_ref and ctx.settings.model(
+            spec.model_ref).kind == MediaKind.IMAGE_EDIT.value else ctx.settings.default_model(
+                MediaKind.IMAGE_EDIT.value)
+    except ConfigError:
+        return job
+    # the edit model has its own parameter defaults (tier layers resolve in the worker from model_ref and tier)
+    return MediaJob(**{**job.__dict__, "kind": MediaKind.IMAGE_EDIT, "model_ref": model.ref,
+                       "inputs": {**job.inputs, "refs": [*refs, *job.inputs.get("refs", [])]}})
 
 
 # Seconds per job when the ledger has no history for the model yet (only used to shape the progress bar).
@@ -127,8 +162,11 @@ FALLBACK_SECONDS = {"image": 45.0, "video": 240.0, "audio.tts": 12.0, "audio.mus
 def _expected_seconds(ctx: Ctx, ledger: Ledger, specs: list[SpecRecord], tier: QualityTier) -> float:
     total = 0.0
     skip = {str(x) for x in ctx.params.get("skip", [])}
+    only = {str(x) for x in ctx.params.get("only", [])}
     for spec in specs:
         if spec.subject_type in skip or not any(spec.subject_type in p for p in PHASES):
+            continue
+        if only and spec.id not in only:
             continue
         if up_to_date(ledger, spec) and not ctx.force():
             continue
@@ -151,7 +189,8 @@ def produce(ctx: Ctx) -> dict[str, Any]:
     made = failed = 0
     counts = {"reused": 0}
     failures: list[dict[str, Any]] = []
-    total_planned = sum(1 for s in specs if any(s.subject_type in p for p in PHASES))
+    only = {str(x) for x in ctx.params.get("only", [])}
+    total_planned = sum(1 for s in specs if any(s.subject_type in p for p in PHASES) and (not only or s.id in only))
     ctx.hint_weight(_expected_seconds(ctx, ledger, specs, tier))
     ctx.step(0, max(total_planned, 1), "")
     done_before = 0

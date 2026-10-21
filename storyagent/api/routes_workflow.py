@@ -10,12 +10,23 @@ from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
 
 from storyagent.compose.export import ExportError, build_package
+from storyagent.domain import QualityTier
 from storyagent.llm import LLMError
 from storyagent.workflow import WorkflowEngine, WorkflowStateError
+from storyagent.workflow.plan import produce_plan, totals
 
 from .context import ctx_of
 from .errors import ApiError
-from .schemas import ScriptReviewOut, WorkflowOut, WorkflowRunCreate, WorkflowRunOut, WorkflowStageOut
+from .schemas import (
+    PlannedTaskOut,
+    PlanTotals,
+    ProducePlanOut,
+    ScriptReviewOut,
+    WorkflowOut,
+    WorkflowRunCreate,
+    WorkflowRunOut,
+    WorkflowStageOut,
+)
 
 router = APIRouter(prefix="/api", tags=["workflow"])
 
@@ -45,6 +56,22 @@ def start_run(project_id: int, body: WorkflowRunCreate, request: Request) -> Wor
     if not stages:
         raise ApiError(409, "nothing_to_do", "every stage is already completed")
     return run_out(ctx.workflow.enqueue(project_id, stages, body.params))
+
+
+@router.get("/projects/{project_id}/produce/plan", response_model=ProducePlanOut)
+def get_produce_plan(project_id: int, request: Request, tier: str = "draft", force: bool = False) -> ProducePlanOut:
+    """What producing the media would make, task by task, with models and estimates - to confirm before it runs.
+    Start the confirmed part with ``POST .../workflow/runs {"stages": ["produce"], "params": {"only": [spec ids],
+    "tier": ...}}``."""
+    ctx = ctx_of(request)
+    ctx.projects.get(project_id)
+    try:
+        level = QualityTier(tier)
+    except ValueError:
+        raise ApiError(422, "invalid", f"unknown tier {tier!r}") from None
+    tasks = produce_plan(ctx.settings, ctx.story, ctx.specs, ctx.ledger, project_id, level, force=force)
+    return ProducePlanOut(tier=level.value, tasks=[PlannedTaskOut.model_validate(t.__dict__) for t in tasks],
+                          totals=PlanTotals.model_validate(totals(tasks)))
 
 
 @router.get("/projects/{project_id}/workflow/runs", response_model=list[WorkflowRunOut])

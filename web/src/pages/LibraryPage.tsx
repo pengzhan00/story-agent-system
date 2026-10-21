@@ -6,6 +6,7 @@ import type { Asset, LibraryItem } from "../api/types";
 import { useWorkshop } from "../api/workshop";
 import { AssetPreview } from "../components/Candidates";
 import { ErrorNote } from "../components/ErrorNote";
+import { MakeProject } from "../components/MakeProject";
 import { useT } from "../i18n";
 import { duration } from "../lib/format";
 import { CATEGORIES, type Category, categoryOf, mediaOfAsset, targetsFor } from "../lib/assets";
@@ -161,6 +162,7 @@ function AssetCard({
           ))}
         </div>
       ) : null}
+      {cat === "story" || cat === "script" || asset.kind === "upload.text" ? <MakeProject assetId={asset.id} /> : null}
       <div className="row small">
         <button className="link" onClick={() => setFiling(!filing)}>
           {t("web.library.file_as")}

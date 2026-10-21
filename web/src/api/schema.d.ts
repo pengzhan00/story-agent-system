@@ -521,6 +521,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/from-text": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Project From Text
+         * @description A project from a written story or script (e.g. the workshop's): the text becomes the premise and the source the
+         *     script stage adapts. With ``start`` the story stages (not the media) are queued; the media are confirmed later in
+         *     the production plan.
+         */
+        post: operations["create_project_from_text_api_projects_from_text_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/overview": {
         parameters: {
             query?: never;
@@ -787,6 +809,28 @@ export interface paths {
         head?: never;
         /** Update Music */
         patch: operations["update_music_api_projects__project_id__music__item_id__patch"];
+        trace?: never;
+    };
+    "/api/projects/{project_id}/produce/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Produce Plan
+         * @description What producing the media would make, task by task, with models and estimates - to confirm before it runs.
+         *     Start the confirmed part with ``POST .../workflow/runs {"stages": ["produce"], "params": {"only": [spec ids],
+         *     "tier": ...}}``.
+         */
+        get: operations["get_produce_plan_api_projects__project_id__produce_plan_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/projects/{project_id}/restore": {
@@ -2114,6 +2158,51 @@ export interface components {
              */
             tier: string;
         };
+        /** PlanTotals */
+        PlanTotals: {
+            /** By State */
+            by_state: {
+                [key: string]: number;
+            };
+            /**
+             * Count
+             * @description tasks that would run (new + stale)
+             */
+            count: number;
+            /** Est Seconds */
+            est_seconds: number;
+        };
+        /** PlannedTaskOut */
+        PlannedTaskOut: {
+            /** Est Seconds */
+            est_seconds: number;
+            /** Kind */
+            kind: string;
+            /** Label */
+            label: string;
+            /** Model Ref */
+            model_ref: string;
+            /** Needs */
+            needs: string[];
+            /** Phase */
+            phase: number;
+            /**
+             * Reason
+             * @description why a blocked task cannot be made (no_model | no_voice)
+             */
+            reason: string;
+            /** Spec Id */
+            spec_id: string;
+            /**
+             * State
+             * @description new | stale | done | blocked
+             */
+            state: string;
+            /** Subject Id */
+            subject_id: string;
+            /** Subject Type */
+            subject_type: string;
+        };
         /** PresetBody */
         PresetBody: {
             /**
@@ -2130,6 +2219,14 @@ export interface components {
              * @default
              */
             tier: string;
+        };
+        /** ProducePlanOut */
+        ProducePlanOut: {
+            /** Tasks */
+            tasks: components["schemas"]["PlannedTaskOut"][];
+            /** Tier */
+            tier: string;
+            totals: components["schemas"]["PlanTotals"];
         };
         /**
          * ProjectCard
@@ -2180,6 +2277,42 @@ export interface components {
             genre: string;
             /** Name */
             name: string;
+        };
+        /** ProjectFromText */
+        ProjectFromText: {
+            /**
+             * Asset Id
+             * @description a text asset (story, script, transcript, uploaded text)
+             */
+            asset_id?: string | null;
+            /**
+             * Content Language
+             * @default
+             */
+            content_language: string;
+            /**
+             * Genre
+             * @default
+             */
+            genre: string;
+            /** Name */
+            name: string;
+            /**
+             * Start
+             * @description queue the story stages (no media) right away
+             * @default true
+             */
+            start: boolean;
+            /**
+             * Text
+             * @default
+             */
+            text: string;
+        };
+        /** ProjectFromTextOut */
+        ProjectFromTextOut: {
+            project: components["schemas"]["ProjectOut"];
+            run: components["schemas"]["WorkflowRunOut"] | null;
         };
         /** ProjectOut */
         ProjectOut: {
@@ -3824,6 +3957,39 @@ export interface operations {
             };
         };
     };
+    create_project_from_text_api_projects_from_text_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectFromText"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectFromTextOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     overview_api_projects_overview_get: {
         parameters: {
             query?: {
@@ -4716,6 +4882,40 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_produce_plan_api_projects__project_id__produce_plan_get: {
+        parameters: {
+            query?: {
+                tier?: string;
+                force?: boolean;
+            };
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProducePlanOut"];
                 };
             };
             /** @description Validation Error */

@@ -26,11 +26,16 @@ from .story_kit import make_engine, new_project
 FAKE_MODELS = """
 [defaults]
 "image.generate" = "f-img"
+"image.edit" = "f-edit"
 "video.generate" = "f-vid"
 "audio.tts" = "f-tts"
 "audio.music" = "f-mus"
 [models."f-img"]
 kind = "image.generate"
+provider = "fake"
+timeout_sec = 30
+[models."f-edit"]
+kind = "image.edit"
 provider = "fake"
 timeout_sec = 30
 [models."f-vid"]
@@ -243,3 +248,47 @@ def test_compliance_label_goes_into_the_film_and_the_package_describes_it(tmp_pa
     prov = json.loads((dest / "provenance.json").read_text("utf-8"))
     assert prov["aigc"] and prov["sources"] and "inputs" not in json.dumps(prov)
     assert json.loads((dest / "manifest.json").read_text("utf-8"))["qc"]["checks"]
+
+
+def test_a_keyframe_is_composed_from_the_made_portraits_and_scene_image(tmp_path: Path) -> None:
+    fake = FakeAdapter()
+    engine, worker, _ = story(tmp_path, [fake])
+    with serving(worker):
+        engine.run_stage(1, "produce", {})
+    ledger: Ledger = engine.spec_store.ledger
+    jobs = {j.spec_id: j for j in ledger.list_jobs(project_id=1, limit=500)}
+    shot = engine.store.list_shots(1)[0]
+    key = engine.spec_store.current(1, "shot.keyframe", str(shot["id"]))
+    job = jobs[key.id]
+    assert job.kind.value == "image.edit" and job.model_ref == "f-edit"
+    refs = fake.seen[job.id][0]["refs"]
+    made = {a.id: a for a in ledger.list_assets(project_id=1, limit=500)}
+    deps = {d["subject_type"] for d in key.depends_on}
+    used = [a for a in made.values() if str(tmp_path / "home" / a.path) in refs]
+    assert {a.kind for a in used} == {"image.generate"} and len(used) == len(
+        [d for d in key.depends_on if d["subject_type"] in ("character.portrait", "scene.keyframe")])
+    assert deps == {"character.portrait", "scene.keyframe"}
+
+
+def test_the_plan_lists_what_would_be_made_and_only_the_confirmed_part_runs(tmp_path: Path) -> None:
+    from storyagent.domain import QualityTier
+    from storyagent.workflow.plan import produce_plan, totals
+
+    fake = FakeAdapter()
+    engine, worker, _ = story(tmp_path, [fake])
+    ledger: Ledger = engine.spec_store.ledger
+    plan = produce_plan(engine.settings, engine.store, engine.spec_store, ledger, 1, QualityTier.DRAFT)
+    by_type = {t: [p for p in plan if p.subject_type == t] for t in {p.subject_type for p in plan}}
+    assert len(by_type["character.portrait"]) == 2 and len(by_type["shot.video"]) == 8
+    assert all(p.state in ("new", "blocked") for p in plan) and totals(plan)["count"] == MADE
+    blocked = {p.reason for p in plan if p.state == "blocked"}
+    assert blocked == {"no_model", "no_voice"}                       # said up front, not discovered at run time
+    assert all(p.label for p in plan)
+    assert all(p.needs for p in by_type["shot.keyframe"])             # a keyframe builds on portraits and scene image
+    only = [p.spec_id for p in plan if p.subject_type == "character.portrait"]
+    with serving(worker):
+        out = engine.run_stage(1, "produce", {"only": only})
+    assert out["made"] == 2 and out["failed"] == 0                  # the two confirmed portraits, nothing else
+    after = produce_plan(engine.settings, engine.store, engine.spec_store, ledger, 1, QualityTier.DRAFT)
+    assert {p.state for p in after if p.subject_type == "character.portrait"} == {"done"}
+    assert totals(after)["count"] == MADE - 2

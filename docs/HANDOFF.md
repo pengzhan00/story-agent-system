@@ -166,13 +166,18 @@ docs/          API CONFIGURATION MEDIA_CONTRACT RUNBOOK WORKFLOW USER_GUIDE PARI
 
 **已做且有测试**:故事全流程(analyze…compose)、规格/作业/资产台账与 worker、全部适配器(acestep mflux phosphene cosyvoice seedvc whisper h3 longcat lora_train llm assemble)、
 合规/溯源、API+SSE、网页(启动台/项目/工坊/资产库/队列/AI 提示词/系统)、工坊九个模块(故事 剧本 图片 成片 LoRA 歌曲 配音 视频 转写)+流水线、
-启动台、目标时长/交付档位。
+启动台、目标时长/交付档位、**生产计划(先列清单、确认后才生成)**、**从文字建项目**。
+链路:剧本/故事 → 人物与场景 → 人物像/场景图 → 镜头关键帧(`image.edit`,以已做好的人物像+场景图为参考,`[workflow] keyframe_from_references`)→ 镜头视频。
+`GET /api/projects/{id}/produce/plan` 列出每个待做任务(规格、模型、阶段、新/过期/已有/阻塞、估时);运行时用 `params.only=[规格id]` 只做勾选的;`workflow/plan.py`。
+`POST /api/projects/from-text` 把资产库/工坊里的故事或剧本变成项目(网页「用它新建项目」)。
 
 **没在真实模型上验证过**:LoRA 训练、h3、多数工坊模块的真实流水线、项目页的新控件。
 **没做**:接具体云厂商(接口已留好,只缺厂商与密钥)、系列层(S1-S3,S7,S8)、镜头分层/预算(S4)、剪辑(转场/回顾/悬念卡/字幕样式/音效合成,S5)、RIFE 补帧、EDL/FCPXML、
 网页上传项目参考图、AI 改写+变更清单、API 鉴权(目前仅本机回环)、审计表。
 
 ## 8. 下一步(按这个顺序做)
+
+0. (已完成)「剧本→人物/场景图→关键帧」断链修复 + 生产计划确认队列 + 从文字建项目。仍未覆盖:声音未指定时台词被阻塞(计划里可见但无一键指定)、口型头像步骤不在项目流程内、每集只用一首配乐、工坊成片模块要手工拼镜头。
 
 1. (已完成)LongCat 实测 54 分钟/3.1 秒;工坊「故事→剧本」用 gemma4 实测通过(故事 33 秒、剧本 17 秒)。
 2. (已完成)生产环境与数据迁到主检出。

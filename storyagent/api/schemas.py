@@ -468,6 +468,46 @@ class WorkflowRunCreate(BaseModel):
     params: dict[str, Any] = Field(default_factory=dict)
 
 
+class PlannedTaskOut(Strict):
+    spec_id: str
+    subject_type: str
+    subject_id: str
+    label: str
+    kind: str
+    model_ref: str
+    phase: int
+    state: str = Field(description="new | stale | done | blocked")
+    reason: str = Field(description="why a blocked task cannot be made (no_model | no_voice)")
+    est_seconds: int
+    needs: list[str]
+
+
+class PlanTotals(Strict):
+    count: int = Field(description="tasks that would run (new + stale)")
+    est_seconds: int
+    by_state: dict[str, int]
+
+
+class ProducePlanOut(Strict):
+    tier: str
+    tasks: list[PlannedTaskOut]
+    totals: PlanTotals
+
+
+class ProjectFromText(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    asset_id: str | None = Field(default=None, description="a text asset (story, script, transcript, uploaded text)")
+    text: str = ""
+    genre: str = ""
+    content_language: str = ""
+    start: bool = Field(default=True, description="queue the story stages (no media) right away")
+
+
+class ProjectFromTextOut(Strict):
+    project: ProjectOut
+    run: WorkflowRunOut | None
+
+
 class ReviewIssue(Strict):
     severity: str = ""
     where: str = ""

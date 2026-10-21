@@ -6,6 +6,7 @@ import { type Step, useWorkshop, useWorkshopActions, useWorkshopHistory, useWork
 import { AddParam } from "../components/AddParam";
 import { AssetPreview } from "../components/Candidates";
 import { ErrorNote } from "../components/ErrorNote";
+import { MakeProject } from "../components/MakeProject";
 import { ProgressBar } from "../components/ProgressBar";
 import { StatusChip } from "../components/StatusChip";
 import { ValueEditor } from "../components/ValueEditor";
@@ -464,6 +465,7 @@ function JobCard({
           ))}
         </div>
       ) : null}
+      {main && (main.kind === "text.story" || main.kind === "text.script") ? <MakeProject assetId={main.id} /> : null}
       <details>
         <summary className="small muted">{t("web.workshop.params")}</summary>
         <ValueView value={j.inputs} prefix="input" />

@@ -5,7 +5,17 @@ from fastapi import APIRouter, Request
 from storyagent.workflow import STAGES
 
 from .context import ctx_of
-from .schemas import ProjectCard, ProjectCreate, ProjectOut, ProjectPatch, ProjectSettingsPatch
+from .errors import ApiError
+from .schemas import (
+    ProjectCard,
+    ProjectCreate,
+    ProjectFromText,
+    ProjectFromTextOut,
+    ProjectOut,
+    ProjectPatch,
+    ProjectSettingsPatch,
+    WorkflowRunOut,
+)
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
@@ -44,6 +54,38 @@ def create_project(body: ProjectCreate, request: Request) -> ProjectOut:
         body.name, genre=body.genre, description=body.description, content_language=body.content_language
     )
     return ProjectOut.model_validate(p)
+
+
+TEXT_KINDS = ("text.story", "text.script", "text.asr", "upload.text")
+MAX_SOURCE_CHARS = 24000          # what the script stage reads of a source text
+
+
+@router.post("/from-text", response_model=ProjectFromTextOut, status_code=201)
+def create_project_from_text(body: ProjectFromText, request: Request) -> ProjectFromTextOut:
+    """A project from a written story or script (e.g. the workshop's): the text becomes the premise and the source the
+    script stage adapts. With ``start`` the story stages (not the media) are queued; the media are confirmed later in
+    the production plan."""
+    ctx = ctx_of(request)
+    text = body.text.strip()
+    if body.asset_id:
+        asset = ctx.ledger.get_asset(body.asset_id)
+        if asset.kind not in TEXT_KINDS:
+            raise ApiError(422, "invalid", f"asset {asset.id} is {asset.kind}, not a text")
+        path = (ctx.settings.home / asset.path).resolve()
+        if ctx.settings.home.resolve() not in path.parents or not path.is_file():
+            raise ApiError(404, "asset_file_missing", asset.path)
+        text = path.read_text("utf-8", errors="replace").strip()
+    if not text:
+        raise ApiError(422, "invalid", "no text: give asset_id or text")
+    premise = " ".join(text.split())[:400]
+    project = ctx.projects.create(body.name, genre=body.genre, description=premise,
+                                  content_language=body.content_language)
+    run = None
+    if body.start:
+        run = ctx.workflow.enqueue(project.id, ctx.workflow.pending_stages(project.id, None),
+                                   {"source_text": text[:MAX_SOURCE_CHARS], "premise": premise})
+    return ProjectFromTextOut(project=ProjectOut.model_validate(project),
+                              run=WorkflowRunOut.model_validate(run) if run else None)
 
 
 @router.get("/{project_id}", response_model=ProjectOut)

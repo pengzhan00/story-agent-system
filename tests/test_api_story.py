@@ -308,3 +308,28 @@ def test_script_review_is_refused_while_a_heavy_job_runs(client: TestClient, fse
                     " VALUES ('hj', ?, 'video.avatar', 'longcat', 'x', 1, 'running')", (pid,))
     r = client.post(f"/api/projects/{pid}/review")
     assert r.status_code == 409 and r.json()["error"]["code"] == "heavy_busy"
+
+
+def test_the_production_plan_is_listed_for_confirmation(client: TestClient, fsettings: Settings) -> None:
+    pid = new_project(client)
+    started(client, pid)
+    run_to_end(fsettings)
+    plan = client.get(f"/api/projects/{pid}/produce/plan?tier=draft").json()
+    assert plan["tier"] == "draft" and plan["totals"]["count"] > 0
+    assert {t["subject_type"] for t in plan["tasks"]} >= {"character.portrait", "shot.keyframe", "shot.video"}
+    assert all(t["spec_id"] and t["label"] and t["est_seconds"] > 0 for t in plan["tasks"])
+    assert client.get(f"/api/projects/{pid}/produce/plan?tier=bogus").status_code == 422
+    assert client.get("/api/projects/999/produce/plan").status_code == 404
+
+
+def test_a_project_from_a_written_script_queues_the_story_stages_but_no_media(
+    client: TestClient, fsettings: Settings
+) -> None:
+    text = "SCENE 1. PIER - NIGHT\nMara: You are late.\nSCENE 2. OFFICE - DAY\nJon: The case is closed."
+    made = client.post("/api/projects/from-text", json={"name": "From script", "text": text})
+    assert made.status_code == 201
+    body = made.json()
+    assert body["project"]["description"].startswith("SCENE 1. PIER") and body["run"]["status"] == "queued"
+    assert body["run"]["params"]["source_text"] == text and len(body["run"]["stages"]) == 7   # story only, no media
+    assert client.post("/api/projects/from-text", json={"name": "x", "text": "  "}).status_code == 422
+    assert client.post("/api/projects/from-text", json={"name": "x", "asset_id": "0" * 32}).status_code == 404

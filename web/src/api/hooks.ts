@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, del, patch, post, put } from "./client";
-import type { Agent, AgentEdit, AiCallDetail, AiCallRow, FlowStep, Health, Launch, ProjectCard, ScriptReview, Job, Meta, Project, QueueState, Row, WorkflowOverview, WorkflowRun } from "./types";
+import type { Agent, AgentEdit, AiCallDetail, AiCallRow, FlowStep, Health, Launch, ProjectCard, ProducePlan, ProjectFromText, ScriptReview, Job, Meta, Project, QueueState, Row, WorkflowOverview, WorkflowRun } from "./types";
 import { useI18n } from "../i18n";
 
 /** Polling is the fallback; the SSE feed (``events.ts``) pushes the same data much sooner. */
@@ -200,5 +200,23 @@ export function useStartService() {
   return useMutation({
     mutationFn: (name: string) => post<Launch>(`/api/launch/${name}/start`),
     onSuccess: (data) => qc.setQueryData(["launch"], data),
+  });
+}
+
+/** What producing the media would make, task by task (nothing runs): the list a person confirms. */
+export const useProducePlan = (id: number, tier: string, enabled: boolean) =>
+  useQuery({
+    queryKey: ["produce-plan", id, tier],
+    queryFn: () => api<ProducePlan>(`/api/projects/${id}/produce/plan?tier=${tier}`),
+    enabled,
+    refetchOnWindowFocus: false,
+  });
+
+/** A project from a written story/script: its text becomes the premise and the source the script stage adapts. */
+export function useProjectFromText() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { name: string; asset_id: string }) => post<ProjectFromText>("/api/projects/from-text", body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["projects"] }),
   });
 }

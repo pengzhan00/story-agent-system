@@ -146,6 +146,9 @@ sse_poll_seconds = 0.5
 sse_keepalive_seconds = 15
 
 [workflow]
+# A shot keyframe is composed from the approved portraits and the scene image (reference images of an image-edit job)
+# instead of being imagined again from words. false = text-to-image only, as before.
+keyframe_from_references = true
 # The produce stage turns every spec into media. Quality tier for the first pass (draft | preview | final).
 tier = "draft"
 # Library voice used for a character without a voice of their own, e.g. "library:voice/narrator". Empty = such

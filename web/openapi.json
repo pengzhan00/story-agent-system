@@ -1823,6 +1823,101 @@
         "title": "PipelineStep",
         "type": "object"
       },
+      "PlanTotals": {
+        "properties": {
+          "by_state": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "By State",
+            "type": "object"
+          },
+          "count": {
+            "description": "tasks that would run (new + stale)",
+            "title": "Count",
+            "type": "integer"
+          },
+          "est_seconds": {
+            "title": "Est Seconds",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "count",
+          "est_seconds",
+          "by_state"
+        ],
+        "title": "PlanTotals",
+        "type": "object"
+      },
+      "PlannedTaskOut": {
+        "properties": {
+          "est_seconds": {
+            "title": "Est Seconds",
+            "type": "integer"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "model_ref": {
+            "title": "Model Ref",
+            "type": "string"
+          },
+          "needs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Needs",
+            "type": "array"
+          },
+          "phase": {
+            "title": "Phase",
+            "type": "integer"
+          },
+          "reason": {
+            "description": "why a blocked task cannot be made (no_model | no_voice)",
+            "title": "Reason",
+            "type": "string"
+          },
+          "spec_id": {
+            "title": "Spec Id",
+            "type": "string"
+          },
+          "state": {
+            "description": "new | stale | done | blocked",
+            "title": "State",
+            "type": "string"
+          },
+          "subject_id": {
+            "title": "Subject Id",
+            "type": "string"
+          },
+          "subject_type": {
+            "title": "Subject Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "spec_id",
+          "subject_type",
+          "subject_id",
+          "label",
+          "kind",
+          "model_ref",
+          "phase",
+          "state",
+          "reason",
+          "est_seconds",
+          "needs"
+        ],
+        "title": "PlannedTaskOut",
+        "type": "object"
+      },
       "PresetBody": {
         "properties": {
           "model_ref": {
@@ -1842,6 +1937,31 @@
           }
         },
         "title": "PresetBody",
+        "type": "object"
+      },
+      "ProducePlanOut": {
+        "properties": {
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/PlannedTaskOut"
+            },
+            "title": "Tasks",
+            "type": "array"
+          },
+          "tier": {
+            "title": "Tier",
+            "type": "string"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/PlanTotals"
+          }
+        },
+        "required": [
+          "tier",
+          "tasks",
+          "totals"
+        ],
+        "title": "ProducePlanOut",
         "type": "object"
       },
       "ProjectCard": {
@@ -1962,6 +2082,77 @@
           "name"
         ],
         "title": "ProjectCreate",
+        "type": "object"
+      },
+      "ProjectFromText": {
+        "properties": {
+          "asset_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "a text asset (story, script, transcript, uploaded text)",
+            "title": "Asset Id"
+          },
+          "content_language": {
+            "default": "",
+            "title": "Content Language",
+            "type": "string"
+          },
+          "genre": {
+            "default": "",
+            "title": "Genre",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "start": {
+            "default": true,
+            "description": "queue the story stages (no media) right away",
+            "title": "Start",
+            "type": "boolean"
+          },
+          "text": {
+            "default": "",
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "ProjectFromText",
+        "type": "object"
+      },
+      "ProjectFromTextOut": {
+        "properties": {
+          "project": {
+            "$ref": "#/components/schemas/ProjectOut"
+          },
+          "run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkflowRunOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "project",
+          "run"
+        ],
+        "title": "ProjectFromTextOut",
         "type": "object"
       },
       "ProjectOut": {
@@ -5196,6 +5387,48 @@
         ]
       }
     },
+    "/api/projects/from-text": {
+      "post": {
+        "description": "A project from a written story or script (e.g. the workshop's): the text becomes the premise and the source the\nscript stage adapts. With ``start`` the story stages (not the media) are queued; the media are confirmed later in\nthe production plan.",
+        "operationId": "create_project_from_text_api_projects_from_text_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectFromText"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectFromTextOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Project From Text",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
     "/api/projects/overview": {
       "get": {
         "description": "For the list page: per project the step progress and the newest finished episode (open it to preview).",
@@ -6585,6 +6818,69 @@
         "summary": "Update Music",
         "tags": [
           "story"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/produce/plan": {
+      "get": {
+        "description": "What producing the media would make, task by task, with models and estimates - to confirm before it runs.\nStart the confirmed part with ``POST .../workflow/runs {\"stages\": [\"produce\"], \"params\": {\"only\": [spec ids],\n\"tier\": ...}}``.",
+        "operationId": "get_produce_plan_api_projects__project_id__produce_plan_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tier",
+            "required": false,
+            "schema": {
+              "default": "draft",
+              "title": "Tier",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "force",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Force",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProducePlanOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Produce Plan",
+        "tags": [
+          "workflow"
         ]
       }
     },
