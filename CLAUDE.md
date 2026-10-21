@@ -20,7 +20,7 @@ scripts/start.sh                                   # worker + server (Ctrl-C sto
 .venv/bin/python -m storyagent db migrate | status | import-legacy --from <v1 db> ; config show ; i18n check
 .venv/bin/python -m storyagent project create|list [--trashed]|trash ID [--restore]
 .venv/bin/python -m storyagent media healthcheck | submit | jobs | show | cancel | retry | adopt ; asset import ; library add|list|show|remove ; spec create|show|edit|diff|revert|lock|unlock|regenerate
-.venv/bin/python -m storyagent worker [--once] ; serve [--host --port] ; llm check ; ops llm-unload
+.venv/bin/python -m storyagent worker [--once] ; serve [--host --port] ; llm check ; ops llm-unload ; ops launch [--all|NAME]
 .venv/bin/python -m storyagent workflow run [--stage S] [--param k=v] [--inline] | status | watch | review ; export episode --project N --out DIR
 STORY_AGENT_ENABLE_FAKE=1 registers the fake adapter for local end-to-end runs (see tests/test_cli_media.py)
 ```
@@ -41,7 +41,7 @@ Config layers (low → high): packaged `storyagent/config/defaults/*.toml` < `$S
 
 ## Rules enforced by tests
 
-`tests/test_guards.py`: inside `storyagent/` no `/Users/`, `~/myworkspace`, `127.0.0.1`/`localhost` literals, `pkill`/`shell=True`, or CJK string literals. Services/tools/models come from `Settings`; prompts live in TOML/JSON; every user-visible string is an i18n key in `storyagent/locales/{zh-CN,en}.json` (`storyagent i18n check` must stay green; the web has `react/jsx-no-literals`). Never add code that kills or starts processes belonging to someone else.
+`tests/test_guards.py`: inside `storyagent/` no `/Users/`, `~/myworkspace`, `127.0.0.1`/`localhost` literals, `pkill`/`shell=True`, or CJK string literals. Services/tools/models come from `Settings`; prompts live in TOML/JSON; every user-visible string is an i18n key in `storyagent/locales/{zh-CN,en}.json` (`storyagent i18n check` must stay green; the web has `react/jsx-no-literals`). Never add code that kills or starts processes belonging to someone else. The only thing the system starts is what the operator listed under `[launch.<service>]` in `services.toml` and asked for (launch screen / `ops launch`); it never stops anything (`storyagent/launcher.py`).
 
 ## Gotchas
 

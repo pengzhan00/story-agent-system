@@ -1,11 +1,31 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAgentEdit, useAgents } from "../api/hooks";
 import type { Agent } from "../api/types";
 import { ErrorNote } from "../components/ErrorNote";
 import { useT } from "../i18n";
 
+/** Where each AI step sits in the film-making pipeline (the stage names come from the workflow catalog). */
+const STAGE_OF: Record<string, string> = {
+  "director.analyze": "analyze",
+  "art.style": "analyze",
+  "character.design": "cast",
+  "screenwriter.outline": "script",
+  "screenwriter.adapt": "script",
+  "scene.design": "scenes",
+  "composer.bgm": "music",
+  "composer.theme": "music",
+  "sound.design": "music",
+  "screenwriter.shots": "shotplan",
+  "shot.visual": "specs",
+  "reviewer.script": "review",
+};
+const STAGE_ORDER = ["analyze", "cast", "script", "scenes", "music", "shotplan", "specs", "review"];
+
 function Editor({ agent }: { agent: Agent }) {
   const t = useT();
+  const system = useRef<HTMLTextAreaElement>(null);
+  const promptBox = useRef<HTMLTextAreaElement>(null);
+  const lastBox = useRef<"system" | "prompt">("prompt");
   const edit = useAgentEdit();
   const [d, setD] = useState({
     system: agent.system, prompt: agent.prompt, model: agent.model, temperature: String(agent.temperature),
@@ -18,26 +38,46 @@ function Editor({ agent }: { agent: Agent }) {
   const dirty =
     d.system !== agent.system || d.prompt !== agent.prompt || d.model !== agent.model || Number(d.temperature) !== agent.temperature ||
     Number(d.max_tokens) !== agent.max_tokens || Number(d.attempts) !== agent.attempts;
+  function insert(name: string) {
+    const which = lastBox.current;
+    const el = (which === "system" ? system : promptBox).current;
+    const token = `$${name}`;
+    const start = el?.selectionStart ?? d[which].length;
+    const end = el?.selectionEnd ?? start;
+    const text = d[which].slice(0, start) + token + d[which].slice(end);
+    setD({ ...d, [which]: text });
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(start + token.length, start + token.length);
+    });
+  }
   return (
     <section className="card stack" id={agent.name}>
       <div className="row">
-        <h2 className="grow mono">{agent.name}</h2>
+        <h2 className="grow">{t(`agent.${agent.name}.title`)}</h2>
         {agent.overridden ? <span className="chip chip-stale">{t("web.prompts.modified")}</span> : <span className="chip">{t("web.prompts.packaged")}</span>}
       </div>
-      <p className="muted small">{agent.description}</p>
+      <p>{t(`agent.${agent.name}.desc`)}</p>
       <p className="small">
-        <span className="muted">{t("web.prompts.placeholders")}</span>{" "}
-        {agent.inputs.map((i) => (
-          <code key={i} className="chip">{`$${i}`}</code>
-        ))}
+        <span className="muted">{t("web.prompts.output")}</span> {t(`agent.${agent.name}.out`)}
       </p>
+      <div className="small stack">
+        <span className="muted">{t("web.prompts.placeholders")}</span>
+        <span className="row">
+          {agent.inputs.map((i) => (
+            <button key={i} type="button" className="chip chip-button" title={`$${i}`} onClick={() => insert(i)}>
+              {t(`agent.var.${i}`)}
+            </button>
+          ))}
+        </span>
+      </div>
       <label className="field wide">
         <span>{t("web.prompts.system")}</span>
-        <textarea rows={6} value={d.system} onChange={(e) => setD({ ...d, system: e.target.value })} />
+        <textarea ref={system} onFocus={() => (lastBox.current = "system")} rows={6} value={d.system} onChange={(e) => setD({ ...d, system: e.target.value })} />
       </label>
       <label className="field wide">
         <span>{t("web.prompts.prompt")}</span>
-        <textarea rows={12} value={d.prompt} onChange={(e) => setD({ ...d, prompt: e.target.value })} />
+        <textarea ref={promptBox} onFocus={() => (lastBox.current = "prompt")} rows={12} value={d.prompt} onChange={(e) => setD({ ...d, prompt: e.target.value })} />
       </label>
       <div className="form-grid">
         <label className="field">
@@ -99,14 +139,25 @@ export function PromptsPage() {
       <h1>{t("web.nav.prompts")}</h1>
       <p className="muted">{t("web.prompts.intro")}</p>
       <ErrorNote error={agents.error} />
-      <nav className="tabs" aria-label={t("web.nav.prompts")}>
-        {agents.data?.map((a) => (
-          <button key={a.name} className={a.name === current?.name ? "tab active" : "tab"} onClick={() => setPick(a.name)}>
-            {a.name}
-            {a.overridden ? ` ${t("web.prompts.dot")}` : ""}
-          </button>
-        ))}
-      </nav>
+      <div className="stack">
+        {STAGE_ORDER.map((stage) => {
+          const group = (agents.data ?? []).filter((a) => (STAGE_OF[a.name] ?? "review") === stage);
+          if (group.length === 0) return null;
+          return (
+            <div key={stage} className="row">
+              <strong className="small stage-label">{t(stage === "review" ? "web.prompts.stage_review" : `workflow.stage.${stage}`)}</strong>
+              <nav className="tabs" aria-label={t(stage === "review" ? "web.prompts.stage_review" : `workflow.stage.${stage}`)}>
+                {group.map((a) => (
+                  <button key={a.name} className={a.name === current?.name ? "tab active" : "tab"} onClick={() => setPick(a.name)}>
+                    {t(`agent.${a.name}.title`)}
+                    {a.overridden ? ` ${t("web.prompts.dot")}` : ""}
+                  </button>
+                ))}
+              </nav>
+            </div>
+          );
+        })}
+      </div>
       {current ? <Editor key={current.name} agent={current} /> : null}
     </div>
   );

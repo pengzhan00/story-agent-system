@@ -36,6 +36,7 @@ from storyagent.db import Database, MigrationError, current_version, migrate
 from storyagent.db.legacy_import import LegacyImportError, import_legacy
 from storyagent.domain import JobStatus, MediaKind, QualityTier
 from storyagent.i18n import available_locales, check_catalogs, set_locale, t
+from storyagent.launcher import Launcher, LaunchError
 from storyagent.logging_setup import setup_logging
 from storyagent.media import healthcheck as health
 from storyagent.media.contracts import MediaJob
@@ -430,6 +431,36 @@ def _cmd_llm_unload(s: Settings, _a: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_launch(s: Settings, a: argparse.Namespace) -> int:
+    """Show the services and start the ones that are needed (`--all`) or one by name."""
+    launcher = Launcher(s)
+    if a.all or a.name:
+        try:
+            if a.all:
+                for name, outcome, detail in launcher.start_all():
+                    if outcome in ("started", "already"):
+                        print(t(f"cli.launch.{outcome}", name=name, state=t(f"launch.state.{detail}")))
+                    else:
+                        print(t("cli.launch.error", name=name, error=t(f"api.error.{outcome}"), detail=detail))
+            else:
+                st = launcher.start(a.name)
+                print(t("cli.launch.started", name=st.name, state=t(f"launch.state.{st.state}")))
+        except LaunchError as exc:
+            print(t("cli.launch.error", name=a.name or "", error=t(f"api.error.{exc.code}"), detail=exc.detail),
+                  file=sys.stderr)
+            return 1
+    print(t("cli.launch.header"))
+    for st in launcher.statuses():
+        print(t("cli.launch.row", name=st.name, state=t(f"launch.state.{st.state}"), detail=st.detail))
+    report = health.run_checks(s, registry=default_registry(s))
+    for e in report.entries:
+        if e.category != "service" and not e.ok and e.state.value != "disabled":
+            print(t("cli.launch.issue", name=e.name, label=t(f"health.{e.state.value}"), detail=e.detail))
+    required_down = [st for st in launcher.statuses() if st.name in s.healthcheck_required and st.state != "running"]
+    print(t("cli.launch.ready") if not required_down and not report.failing_required else t("cli.launch.not_ready"))
+    return 0 if not required_down else 1
+
+
 # -- story workflow ---------------------------------------------------------------------------------
 def _show_run(state: WorkflowState, run_id: str, interval: float) -> dict[str, Any]:
     """Draw the run's progress bar until it ends (a worker - or ``--inline`` - is doing the work)."""
@@ -734,6 +765,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     ops = sub.add_parser("ops").add_subparsers(dest="cmd", required=True)
     add(ops, "llm-unload", _cmd_llm_unload)
+    launch = add(ops, "launch", _cmd_launch)
+    launch.add_argument("name", nargs="?", default="", help="service to start (default: only show the state)")
+    launch.add_argument("--all", action="store_true", help="start every startable service that is not up")
     return p
 
 

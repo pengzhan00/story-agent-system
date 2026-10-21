@@ -134,3 +134,25 @@ ol.flow { list-style: none; margin: 0; padding: 0; display: flex; flex-direction
 .flow-medias, .flow-agents { display: flex; flex-direction: column; gap: 8px; }
 .flow-media { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; }
 .flow-model summary { cursor: pointer; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+
+/* launch screen */
+.banner { padding: 10px 14px; border-radius: 8px; border: 1px solid var(--line); }
+.banner-ok { border-color: var(--ok); }
+.banner-warn { border-color: var(--warn); }
+.issue-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+
+/* friendly data views/editors, prompt placeholders */
+.chip-button { cursor: pointer; background: transparent; font: inherit; }
+.chip-button:hover { border-color: var(--accent); color: var(--accent); }
+.stage-label { min-width: 4.5em; }
+.value-dl { margin: 0; display: grid; gap: 4px; }
+.value-row { display: grid; grid-template-columns: minmax(6em, 14em) 1fr; gap: 8px; }
+.value-row dt { color: var(--muted, #6b7280); font-size: 0.85rem; }
+.value-row dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.value-dl.depth-1, .value-dl.depth-2 { padding-left: 10px; border-left: 2px solid var(--line); }
+.value-list { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
+.vgroup { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; margin: 0; }
+.vgroup legend { padding: 0 6px; font-weight: 600; font-size: 0.9rem; }
+.vitem { border-top: 1px dashed var(--line); padding: 8px 0; }
+.vitem:first-of-type { border-top: 0; }
+.field.check { flex-direction: row; align-items: center; gap: 8px; }

@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { ValueView } from "./ValueView";
 import { useFlow, useHealth } from "../api/hooks";
 import type { FlowMedia, FlowStep } from "../api/types";
 import { useT } from "../i18n";
@@ -46,7 +47,7 @@ function MediaRow({ m, health }: { m: FlowMedia; health: Map<string, { ok: boole
                   {Object.entries(model.params ?? {}).map(([tier, params]) => (
                     <tr key={tier}>
                       <td className="strong">{t(`media.tier.${tier}`)}</td>
-                      <td className="mono small">{JSON.stringify(params)}</td>
+                      <td className="small"><ValueView value={params} prefix="param" /></td>
                     </tr>
                   ))}
                 </tbody>

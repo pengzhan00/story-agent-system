@@ -1027,6 +1027,180 @@
         "title": "LabeledValue",
         "type": "object"
       },
+      "LaunchIssue": {
+        "properties": {
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "required": {
+            "title": "Required",
+            "type": "boolean"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "category",
+          "state",
+          "label",
+          "detail",
+          "required"
+        ],
+        "title": "LaunchIssue",
+        "type": "object"
+      },
+      "LaunchOut": {
+        "properties": {
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/LaunchIssue"
+            },
+            "title": "Issues",
+            "type": "array"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "boolean"
+          },
+          "services": {
+            "items": {
+              "$ref": "#/components/schemas/LaunchService"
+            },
+            "title": "Services",
+            "type": "array"
+          },
+          "startable": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Startable",
+            "type": "array"
+          },
+          "starting": {
+            "title": "Starting",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "services",
+          "issues",
+          "ready",
+          "starting",
+          "startable"
+        ],
+        "title": "LaunchOut",
+        "type": "object"
+      },
+      "LaunchService": {
+        "properties": {
+          "bulk": {
+            "title": "Bulk",
+            "type": "boolean"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "elapsed_sec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Elapsed Sec"
+          },
+          "hint": {
+            "title": "Hint",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "log": {
+            "title": "Log",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "pid": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pid"
+          },
+          "required": {
+            "title": "Required",
+            "type": "boolean"
+          },
+          "startable": {
+            "title": "Startable",
+            "type": "boolean"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "timeout_sec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeout Sec"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "url",
+          "state",
+          "label",
+          "startable",
+          "bulk",
+          "required",
+          "detail",
+          "hint",
+          "pid",
+          "elapsed_sec",
+          "timeout_sec",
+          "log"
+        ],
+        "title": "LaunchService",
+        "type": "object"
+      },
       "LibraryItemOut": {
         "properties": {
           "asset": {
@@ -3837,6 +4011,92 @@
         "summary": "Retry Job",
         "tags": [
           "jobs"
+        ]
+      }
+    },
+    "/api/launch": {
+      "get": {
+        "description": "The services with their state, the problems found by the health checks, and whether the system is ready.",
+        "operationId": "launch_state_api_launch_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LaunchOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Launch State",
+        "tags": [
+          "launch"
+        ]
+      }
+    },
+    "/api/launch/start-all": {
+      "post": {
+        "description": "Start every startable service that is not up yet. A service that is up is left alone.",
+        "operationId": "start_all_api_launch_start_all_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LaunchOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Start All",
+        "tags": [
+          "launch"
+        ]
+      }
+    },
+    "/api/launch/{name}/start": {
+      "post": {
+        "operationId": "start_one_api_launch__name__start_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LaunchOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start One",
+        "tags": [
+          "launch"
         ]
       }
     },

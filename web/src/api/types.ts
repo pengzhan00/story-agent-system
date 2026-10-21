@@ -11,6 +11,7 @@ export type StageProgress = S["StageProgressOut"];
 export type WorkflowOverview = S["WorkflowOut"];
 export type WorkflowStage = S["WorkflowStageOut"];
 export type Health = S["HealthOut"];
+export type Launch = S["LaunchOut"];
 export type QueueState = S["QueueState"];
 export type Row = Record<string, unknown>;
 export type Spec = S["SpecOut"];

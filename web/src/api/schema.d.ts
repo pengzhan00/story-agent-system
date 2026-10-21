@@ -322,6 +322,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/launch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Launch State
+         * @description The services with their state, the problems found by the health checks, and whether the system is ready.
+         */
+        get: operations["launch_state_api_launch_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/launch/start-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start All
+         * @description Start every startable service that is not up yet. A service that is up is left alone.
+         */
+        post: operations["start_all_api_launch_start_all_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/launch/{name}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start One */
+        post: operations["start_one_api_launch__name__start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/library": {
         parameters: {
             query?: never;
@@ -1598,6 +1655,63 @@ export interface components {
             label: string;
             /** Value */
             value: string;
+        };
+        /** LaunchIssue */
+        LaunchIssue: {
+            /** Category */
+            category: string;
+            /** Detail */
+            detail: string;
+            /** Label */
+            label: string;
+            /** Name */
+            name: string;
+            /** Required */
+            required: boolean;
+            /** State */
+            state: string;
+        };
+        /** LaunchOut */
+        LaunchOut: {
+            /** Issues */
+            issues: components["schemas"]["LaunchIssue"][];
+            /** Ready */
+            ready: boolean;
+            /** Services */
+            services: components["schemas"]["LaunchService"][];
+            /** Startable */
+            startable: string[];
+            /** Starting */
+            starting: boolean;
+        };
+        /** LaunchService */
+        LaunchService: {
+            /** Bulk */
+            bulk: boolean;
+            /** Detail */
+            detail: string;
+            /** Elapsed Sec */
+            elapsed_sec: number | null;
+            /** Hint */
+            hint: string;
+            /** Label */
+            label: string;
+            /** Log */
+            log: string;
+            /** Name */
+            name: string;
+            /** Pid */
+            pid: number | null;
+            /** Required */
+            required: boolean;
+            /** Startable */
+            startable: boolean;
+            /** State */
+            state: string;
+            /** Timeout Sec */
+            timeout_sec: number | null;
+            /** Url */
+            url: string;
         };
         /** LibraryItemOut */
         LibraryItemOut: {
@@ -2904,6 +3018,77 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    launch_state_api_launch_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LaunchOut"];
+                };
+            };
+        };
+    };
+    start_all_api_launch_start_all_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LaunchOut"];
+                };
+            };
+        };
+    };
+    start_one_api_launch__name__start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LaunchOut"];
                 };
             };
             /** @description Validation Error */

@@ -1,14 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useMeta } from "../api/hooks";
 import { useDiff, useSpecActions, useVersions } from "../api/specs";
 import type { Spec, SpecEdit } from "../api/types";
 import { fieldsOfKind, textFieldKey } from "../lib/subjects";
 import { useT } from "../i18n";
 import { ErrorNote } from "./ErrorNote";
+import { ValueEditor } from "./ValueEditor";
+import { formatValue, useLabel } from "../lib/labels";
 
-function pretty(v: unknown): string {
-  return JSON.stringify(v ?? {}, null, 2);
-}
 
 export function SpecEditor({ pid, spec, review, onAcknowledge }: { pid: number; spec: Spec; review: boolean; onAcknowledge: () => void }) {
   const t = useT();
@@ -19,7 +18,7 @@ export function SpecEditor({ pid, spec, review, onAcknowledge }: { pid: number; 
   const [text, setText] = useState(spec.text_payload);
   const [seed, setSeed] = useState(spec.seed === null ? "" : String(spec.seed));
   const [model, setModel] = useState(spec.model_ref);
-  const [params, setParams] = useState(pretty(spec.params));
+  const [params, setParams] = useState<Record<string, unknown>>({ ...(spec.params ?? {}) });
   const [note, setNote] = useState("");
 
   // Reload the form when another spec is chosen or a new version arrives.
@@ -29,18 +28,9 @@ export function SpecEditor({ pid, spec, review, onAcknowledge }: { pid: number; 
     setText(spec.text_payload);
     setSeed(spec.seed === null ? "" : String(spec.seed));
     setModel(spec.model_ref);
-    setParams(pretty(spec.params));
+    setParams({ ...(spec.params ?? {}) });
     setNote("");
   }, [spec.id, spec.version, spec.slot]);
-
-  const parsed = useMemo(() => {
-    try {
-      const v: unknown = JSON.parse(params || "{}");
-      return v && typeof v === "object" && !Array.isArray(v) ? { ok: true as const, value: v as Record<string, unknown> } : { ok: false as const };
-    } catch {
-      return { ok: false as const };
-    }
-  }, [params]);
 
   const models = (meta.data?.models ?? []).filter((m) => m.kind === spec.kind);
   const f = fieldsOfKind(spec.kind);
@@ -53,7 +43,7 @@ export function SpecEditor({ pid, spec, review, onAcknowledge }: { pid: number; 
   if (text !== spec.text_payload) changes.text_payload = text;
   if (model !== spec.model_ref) changes.model_ref = model;
   if (seedOk && seedValue !== spec.seed) changes.seed = seedValue;
-  if (parsed.ok && JSON.stringify(parsed.value) !== JSON.stringify(spec.params ?? {})) changes.params = parsed.value;
+  if (JSON.stringify(params) !== JSON.stringify(spec.params ?? {})) changes.params = params;
   const dirty = Object.keys(changes).length > 0;
   const locked = spec.locked;
 
@@ -111,17 +101,17 @@ export function SpecEditor({ pid, spec, review, onAcknowledge }: { pid: number; 
             </label>
           ) : null}
         </div>
-        <label className="field">
+        <div className="field wide">
           <span>{t("web.creative.params")}</span>
-          <textarea className="mono" value={params} onChange={(e) => setParams(e.target.value)} rows={5} aria-invalid={!parsed.ok} />
-          {!parsed.ok ? <span className="bad small">{t("web.creative.params_invalid")}</span> : null}
-        </label>
+          {Object.keys(params).length > 0 ? <ValueEditor value={params} onChange={setParams} prefix="param" /> : null}
+          <AddParam onAdd={(k, v) => setParams({ ...params, [k]: v })} existing={Object.keys(params)} />
+        </div>
         <label className="field">
           <span>{t("web.creative.note")}</span>
           <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("web.creative.note_hint")} />
         </label>
         <div className="row">
-          <button className="primary" disabled={!dirty || !parsed.ok || !seedOk || act.edit.isPending} onClick={() => act.edit.mutate({ ...changes, note })}>
+          <button className="primary" disabled={!dirty || !seedOk || act.edit.isPending} onClick={() => act.edit.mutate({ ...changes, note })}>
             {t("web.creative.save_version", { v: spec.version + 1 })}
           </button>
           <span className="small muted">{t("web.creative.version_of", { v: spec.version, author: t(`web.creative.author.${spec.author}`) })}</span>
@@ -139,12 +129,45 @@ export function SpecEditor({ pid, spec, review, onAcknowledge }: { pid: number; 
   );
 }
 
+/** A parameter that is not there yet: a name and a value (numbers and yes/no are recognised). */
+function AddParam({ onAdd, existing }: { onAdd: (key: string, value: unknown) => void; existing: string[] }) {
+  const t = useT();
+  const [key, setKey] = useState("");
+  const [val, setVal] = useState("");
+  const name = key.trim();
+  const ok = name !== "" && !existing.includes(name);
+  const parse = (raw: string): unknown => {
+    if (raw.trim() !== "" && Number.isFinite(Number(raw))) return Number(raw);
+    if (raw === "true" || raw === "false") return raw === "true";
+    return raw;
+  };
+  return (
+    <div className="row">
+      <input value={key} onChange={(e) => setKey(e.target.value)} placeholder={t("web.creative.param_name")} aria-label={t("web.creative.param_name")} />
+      <input value={val} onChange={(e) => setVal(e.target.value)} placeholder={t("web.creative.param_value")} aria-label={t("web.creative.param_value")} />
+      <button
+        type="button"
+        disabled={!ok}
+        onClick={() => {
+          onAdd(name, parse(val));
+          setKey("");
+          setVal("");
+        }}
+      >
+        {t("web.creative.add_param")}
+      </button>
+    </div>
+  );
+}
+
 function History({ pid, spec }: { pid: number; spec: Spec }) {
   const t = useT();
   const act = useSpecActions(pid, spec);
   const versions = useVersions(pid, spec);
   const [open, setOpen] = useState<number | null>(null);
   const diff = useDiff(pid, spec, open, spec.version);
+  const fieldName = useLabel("specfield");
+  const paramName = useLabel("param");
   const list = versions.data ?? [];
   if (list.length <= 1) return null;
   return (
@@ -176,9 +199,9 @@ function History({ pid, spec }: { pid: number; spec: Spec }) {
                 <tbody>
                   {diff.data.map((d) => (
                     <tr key={d.field}>
-                      <th>{d.field}</th>
-                      <td className="del">{JSON.stringify(d.before)}</td>
-                      <td className="add">{JSON.stringify(d.after)}</td>
+                      <th>{fieldName(d.field)}</th>
+                      <td className="del">{formatValue(d.before, t, paramName)}</td>
+                      <td className="add">{formatValue(d.after, t, paramName)}</td>
                     </tr>
                   ))}
                 </tbody>

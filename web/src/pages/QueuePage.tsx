@@ -1,4 +1,6 @@
 import { Fragment, useState } from "react";
+import { ValueView } from "../components/ValueView";
+import { formatValue, useLabel } from "../lib/labels";
 import { useJobActions, useJobEvents, useJobs, useQueueState } from "../api/hooks";
 import type { Job } from "../api/types";
 import { ErrorNote } from "../components/ErrorNote";
@@ -20,7 +22,9 @@ type Filter = keyof typeof FILTERS;
 function JobDetail({ job }: { job: Job }) {
   const t = useT();
   const events = useJobEvents(job.id);
-  const json = (v: unknown) => JSON.stringify(v, null, 2);
+  const paramName = useLabel("param");
+  const eventLabel = useLabel("jobevent");
+  const eventName = (n: string) => eventLabel(n);
   return (
     <div className="stack">
       <div className="row small">
@@ -36,13 +40,13 @@ function JobDetail({ job }: { job: Job }) {
         </div>
       ) : null}
       <strong className="small">{t("web.jobs.d.inputs")}</strong>
-      <pre className="transcript">{json(job.inputs)}</pre>
+      <div className="transcript"><ValueView value={job.inputs} prefix="input" /></div>
       <strong className="small">{t("web.jobs.d.params")}</strong>
-      <pre className="transcript">{json(job.params)}</pre>
+      <div className="transcript"><ValueView value={job.params} prefix="param" /></div>
       <strong className="small">{t("web.jobs.d.events")}</strong>
       <ul className="plain small">
         {events.data?.map((e) => (
-          <li key={e.id} className="mono">{`${e.ts.slice(11, 19)} ${e.event} ${Object.keys(e.data ?? {}).length ? JSON.stringify(e.data).slice(0, 160) : ""}`}</li>
+          <li key={e.id} className="mono">{`${e.ts.slice(11, 19)} ${eventName(e.event)} ${Object.keys(e.data ?? {}).length ? formatValue(e.data, t, paramName).slice(0, 160) : ""}`}</li>
         ))}
       </ul>
     </div>

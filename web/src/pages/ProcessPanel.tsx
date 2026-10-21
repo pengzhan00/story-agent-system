@@ -1,8 +1,28 @@
 import { Fragment, useMemo, useState } from "react";
 import { useAiCall, useAiCalls, useProjectData, useSaveProjectData } from "../api/hooks";
 import { ErrorNote } from "../components/ErrorNote";
+import { ValueEditor } from "../components/ValueEditor";
+import { ValueView } from "../components/ValueView";
 import { useT } from "../i18n";
 import { duration } from "../lib/format";
+
+/** A model answer that is a JSON object is shown as labelled fields; anything else stays plain text. */
+function asObject(text: string): Record<string, unknown> | null {
+  const trimmed = text.trim();
+  if (!trimmed.startsWith("{")) return null;
+  try {
+    const v: unknown = JSON.parse(trimmed);
+    return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+function agentName(t: (k: string) => string, name: string): string {
+  const key = `agent.${name}.title`;
+  const text = t(key);
+  return text === key ? name : text;
+}
 
 function Transcript({ id }: { id: number }) {
   const t = useT();
@@ -21,7 +41,7 @@ function Transcript({ id }: { id: number }) {
               {t("web.copy")}
             </button>
           </div>
-          <pre className="transcript">{text}</pre>
+          {k === "response" && asObject(text) ? <div className="transcript"><ValueView value={asObject(text)} /></div> : <pre className="transcript">{text}</pre>}
         </div>
       ))}
     </div>
@@ -43,7 +63,7 @@ function AiCalls({ id }: { id: number }) {
           <option value="">{t("web.process.all_agents")}</option>
           {labels.map((l) => (
             <option key={l} value={l}>
-              {l}
+              {agentName(t, l)}
             </option>
           ))}
         </select>
@@ -69,7 +89,7 @@ function AiCalls({ id }: { id: number }) {
                 <Fragment key={c.id}>
                   <tr>
                     <td className="small muted">{c.created_at.replace("T", " ").slice(0, 19)}</td>
-                    <td className="strong mono">{c.label || c.agent}</td>
+                    <td className="strong">{agentName(t, c.label || c.agent)}</td>
                     <td className="small">{c.model}</td>
                     <td className="small">{`${c.tokens_in} → ${c.tokens_out}`}</td>
                     <td className="small">{duration(c.duration_ms / 1000)}</td>
@@ -96,57 +116,25 @@ function AiCalls({ id }: { id: number }) {
   );
 }
 
-/** Every key of the plan/style as its own field; texts edit as text, lists and objects as JSON. */
+/** The plan / style as labelled fields (text, numbers, lists, groups), never as JSON. */
 function DataEditor({ id, name }: { id: number; name: "plan" | "style" }) {
   const t = useT();
   const data = useProjectData(id, name);
   const save = useSaveProjectData(id, name);
-  const [draft, setDraft] = useState<Record<string, string> | null>(null);
-  const [bad, setBad] = useState<string | null>(null);
-  const current = data.data ?? {};
-  const text = (v: unknown) => (typeof v === "string" ? v : JSON.stringify(v, null, 2));
-  const values = draft ?? Object.fromEntries(Object.entries(current).map(([k, v]) => [k, text(v)]));
-  const dirty = draft !== null;
-  function submit() {
-    const out: Record<string, unknown> = {};
-    for (const [k, raw] of Object.entries(values)) {
-      if (typeof current[k] === "string" || current[k] === undefined) {
-        out[k] = raw;
-        continue;
-      }
-      try {
-        out[k] = JSON.parse(raw);
-      } catch {
-        setBad(k);
-        return;
-      }
-    }
-    setBad(null);
-    save.mutate(out, { onSuccess: () => setDraft(null) });
-  }
+  const [draft, setDraft] = useState<Record<string, unknown> | null>(null);
+  const current = (data.data ?? {}) as Record<string, unknown>;
+  const values = draft ?? current;
+  const dirty = draft !== null && JSON.stringify(draft) !== JSON.stringify(current);
   return (
     <section className="card stack">
       <h2>{t(`web.process.${name}`)}</h2>
       <p className="muted small">{t(`web.process.${name}_hint`)}</p>
       <ErrorNote error={data.error ?? save.error} />
       {Object.keys(current).length === 0 && !data.isLoading ? <p className="empty">{t("web.process.not_yet")}</p> : null}
-      <div className="form-grid">
-        {Object.keys(values).map((k) => (
-          <label key={k} className="field wide">
-            <span className="mono">{k}</span>
-            <textarea
-              rows={Math.min(Math.max((values[k] ?? "").split("\n").length, 2), 12)}
-              value={values[k]}
-              aria-invalid={bad === k}
-              onChange={(e) => setDraft({ ...values, [k]: e.target.value })}
-            />
-            {bad === k ? <span className="bad small">{t("web.process.bad_json")}</span> : null}
-          </label>
-        ))}
-      </div>
+      {Object.keys(values).length > 0 ? <ValueEditor value={values} onChange={setDraft} /> : null}
       {Object.keys(values).length > 0 ? (
         <div className="row">
-          <button className="primary" disabled={!dirty || save.isPending} onClick={submit}>
+          <button className="primary" disabled={!dirty || save.isPending} onClick={() => save.mutate(values, { onSuccess: () => setDraft(null) })}>
             {t("web.save")}
           </button>
           <button disabled={!dirty} onClick={() => setDraft(null)}>

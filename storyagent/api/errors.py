@@ -15,6 +15,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from storyagent.agents.registry import AgentSpecError
 from storyagent.config import ConfigError
+from storyagent.launcher import LaunchError
 from storyagent.media.ledger import LedgerError
 from storyagent.media.library import LibraryError
 from storyagent.media.specs import SpecError, SpecLocked
@@ -54,6 +55,11 @@ def install(app: FastAPI) -> None:
     @app.exception_handler(ApiError)
     async def _api(request: Request, exc: ApiError) -> JSONResponse:
         return respond(request, exc.status, exc.code, exc.detail)
+
+    @app.exception_handler(LaunchError)
+    async def _launch(request: Request, exc: LaunchError) -> JSONResponse:
+        status = {"launch_unknown": 404, "launch_not_startable": 409, "launch_missing": 424}.get(exc.code, 500)
+        return respond(request, status, exc.code, exc.detail)
 
     @app.exception_handler(ProjectNotFound)
     async def _project(request: Request, exc: ProjectNotFound) -> JSONResponse:

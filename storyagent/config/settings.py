@@ -141,6 +141,7 @@ class Settings:
     legacy_db_path: Path | None = None
     api: Mapping[str, Any] = field(default_factory=dict)  # [api] host/port/cors_origins/sse_*
     workflow: Mapping[str, Any] = field(default_factory=dict)  # [workflow] produce/compose defaults
+    launch: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)  # [launch.<service>] how to start it
 
     # -- derived paths ----------------------------------------------------
     @property
@@ -401,6 +402,25 @@ def _build_api(raw: Mapping[str, Any]) -> dict[str, Any]:
     return api
 
 
+def _build_launch(raw: Mapping[str, Any], services: Mapping[str, ServiceConfig]) -> dict[str, dict[str, Any]]:
+    out: dict[str, dict[str, Any]] = {}
+    for name, spec in raw.items():
+        if name not in services:
+            raise ConfigError(f"[launch.{name}] names no service in [services]")
+        argv = spec.get("argv")
+        if not isinstance(argv, list) or not argv or not all(isinstance(a, str) and a for a in argv):
+            raise ConfigError(f"[launch.{name}] argv must be a non-empty list of strings")
+        env = spec.get("env", {})
+        if not isinstance(env, dict) or not all(isinstance(v, str) for v in env.values()):
+            raise ConfigError(f"[launch.{name}] env must be a table of strings")
+        out[name] = {
+            "argv": list(argv), "cwd": str(spec.get("cwd", "")), "env": dict(env),
+            "bulk": bool(spec.get("bulk", True)), "launcher": bool(spec.get("launcher", False)),
+            "timeout_sec": float(spec.get("timeout_sec", 120)), "hint_key": str(spec.get("hint_key", "")),
+        }
+    return out
+
+
 def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     env = os.environ if env is None else env
 
@@ -462,6 +482,7 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         raise ConfigError(f"[healthcheck] required lists unknown entries: {unknown_required}")
 
     backends, roles = _build_llm(merged["llm"], services)
+    launch = _build_launch(merged["services"].get("launch", {}), services)
     legacy = env.get(ENV_LEGACY_DB)
     return Settings(
         home=home,
@@ -482,6 +503,7 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         legacy_db_path=Path(legacy).expanduser() if legacy else None,
         api=_build_api(merged["services"].get("api", {})),
         workflow=dict(merged["services"].get("workflow", {})),
+        launch=launch,
     )
 
 

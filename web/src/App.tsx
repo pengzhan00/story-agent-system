@@ -1,11 +1,23 @@
 import { NavLink, Navigate, Route, Routes } from "react-router-dom";
 import { useEventFeed } from "./api/events";
 import { useI18n } from "./i18n";
+import { LAUNCH_SEEN, LaunchPage } from "./pages/LaunchPage";
 import { ProjectPage } from "./pages/ProjectPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
 import { PromptsPage } from "./pages/PromptsPage";
 import { QueuePage } from "./pages/QueuePage";
 import { SystemPage } from "./pages/SystemPage";
+
+/** The first visit of a browser session lands on the launch screen; later visits go straight to the projects. */
+function Home() {
+  let seen = false;
+  try {
+    seen = sessionStorage.getItem(LAUNCH_SEEN) === "1";
+  } catch {
+    seen = false;
+  }
+  return <Navigate to={seen ? "/projects" : "/launch"} replace />;
+}
 
 export function App() {
   const { t, locale, locales, setLocale } = useI18n();
@@ -16,6 +28,9 @@ export function App() {
       <header className="topbar">
         <strong className="brand">{t("web.app.name")}</strong>
         <nav className="nav">
+          <NavLink to="/launch" className={link}>
+            {t("web.nav.launch")}
+          </NavLink>
           <NavLink to="/projects" className={link}>
             {t("web.nav.projects")}
           </NavLink>
@@ -43,7 +58,8 @@ export function App() {
       </header>
       <main className="content">
         <Routes>
-          <Route path="/" element={<Navigate to="/projects" replace />} />
+          <Route path="/" element={<Home />} />
+          <Route path="/launch" element={<LaunchPage />} />
           <Route path="/projects" element={<ProjectsPage />} />
           <Route path="/projects/:id/*" element={<ProjectPage />} />
           <Route path="/queue" element={<QueuePage />} />

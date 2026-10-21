@@ -516,6 +516,39 @@ class AiCallDetail(Strict):
     created_at: str
 
 
+class LaunchService(Strict):
+    name: str
+    url: str
+    state: str   # running | starting | failed | stopped | disabled | probe_only
+    label: str
+    startable: bool
+    bulk: bool
+    required: bool
+    detail: str
+    hint: str
+    pid: int | None
+    elapsed_sec: float | None
+    timeout_sec: float | None
+    log: str
+
+
+class LaunchIssue(Strict):
+    name: str
+    category: str
+    state: str
+    label: str
+    detail: str
+    required: bool
+
+
+class LaunchOut(Strict):
+    services: list[LaunchService]
+    issues: list[LaunchIssue]
+    ready: bool
+    starting: bool
+    startable: list[str]
+
+
 class FlowOut(Strict):
     steps: list[dict[str, Any]]
 

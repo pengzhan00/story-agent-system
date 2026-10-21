@@ -15,7 +15,7 @@ health_path = "/v1/models"
 url = "http://127.0.0.1:11434"
 health_path = "/api/tags"
 
-# Phosphene panel (Pinokio app) hosting LTX-2.5. Started by the operator (open -a Pinokio); never launched here.
+# Phosphene panel (Pinokio app) hosting LTX-2.5. The launch screen opens the Pinokio app ([launch.phosphene]).
 [services.phosphene]
 url = "http://127.0.0.1:8198"
 health_path = "/status"
@@ -36,6 +36,39 @@ enabled = false
 url = "http://127.0.0.1:8000"
 health_path = "/"
 probe_only = true
+
+# How the launch screen starts a service ("Start" button, `storyagent ops launch`). Only services listed here can be
+# started from the system; the rest (comfy, nodus, llamacpp, fastvideo) are probed only. The command is an argv list
+# (no shell), run detached with its output in <home>/logs/launch_<name>.log. Nothing is ever stopped or killed.
+#   argv           command; a bare name is looked up on PATH, "~" is expanded
+#   cwd            working directory ("" = the data home)
+#   env            extra environment variables
+#   bulk           true = included in "start everything"
+#   launcher       true = the command only opens an app and exits at once (the service comes up afterwards)
+#   timeout_sec    how long to wait for the health probe before the launch counts as failed
+#   hint_key       i18n key of a note shown next to the service
+[launch.ollama]
+argv = ["ollama", "serve"]
+bulk = true
+timeout_sec = 60
+
+[launch.acestep]
+argv = [".venv/bin/python3", "-m", "acestep.api_server", "--host", "127.0.0.1", "--port", "8001",
+        "--lm-model-path", "acestep-5Hz-lm-1.7B"]
+cwd = "~/ACE-Step-1.5"
+bulk = true
+timeout_sec = 180
+hint_key = "launch.hint.acestep"
+[launch.acestep.env]
+ACESTEP_LM_BACKEND = "mlx"
+TOKENIZERS_PARALLELISM = "false"
+
+[launch.phosphene]
+argv = ["open", "-a", "Pinokio"]
+bulk = true
+launcher = true
+timeout_sec = 240
+hint_key = "launch.hint.phosphene"
 
 # Subprocess / library style tools (no service).
 [tools.h3]
@@ -138,6 +171,6 @@ takes = 1
 
 [healthcheck]
 # Entries that must be "ok" for the healthcheck exit code to be 0. Names: a service (comfy), or tool.<name>.
-required = ["comfy", "acestep", "ollama", "tool.ffmpeg"]
+required = ["ollama", "acestep", "phosphene", "tool.ffmpeg"]
 # Below this much free disk (GiB) on the data home the system entry reports "degraded".
 min_free_gib = 50

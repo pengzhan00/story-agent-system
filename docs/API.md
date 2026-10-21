@@ -17,6 +17,8 @@ The API never generates anything itself: it reads/writes the ledger, and `storya
 |---|---|---|
 | System | `GET /api/ready` | liveness + schema version |
 | | `GET /api/health` | same report as `storyagent media healthcheck`, with localised state labels |
+| | `GET /api/launch` | launch screen: every service with its state (`running`/`starting`/`failed`/`stopped`/`disabled`/`probe_only`), whether it can be started here, `issues` (failed health checks and language models a role needs that are not installed), `ready` (all `[healthcheck] required` services up and no required issue) |
+| | `POST /api/launch/start-all`, `POST /api/launch/{name}/start` | start the configured `[launch.<name>]` command (detached, output in `logs/launch_<name>.log`); a service that already answers is left alone; 404 `launch_unknown`, 409 `launch_not_startable`, 424 `launch_missing`. Nothing is ever stopped |
 | | `GET /api/meta` | enums with labels, models (params/tiers/licence), default models, recipes, queue state |
 | | `GET /api/i18n/{locale}` | message catalog |
 | | `GET /api/events?project_id=&after=&timeout=` | **SSE**. `event: job`, `data` = JobOut, `id` = event cursor; `event: workflow`, `data` = WorkflowRunOut (live `progress`, sent whenever the percentage/stage/message changes, plus the final frame). On connect: snapshot of active jobs and runs. Reconnect with `?after=<last id>` to catch up. `: keepalive` comments |

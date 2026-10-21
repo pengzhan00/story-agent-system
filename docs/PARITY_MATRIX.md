@@ -66,7 +66,7 @@
 
 | # | 旧功能 | v2 去向 | 状态 |
 |---|---|---|---|
-| E1 | `start.sh` 启动/停止/重启/诊断 | `scripts/start.sh`(只启动本项目的 serve + worker,Ctrl-C 只停自己的子进程)+ `media healthcheck`;**不 pkill、不替用户拉起外部服务** | 🔀 |
+| E1 | `start.sh` 启动/停止/重启/诊断 | `scripts/start.sh`(只启动本项目的 serve + worker,Ctrl-C 只停自己的子进程)+ `media healthcheck`;**不 pkill**;外部服务只在用户于「启动台」点击(或 `ops launch`)时按 `[launch.*]` 配置启动,从不自动拉起、从不停止 | 🔀 |
 | E2 | `setup.sh` | `pyproject.toml` + README「快速开始」 | ✅ |
 | E3 | `main.py --render/--workshop/--cli/--check` | `storyagent serve | worker | workflow | media | export …` | ✅ |
 | E4 | 独立渲染服务 UI(`render_app.py`) | 并入 Web「任务队列」+ worker | ⛔ |
