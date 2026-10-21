@@ -1121,5 +1121,7 @@
   "web.workflow.video_share": "Shots with a video clip (%)",
   "web.workflow.video_budget": "Clip budget (machine hours, 0 = none)",
   "web.workflow.default": "default",
-  "web.workflow.video_hint": "A clip takes minutes to hours, a keyframe seconds. The hook, the cliffhanger and act openers get clips first; every shot can be set to video or still in the Story tab."
+  "web.workflow.video_hint": "A clip takes minutes to hours, a keyframe seconds. The hook, the cliffhanger and act openers get clips first; every shot can be set to video or still in the Story tab.",
+  "web.field.locked": "Locked (the cast step never redesigns it)",
+  "web.field.introduced_episode": "First seen in episode"
 }

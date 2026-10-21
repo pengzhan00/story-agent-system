@@ -39,7 +39,7 @@ _JSON = {
 _FIELDS: dict[str, tuple[str, ...]] = {
     "characters": ("name", "role", "age", "gender", "appearance", "personality", "background", "relationships",
                    "prompt_template", "voice_profile", "voice_ref_audio", "voice_ref_text", "voice_ref_consent",
-                   "voice_consent_note", "lora_ref", "ref_images"),
+                   "voice_consent_note", "lora_ref", "ref_images", "introduced_episode", "locked"),
     "scenes": ("name", "description", "lighting", "color_palette", "atmosphere", "prompt_template", "lora_ref",
                "ref_images"),
     "scripts": ("episode_no", "title", "synopsis", "acts", "total_scenes", "word_count", "status"),
@@ -65,6 +65,7 @@ def _decode(table: str, row: Any) -> dict[str, Any]:
         out[col] = json.loads(raw) if raw else ({} if col == "render_payload" else [])
     if table == "characters":
         out["voice_ref_consent"] = bool(out.get("voice_ref_consent"))
+        out["locked"] = bool(out.get("locked"))
     if table == "shots":
         out["locked"] = bool(out.get("locked"))
     return out

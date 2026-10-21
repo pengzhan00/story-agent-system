@@ -1121,5 +1121,7 @@
   "web.workflow.video_share": "做视频的镜头比例(%)",
   "web.workflow.video_budget": "视频预算(机器小时,0 = 不限)",
   "web.workflow.default": "默认",
-  "web.workflow.video_hint": "一段视频要几分钟到几小时,关键帧只要几秒。开场钩子、结尾悬念和每幕开头优先做视频;每个镜头都能在「故事」页单独设为视频或静图。"
+  "web.workflow.video_hint": "一段视频要几分钟到几小时,关键帧只要几秒。开场钩子、结尾悬念和每幕开头优先做视频;每个镜头都能在「故事」页单独设为视频或静图。",
+  "web.field.locked": "锁定(「角色」步骤不会重新设计它)",
+  "web.field.introduced_episode": "首次出场(集)"
 }

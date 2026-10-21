@@ -153,6 +153,8 @@ keyframe_from_references = true
 # hours). A share of each episode's shots (the opening hook, the cliffhanger, act openers, camera moves first), at
 # least `video_min_per_episode`, and optionally at most `video_budget_hours` of machine time for clips in the whole
 # series (0 = no limit). Per project: projects.settings video_share / video_budget_hours; per shot: treatment.
+# Speaker labels that are not characters (narration): never added to the cast when a later episode uses them.
+non_character_speakers = ["narrator", "voice-over", "voiceover", "v.o.", "caption", "旁白", "画外音", "字幕"]
 video_share = 0.2
 video_min_per_episode = 2
 video_budget_hours = 0

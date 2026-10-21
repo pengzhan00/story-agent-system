@@ -27,7 +27,7 @@ def test_migration_007_moves_the_old_stage_rows_to_season_1_episode_1(
     for stage in ("analyze", "cast", "script", "shotplan"):
         db.conn.execute("INSERT INTO workflow_stages(project_id, stage, status) VALUES (1, ?, 'completed')", (stage,))
     monkeypatch.setattr(migrate_mod, "discover", lambda: real)
-    assert migrate(db) == (6, 10)
+    assert migrate(db) == (6, real[-1].version)
     found = db.conn.execute("SELECT * FROM workflow_stages")
     rows = {r["stage"]: (r["season"], r["episode"], r["status"]) for r in found}
     assert rows == {"analyze": (0, 0, "completed"), "cast": (0, 0, "completed"),
@@ -220,3 +220,43 @@ def test_a_second_season_numbers_its_episodes_after_the_first(tmp_path: Path) ->
     engine.run(pid, ["outline"], {"season": 2})
     got = {e["number"]: (e["season"], e["number_in_season"]) for e in engine.store.list_episodes(pid)}
     assert got == {1: (1, 1), 2: (1, 2), 3: (1, 3), 4: (2, 1), 5: (2, 2)}
+
+
+def test_a_new_speaker_in_a_later_episode_joins_the_cast(tmp_path: Path) -> None:
+    engine, client, _ = make_engine(tmp_path)
+    pid = new_project(engine)
+    client.speaker = "Old Wen"
+    first = engine.run(pid, None, {"visual_prompts": False})["script"]
+    assert first["unknown_speakers"] == ["Old Wen"] and first["new_characters"] == []     # episode 1: only the cast
+    second = engine.run(pid, None, {"visual_prompts": False, "episode": 2})["script"]
+    assert second["new_characters"] == ["Old Wen"] and second["unknown_speakers"] == []
+    who = engine.store.find_character(pid, "Old Wen")
+    assert who is not None and who["introduced_episode"] == 2 and who["appearance"].startswith("short black hair")
+    assert engine.store.find_character(pid, "Lin Wan")["introduced_episode"] == 1
+    assert any(s.subject_type == "character.portrait" and s.subject_id == str(who["id"])      # specs follow the cast
+               for s in engine.spec_store.list_current(pid))
+
+
+def test_narration_labels_and_the_opt_out_do_not_add_characters(tmp_path: Path) -> None:
+    engine, client, _ = make_engine(tmp_path)
+    pid = new_project(engine)
+    engine.run(pid, ["analyze", "cast"])
+    client.speaker = "Narrator"
+    out = engine.run(pid, ["script"], {"visual_prompts": False, "episode": 2})["script"]
+    assert out["new_characters"] == [] and out["unknown_speakers"] == ["Narrator"]
+    client.speaker = "Old Wen"
+    off = engine.run(pid, ["script"], {"visual_prompts": False, "episode": 3, "auto_cast": False})["script"]
+    assert off["new_characters"] == [] and engine.store.find_character(pid, "Old Wen") is None
+
+
+def test_a_locked_character_survives_a_forced_cast(tmp_path: Path) -> None:
+    engine, client, _ = make_engine(tmp_path)
+    pid = new_project(engine)
+    engine.run(pid, ["analyze", "cast"])
+    keep = engine.store.find_character(pid, "Lin Wan")
+    engine.store.update_character(keep["id"], {"appearance": "scar over the left eye", "locked": True})
+    before = client.calls.count("character")
+    out = engine.run(pid, ["cast"], {"force": True})["cast"]
+    assert engine.store.find_character(pid, "Lin Wan")["appearance"] == "scar over the left eye"
+    assert out["skipped"] == 1 and client.calls.count("character") - before == 1       # only the unlocked one redone
+    assert engine.store.find_character(pid, "Lin Wan")["locked"] is True

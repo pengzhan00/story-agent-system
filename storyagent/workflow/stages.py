@@ -153,6 +153,25 @@ def analyze(ctx: Ctx) -> dict[str, Any]:
     return {"characters": len(plan.get("characters", [])), "locations": len(plan.get("locations", []))}
 
 
+def _design_character(
+    ctx: Ctx, name: str, role_hint: str, story: str, others: list[str], style: dict[str, Any],
+) -> dict[str, Any]:
+    """Ask the character designer for one character; returns the story-table fields (the extras are stored aside)."""
+    data = ctx.run_agent("character.design", {
+        "name": name, "role_hint": role_hint, "story": story, "others": others, "style": style.get("visual_style", "")})
+    fields = {k: data.get(k, "") for k in ("role", "age", "gender", "appearance", "personality", "background",
+                                          "voice_profile", "prompt_template")}
+    fields["role"] = fields["role"] or role_hint
+    fields["relationships"] = data.get("relationships", [])
+    # the image prompt is kept in prompt_template when the model did not give a template of its own
+    fields["prompt_template"] = fields["prompt_template"] or data.get("image_prompt", "")
+    extra = {"image_prompt": data.get("image_prompt", ""), "costume": data.get("costume", ""),
+             "voice_sample_text": data.get("voice_sample_text", "")}
+    ctx.extra.setdefault("character_extra", {})[name] = extra
+    ctx.state.put_data(ctx.pid, f"character_extra:{name}", extra)
+    return fields
+
+
 def cast(ctx: Ctx) -> dict[str, Any]:
     plan, style = _plan(ctx), _style(ctx)
     wanted = [c for c in plan.get("characters", []) if str(c.get("name", "")).strip()]
@@ -161,27 +180,16 @@ def cast(ctx: Ctx) -> dict[str, Any]:
         name = str(entry["name"]).strip()
         ctx.step(i, len(wanted), name)
         existing = ctx.store.find_character(ctx.pid, name)
-        if existing and not ctx.force():
+        if existing and (existing["locked"] or not ctx.force()):       # a locked character is never redesigned
             skipped += 1
             continue
-        data = ctx.run_agent("character.design", {
-            "name": name, "role_hint": entry.get("role", ""), "story": plan.get("summary", ""),
-            "others": [c.get("name", "") for c in wanted if c is not entry], "style": style.get("visual_style", "")})
-        fields = {k: data.get(k, "") for k in ("role", "age", "gender", "appearance", "personality", "background",
-                                              "voice_profile", "prompt_template")}
-        fields["role"] = fields["role"] or entry.get("role", "")
-        fields["relationships"] = data.get("relationships", [])
-        # the image prompt is kept in prompt_template when the model did not give a template of its own
-        fields["prompt_template"] = fields["prompt_template"] or data.get("image_prompt", "")
+        fields = _design_character(ctx, name, str(entry.get("role", "")), plan.get("summary", ""),
+                                   [str(c.get("name", "")) for c in wanted if c is not entry], style)
         if existing:
             ctx.store.update_character(existing["id"], fields)
         else:
             ctx.store.create_character(ctx.pid, {"name": name, **fields})
             created += 1
-        ctx.extra.setdefault("character_extra", {})[name] = {
-            "image_prompt": data.get("image_prompt", ""), "costume": data.get("costume", ""),
-            "voice_sample_text": data.get("voice_sample_text", "")}
-        ctx.state.put_data(ctx.pid, f"character_extra:{name}", ctx.extra["character_extra"][name])
     ctx.step(len(wanted), len(wanted), "done")
     return {"created": created, "skipped": skipped}
 
@@ -263,6 +271,27 @@ def _episode_brief(ctx: Ctx, episode: int) -> str:
     return "\n".join(lines)
 
 
+def _introduce_characters(
+    ctx: Ctx, episode: int, unknown: list[str], synopsis: str, plan: dict[str, Any],
+) -> list[str]:
+    """A series brings in new people: speakers of episode 2 or later that the cast does not have yet are designed
+    (``character.design``) and added, remembered as introduced in this episode. Episode 1 keeps what ``cast`` made, and
+    ``auto_cast=false`` turns this off; narration labels are never characters; at most ``max_new_characters`` per
+    script."""
+    if episode < 2 or ctx.params.get("auto_cast") is False or not unknown:
+        return []
+    ignore = {str(x).strip().lower() for x in ctx.settings.workflow.get("non_character_speakers", [])}
+    fresh = [n for n in unknown if n and n.lower() not in ignore][: int(ctx.params.get("max_new_characters") or 4)]
+    style, made = _style(ctx), []
+    for name in fresh:
+        others = [c["name"] for c in ctx.store.list_characters(ctx.pid)]
+        fields = _design_character(ctx, name, f"introduced in episode {episode}",
+                                   f"{plan.get('summary', '')}\nEpisode {episode}: {synopsis}", others, style)
+        ctx.store.create_character(ctx.pid, {"name": name, **fields, "introduced_episode": episode})
+        made.append(name)
+    return made
+
+
 def script(ctx: Ctx) -> dict[str, Any]:
     plan = _plan(ctx)
     episode = int(ctx.params.get("episode") or 1)
@@ -323,11 +352,14 @@ def script(ctx: Ctx) -> dict[str, Any]:
         done += 1
     unknown = sorted({str(line.get("character", "")).strip() for _, sc in scenes for sh in sc.get("shots", [])
                       for line in sh.get("dialogue", []) if str(line.get("character", "")).strip() not in names})
+    introduced = _introduce_characters(ctx, episode, unknown, outline.get("synopsis", ""), plan)
+    unknown = [n for n in unknown if n not in introduced]
     ctx.store.ensure_episode(ctx.pid, episode, title=outline["title"], summary=outline.get("synopsis", ""),
                              season=ctx.season_of(episode))
     ctx.step(len(scenes), len(scenes), "done")
     return {"episode": episode, "acts": len(outline["acts"]), "scenes": len(scenes),
-            "shots": sum(len(sc.get("shots", [])) for _, sc in scenes), "unknown_speakers": unknown}
+            "shots": sum(len(sc.get("shots", [])) for _, sc in scenes), "unknown_speakers": unknown,
+            "new_characters": introduced}
 
 
 def scenes(ctx: Ctx) -> dict[str, Any]:

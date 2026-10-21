@@ -6,7 +6,7 @@ import { ScriptOutline } from "../components/ScriptOutline";
 import { VoiceUpload } from "../components/VoiceUpload";
 import { useT } from "../i18n";
 
-type FieldType = "text" | "area" | "number" | "select";
+type FieldType = "text" | "area" | "number" | "select" | "bool";
 interface Field {
   key: string;
   type: FieldType;
@@ -16,7 +16,7 @@ interface Field {
 
 /** Columns shown in the table and fields offered in the editor, per kind of row. */
 const COLUMNS: Record<StoryPart, string[]> = {
-  characters: ["name", "role", "appearance", "voice_profile"],
+  characters: ["name", "role", "introduced_episode", "appearance", "voice_profile"],
   locations: ["name", "description", "lighting"],
   music: ["name", "kind", "mood", "description"],
   sfx: ["name", "category", "description"],
@@ -30,6 +30,7 @@ const EDITABLE: Partial<Record<StoryPart, Field[]>> = {
     { key: "appearance", type: "area", rows: 3 }, { key: "personality", type: "area" }, { key: "background", type: "area" },
     { key: "voice_profile", type: "area", rows: 2 }, { key: "prompt_template", type: "area" },
     { key: "voice_ref_audio", type: "text" }, { key: "voice_ref_text", type: "text" },
+    { key: "locked", type: "bool" },
   ],
   locations: [
     { key: "name", type: "text" }, { key: "description", type: "area", rows: 3 }, { key: "lighting", type: "text" },
@@ -164,7 +165,7 @@ function RowEditor({ pid, part, row, onDone }: { pid: number; part: StoryPart; r
     for (const f of fields) {
       const now = draft[f.key] ?? "";
       if (now === cell(row[f.key])) continue;
-      out[f.key] = f.type === "number" ? (now.trim() === "" ? null : Number(now)) : now;
+      out[f.key] = f.type === "number" ? (now.trim() === "" ? null : Number(now)) : f.type === "bool" ? now === "true" : now;
     }
     return out;
   }, [draft, fields, row]);
@@ -178,7 +179,9 @@ function RowEditor({ pid, part, row, onDone }: { pid: number; part: StoryPart; r
         {fields.map((f) => (
           <label key={f.key} className={f.type === "area" ? "field wide" : "field"}>
             <span>{t(`web.field.${f.key}`)}</span>
-            {f.type === "select" ? (
+            {f.type === "bool" ? (
+              <input type="checkbox" checked={draft[f.key] === "true"} onChange={(e) => setDraft({ ...draft, [f.key]: String(e.target.checked) })} />
+            ) : f.type === "select" ? (
               <select value={draft[f.key] ?? ""} disabled={locked} onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })}>
                 {(f.options ?? []).map((o) => (
                   <option key={o} value={o}>

@@ -21,6 +21,7 @@ class StoryClient:
         self.prompts: list[str] = []
         self.fail_on: dict[str, int] = {}   # shape -> fail when this many calls of that shape were made already
         self.unknown_speaker = False
+        self.speaker: str | None = None     # who speaks in every shot (overrides the defaults)
         self.scenes_per_act = 2
 
     def list_models(self) -> list[str]:
@@ -73,7 +74,7 @@ class StoryClient:
              "hook": f"hook {first + i}", "cliffhanger": f"cliff {first + i}"} for i in range(n)]}
 
     def _shots(self, prompt: str) -> dict[str, Any]:
-        who = "Nobody" if self.unknown_speaker else NAMES[0]
+        who = self.speaker or ("Nobody" if self.unknown_speaker else NAMES[0])
         return {"shots": [
             {"shot_number": 1, "camera_angle": "wide", "camera_movement": "push in", "characters_present": NAMES,
              "mood": "tense", "action": "walks in", "expression": "wary", "narration": "",
