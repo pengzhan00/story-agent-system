@@ -185,9 +185,8 @@ git status && git log --oneline -5 && git fetch && git status -sb
 记忆文件(Claude 自动记忆):`~/.claude/projects/-Users-pengzhan-myworkspace-projects-story-agent-system/memory/`(`MEMORY.md` 是索引)。
 原始计划:`~/.claude/plans/recursive-yawning-dusk.md`(R0-R7,已大体完成)。
 
-## 10. 文件夹整理(2026-10-21)
+## 10. 文件夹整理(2026-10-21,已完成)
 
 - 仓库里只留 v2:`storyagent/ web/ tests/ docs/ scripts/` + 根文档;v1 在 tag `v1-final`,旧文档在 `docs/archive/`(含 4 月的"红果短剧工业化"改造方案 `docs/archive/hermes-plans-2026-04-29/`:当时的目标是 80 集、每集 4-6 幕、800+ 镜头,Wan2 5B 约 7 分钟/镜头——和现在的算力约束同一个问题)。
-- 主检出目录(`story-agent-system/`)里 v1 的遗留文件(ChatTTS 权重 `asset/` 579M、v1 数据库残留、`output/`、`.hermes/`、空的 `agents/ core/ pipelines/ ui/` 等)已**整体移到** `_archive/v1-leftovers-2026-10-21/`(不在 Git 里,`.git/info/exclude` 已忽略;没有删除,确认不要后再删)。
-- 没动:`.env`(v1 的小配置,v2 不读)、`.venv`(旧 v1 虚拟环境 844M,v2 用工作树里的 `.venv`;确认不用后可删,重建用 `uv venv`)、`.claude/`。
-- 分支:本地只剩 `main` 和工作树分支 `claude/init-127186`(都指向 `origin/main`);另有 `worktree-agent-a38072bfa0deeba37`(v1 ComfyUI 的一个已过时提交,未合并,确认不要后 `git branch -D`)。
+- 已**删除**(用户确认不要;v2 不引用):v1 遗留的 ChatTTS 权重 `asset/`(579M;v2 的配音是 CosyVoice)、v1 数据库残留、`output/`、旧的空代码目录、v1 的 `.env`(只有 v1 的模型名/ComfyUI/Gradio 端口)、v1 的 `.venv`(844M)、本地分支 `worktree-agent-a38072bfa0deeba37`(v1 ComfyUI 的过时提交)和已合并的旧分支。
+- 现在本地只有 `main` 与工作树分支 `claude/init-127186`(都等于 `origin/main`)。主检出目录里没有虚拟环境:要在那里跑,先 `uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python -e '.[dev]'`;日常开发用工作树里的 `.venv`。
