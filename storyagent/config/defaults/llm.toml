@@ -13,11 +13,11 @@ service = "llamacpp"
 
 # Installed locally (2026-10-21): gemma4:31b, gpt-oss-20b. Point a role at any other model/backend in your own
 # llm.toml, e.g. a fast MoE for the structural roles once it is pulled. `storyagent llm check` lists what is missing.
-# The default role serves the structural/analytical steps (character, scene, composer, sound ...): gpt-oss-20b is a
-# MoE (fast, 12 GB). Its Chinese prose is weaker, so the creative roles below keep the larger gemma4.
+# gpt-oss-20b was tried for the default role (2026-10-21, 5 structured Chinese character requests): 2 of 5 put the
+# name and the description into the wrong JSON fields, and it was not faster than a warm gemma4:31b. Not used.
 [llm.roles.default]
 backend = "ollama"
-model = "gpt-oss-20b"
+model = "gemma4:31b"
 
 # Creative roles use the larger model installed locally.
 [llm.roles.director]
