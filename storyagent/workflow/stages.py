@@ -213,8 +213,7 @@ def outline(ctx: Ctx) -> dict[str, Any]:
     count = int(ctx.params.get("episode_count") or season["planned_episodes"] or 0)
     if count < 1:
         raise StageError("season_unplanned", "set how many episodes the season has (planned_episodes)")
-    seasons = ctx.store.list_seasons(ctx.pid)
-    first = 1 + sum(max(s["planned_episodes"], s["episodes"]) for s in seasons if s["number"] < season_no)
+    first = ctx.state.season_first_episode(ctx.pid, season_no)
     target = ctx.target_sec()
     length = f"about {int(target)} seconds" if target else "not fixed"
     scripted = {s["episode_no"] for s in ctx.store.list_scripts(ctx.pid)}

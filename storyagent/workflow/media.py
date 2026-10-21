@@ -55,8 +55,25 @@ def _shot_id(spec: SpecRecord) -> int | None:
 
 
 def current_asset(ledger: Ledger, spec: SpecRecord) -> AssetRecord | None:
-    rows = ledger.list_assets(project_id=spec.project_id, spec_id=spec.id, current_only=True, limit=5)
-    return rows[0] if rows else None
+    """The asset currently in this spec's slot. Every spec version is its own row, so after an edit the asset made
+    from an older version is still the slot's current one - it stays in use (and counts as outdated, see
+    ``up_to_date``) until a new asset replaces it."""
+    return slot_asset(ledger, spec.project_id, spec.subject_type, spec.subject_id, spec.slot, spec.id)
+
+
+def slot_asset(
+    ledger: Ledger, project_id: int, subject_type: str, subject_id: str, slot: str, spec_id: str | None = None,
+) -> AssetRecord | None:
+    if spec_id:
+        rows = ledger.list_assets(project_id=project_id, spec_id=spec_id, current_only=True, limit=5)
+        if rows:
+            return rows[0]
+    older = ledger.db.conn.execute(
+        """SELECT a.id FROM media_assets a JOIN gen_specs s ON s.id = a.spec_id
+           WHERE s.project_id=? AND s.subject_type=? AND s.subject_id=? AND s.slot=?
+             AND a.is_current=1 AND a.trashed_at IS NULL ORDER BY s.version DESC, a.rowid DESC LIMIT 1""",
+        (project_id, subject_type, subject_id, slot)).fetchone()
+    return ledger.get_asset(older["id"]) if older else None
 
 
 def up_to_date(ledger: Ledger, spec: SpecRecord) -> bool:

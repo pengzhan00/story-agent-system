@@ -15,6 +15,7 @@ from storyagent.db import Database
 from storyagent.domain import MediaKind, QualityTier
 from storyagent.media.params import resolve_params
 
+from .media import slot_asset
 from .state import STAGES, WorkflowState
 
 # (stage, how it works, agents (always), agents (only on some runs), reads, writes)
@@ -81,16 +82,16 @@ def _agents(settings: Settings, names: list[str], *, optional: bool) -> list[dic
 
 def _counts(db: Database, ledger: Any, project_id: int, subject: str) -> dict[str, Any]:
     rows = db.conn.execute(
-        "SELECT id, version, model_ref FROM gen_specs_current WHERE project_id=? AND subject_type=?",
+        "SELECT id, version, model_ref, subject_id, slot FROM gen_specs_current WHERE project_id=? AND subject_type=?",
         (project_id, subject)).fetchall()
     made = stale = 0
     models: dict[str, int] = {}
     for r in rows:
         models[r["model_ref"]] = models.get(r["model_ref"], 0) + 1
-        assets = ledger.list_assets(project_id=project_id, spec_id=r["id"], current_only=True, limit=1)
-        if assets:
+        asset = slot_asset(ledger, project_id, subject, r["subject_id"], r["slot"], r["id"])
+        if asset:
             made += 1
-            if (assets[0].spec_version or 0) < r["version"]:
+            if (asset.spec_version or 0) < r["version"]:
                 stale += 1
     return {"specs": len(rows), "made": made, "stale": stale, "models": models}
 

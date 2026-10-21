@@ -364,3 +364,31 @@ def test_compose_adds_the_cards_the_project_asks_for_in_its_language(tmp_path: P
                                        "params": {"edit": {"recap_card": True, "next_card": False}}})()
                         )["recap_card"] is True
 
+
+
+def test_an_edited_spec_keeps_its_old_asset_in_use_and_shows_as_outdated(tmp_path: Path) -> None:
+    from storyagent.domain import QualityTier
+    from storyagent.workflow.flow import describe_flow
+    from storyagent.workflow.plan import produce_plan
+    from storyagent.workflow.stages import Ctx
+
+    engine, _worker = _episode_rig(tmp_path)
+    ledger: Ledger = engine.spec_store.ledger
+    ctx = Ctx(engine.settings, engine.db, engine.store, engine.state, engine.agents, engine.projects,
+              engine.projects.get(1), {}, spec_store=engine.spec_store)
+    from storyagent.workflow.media import build_episode_timeline
+
+    shot = engine.store.list_shots(1)[0]
+    key_before = [s["source"]["type"] for s in build_episode_timeline(ctx, 1)["segments"]]
+    engine.spec_store.edit(1, "shot.keyframe", str(shot["id"]), prompt="a different picture")
+    engine.spec_store.edit(1, "shot.video", str(shot["id"]), prompt="a different clip")
+    timeline = build_episode_timeline(ctx, 1)
+    assert [s["source"]["type"] for s in timeline["segments"]] == key_before          # not a black card meanwhile
+    assert "no_picture" not in {w["code"] for w in timeline["warnings"]}
+    plan = produce_plan(engine.settings, engine.store, engine.spec_store, ledger, 1, QualityTier.DRAFT)
+    edited = {p.subject_type: p.state for p in plan if p.subject_id == str(shot["id"])}
+    assert edited["shot.keyframe"] == "stale" and edited["shot.video"] == "stale"      # outdated, not "new"
+    steps = {s["stage"]: s for s in describe_flow(engine.settings, engine.db, engine.state, ledger, 1)["steps"]}
+    produce = steps["produce"]["media"]
+    counts = next(m for m in produce if m["subject"] == "shot.keyframe")["counts"]
+    assert counts["stale"] == 1 and counts["made"] == counts["specs"]                  # all made, one of them outdated

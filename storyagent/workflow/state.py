@@ -122,6 +122,19 @@ class WorkflowState:
                         "UPDATE workflow_stages SET status='stale'"
                         " WHERE project_id=? AND stage=? AND status='completed'" + where, (project_id, later, *extra))
 
+    def season_first_episode(self, project_id: int, season: int) -> int:
+        """The series-wide number of a season's first episode: where its existing episodes start, else right after
+        the room the earlier seasons take (each holds at least its planned episodes). One rule for the outline stage
+        and for a season run, so both always agree on the numbers."""
+        row = self.db.conn.execute(
+            "SELECT MIN(number) n FROM episodes WHERE project_id=? AND season=?", (project_id, season)).fetchone()
+        if row["n"] is not None:
+            return int(row["n"])
+        rows = self.db.conn.execute(
+            "SELECT s.planned_episodes p, (SELECT COUNT(*) FROM episodes e WHERE e.project_id=s.project_id"
+            " AND e.season=s.number) n FROM seasons s WHERE s.project_id=? AND s.number<?", (project_id, season))
+        return 1 + sum(max(int(r["p"]), int(r["n"])) for r in rows)
+
     def episodes_for(self, project_id: int, params: dict[str, Any] | None) -> list[int]:
         """The episodes a run covers: ``episodes`` ("1-10", "1,3" or a list), else ``episode``; with only a ``season``
         it is that season's episodes (a season that has none yet gets ``planned_episodes`` new ones after the last)."""
@@ -137,10 +150,9 @@ class WorkflowState:
             row = self.db.conn.execute(
                 "SELECT planned_episodes FROM seasons WHERE project_id=? AND number=?", (project_id, season)).fetchone()
             planned = int(row["planned_episodes"]) if row else 0
-            last = self.db.conn.execute(
-                "SELECT COALESCE(MAX(number), 0) n FROM episodes WHERE project_id=?", (project_id,)).fetchone()["n"]
             if planned > 0:
-                return list(range(last + 1, last + 1 + planned))
+                first = self.season_first_episode(project_id, season)
+                return list(range(first, first + planned))
             raise WorkflowStateError(f"season {season} has no episodes and no planned_episodes")
         return [int(params.get("episode") or 1)]
 

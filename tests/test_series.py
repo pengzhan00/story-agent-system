@@ -260,3 +260,20 @@ def test_a_locked_character_survives_a_forced_cast(tmp_path: Path) -> None:
     assert engine.store.find_character(pid, "Lin Wan")["appearance"] == "scar over the left eye"
     assert out["skipped"] == 1 and client.calls.count("character") - before == 1       # only the unlocked one redone
     assert engine.store.find_character(pid, "Lin Wan")["locked"] is True
+
+
+def test_a_season_run_and_its_outline_agree_on_the_episode_numbers(tmp_path: Path) -> None:
+    engine, _client, _ = make_engine(tmp_path)
+    pid = new_project(engine)
+    engine.run(pid, ["analyze", "cast"])
+    engine.store.update_season(pid, 1, {"planned_episodes": 10})
+    for n in (1, 2, 3):
+        engine.store.ensure_episode(pid, n)                    # season 1 has 3 of its 10 episodes so far
+    engine.store.update_season(pid, 2, {"planned_episodes": 2})
+    expected = engine.state.episodes_for(pid, {"season": 2})
+    assert expected == [11, 12]                                # room is kept for the rest of season 1
+    engine.run(pid, ["outline"], {"season": 2})
+    assert [e["number"] for e in engine.store.list_episodes(pid) if e["season"] == 2] == expected
+    assert engine.state.episodes_for(pid, {"season": 2}) == expected          # and stays so once they exist
+    engine.store.update_season(pid, 1, {"planned_episodes": 5})              # an earlier season shrinking moves nothing
+    assert engine.state.episodes_for(pid, {"season": 2}) == expected
