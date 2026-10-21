@@ -41,7 +41,7 @@ export function RunProgress({ run }: { run: WorkflowRun }) {
         ) : (
           <>
             {p.stage ? t("workflow.progress.stage_of", { index: p.stage_index, count: p.stage_count }) : t("workflow.progress.working")}
-            {p.stage ? ` · ${t(`workflow.stage.${p.stage}`)}` : ""}
+            {p.stage ? ` · ${t(`workflow.stage.${p.stage}`)}${p.episode ? ` · ${t("workflow.progress.episode", { n: p.episode })}` : ""}` : ""}
             {p.total > 0 ? ` · ${t("workflow.progress.items", { done: p.done, total: p.total })}` : ""}
             {p.message ? ` · ${stageMessage(t, p.message)}` : ""}
           </>
@@ -55,8 +55,11 @@ export function RunProgress({ run }: { run: WorkflowRun }) {
       )}
       <ol className="stages">
         {p.stages.map((s) => (
-          <li key={s.stage} className="stage-row">
-            <span className="stage-name">{t(`workflow.stage.${s.stage}`)}</span>
+          <li key={`${s.stage}@${s.episode ?? 0}`} className="stage-row">
+            <span className="stage-name">
+              {t(`workflow.stage.${s.stage}`)}
+              {s.episode ? <span className="muted">{` · ${t("workflow.progress.episode", { n: s.episode })}`}</span> : null}
+            </span>
             <ProgressBar
               percent={s.status === "running" ? s.percent : s.status === "completed" ? 100 : s.percent ?? 0}
               tone={s.status}

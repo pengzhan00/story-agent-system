@@ -22,11 +22,11 @@ function run(over: Partial<WorkflowRun> = {}): WorkflowRun {
     id: "r1", project_id: 1, stages: ["analyze", "cast", "script"], params: {}, status: "running", cancel_requested: false,
     created_at: "", started_at: "", finished_at: null, error_code: null, error_message: null,
     progress: {
-      stage: "cast", stage_index: 2, stage_count: 3, done: 1, total: 4, message: "Mara", percent: 37.5, elapsed_sec: 80, eta_sec: 110,
+      stage: "cast", episode: null, stage_index: 2, stage_count: 3, done: 1, total: 4, message: "Mara", percent: 37.5, elapsed_sec: 80, eta_sec: 110,
       stages: [
-        { stage: "analyze", status: "completed", percent: 100, seconds: 8 },
-        { stage: "cast", status: "running", percent: 25, seconds: null },
-        { stage: "script", status: "pending", percent: 0, seconds: null },
+        { stage: "analyze", episode: null, status: "completed", percent: 100, seconds: 8 },
+        { stage: "cast", episode: null, status: "running", percent: 25, seconds: null },
+        { stage: "script", episode: null, status: "pending", percent: 0, seconds: null },
       ],
     },
     ...over,

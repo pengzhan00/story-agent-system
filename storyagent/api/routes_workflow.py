@@ -12,7 +12,7 @@ from starlette.background import BackgroundTask
 from storyagent.compose.export import ExportError, build_package
 from storyagent.domain import QualityTier
 from storyagent.llm import LLMError
-from storyagent.workflow import WorkflowEngine, WorkflowStateError
+from storyagent.workflow import STAGES, WorkflowEngine, WorkflowStateError
 from storyagent.workflow.plan import produce_plan, totals
 
 from .context import ctx_of
@@ -52,10 +52,17 @@ def start_run(project_id: int, body: WorkflowRunCreate, request: Request) -> Wor
     ctx = ctx_of(request)
     if ctx.projects.get(project_id).status == "trashed":
         raise ApiError(409, "conflict", "the project is in the recycle bin; restore it first")
-    stages = ctx.workflow.pending_stages(project_id, body.stages, int(body.params.get("episode") or 1))
-    if not stages:
+    params = dict(body.params)
+    try:
+        plan = ctx.workflow.plan(project_id, body.stages, params)
+    except WorkflowStateError as exc:
+        raise ApiError(422, "invalid", str(exc)) from exc
+    if not plan:
         raise ApiError(409, "nothing_to_do", "every stage is already completed")
-    return run_out(ctx.workflow.enqueue(project_id, stages, body.params))
+    if body.stages is None:
+        params["resume"] = True                 # every episode picks up where it stopped when the worker gets to it
+    stages = [s for s in STAGES if any(s == name for _, name in plan)]
+    return run_out(ctx.workflow.enqueue(project_id, stages, params))
 
 
 @router.get("/projects/{project_id}/produce/plan", response_model=ProducePlanOut)

@@ -10,7 +10,7 @@ from storyagent.api.app import create_app
 from storyagent.config import Settings
 from storyagent.db import Database, migrate
 from storyagent.db import migrator as migrate_mod
-from storyagent.workflow import WorkflowState
+from storyagent.workflow import STAGES, WorkflowState
 
 from .story_kit import make_engine, new_project
 
@@ -131,3 +131,56 @@ def test_migration_008_moves_old_scene_music_to_episode_1(settings: Settings, mo
     got = [r["scene_ref"] for r in old.conn.execute("SELECT scene_ref FROM music_themes ORDER BY id")]
     assert got == ["ep01_act01_scene02", ""]
     old.close()
+
+
+def test_episode_lists_are_parsed_and_checked() -> None:
+    from storyagent.workflow.state import WorkflowStateError, parse_episodes
+
+    assert parse_episodes("1-3") == [1, 2, 3] and parse_episodes("1,3,5-6") == [1, 3, 5, 6]
+    assert parse_episodes([2, 1, 2]) == [1, 2] and parse_episodes(4) == [4]
+    for bad in ("0-2", "a", "", "3-1", "1-9999"):
+        with pytest.raises(WorkflowStateError):
+            parse_episodes(bad)
+
+
+def test_a_batch_runs_the_series_stages_once_and_each_episode_resumes_on_its_own(tmp_path: Path) -> None:
+    engine, _client, _ = make_engine(tmp_path)
+    pid = new_project(engine)
+    engine.run(pid, None, {"visual_prompts": False})                      # episode 1 is done
+    plan, several = engine.plan(pid, None, {"episodes": "1-3", "resume": True})
+    assert several and [(e, s) for e, s in plan if e == 1] == []         # nothing left for episode 1
+    assert {e for e, _ in plan} == {2, 3} and not any(s in ("analyze", "cast") for _, s in plan)
+    fresh = engine.state.plan(new_project(engine), None, {"episodes": "1-2"})
+    assert fresh.count((0, "analyze")) == 1 and fresh.count((0, "cast")) == 1      # once, not once per episode
+    assert fresh[2:4] == [(1, "script"), (1, "scenes")]
+
+
+def test_a_queued_batch_reports_a_bar_per_episode_stage(tmp_path: Path) -> None:
+    engine, _client, _ = make_engine(tmp_path)
+    pid = new_project(engine)
+    params = {"visual_prompts": False, "episodes": "1-2", "resume": True}
+    plan, _several = engine.plan(pid, None, params)
+    stages = [x for x in STAGES if any(x == name for _, name in plan)]
+    run = engine.state.enqueue(pid, stages, params)
+    claimed = engine.state.claim_next("t", 60.0)
+    assert claimed is not None and claimed["id"] == run["id"]
+    engine.execute_run(claimed, "t", 60.0, 0.05)
+    done = engine.state.get_run(run["id"])
+    assert done["status"] == "completed", done["error_message"]
+    bars = done["progress"]["stages"]
+    assert [(b["stage"], b["episode"]) for b in bars][:3] == [("analyze", None), ("cast", None), ("script", 1)]
+    assert {b["episode"] for b in bars} == {None, 1, 2} and all(b["status"] == "completed" for b in bars)
+    assert done["progress"]["percent"] == 100.0
+    assert {e["number"] for e in engine.store.list_episodes(pid)} == {1, 2}
+
+
+def test_a_season_run_covers_the_planned_episodes_and_the_api_validates(fsettings: Settings) -> None:
+    with TestClient(create_app(fsettings), raise_server_exceptions=False) as client:
+        pid = client.post("/api/projects", json={"name": "Saga"}).json()["id"]
+        bad = client.post(f"/api/projects/{pid}/workflow/runs", json={"params": {"episodes": "0-2"}})
+        assert bad.status_code == 422
+        no_plan = client.post(f"/api/projects/{pid}/workflow/runs", json={"params": {"season": 2}})
+        assert no_plan.status_code == 422                                   # nothing planned for season 2 yet
+        client.patch(f"/api/projects/{pid}/seasons/2", json={"planned_episodes": 3})
+        ok = client.post(f"/api/projects/{pid}/workflow/runs", json={"params": {"season": 2}})
+        assert ok.status_code == 201 and ok.json()["params"]["resume"] is True

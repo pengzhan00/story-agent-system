@@ -179,7 +179,7 @@ docs/          API CONFIGURATION MEDIA_CONTRACT RUNBOOK WORKFLOW USER_GUIDE PARI
 
 ## 8. 下一步(按这个顺序做)
 
-0. (已完成)多集改造步骤 A(`docs/SERIES.md`):迁移 007、季表、按集的阶段状态;`workflow run --param episode=2` 能接着做第 2 集而不动第 1 集。步骤 B 也已做(配乐按集,迁移 008)。下一步 C 批量跑多集/一季、D 圣经/季大纲、E 看板。
+0. (已完成)多集改造步骤 A(`docs/SERIES.md`):迁移 007、季表、按集的阶段状态;`workflow run --param episode=2` 能接着做第 2 集而不动第 1 集。步骤 B 也已做(配乐按集,迁移 008)。步骤 C 也已做(批量跑多集/一季,进度按集)。下一步 D 圣经/季大纲、E 看板。
 0. (已完成)「剧本→人物/场景图→关键帧」断链修复 + 生产计划确认队列 + 从文字建项目。项目级默认声音已做(`projects.settings.default_voice`,制作流程页可选)。仍未覆盖:口型头像步骤不在项目流程内、每集只用一首配乐、工坊成片模块要手工拼镜头。
 
 1. (已完成)LongCat 实测 54 分钟/3.1 秒;工坊「故事→剧本」用 gemma4 实测通过(故事 33 秒、剧本 17 秒)。

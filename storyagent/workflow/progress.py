@@ -17,6 +17,18 @@ STAGE_WEIGHTS: dict[str, float] = {
     "compose": 4,
 }
 SECONDS_PER_UNIT = 14.0
+
+
+def stage_key(stage: str, episode: int = 0) -> str:
+    """Progress item of a run over several episodes: ``script@2`` (series stages and single-episode runs: the name)."""
+    return f"{stage}@{episode}" if episode else stage
+
+
+def split_key(key: str) -> tuple[str, int | None]:
+    name, _, ep = key.partition("@")
+    return name, (int(ep) if ep else None)
+
+
 ETA_MIN_PERCENT = 10.0          # below this an extrapolated ETA is noise (LLM stages are lumpy)
 
 
@@ -26,7 +38,8 @@ class RunProgress:
 
     def __init__(self, stages: list[str], weights: dict[str, float] | None = None, clock: Any = time.monotonic) -> None:
         self.order = list(stages)
-        self.weights = {s: float((weights or STAGE_WEIGHTS).get(s, 1.0)) for s in self.order}
+        table = weights or STAGE_WEIGHTS
+        self.weights = {s: float(table.get(s, table.get(split_key(s)[0], 1.0))) for s in self.order}
         self._clock = clock
         self._t0 = clock()
         self.current: str | None = None
@@ -95,9 +108,12 @@ class RunProgress:
                 status = "running"
             else:
                 status = "pending"
-            stages.append({"stage": s, "status": status, "percent": None if frac is None else round(100 * frac, 1),
+            name, ep = split_key(s)
+            stages.append({"stage": name, "episode": ep, "status": status,
+                           "percent": None if frac is None else round(100 * frac, 1),
                            "seconds": round(self.stage_seconds[s], 1) if s in self.stage_seconds else None})
         idx = self.order.index(self.current) + 1 if self.current in self.order else 0
-        return {"stage": self.current, "stage_index": idx, "stage_count": len(self.order), "done": self.done,
-                "total": self.total, "message": self.message, "percent": pct, "elapsed_sec": round(elapsed, 1),
-                "eta_sec": eta, "stages": stages}
+        now_stage, now_ep = split_key(self.current) if self.current else (None, None)
+        return {"stage": now_stage, "episode": now_ep, "stage_index": idx, "stage_count": len(self.order),
+                "done": self.done, "total": self.total, "message": self.message, "percent": pct,
+                "elapsed_sec": round(elapsed, 1), "eta_sec": eta, "stages": stages}

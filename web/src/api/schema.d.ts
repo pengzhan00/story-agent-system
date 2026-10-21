@@ -2598,6 +2598,8 @@ export interface components {
              * @default 0
              */
             elapsed_sec: number;
+            /** Episode */
+            episode: number | null;
             /** Eta Sec */
             eta_sec: number | null;
             /**
@@ -2805,6 +2807,11 @@ export interface components {
         };
         /** StageProgressOut */
         StageProgressOut: {
+            /**
+             * Episode
+             * @description the episode, in a run over several; null for series stages
+             */
+            episode: number | null;
             /** Percent */
             percent: number | null;
             /** Seconds */

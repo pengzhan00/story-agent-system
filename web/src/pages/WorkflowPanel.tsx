@@ -92,7 +92,9 @@ function Spec({ id }: { id: number }) {
 export function WorkflowPanel({ id }: { id: number }) {
   const t = useT();
   const project = useProject(id);
-  const wf = useWorkflow(id);
+  const [episode, setEpisode] = useState(1);
+  const [batch, setBatch] = useState("");
+  const wf = useWorkflow(id, episode);
   const start = useStartRun(id);
   const cancel = useCancelRun(id);
   const update = useUpdateProject(id);
@@ -127,6 +129,14 @@ export function WorkflowPanel({ id }: { id: number }) {
             {t("web.save")}
           </button>
           <span className="spacer" />
+          <label className="field">
+            <span>{t("web.workflow.episode")}</span>
+            <input type="number" min={1} value={episode} onChange={(e) => setEpisode(Math.max(1, Number(e.target.value) || 1))} />
+          </label>
+          <label className="field">
+            <span>{t("web.workflow.episodes")}</span>
+            <input value={batch} placeholder="1-5" onChange={(e) => setBatch(e.target.value)} />
+          </label>
           <label className="check">
             <input type="checkbox" checked={force} onChange={(e) => setForce(e.target.checked)} />
             <span>{t("web.workflow.force")}</span>
@@ -142,7 +152,7 @@ export function WorkflowPanel({ id }: { id: number }) {
               onClick={() =>
                 start.mutate({
                   stages: force ? wf.data?.stages.map((s) => s.stage) : undefined,
-                  params: force ? { force: true } : {},
+                  params: { ...(force ? { force: true } : {}), ...(batch.trim() ? { episodes: batch.trim() } : { episode }) },
                 })
               }
             >
@@ -150,6 +160,7 @@ export function WorkflowPanel({ id }: { id: number }) {
             </button>
           )}
         </div>
+        <p className="muted small">{t("web.workflow.episodes_hint")}</p>
         {dirty ? <p className="hint">{t("web.workflow.save_first")}</p> : null}
         <ErrorNote error={start.error ?? cancel.error ?? update.error ?? wf.error} />
       </section>

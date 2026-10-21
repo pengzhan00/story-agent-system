@@ -32,6 +32,27 @@ class WorkflowStateError(ValueError):
     pass
 
 
+MAX_EPISODES_PER_RUN = 500
+
+
+def parse_episodes(value: Any) -> list[int]:
+    """``[1, 2, 5]``, ``"1-10"``, ``"1,3,5-7"`` or ``3`` -> sorted episode numbers (each >= 1)."""
+    if isinstance(value, int):
+        value = [value]
+    parts: list[Any] = value if isinstance(value, list) else str(value).replace(" ", "").split(",")
+    out: set[int] = set()
+    try:
+        for part in parts:
+            text = str(part)
+            lo, _, hi = text.partition("-")
+            out.update(range(int(lo), int(hi or lo) + 1))
+    except ValueError:
+        raise WorkflowStateError(f"bad episode list {value!r}") from None
+    if not out or min(out) < 1 or len(out) > MAX_EPISODES_PER_RUN:
+        raise WorkflowStateError(f"episodes must be 1..{MAX_EPISODES_PER_RUN} numbers, each >= 1")
+    return sorted(out)
+
+
 def _ts(text: str) -> float:
     return datetime.fromisoformat(text.replace("Z", "+00:00")).timestamp()
 
@@ -95,6 +116,45 @@ class WorkflowState:
                     conn.execute(
                         "UPDATE workflow_stages SET status='stale'"
                         " WHERE project_id=? AND stage=? AND status='completed'" + where, (project_id, later, *extra))
+
+    def episodes_for(self, project_id: int, params: dict[str, Any] | None) -> list[int]:
+        """The episodes a run covers: ``episodes`` ("1-10", "1,3" or a list), else ``episode``; with only a ``season``
+        it is that season's episodes (a season that has none yet gets ``planned_episodes`` new ones after the last)."""
+        params = params or {}
+        if params.get("episodes") not in (None, "", []):
+            return parse_episodes(params["episodes"])
+        if params.get("season") and not params.get("episode"):
+            season = int(params["season"])
+            have = [int(r["number"]) for r in self.db.conn.execute(
+                "SELECT number FROM episodes WHERE project_id=? AND season=? ORDER BY number", (project_id, season))]
+            if have:
+                return have
+            row = self.db.conn.execute(
+                "SELECT planned_episodes FROM seasons WHERE project_id=? AND number=?", (project_id, season)).fetchone()
+            planned = int(row["planned_episodes"]) if row else 0
+            last = self.db.conn.execute(
+                "SELECT COALESCE(MAX(number), 0) n FROM episodes WHERE project_id=?", (project_id,)).fetchone()["n"]
+            if planned > 0:
+                return list(range(last + 1, last + 1 + planned))
+            raise WorkflowStateError(f"season {season} has no episodes and no planned_episodes")
+        return [int(params.get("episode") or 1)]
+
+    def plan(
+        self, project_id: int, requested: list[str] | None, params: dict[str, Any] | None = None,
+    ) -> list[tuple[int, str]]:
+        """What a run does, in order: (episode, stage) pairs. Series stages (analyze, cast) appear once, with episode 0.
+        Without ``requested`` (or with ``params.resume``) each episode resumes where it stopped."""
+        params = params or {}
+        resume = requested is None or bool(params.get("resume"))
+        out: list[tuple[int, str]] = []
+        for ep in self.episodes_for(project_id, params):
+            for stage in self.pending_stages(project_id, None if resume else requested, ep):
+                if stage in SERIES_STAGES:
+                    if (0, stage) not in out:
+                        out.append((0, stage))
+                else:
+                    out.append((ep, stage))
+        return out
 
     def pending_stages(self, project_id: int, requested: list[str] | None = None, episode: int = 1) -> list[str]:
         """``requested`` in pipeline order; ``None`` = resume: every story stage of ``episode`` that is not completed

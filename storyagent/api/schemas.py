@@ -412,6 +412,7 @@ class Ready(BaseModel):
 # -- story workflow -----------------------------------------------------------------------------------------
 class StageProgressOut(Strict):
     stage: str
+    episode: int | None = Field(default=None, description="the episode, in a run over several; null for series stages")
     status: Literal["pending", "running", "completed", "failed", "cancelled"] = "pending"
     percent: float | None = None            # None while a running stage has not reported its item count yet
     seconds: float | None = None
@@ -422,6 +423,7 @@ class RunProgressOut(Strict):
     stage; ``eta_sec`` is None until enough has run to estimate."""
 
     stage: str | None = None
+    episode: int | None = None
     stage_index: int = 0
     stage_count: int = 0
     done: int = 0

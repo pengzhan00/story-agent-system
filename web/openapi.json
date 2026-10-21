@@ -2667,6 +2667,17 @@
             "title": "Elapsed Sec",
             "type": "number"
           },
+          "episode": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Episode"
+          },
           "eta_sec": {
             "anyOf": [
               {
@@ -2724,6 +2735,7 @@
         },
         "required": [
           "stage",
+          "episode",
           "stage_index",
           "stage_count",
           "done",
@@ -3152,6 +3164,18 @@
       },
       "StageProgressOut": {
         "properties": {
+          "episode": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the episode, in a run over several; null for series stages",
+            "title": "Episode"
+          },
           "percent": {
             "anyOf": [
               {
@@ -3193,6 +3217,7 @@
         },
         "required": [
           "stage",
+          "episode",
           "status",
           "percent",
           "seconds"

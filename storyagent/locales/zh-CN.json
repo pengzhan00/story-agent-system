@@ -1087,5 +1087,9 @@
   "web.project.from_text_hint": "这段文字会成为故事前提和剧本改编的依据。人物、场景、分镜会生成;图片和视频要等你在「生产计划」里确认。",
   "web.workflow.voice": "没有专属声音的角色用",
   "web.workflow.voice_none": "不指定(这些台词只显示字幕)",
-  "web.workflow.voice_hint": "从资产库里选一个声音(在「资产库 → 声音」添加)。有自己声音样本的角色不受影响。"
+  "web.workflow.voice_hint": "从资产库里选一个声音(在「资产库 → 声音」添加)。有自己声音样本的角色不受影响。",
+  "workflow.progress.episode": "第 {n} 集",
+  "web.workflow.episode": "第几集",
+  "web.workflow.episodes": "批量",
+  "web.workflow.episodes_hint": "「第几集」查看并启动单集。「批量」可填 1-5 或 1,3,6:全剧共用的步骤(策划、角色)只做一次,然后每一集各自从上次停下的地方接着做。"
 }

@@ -299,7 +299,8 @@ def test_progress_tracker_reports_percent_stage_bars_and_eta() -> None:
     now[0] = 10
     p.update("analyze", 0, 0, "")                       # started, no items known yet: running, indeterminate
     snap = p.snapshot()
-    assert snap["stages"][0] == {"stage": "analyze", "status": "running", "percent": None, "seconds": None}
+    assert snap["stages"][0] == {"stage": "analyze", "episode": None, "status": "running", "percent": None,
+                                  "seconds": None}
     p.update("analyze", 2, 2, "done")
     p.update("cast", 1, 2, "Mara")                       # analyze closes when the next stage reports
     now[0] = 20

@@ -41,7 +41,8 @@ def render_run(run: dict[str, Any]) -> str:
     parts = [f"{bar(pct)} {pct:5.1f}%"]
     if pr.get("stage"):
         parts.append(t("workflow.progress.stage_of", index=pr.get("stage_index", 0), count=pr.get("stage_count", 0)))
-        parts.append(t(f"workflow.stage.{pr['stage']}"))
+        parts.append(t(f"workflow.stage.{pr['stage']}")
+                     + (" " + t("workflow.progress.episode", n=pr["episode"]) if pr.get("episode") else ""))
         if pr.get("total"):
             parts.append(t("workflow.progress.items", done=pr["done"], total=pr["total"]))
         if pr.get("message"):
@@ -63,5 +64,7 @@ def render_stages(run: dict[str, Any]) -> list[str]:
         pct = st["percent"]
         shown = bar(pct if pct is not None else 0) + (f" {pct:5.1f}%" if pct is not None else "   ...  ")
         sec = f"  {duration(st['seconds'])}" if st.get("seconds") is not None else ""
-        lines.append(f"  {t('workflow.stage.' + st['stage']):<14} {shown}  {t('workflow.status.' + st['status'])}{sec}")
+        name = t("workflow.stage." + st["stage"]) + (" " + t("workflow.progress.episode", n=st["episode"])
+                                                       if st.get("episode") else "")
+        lines.append(f"  {name:<18} {shown}  {t('workflow.status.' + st['status'])}{sec}")
     return lines

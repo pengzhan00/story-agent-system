@@ -527,10 +527,16 @@ def _cmd_workflow_run(s: Settings, a: argparse.Namespace) -> int:
     if unknown:
         raise CliError("cli.error.bad_kv", 2, item=",".join(unknown))
     params = _kv(a.param or [])
-    stages = state.pending_stages(a.project, a.stage, int(params.get("episode") or 1))
-    if not stages:
+    try:
+        plan = state.plan(a.project, a.stage, params)
+    except WorkflowStateError as exc:
+        raise CliError("cli.error.bad_kv", 2, item=str(exc)) from exc
+    if not plan:
         print(t("cli.workflow.nothing"))
         return 0
+    if not a.stage:
+        params["resume"] = True
+    stages = [x for x in STAGES if any(x == name for _, name in plan)]
     if a.force:
         params["force"] = True
     run = state.enqueue(a.project, stages, params)

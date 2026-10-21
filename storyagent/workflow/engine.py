@@ -17,13 +17,31 @@ from storyagent.media.specs import SpecStore
 from storyagent.projects import ProjectStore
 from storyagent.story import StoryStore
 
-from .progress import RunProgress
+from .progress import RunProgress, stage_key
 from .stages import STAGE_FUNCS, Ctx, Progress, StageError, WorkflowCancelled
-from .state import WorkflowState, WorkflowStateError
+from .state import SERIES_STAGES, WorkflowState, WorkflowStateError
 
 log = logging.getLogger(__name__)
 
 PROGRESS_SECONDS = 1.0     # how often a running run writes its progress (the lease is renewed at the same time)
+
+
+class _EpisodeProgress:
+    """Progress sink of one stage inside a run over several episodes: bars are keyed ``script@2``."""
+
+    def __init__(self, inner: Progress, episode: int, several: bool) -> None:
+        self.inner, self.episode, self.several = inner, episode, several
+
+    def key(self, stage: str) -> str:
+        return stage_key(stage, self.episode) if self.several and stage not in SERIES_STAGES else stage
+
+    def __call__(self, stage: str, done: int, total: int, msg: str) -> None:
+        self.inner(self.key(stage), done, total, msg)
+
+    def set_weight(self, stage: str, units: float) -> None:
+        hook = getattr(self.inner, "set_weight", None)
+        if callable(hook):
+            hook(self.key(stage), units)
 
 
 class WorkflowEngine:
@@ -89,20 +107,31 @@ class WorkflowEngine:
         self.state.set_stage(project_id, stage, "completed", summary=summary, episode=episode)
         return summary
 
+    def plan(self, project_id: int, stages: list[str] | None, params: dict[str, Any] | None) -> tuple[
+            list[tuple[int, str]], bool]:
+        """(episode, stage) pairs a run does, and whether it covers several episodes."""
+        return (self.state.plan(project_id, stages, params),
+                len(self.state.episodes_for(project_id, params)) > 1)
+
     def run(
         self, project_id: int, stages: list[str] | None = None, params: dict[str, Any] | None = None, *,
         progress: Progress | None = None, cancelled: Callable[[], bool] | None = None,
     ) -> dict[str, dict[str, Any]]:
+        params = dict(params or {})
+        plan, several = self.plan(project_id, stages, params)
+        first = self.state.episodes_for(project_id, params)[0]
         out: dict[str, dict[str, Any]] = {}
-        episode = int((params or {}).get("episode") or 1)
-        for stage in self.stages_to_run(project_id, stages, episode):
-            out[stage] = self.run_stage(project_id, stage, params, progress=progress, cancelled=cancelled)
+        for ep, stage in plan:
+            sink = _EpisodeProgress(progress, ep, several) if progress else None
+            out[stage_key(stage, ep) if several and ep else stage] = self.run_stage(
+                project_id, stage, {**params, "episode": ep or first}, progress=sink, cancelled=cancelled)
         return out
 
     # -- queue execution (called by the worker) -------------------------------------------------------
     def execute_run(self, run: dict[str, Any], owner: str, lease_seconds: float, beat_seconds: float) -> None:
         run_id, pid = run["id"], run["project_id"]
-        tracker = RunProgress(self.stages_to_run(pid, run["stages"] or None, int(run["params"].get("episode") or 1)))
+        plan, several = self.plan(pid, run["stages"] or None, run["params"])
+        tracker = RunProgress([stage_key(s, ep) if several and ep else s for ep, s in plan])
         cancel, lost, stop = threading.Event(), threading.Event(), threading.Event()
 
         def beat() -> None:

@@ -58,10 +58,10 @@ export function useUpdateProject(id: number) {
   });
 }
 
-export const useWorkflow = (id: number) =>
+export const useWorkflow = (id: number, episode = 1) =>
   useQuery({
-    queryKey: ["workflow", id],
-    queryFn: () => api<WorkflowOverview>(`/api/projects/${id}/workflow`),
+    queryKey: ["workflow", id, episode],
+    queryFn: () => api<WorkflowOverview>(`/api/projects/${id}/workflow?episode=${episode}`),
     refetchInterval: (q) => (q.state.data?.active_run ? LIVE_MS : false),
   });
 
