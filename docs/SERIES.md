@@ -68,7 +68,7 @@
 
 实现顺序(每步独立可测、可发布):
 - A. ✅ 已做:迁移 007(`seasons`、`episodes.season/number_in_season`、阶段状态带季/集维度),`WorkflowState` 带作用域;`GET /workflow?episode=N`、`GET/PATCH /seasons`、`workflow run --param episode=N [--param season=M]`;网页暂时只看第 1 集。
-- B. `music`/`scenes` 阶段按集;`pending_stages` 按集。
+- B. ✅ 已做:`music` 阶段按集(配乐 scene_ref 加集号前缀 `ep02_...`,主题曲全剧一首,迁移 008 把老数据归第 1 集),成片优先用本集的配乐;`scenes` 本来就只补缺的地点,`pending_stages` 按集。
 - C. 引擎批量:`season=N` 或 `episodes=[1..N]`,进度与 ETA 按集汇总;CLI `workflow run --season 1`、`--episodes 1-10`。
 - D. 全剧圣经 + 季大纲(S1/S2):新增 `outline` 阶段(季级)。
 - E. 系列看板(S8):按季折叠、每集每阶段状态、镜头数、耗时。

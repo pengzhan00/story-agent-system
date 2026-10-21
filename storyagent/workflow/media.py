@@ -261,12 +261,13 @@ def build_episode_timeline(ctx: Ctx, episode: int) -> dict[str, Any]:
             lines=lines, narration=str(shot.get("narration", "")),
         ))
     bgm = None
-    for m in ctx.store.list_music(ctx.pid):
-        if m["kind"] == "bgm":
-            spec = store.current(ctx.pid, "music.bgm", str(m["id"]))
-            bgm = _asset_ref(current_asset(ledger, spec) if spec else None, "audio.music")
-            if bgm:
-                break
+    cues = [m for m in ctx.store.list_music(ctx.pid) if m["kind"] == "bgm"]
+    cues.sort(key=lambda m: not str(m["scene_ref"]).startswith(f"ep{episode:02d}_"))     # this episode's cues first
+    for m in cues:
+        spec = store.current(ctx.pid, "music.bgm", str(m["id"]))
+        bgm = _asset_ref(current_asset(ledger, spec) if spec else None, "audio.music")
+        if bgm:
+            break
     profile = ctx.settings.delivery_profile(ctx.project.delivery_profile)
     label, metadata = compliance_marks(ctx)
     return build_timeline(TimelineInput(

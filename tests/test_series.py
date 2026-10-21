@@ -27,7 +27,7 @@ def test_migration_007_moves_the_old_stage_rows_to_season_1_episode_1(
     for stage in ("analyze", "cast", "script", "shotplan"):
         db.conn.execute("INSERT INTO workflow_stages(project_id, stage, status) VALUES (1, ?, 'completed')", (stage,))
     monkeypatch.setattr(migrate_mod, "discover", lambda: real)
-    assert migrate(db) == (6, 7)
+    assert migrate(db) == (6, 8)
     found = db.conn.execute("SELECT * FROM workflow_stages")
     rows = {r["stage"]: (r["season"], r["episode"], r["status"]) for r in found}
     assert rows == {"analyze": (0, 0, "completed"), "cast": (0, 0, "completed"),
@@ -105,3 +105,29 @@ def test_seasons_api(fsettings: Settings) -> None:
         assert client.patch(f"/api/projects/{pid}/seasons/2", json={"bogus": 1}).status_code == 422
         assert [s["number"] for s in client.get(f"/api/projects/{pid}/seasons").json()] == [1, 2]
         assert client.get(f"/api/projects/{pid}/workflow?episode=2").json()["episode"] == 2
+
+
+def test_each_episode_gets_its_own_scene_music(tmp_path: Path) -> None:
+    engine, _client, _ = make_engine(tmp_path)
+    pid = new_project(engine)
+    engine.run(pid, None, {"visual_prompts": False})
+    engine.run(pid, None, {"visual_prompts": False, "episode": 2})
+    refs = sorted(m["scene_ref"] for m in engine.store.list_music(pid) if m["kind"] == "bgm")
+    assert refs and all(r.startswith(("ep01_", "ep02_")) for r in refs)
+    assert any(r.startswith("ep01_") for r in refs) and any(r.startswith("ep02_") for r in refs)
+    assert sum(1 for m in engine.store.list_music(pid) if m["kind"] == "theme") == 1    
+
+
+def test_migration_008_moves_old_scene_music_to_episode_1(settings: Settings, monkeypatch: pytest.MonkeyPatch) -> None:
+    real = migrate_mod.discover()
+    monkeypatch.setattr(migrate_mod, "discover", lambda: [m for m in real if m.version <= 7])
+    old = Database(settings.db_path)
+    migrate(old)
+    old.conn.execute("INSERT INTO projects(slug,name) VALUES ('q','Q')")
+    old.conn.execute("INSERT INTO music_themes(project_id, kind, scene_ref) VALUES (1,'bgm','act01_scene02')")
+    old.conn.execute("INSERT INTO music_themes(project_id, kind, scene_ref) VALUES (1,'theme','')")
+    monkeypatch.setattr(migrate_mod, "discover", lambda: real)
+    migrate(old)
+    got = [r["scene_ref"] for r in old.conn.execute("SELECT scene_ref FROM music_themes ORDER BY id")]
+    assert got == ["ep01_act01_scene02", ""]
+    old.close()

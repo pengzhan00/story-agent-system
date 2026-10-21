@@ -300,21 +300,23 @@ def _music_fields(data: dict[str, Any], kind: str, scene_ref: str = "") -> dict[
 def music(ctx: Ctx) -> dict[str, Any]:
     plan = _plan(ctx)
     title = plan.get("project_name", ctx.project.name)
+    episode = int(ctx.params.get("episode") or 1)
+    prefix = f"ep{episode:02d}_"                     # a scene BGM belongs to its episode
     existing = ctx.store.list_music(ctx.pid)
     made = 0
     jobs: list[tuple[str, dict[str, Any]]] = []
     if ctx.params.get("theme_song", True) and (ctx.force() or not any(m["kind"] == "theme" for m in existing)):
         jobs.append(("theme", {"subject": title, "mood": plan.get("tone", ""), "vocal": "song"}))
     moods: dict[str, str] = {}
-    for sc in ctx.store.list_scripts(ctx.pid):
-        for act in sc["acts"]:
-            for scene in act.get("scenes", []):
-                ref = f"act{int(act.get('number', 1)):02d}_scene{int(scene.get('number', 1)):02d}"
-                moods.setdefault(str(scene.get("bgm_mood") or scene.get("mood") or ""), ref)
+    this_episode = ctx.store.get_script(ctx.pid, episode)
+    for act in (this_episode or {}).get("acts", []):
+        for scene in act.get("scenes", []):
+            ref = f"act{int(act.get('number', 1)):02d}_scene{int(scene.get('number', 1)):02d}"
+            moods.setdefault(str(scene.get("bgm_mood") or scene.get("mood") or ""), ref)
     have_refs = {m["scene_ref"] for m in existing if m["kind"] == "bgm"}
     for mood, ref in list(moods.items())[: int(ctx.params.get("max_bgm") or 4)]:
-        if ref not in have_refs or ctx.force():
-            jobs.append(("bgm", {"scene": ref, "mood": mood, "ref": ref}))
+        if prefix + ref not in have_refs or ctx.force():
+            jobs.append(("bgm", {"scene": ref, "mood": mood, "ref": prefix + ref}))
     total = len(jobs) + (0 if ctx.params.get("skip_sfx") else 1)
     for i, (kind, spec) in enumerate(jobs):
         ctx.step(i, total, kind)
