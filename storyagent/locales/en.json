@@ -1084,5 +1084,8 @@
   "web.project.from_text": "Make a project from it…",
   "web.project.from_text_name": "Project name",
   "web.project.from_text_go": "Create and write the story stages",
-  "web.project.from_text_hint": "The text becomes the premise and the source the script is adapted from. Characters, scenes and shots are made; images and videos wait for your confirmation in the production plan."
+  "web.project.from_text_hint": "The text becomes the premise and the source the script is adapted from. Characters, scenes and shots are made; images and videos wait for your confirmation in the production plan.",
+  "web.workflow.voice": "Voice for characters without their own",
+  "web.workflow.voice_none": "None (those lines become subtitles only)",
+  "web.workflow.voice_hint": "Pick a voice from the library (add one under Library → voice). Characters with their own voice sample keep it."
 }

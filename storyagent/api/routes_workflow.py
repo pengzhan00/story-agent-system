@@ -64,12 +64,13 @@ def get_produce_plan(project_id: int, request: Request, tier: str = "draft", for
     Start the confirmed part with ``POST .../workflow/runs {"stages": ["produce"], "params": {"only": [spec ids],
     "tier": ...}}``."""
     ctx = ctx_of(request)
-    ctx.projects.get(project_id)
+    project = ctx.projects.get(project_id)
     try:
         level = QualityTier(tier)
     except ValueError:
         raise ApiError(422, "invalid", f"unknown tier {tier!r}") from None
-    tasks = produce_plan(ctx.settings, ctx.story, ctx.specs, ctx.ledger, project_id, level, force=force)
+    tasks = produce_plan(ctx.settings, ctx.story, ctx.specs, ctx.ledger, project_id, level, force=force,
+                         project_settings=project.settings)
     return ProducePlanOut(tier=level.value, tasks=[PlannedTaskOut.model_validate(t.__dict__) for t in tasks],
                           totals=PlanTotals.model_validate(totals(tasks)))
 

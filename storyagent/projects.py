@@ -12,7 +12,7 @@ from storyagent.db import Database
 from storyagent.domain import slugify
 
 _PATCHABLE = ("name", "description", "genre", "content_language", "delivery_profile", "aspect_ratio")
-_SETTINGS_KEYS = ("compliance", "models", "allow_restricted_licenses", "target_sec", "allow_remote")
+_SETTINGS_KEYS = ("compliance", "models", "allow_restricted_licenses", "target_sec", "allow_remote", "default_voice")
 
 
 class ProjectNotFound(LookupError):
@@ -129,6 +129,9 @@ class ProjectStore:
                 parse_target(current.get("target_sec"))
             except PacingError as exc:
                 raise ConfigError(str(exc)) from exc
+            voice = current.get("default_voice")
+            if voice is not None and not (isinstance(voice, str) and voice.startswith(("library:voice/", "asset:"))):
+                raise ConfigError("default_voice must be a library:voice/<name> or asset:<id> reference")
             for ref in current.get("models", {}):
                 self.settings.model(ref)  # unknown model ref -> ConfigError
             conn.execute(

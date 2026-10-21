@@ -90,6 +90,8 @@ class ProjectSettingsPatch(BaseModel):
         default=None, description="allow models that run in the cloud (prompts and reference files leave this machine)")
     target_sec: float | None = Field(
         default=None, description="wanted episode length in seconds (advert to feature film); null = the profile's")
+    default_voice: str | None = Field(
+        default=None, description="voice (library:voice/<name>) for characters with none; null = the global one")
 
 
 # -- jobs -------------------------------------------------------------------------------------------

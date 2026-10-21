@@ -24,7 +24,7 @@ from typing import Any
 from storyagent.compose.pacing import duration_window
 from storyagent.compose.qc import run_qc
 from storyagent.compose.timeline import AssetRef, ShotInput, TimelineInput, build_timeline
-from storyagent.config import ConfigError
+from storyagent.config import ConfigError, Settings
 from storyagent.domain import JobStatus, MediaKind, QualityTier
 from storyagent.media.compliance import visible_marks
 from storyagent.media.contracts import AssetRecord, JobRecord, MediaJob
@@ -87,13 +87,19 @@ def wait_for_jobs(
     return [final[j.id] for j in jobs]
 
 
+def default_voice_of(settings: Settings, project_settings: dict[str, Any] | None) -> str:
+    """Voice for a character that has none: the project's own choice, else ``[workflow] default_voice``."""
+    own = str((project_settings or {}).get("default_voice") or "").strip()
+    return own or str(settings.workflow.get("default_voice", "")).strip()
+
+
 def _plan_phase(
     ctx: Ctx, ledger: Ledger, specs: list[SpecRecord], types: tuple[str, ...], skipped: list[dict[str, Any]],
     tier: QualityTier, counts: dict[str, int],
 ) -> list[tuple[SpecRecord, MediaJob]]:
     store: SpecStore = ctx.spec_store
     out: list[tuple[SpecRecord, MediaJob]] = []
-    default_voice = str(ctx.settings.workflow.get("default_voice", "")).strip()
+    default_voice = default_voice_of(ctx.settings, ctx.project.settings)
     skip = {str(x) for x in ctx.params.get("skip", [])}      # e.g. ["shot.video"]: stills only
     only = {str(x) for x in ctx.params.get("only", [])}      # the confirmed plan: just these specs
     for spec in specs:

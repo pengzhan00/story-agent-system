@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLibraryItems } from "../api/library";
 import { useCancelRun, useMeta, useProject, useProjectSettings, useReviewScript, useStartRun, useUpdateProject, useWorkflow } from "../api/hooks";
 import { ErrorNote } from "../components/ErrorNote";
 import { ProgressBar } from "../components/ProgressBar";
@@ -20,6 +21,8 @@ function Spec({ id }: { id: number }) {
   const settings = useProjectSettings(id);
   const saved = project.data?.settings?.["target_sec"];
   const [draft, setDraft] = useState<string | null>(null);
+  const voices = (useLibraryItems().data ?? []).filter((i) => i.role === "voice");
+  const voice = project.data?.settings?.["default_voice"];
   const profiles = meta.data?.delivery_profiles ?? [];
   const current = profiles.find((p) => p.name === project.data?.delivery_profile);
   const shown = draft ?? (typeof saved === "number" ? String(saved) : "");
@@ -50,7 +53,22 @@ function Spec({ id }: { id: number }) {
             <span className="muted small">{t("web.workflow.target_unit")}</span>
           </span>
         </label>
+        <label className="field">
+          <span>{t("web.workflow.voice")}</span>
+          <select
+            value={typeof voice === "string" ? voice : ""}
+            onChange={(e) => settings.mutate({ default_voice: e.target.value || null })}
+          >
+            <option value="">{t("web.workflow.voice_none")}</option>
+            {voices.map((v) => (
+              <option key={v.id} value={v.ref}>
+                {v.name}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
+      <p className="muted small">{t("web.workflow.voice_hint")}</p>
       <p className="muted small">{t("web.workflow.target_hint")}</p>
       <div className="row">
         {TARGET_PRESETS.map((n) => (

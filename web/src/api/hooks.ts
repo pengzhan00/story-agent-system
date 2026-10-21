@@ -44,7 +44,7 @@ export function useProjectBin() {
 export function useProjectSettings(id: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { target_sec: number | null }) => patch<Project>(`/api/projects/${id}/settings`, body),
+    mutationFn: (body: { target_sec?: number | null; default_voice?: string | null }) => patch<Project>(`/api/projects/${id}/settings`, body),
     onSuccess: (p) => qc.setQueryData(["project", id], p),
   });
 }

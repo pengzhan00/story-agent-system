@@ -2377,6 +2377,11 @@ export interface components {
             compliance?: {
                 [key: string]: unknown;
             } | null;
+            /**
+             * Default Voice
+             * @description voice (library:voice/<name>) for characters with none; null = the global one
+             */
+            default_voice?: string | null;
             /** Models */
             models?: {
                 [key: string]: {

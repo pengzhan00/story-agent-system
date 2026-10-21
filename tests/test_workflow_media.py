@@ -292,3 +292,17 @@ def test_the_plan_lists_what_would_be_made_and_only_the_confirmed_part_runs(tmp_
     after = produce_plan(engine.settings, engine.store, engine.spec_store, ledger, 1, QualityTier.DRAFT)
     assert {p.state for p in after if p.subject_type == "character.portrait"} == {"done"}
     assert totals(after)["count"] == MADE - 2
+
+
+def test_a_project_voice_unblocks_the_dialogue_in_the_plan(tmp_path: Path) -> None:
+    from storyagent.domain import QualityTier
+    from storyagent.workflow.plan import produce_plan
+
+    engine, _worker, _ = story(tmp_path, [FakeAdapter()])
+    ledger: Ledger = engine.spec_store.ledger
+    args = (engine.settings, engine.store, engine.spec_store, ledger, 1, QualityTier.DRAFT)
+    before = produce_plan(*args)
+    after = produce_plan(*args, project_settings={"default_voice": "library:voice/narrator"})
+    lines = lambda plan: [p for p in plan if p.subject_type == "dialogue.line"]  # noqa: E731
+    assert any(p.reason == "no_voice" for p in lines(before))
+    assert not any(p.reason == "no_voice" for p in lines(after))

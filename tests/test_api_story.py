@@ -333,3 +333,12 @@ def test_a_project_from_a_written_script_queues_the_story_stages_but_no_media(
     assert body["run"]["params"]["source_text"] == text and len(body["run"]["stages"]) == 7   # story only, no media
     assert client.post("/api/projects/from-text", json={"name": "x", "text": "  "}).status_code == 422
     assert client.post("/api/projects/from-text", json={"name": "x", "asset_id": "0" * 32}).status_code == 404
+
+
+def test_a_project_can_choose_its_default_voice(client: TestClient) -> None:
+    pid = client.post("/api/projects", json={"name": "Voices"}).json()["id"]
+    ok = client.patch(f"/api/projects/{pid}/settings", json={"default_voice": "library:voice/narrator"})
+    assert ok.status_code == 200 and ok.json()["settings"]["default_voice"] == "library:voice/narrator"
+    assert client.patch(f"/api/projects/{pid}/settings", json={"default_voice": "/etc/passwd"}).status_code == 422
+    cleared = client.patch(f"/api/projects/{pid}/settings", json={"default_voice": None})
+    assert "default_voice" not in cleared.json()["settings"]

@@ -2337,6 +2337,18 @@
             ],
             "title": "Compliance"
           },
+          "default_voice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "voice (library:voice/<name>) for characters with none; null = the global one",
+            "title": "Default Voice"
+          },
           "models": {
             "anyOf": [
               {

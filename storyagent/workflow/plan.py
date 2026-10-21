@@ -19,7 +19,7 @@ from storyagent.media.ledger import Ledger
 from storyagent.media.specs import SpecRecord, SpecStore
 from storyagent.story import StoryStore
 
-from .media import FALLBACK_SECONDS, PHASES, current_asset, up_to_date
+from .media import FALLBACK_SECONDS, PHASES, current_asset, default_voice_of, up_to_date
 
 
 @dataclass
@@ -66,10 +66,10 @@ def _label(spec: SpecRecord, names: dict[str, dict[str, str]]) -> str:
 
 def produce_plan(
     settings: Settings, store: StoryStore, specs: SpecStore, ledger: Ledger, project_id: int, tier: QualityTier,
-    *, force: bool = False,
+    *, force: bool = False, project_settings: dict[str, Any] | None = None,
 ) -> list[PlannedTask]:
     names = _labels(store, project_id)
-    default_voice = str(settings.workflow.get("default_voice", "")).strip()
+    default_voice = default_voice_of(settings, project_settings)
     out: list[PlannedTask] = []
     current = specs.list_current(project_id)
     by_key = {(s.subject_type, s.subject_id, s.slot): s for s in current}
