@@ -4,6 +4,7 @@ A value may name an asset instead of a file path:
 
     "asset:<asset id>"                       "library:<role>/<name>"
     {"asset": "<asset id>"}                  {"library": "<role>/<name>"}
+    "job:<job id>"      the main output of a job (a pipeline step feeding the next one)
 
 The worker resolves every reference to an absolute path just before the adapter runs, so adapters only ever see
 paths. A library item of role ``voice`` used where a ``voice_ref`` object is expected (that is, as the whole
@@ -23,7 +24,7 @@ from .ledger import Ledger, LedgerError
 from .library import ROLES, Library, LibraryError
 
 # Only a WHOLE value of exactly this shape is a reference, so free text ("asset: the old chest") is never touched.
-_REF = re.compile(r"^(?:asset:[0-9a-f]{32}|library:(?:" + "|".join(ROLES) + r")/[^/\x00\n]{1,80})$")
+_REF = re.compile(r"^(?:asset:[0-9a-f]{32}|job:[0-9a-f]{32}|library:(?:" + "|".join(ROLES) + r")/[^/\x00\n]{1,80})$")
 
 
 class RefError(ValueError):
@@ -62,11 +63,21 @@ class Resolver:
             raise RefError(f"{ref}: file is missing ({asset.path})")
         return str(path)
 
+    def _job_output(self, job_id: str, ref: str) -> AssetRecord:
+        """The main asset of a completed job: the one in the job's own slot, else its first."""
+        job = self.ledger.get_job(job_id)
+        if job.status.value != "completed":
+            raise RefError(f"{ref}: the job has not completed ({job.status.value})")
+        assets = [a for a in self.ledger.list_assets(job_id=job_id) if not a.trashed_at]
+        if not assets:
+            raise RefError(f"{ref}: the job produced no asset")
+        return next((a for a in assets if a.slot == job.slot), assets[-1])
+
     def _one(self, ref: str, out: Resolution, *, voice_object: bool) -> Any:
         kind, _, rest = ref.partition(":")
         try:
-            if kind == "asset":
-                asset = self.ledger.get_asset(rest)
+            if kind in ("asset", "job"):
+                asset = self.ledger.get_asset(rest) if kind == "asset" else self._job_output(rest, ref)
                 out.assets[ref], out.sha256[asset.id] = asset.id, asset.sha256
                 path = self._asset_path(asset, ref)
                 if voice_object:  # a bare asset used as a voice reference: its own metadata says what it says / consent

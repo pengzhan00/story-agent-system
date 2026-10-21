@@ -28,6 +28,7 @@ class ErrorCode(StrEnum):
     OUTPUT_INVALID = "output_invalid"
     CANCELLED = "cancelled"
     WORKER_LOST = "worker_lost"
+    DEPENDENCY_FAILED = "dependency_failed"  # the pipeline step this job waited for did not complete
     INTERNAL = "internal"
 
     @property
@@ -51,6 +52,7 @@ _STATUS: dict[ErrorCode, JobStatus] = {
     ErrorCode.OUTPUT_INVALID: JobStatus.FAILED_VALIDATION,
     ErrorCode.CANCELLED: JobStatus.CANCELLED,
     ErrorCode.WORKER_LOST: JobStatus.WORKFLOW_ERROR,
+    ErrorCode.DEPENDENCY_FAILED: JobStatus.WORKFLOW_ERROR,
     ErrorCode.INTERNAL: JobStatus.WORKFLOW_ERROR,
 }
 

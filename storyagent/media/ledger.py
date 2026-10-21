@@ -133,7 +133,7 @@ class Ledger:
         key = job.idempotency_key or digest({
             "p": job.project_id, "s": job.shot_id, "spec": [job.spec_id, job.spec_version],
             "k": job.kind.value, "slot": job.slot, "m": model_ref, "t": job.tier.value,
-            "in": job.inputs, "pa": params, "seed": job.seed,
+            "in": job.inputs, "pa": params, "seed": job.seed, "dep": job.depends_on, "pl": job.pipeline_id,
         })
         with self.db.transaction() as conn:
             existing = conn.execute(
@@ -148,8 +148,8 @@ class Ledger:
                 """INSERT INTO media_jobs(id, project_id, shot_id, spec_id, spec_version, kind, provider,
                        model_ref, tier, slot, status, priority, inputs, params, seed, idempotency_key,
                        heavy, est_memory_gib, est_seconds, license_tag, commercial_ok, max_attempts,
-                       created_at)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,'queued',?,?,?,?,?,?,?,?,?,?,?,?)""",
+                       created_at, depends_on, pipeline_id, pipeline_step)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,'queued',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
                     jid, job.project_id, job.shot_id, job.spec_id, job.spec_version, job.kind.value,
                     model.provider, model_ref, job.tier.value, job.slot, job.priority,
@@ -157,7 +157,7 @@ class Ledger:
                     model.est_memory_gib, self.estimate_seconds(model_ref, job.tier.value),
                     model.license_tag, int(model.commercial_ok),
                     job.max_attempts or int(self.settings.runtime.get("max_attempts", 2)),
-                    self._now(),
+                    self._now(), job.depends_on, job.pipeline_id, job.pipeline_step,
                 ),
             )
             self.add_event(jid, "enqueued", model=model_ref, tier=job.tier.value)
@@ -177,10 +177,21 @@ class Ledger:
         shot_id: int | None = None,
         spec_id: str | None = None,
         status: Sequence[JobStatus | str] | None = None,
+        kinds: Sequence[str] | None = None,
+        standalone: bool = False,
+        pipeline_id: str | None = None,
         limit: int = 100,
     ) -> list[JobRecord]:
         where: list[str] = ["1=1"]
         args: list[Any] = []
+        if standalone:
+            where.append("project_id IS NULL")
+        if pipeline_id is not None:
+            where.append("pipeline_id=?")
+            args.append(pipeline_id)
+        if kinds:
+            where.append(f"kind IN ({','.join('?' * len(kinds))})")
+            args.extend(kinds)
         if spec_id is not None:
             where.append("spec_id=?")
             args.append(spec_id)
@@ -201,7 +212,8 @@ class Ledger:
 
     def queued(self, limit: int = 50) -> list[JobRecord]:
         rows = self.db.conn.execute(
-            "SELECT * FROM media_jobs WHERE status='queued' ORDER BY priority, created_at, rowid LIMIT ?",
+            "SELECT * FROM media_jobs WHERE status='queued' AND (depends_on IS NULL OR depends_on IN "
+            "(SELECT id FROM media_jobs WHERE status='completed')) ORDER BY priority, created_at, rowid LIMIT ?",
             (limit,),
         ).fetchall()
         return [JobRecord.from_row(r) for r in rows]
@@ -310,6 +322,12 @@ class Ledger:
             (code.status.value, code.value, message, now, actual, job_id),
         )
         self.add_event(job_id, "failed", "error", code=code.value, message=message, params=params)
+        self._cascade(conn, job_id)
+
+    def _cascade(self, conn: Any, job_id: str) -> None:
+        """A step of a pipeline that did not complete takes the steps waiting for it down with it."""
+        for r in conn.execute("SELECT id FROM media_jobs WHERE depends_on=? AND status='queued'", (job_id,)).fetchall():
+            self._finish(conn, r["id"], ErrorCode.DEPENDENCY_FAILED, "", upstream=job_id)
 
     def fail(self, job_id: str, code: ErrorCode, message: str = "", **params: Any) -> JobRecord:
         with self.db.transaction() as conn:
@@ -447,6 +465,7 @@ class Ledger:
         kind: str | None = None,
         slot: str | None = None,
         spec_id: str | None = None,
+        job_id: str | None = None,
         current_only: bool = False,
         include_trashed: bool = False,
         limit: int = 200,
@@ -454,7 +473,7 @@ class Ledger:
         where: list[str] = ["1=1"]
         args: list[Any] = []
         for col, val in (("project_id", project_id), ("shot_id", shot_id), ("kind", kind), ("slot", slot),
-                         ("spec_id", spec_id)):
+                         ("spec_id", spec_id), ("job_id", job_id)):
             if val is not None:
                 where.append(f"{col}=?")
                 args.append(val)

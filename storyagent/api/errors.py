@@ -22,6 +22,7 @@ from storyagent.media.specs import SpecError, SpecLocked
 from storyagent.projects import ProjectNotFound, ProjectStateError
 from storyagent.story import ShotLocked, StoryError, StoryNotFound
 from storyagent.workflow import WorkflowStateError
+from storyagent.workshop import WorkshopError
 
 from .context import translator_of
 
@@ -60,6 +61,10 @@ def install(app: FastAPI) -> None:
     async def _launch(request: Request, exc: LaunchError) -> JSONResponse:
         status = {"launch_unknown": 404, "launch_not_startable": 409, "launch_missing": 424}.get(exc.code, 500)
         return respond(request, status, exc.code, exc.detail)
+
+    @app.exception_handler(WorkshopError)
+    async def _workshop(request: Request, exc: WorkshopError) -> JSONResponse:
+        return respond(request, 422, exc.code, exc.detail)
 
     @app.exception_handler(ProjectNotFound)
     async def _project(request: Request, exc: ProjectNotFound) -> JSONResponse:

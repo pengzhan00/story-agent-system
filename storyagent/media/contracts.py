@@ -49,6 +49,9 @@ class MediaJob:
     spec_version: int | None = None
     idempotency_key: str = ""  # "" => derived from the request
     max_attempts: int | None = None
+    depends_on: str | None = None  # job id: starts only after it completed; inputs may name it as "job:<id>"
+    pipeline_id: str | None = None
+    pipeline_step: int | None = None
 
 
 @dataclass(frozen=True)
@@ -90,6 +93,9 @@ class JobRecord:
     finished_at: str | None
     actual_seconds: float | None
     peak_memory_gib: float | None
+    depends_on: str | None = None
+    pipeline_id: str | None = None
+    pipeline_step: int | None = None
 
     @classmethod
     def from_row(cls, r: sqlite3.Row) -> JobRecord:
@@ -106,7 +112,8 @@ class JobRecord:
             progress_msg=r["progress_msg"], error_code=r["error_code"], error_message=r["error_message"],
             cancel_requested=bool(r["cancel_requested"]), created_at=r["created_at"],
             started_at=r["started_at"], finished_at=r["finished_at"], actual_seconds=r["actual_seconds"],
-            peak_memory_gib=r["peak_memory_gib"],
+            peak_memory_gib=r["peak_memory_gib"], depends_on=r["depends_on"], pipeline_id=r["pipeline_id"],
+            pipeline_step=r["pipeline_step"],
         )
 
 

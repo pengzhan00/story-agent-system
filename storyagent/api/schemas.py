@@ -122,6 +122,9 @@ class JobOut(Out):
     started_at: str | None
     finished_at: str | None
     actual_seconds: float | None
+    depends_on: str | None = None
+    pipeline_id: str | None = None
+    pipeline_step: int | None = None
 
 
 class JobCreate(BaseModel):
@@ -559,3 +562,92 @@ class LockBody(BaseModel):
 
 class SpeakerBody(BaseModel):
     character: str = Field(min_length=1)
+
+
+# -- workshop ---------------------------------------------------------------------------------------
+class WorkshopField(Strict):
+    name: str
+    target: str
+    type: str
+    media: str
+    required: bool
+
+
+class WorkshopModel(Strict):
+    ref: str
+    provider: str
+    version: str
+    heavy: bool
+    est_memory_gib: float
+    license_tag: str
+    commercial_ok: bool
+    available: bool
+    note: str
+
+
+class WorkshopKind(Strict):
+    kind: str
+    model_ref: str
+    default_model: str
+    tier: str
+    models: list[WorkshopModel]
+    base_params: dict[str, Any]
+    preset_params: dict[str, Any]
+    schema_: dict[str, dict[str, Any]] = Field(alias="schema", serialization_alias="schema")
+    inputs: list[WorkshopField]
+    output: str
+
+    model_config = ConfigDict(populate_by_name=True, json_schema_serialization_defaults_required=True)
+
+
+class WorkshopModuleOut(Strict):
+    id: str
+    kinds: list[WorkshopKind]
+
+
+class ParamsOut(Strict):
+    base: dict[str, Any]
+    preset: dict[str, Any]
+    effective: dict[str, Any]
+    schema_: dict[str, dict[str, Any]] = Field(alias="schema", serialization_alias="schema")
+
+    model_config = ConfigDict(populate_by_name=True, json_schema_serialization_defaults_required=True)
+
+
+class PresetBody(BaseModel):
+    model_ref: str = ""
+    tier: str = ""
+    params: dict[str, Any] = Field(default_factory=dict)
+
+
+class RunBody(BaseModel):
+    kind: MediaKind
+    inputs: dict[str, Any] = Field(default_factory=dict)
+    model_ref: str = ""
+    tier: str = ""
+    params: dict[str, Any] = Field(default_factory=dict)
+    seed: int | None = None
+    count: int = Field(default=1, ge=1, le=8)
+
+
+class PipelineStep(BaseModel):
+    kind: MediaKind
+    inputs: dict[str, Any] = Field(default_factory=dict)
+    model_ref: str = ""
+    tier: str = ""
+    params: dict[str, Any] = Field(default_factory=dict)
+    seed: int | None = None
+
+
+class PipelineBody(BaseModel):
+    steps: list[PipelineStep] = Field(min_length=1, max_length=12)
+
+
+class PipelineOut(Strict):
+    pipeline_id: str
+    jobs: list[JobOut]
+
+
+class WorkshopHistoryItem(Strict):
+    job: JobOut
+    assets: list[AssetOut]
