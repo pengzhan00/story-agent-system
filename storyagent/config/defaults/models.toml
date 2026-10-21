@@ -29,6 +29,7 @@
 "text.script" = "llm-script"
 "text.asr" = "whisper-large-v3-turbo"
 "audio.music" = "acestep-1.5-turbo"
+"audio.sfx" = "acestep-1.5-sfx"
 "compose.assemble" = "ffmpeg-assemble"
 "train.lora" = "flux2-klein-4b-lora-trainer"
 
@@ -206,6 +207,26 @@ duration = 30
 steps = 8
 guidance_scale = 7.0
 vocal_language = "zh"
+infer_method = "ode"
+
+# Sound effects from the same ACE-Step server: a music model asked for non-musical sound. Quality is unproven; swap the
+# `audio.sfx` default for a dedicated model (e.g. Stable Audio via an adapter) when one is wired.
+[models."acestep-1.5-sfx"]
+kind = "audio.sfx"
+provider = "acestep"
+version = "v15-turbo"
+family = "acestep-1.5"
+heavy = false
+est_memory_gib = 20
+license_tag = "acestep"
+commercial_ok = true
+prompt_profile = "natural_en"
+timeout_sec = 600
+api_model = "acestep-v15-turbo"
+[models."acestep-1.5-sfx".params]
+duration = 5
+steps = 8
+guidance_scale = 7.0
 infer_method = "ode"
 
 [models."acestep-1.5-xl-sft"]
