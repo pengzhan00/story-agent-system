@@ -38,6 +38,14 @@ def _acestep(settings: Settings) -> Adapter:
     return AceStepAdapter(ServiceClient(settings.service("acestep")), api_models)
 
 
+def _comfy(settings: Settings) -> Adapter:
+    from .adapters._http import ServiceClient
+    from .adapters.comfy import ComfyAdapter
+
+    workflows = {ref: str(m.extra.get("workflow", "")) for ref, m in settings.models.items() if m.provider == "comfy"}
+    return ComfyAdapter(ServiceClient(settings.service("comfy")), workflows)
+
+
 def _phosphene(settings: Settings) -> Adapter:
     from .adapters._http import ServiceClient
     from .adapters.phosphene import PhospheneAdapter
@@ -106,7 +114,7 @@ def _longcat(settings: Settings) -> Adapter:
 
 
 _BUILTIN: list[Callable[[Settings], Adapter]] = [
-    _acestep, _phosphene, _cosyvoice, _whisper, _llm, _remote_video, _mflux, _lora_train, _seedvc, _ffmpeg, _h3,
+    _acestep, _comfy, _phosphene, _cosyvoice, _whisper, _llm, _remote_video, _mflux, _lora_train, _seedvc, _ffmpeg, _h3,
     _longcat,
 ]
 

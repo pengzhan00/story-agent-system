@@ -2,7 +2,7 @@
 #
 #   kind     : a MediaKind value (storyagent/domain/enums.py), e.g. "video.generate"
 #   provider : the runtime/adapter that executes it:
-#              llm | mflux | phosphene | acestep | cosyvoice | seedvc | whisper | h3 | longcat | lora_train | ffmpeg
+#              llm | mflux | phosphene | acestep | comfy | cosyvoice | seedvc | whisper | h3 | longcat | lora_train | ffmpeg
 #   family   : the underlying model family — the same weights may have several runtimes
 #              (e.g. one model through several runtimes); licence applies per family
 #   heavy    : true => the broker runs at most one heavy job at a time
@@ -29,6 +29,7 @@
 "text.script" = "llm-script"
 "text.asr" = "whisper-large-v3-turbo"
 "audio.music" = "acestep-1.5-turbo"
+"audio.sfx" = "stable-audio-3-medium"
 "compose.assemble" = "ffmpeg-assemble"
 "train.lora" = "flux2-klein-4b-lora-trainer"
 
@@ -207,6 +208,30 @@ steps = 8
 guidance_scale = 7.0
 vocal_language = "zh"
 infer_method = "ode"
+
+# Sound effects: Stable Audio 3 through ComfyUI (workflow template media/workflows/stable_audio_3.json). Needs the
+# checkpoint stable_audio_3_medium and the text encoder t5gemma_b_b_ul2 in ComfyUI's models folders. Licence: Stability
+# AI Community License (free commercial use below a revenue threshold, attribution) - confirm the terms for your use.
+# ACE-Step is a music model and returns noise for sound effects: do not route audio.sfx to it.
+[models."stable-audio-3-medium"]
+kind = "audio.sfx"
+provider = "comfy"
+version = "medium"
+family = "stable-audio-3"
+heavy = false
+est_memory_gib = 12
+license_tag = "stability-ai-community"
+commercial_ok = true
+attribution = "Powered by Stability AI"
+prompt_profile = "natural_en"
+timeout_sec = 600
+workflow = "stable_audio_3"
+[models."stable-audio-3-medium".params]
+duration = 5
+steps = 8
+cfg = 1.0
+sampler_name = "lcm"
+scheduler = "simple"
 
 [models."acestep-1.5-xl-sft"]
 kind = "audio.music"

@@ -66,7 +66,8 @@ Uploads (`import_file`) register outside files as `upload.<audio|image|video|mod
 
 | Provider | Kinds | Runtime | Notes |
 |---|---|---|---|
-| `acestep` | audio.music | HTTP :8001 | `batch_size=1`; XL SFT model absent -> `missing_model` (honest) |
+| `acestep` | audio.music | HTTP :8001 | `batch_size=1`; XL SFT model absent -> `missing_model` (honest). A music model: asked for sound effects it returns noise (measured), so `audio.sfx` is not routed to it |
+| `comfy` | audio.sfx | ComfyUI HTTP :8188, workflow templates `media/workflows/<name>.json` (node graph + `bindings` table, no guessing) | Stable Audio 3 medium: ~5 s per clip; `validate` checks node classes and checkpoint/text-encoder files on the server first |
 | `phosphene` | video.av / video.generate / video.lipsync | LTX-2.5 panel :8198 | fake-panel tested only (panel was not running) |
 | `cosyvoice` | audio.tts | subprocess, one model load per job | default **CosyVoice 3.0** (`cosyvoice3-0.5b`, engine `cv3`, 3 s reference, `speed`); `cosyvoice2-0.5b` is the fallback. Zero-shot clone needs `voice_ref` {audio, text, consent}; `lines=[...]` batches |
 | `whisper` | text.asr | whisper-cli | transcript.txt + .srt; homophones ("工坊"/"工房") mean QC must compare fuzzily |

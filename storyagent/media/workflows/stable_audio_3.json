@@ -1,0 +1,28 @@
+{
+  "bindings": {
+    "prompt": ["3", "text"],
+    "negative_prompt": ["4", "text"],
+    "seconds": ["5", "seconds"],
+    "seed": ["6", "seed"],
+    "steps": ["6", "steps"],
+    "cfg": ["6", "cfg"],
+    "sampler_name": ["6", "sampler_name"],
+    "scheduler": ["6", "scheduler"],
+    "checkpoint": ["1", "ckpt_name"],
+    "text_encoder": ["2", "clip_name"]
+  },
+  "output": "8",
+  "graph": {
+    "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": "stable_audio_3_medium.safetensors"}},
+    "2": {"class_type": "CLIPLoader",
+          "inputs": {"clip_name": "t5gemma_b_b_ul2.safetensors", "type": "stable_audio", "device": "default"}},
+    "3": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["2", 0], "text": ""}},
+    "4": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["2", 0], "text": ""}},
+    "5": {"class_type": "EmptyLatentAudio", "inputs": {"seconds": 5.0, "batch_size": 1}},
+    "6": {"class_type": "KSampler",
+          "inputs": {"model": ["1", 0], "positive": ["3", 0], "negative": ["4", 0], "latent_image": ["5", 0],
+                     "seed": 0, "steps": 8, "cfg": 1, "sampler_name": "lcm", "scheduler": "simple", "denoise": 1}},
+    "7": {"class_type": "VAEDecodeAudio", "inputs": {"samples": ["6", 0], "vae": ["1", 2]}},
+    "8": {"class_type": "SaveAudio", "inputs": {"audio": ["7", 0], "filename_prefix": "storyagent/sfx"}}
+  }
+}

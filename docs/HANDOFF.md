@@ -58,7 +58,7 @@ storyagent/
                engine.py 执行;stages.py/media.py/seed.py/shotplan.py 各阶段;progress.py 进度/ETA;flow.py "流程说明"
   media/       contracts(Adapter 协议)、ledger(作业/资产台账)、specs(规格存储)、worker、broker(并发/内存/互斥)、
                assetrefs(asset:/job:/library: 解析)、library、compliance、healthcheck、registry、params(参数分层)
-    adapters/  acestep mflux phosphene cosyvoice seedvc whisper h3 longcat lora_train llm assemble remote_video fake(+_http/_subprocess 公共件)
+    adapters/  acestep comfy mflux phosphene cosyvoice seedvc whisper h3 longcat lora_train llm assemble remote_video fake(+_http/_subprocess 公共件)
     runners/   assemble_episode.py(仅标准库,子进程跑 ffmpeg)
   compose/     timeline.py(纯函数 EDL)、pacing.py(目标时长→结构/镜头时长/QC窗口)、qc.py、export.py(交付包)
   workshop.py  工坊:模块(story script image episode lora song voice video transcript)= 单独可用,或串成流水线
@@ -166,7 +166,7 @@ docs/          API CONFIGURATION MEDIA_CONTRACT RUNBOOK WORKFLOW USER_GUIDE PARI
 
 ## 7. 已做 / 未做(诚实清单)
 
-**已做且有测试**:故事全流程(analyze…compose)、规格/作业/资产台账与 worker、全部适配器(acestep mflux phosphene cosyvoice seedvc whisper h3 longcat lora_train llm assemble remote_video)、
+**已做且有测试**:故事全流程(analyze…compose)、规格/作业/资产台账与 worker、全部适配器(acestep comfy(音效,Stable Audio 3) mflux phosphene cosyvoice seedvc whisper h3 longcat lora_train llm assemble remote_video)、
 合规/溯源、API+SSE、网页(启动台/项目/工坊/资产库/队列/AI 提示词/系统)、工坊九个模块(故事 剧本 图片 成片 LoRA 歌曲 配音 视频 转写)+流水线、
 启动台、目标时长/交付档位、**生产计划(先列清单、确认后才生成)**、**从文字建项目**。
 链路:剧本/故事 → 人物与场景 → 人物像/场景图 → 镜头关键帧(`image.edit`,以已做好的人物像+场景图为参考,`[workflow] keyframe_from_references`)→ 镜头视频。

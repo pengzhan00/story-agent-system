@@ -7,6 +7,11 @@
 url = "http://127.0.0.1:8001"
 health_path = "/v1/models"
 
+# ComfyUI (Comfy Desktop app or a standalone server): runs the workflow templates of the `comfy` provider.
+[services.comfy]
+url = "http://127.0.0.1:8188"
+health_path = "/system_stats"
+
 [services.ollama]
 url = "http://127.0.0.1:11434"
 health_path = "/api/tags"
