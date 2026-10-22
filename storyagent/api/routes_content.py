@@ -10,7 +10,7 @@ from typing import Any
 from fastapi import APIRouter, Request
 
 from storyagent.auth import AuthStore, User, verify_password
-from storyagent.content import ContentError, UnlockStore, vault_ready
+from storyagent.content import NO_EXPIRY, ContentError, UnlockStore, vault_ready
 
 from .context import ctx_of
 from .errors import ApiError
@@ -29,8 +29,9 @@ def _status(request: Request) -> ContentStatusOut:
     cfg = ctx.settings.content
     user = _user(request)
     active = UnlockStore(ctx.db, ctx.settings).active(user.id if user else None)
+    ends = active["expires_at"] if active and active["expires_at"] != NO_EXPIRY else None
     return ContentStatusOut(
-        unlocked=active is not None, expires_at=active["expires_at"] if active else None, ttl_sec=cfg.unlock_ttl_sec,
+        unlocked=active is not None, expires_at=ends, ttl_sec=cfg.unlock_ttl_sec,
         needs_password=ctx.settings.auth.enabled, vault_ready=vault_ready(ctx.settings), encryption=cfg.encryption,
         default_rating=cfg.default_rating,
         ratings=[RatingOut(name=p.name, label_key=p.label_key, restricted=p.restricted, mask_ui=p.mask_ui,

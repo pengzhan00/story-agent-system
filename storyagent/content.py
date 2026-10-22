@@ -75,6 +75,10 @@ def vault_ready(settings: Settings) -> bool:
     return True
 
 
+# An unlock without an end (``unlock_ttl_sec = 0``) is stored with this far-away time and shown without one.
+NO_EXPIRY = "9999-12-31T23:59:59.000Z"
+
+
 # -- the hard gates ------------------------------------------------------------------------------------------
 def _strings(node: Any) -> Iterator[str]:
     if isinstance(node, str):
@@ -147,13 +151,13 @@ class UnlockStore:
 
     def start(self, user_id: int | None, actor: str) -> dict[str, Any]:
         ttl = self.settings.content.unlock_ttl_sec
-        expires = iso_at(time.time() + ttl)
+        expires = iso_at(time.time() + ttl) if ttl > 0 else NO_EXPIRY
         with self.db.transaction() as conn:
             conn.execute("UPDATE content_unlocks SET revoked_at=? WHERE user_id IS ? AND revoked_at IS NULL",
                          (now_iso(), user_id))
             conn.execute("INSERT INTO content_unlocks(user_id, actor, expires_at) VALUES (?,?,?)",
                          (user_id, actor, expires))
-        return {"unlocked": True, "expires_at": expires, "ttl_sec": ttl}
+        return {"unlocked": True, "expires_at": None if ttl <= 0 else expires, "ttl_sec": ttl}
 
     def active(self, user_id: int | None) -> dict[str, Any] | None:
         row = self.db.conn.execute(

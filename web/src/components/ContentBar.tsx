@@ -16,7 +16,7 @@ export function ContentBar() {
     <section className="card stack" aria-label={t("web.content.title")}>
       <div className="row">
         <strong>{t("web.content.title")}</strong>
-        <span className={status.unlocked ? "chip chip-completed" : "chip"}>{status.unlocked ? t("web.content.unlocked", { time: until }) : t("web.content.locked")}</span>
+        <span className={status.unlocked ? "chip chip-completed" : "chip"}>{status.unlocked ? (status.expires_at ? t("web.content.unlocked", { time: until }) : t("web.content.unlocked_open")) : t("web.content.locked")}</span>
         <span className="spacer" />
         {status.unlocked ? (
           <button disabled={lock.isPending} onClick={() => lock.mutate()}>

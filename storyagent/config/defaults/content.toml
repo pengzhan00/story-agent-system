@@ -13,7 +13,9 @@ volume_mount = ""
 # off | volume. (Per-file encryption inside the app is not built: it needs a crypto dependency, see
 # docs/RESTRICTED_CONTENT.md.)
 encryption = "volume"
-unlock_ttl_sec = 900
+# How long an unlock lasts. 0 = until the person locks again (adult confirmation once, then only the lock button locks);
+# seconds = it locks itself after that time.
+unlock_ttl_sec = 0
 
 [content.ratings.general]
 rank = 0

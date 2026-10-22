@@ -369,6 +369,7 @@
   "web.content.title": "受限内容",
   "web.content.locked": "已锁定",
   "web.content.unlocked": "已解锁,至 {time}",
+  "web.content.unlocked_open": "已解锁(点“立即上锁”才会锁上)",
   "web.content.unlock": "解锁",
   "web.content.lock": "立即上锁",
   "web.content.confirm_adult": "我确认自己是成年人,且此内容中的所有人均为已同意的成年人。",

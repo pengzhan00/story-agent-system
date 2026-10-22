@@ -241,7 +241,7 @@ def test_locked_material_is_blanked_blocked_and_shown_as_a_blurred_thumbnail(
 
     assert unlock(rclient, confirm_adult=False).status_code == 422
     status = unlock(rclient).json()
-    assert status["unlocked"] and status["expires_at"] and status["vault_ready"]
+    assert status["unlocked"] and status["expires_at"] is None and status["vault_ready"]   # stays until locked
     shown = rclient.get(f"/api/assets/{asset['id']}").json()
     assert not shown["locked"] and shown["path"].startswith("vault/")
     assert rclient.get(f"/api/assets/{asset['id']}/file").content == png
@@ -253,11 +253,25 @@ def test_locked_material_is_blanked_blocked_and_shown_as_a_blurred_thumbnail(
     assert {"content.unlock", "content.view", "content.lock"} <= set(actions)
 
 
-def test_an_unlock_expires_by_itself(rclient: TestClient, rsettings: Settings) -> None:
+def test_an_unlock_lasts_until_the_lock_button_by_default(rclient: TestClient) -> None:
     unlock(rclient)
-    assert rclient.get("/api/content/status").json()["unlocked"]
-    Database(rsettings.db_path).conn.execute("UPDATE content_unlocks SET expires_at='2000-01-01T00:00:00.000Z'")
-    assert rclient.get("/api/content/status").json()["unlocked"] is False
+    status = rclient.get("/api/content/status").json()
+    assert status["unlocked"] and status["expires_at"] is None and status["ttl_sec"] == 0
+    assert rclient.delete("/api/content/unlock").json()["unlocked"] is False
+
+
+def test_an_unlock_with_a_time_limit_expires_by_itself(tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    (home / "config").mkdir(parents=True)
+    (home / "config" / "models.toml").write_text(RATED_MODELS)
+    (home / "config" / "services.toml").write_text(FAKE_SERVICES)
+    (home / "config" / "content.toml").write_text("[content]\nunlock_ttl_sec = 600\n")
+    settings = load_settings({"STORY_AGENT_HOME": str(home)})
+    with TestClient(create_app(settings), raise_server_exceptions=False) as c:
+        status = unlock(c).json()
+        assert status["unlocked"] and status["expires_at"]
+        Database(settings.db_path).conn.execute("UPDATE content_unlocks SET expires_at='2000-01-01T00:00:00.000Z'")
+        assert c.get("/api/content/status").json()["unlocked"] is False
 
 
 def test_with_accounts_an_unlock_needs_the_users_password(fsettings: Settings, tmp_path: Path) -> None:

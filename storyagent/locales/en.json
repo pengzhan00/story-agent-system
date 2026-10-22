@@ -369,6 +369,7 @@
   "web.content.title": "Restricted content",
   "web.content.locked": "Locked",
   "web.content.unlocked": "Unlocked until {time}",
+  "web.content.unlocked_open": "Unlocked (stays until you press Lock)",
   "web.content.unlock": "Unlock",
   "web.content.lock": "Lock now",
   "web.content.confirm_adult": "I confirm that I am an adult and that everyone shown in this material is an adult who has consented.",

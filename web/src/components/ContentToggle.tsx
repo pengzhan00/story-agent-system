@@ -20,7 +20,7 @@ export function ContentToggle() {
         aria-expanded={open}
         onClick={() => setOpen(!open)}
       >
-        {`${t("web.content.title")} · ${status.unlocked ? t("web.content.unlocked", { time: until }) : t("web.content.locked")}`}
+        {`${t("web.content.title")} · ${status.unlocked ? (status.expires_at ? t("web.content.unlocked", { time: until }) : t("web.content.unlocked_open")) : t("web.content.locked")}`}
       </button>
       {open ? (
         <div className="content-pop">
