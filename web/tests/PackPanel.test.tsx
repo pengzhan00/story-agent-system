@@ -29,6 +29,8 @@ beforeEach(() => {
     if (url.includes("/api/i18n")) json = en;
     else if (url.includes("/api/auth/mode")) json = { mode: "off", first_user: false, locales: ["en"] };
     else if (url.includes("/api/auth/me")) json = { mode: "off", user: null, can_write: true, can_create_project: true, is_admin: true };
+    else if (url.includes("/episodes") && !url.includes("/fcp")) json = [{ id: 1, number: 1 }];
+    else if (url.includes("/fcp/diff")) json = { original_sec: 10, edited_sec: 9, shots: [{ shot_id: 4, status: "trimmed", duration: 3, new_duration: 2 }], added: [], changed: 1 };
     else if (url.includes("/pack?")) json = { name: "demo.zip", bytes: 2097152, scope: "all", counts: {}, warnings: [] };
     else if (url.includes("import-pack")) json = report(url.includes("dry_run=true"));
     return { ok: true, status: 200, statusText: "", json: async () => json, text: async () => JSON.stringify(json) };
@@ -67,5 +69,17 @@ describe("PackPanel", () => {
     await waitFor(() => expect((screen.getByRole("button", { name: tr("web.pack.run") }) as HTMLButtonElement).disabled).toBe(false));
     fireEvent.click(screen.getByRole("button", { name: tr("web.pack.run") }));
     await waitFor(() => expect(calls.some((c) => c.includes("into=1") && c.includes("dry_run=false"))).toBe(true));
+  });
+});
+
+describe("FcpPanel inside the pack tab", () => {
+  it("offers the Final Cut Pro project and shows what an edit changed", async () => {
+    mount();
+    const link = await screen.findByRole("link", { name: new RegExp(tr("web.fcp.download").slice(0, 20)) });
+    expect(link.getAttribute("href")).toBe("/api/projects/1/episodes/1/fcp");
+    const inputs = document.querySelectorAll("input[type=file]");
+    fireEvent.change(inputs[1] as HTMLInputElement, { target: { files: [new File(["<fcpxml/>"], "e.fcpxml")] } });
+    fireEvent.click(screen.getByRole("button", { name: tr("web.fcp.compare_run") }));
+    await screen.findByText("Shot 4: trimmed (3 s to 2 s)");
   });
 });

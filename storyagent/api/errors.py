@@ -15,6 +15,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from storyagent.agents.registry import AgentSpecError
 from storyagent.auth import AuthError
+from storyagent.compose.interchange import InterchangeError
 from storyagent.config import ConfigError
 from storyagent.launcher import LaunchError
 from storyagent.media.ledger import LedgerError
@@ -118,6 +119,11 @@ def install(app: FastAPI) -> None:
     async def _pack(request: Request, exc: PackError) -> JSONResponse:
         detail = translator_of(request)(f"pack.error.{exc.code}", **exc.params)
         return respond(request, 404 if exc.code == "not_found" else 422, "invalid", detail)
+
+    @app.exception_handler(InterchangeError)
+    async def _interchange(request: Request, exc: InterchangeError) -> JSONResponse:
+        detail = translator_of(request)(f"interchange.error.{exc.code}", **exc.params)
+        return respond(request, 409 if exc.code == "no_timeline" else 422, "invalid", detail)
 
     @app.exception_handler(StoryNotFound)
     async def _story_missing(request: Request, exc: StoryNotFound) -> JSONResponse:

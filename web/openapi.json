@@ -740,6 +740,96 @@
         "title": "DeliveryProfileOut",
         "type": "object"
       },
+      "EditAddedOut": {
+        "properties": {
+          "duration": {
+            "title": "Duration",
+            "type": "number"
+          },
+          "media": {
+            "title": "Media",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "media",
+          "duration"
+        ],
+        "title": "EditAddedOut",
+        "type": "object"
+      },
+      "EditDiffOut": {
+        "properties": {
+          "added": {
+            "items": {
+              "$ref": "#/components/schemas/EditAddedOut"
+            },
+            "title": "Added",
+            "type": "array"
+          },
+          "changed": {
+            "title": "Changed",
+            "type": "integer"
+          },
+          "edited_sec": {
+            "title": "Edited Sec",
+            "type": "number"
+          },
+          "original_sec": {
+            "title": "Original Sec",
+            "type": "number"
+          },
+          "shots": {
+            "items": {
+              "$ref": "#/components/schemas/EditShotOut"
+            },
+            "title": "Shots",
+            "type": "array"
+          }
+        },
+        "required": [
+          "original_sec",
+          "edited_sec",
+          "shots",
+          "added",
+          "changed"
+        ],
+        "title": "EditDiffOut",
+        "type": "object"
+      },
+      "EditShotOut": {
+        "properties": {
+          "duration": {
+            "title": "Duration",
+            "type": "number"
+          },
+          "new_duration": {
+            "title": "New Duration",
+            "type": "number"
+          },
+          "shot_id": {
+            "title": "Shot Id",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "shot_id",
+          "status",
+          "duration",
+          "new_duration"
+        ],
+        "title": "EditShotOut",
+        "type": "object"
+      },
       "EstimateOut": {
         "properties": {
           "brief": {
@@ -8606,6 +8696,203 @@
         "summary": "Update Episode",
         "tags": [
           "story"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/episodes/{episode}/fcp": {
+      "get": {
+        "description": "A zip with `episode.fcpxml`, the media it points to (relative paths unless `absolute`), the subtitles and\n`interchange.json`. Import the .fcpxml in Final Cut Pro (File > Import > XML) from the unzipped folder.",
+        "operationId": "export_fcp_api_projects__project_id__episodes__episode__fcp_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "episode",
+            "required": true,
+            "schema": {
+              "title": "Episode",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "absolute",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Absolute",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Fcp",
+        "tags": [
+          "interchange"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/episodes/{episode}/fcp/diff": {
+      "post": {
+        "description": "Upload the FCPXML exported back from Final Cut Pro (raw body): per shot kept / trimmed / moved / removed,\nclips that came from elsewhere, and the new length. Changes nothing.",
+        "operationId": "diff_api_projects__project_id__episodes__episode__fcp_diff_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "episode",
+            "required": true,
+            "schema": {
+              "title": "Episode",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "filename",
+            "required": false,
+            "schema": {
+              "default": "episode.fcpxml",
+              "maxLength": 200,
+              "minLength": 1,
+              "title": "Filename",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EditDiffOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Diff",
+        "tags": [
+          "interchange"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/episodes/{episode}/fcp/final": {
+      "post": {
+        "description": "Upload the film finished in the editor (raw body, .mp4/.mov): it becomes the current version of the episode.",
+        "operationId": "final_api_projects__project_id__episodes__episode__fcp_final_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "episode",
+            "required": true,
+            "schema": {
+              "title": "Episode",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "filename",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "title": "Filename",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "note",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Note",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Final",
+        "tags": [
+          "interchange"
         ]
       }
     },

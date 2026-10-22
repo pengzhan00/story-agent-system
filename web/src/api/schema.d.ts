@@ -902,6 +902,68 @@ export interface paths {
         patch: operations["update_episode_api_projects__project_id__episodes__episode_id__patch"];
         trace?: never;
     };
+    "/api/projects/{project_id}/episodes/{episode}/fcp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Fcp
+         * @description A zip with `episode.fcpxml`, the media it points to (relative paths unless `absolute`), the subtitles and
+         *     `interchange.json`. Import the .fcpxml in Final Cut Pro (File > Import > XML) from the unzipped folder.
+         */
+        get: operations["export_fcp_api_projects__project_id__episodes__episode__fcp_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/episodes/{episode}/fcp/diff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Diff
+         * @description Upload the FCPXML exported back from Final Cut Pro (raw body): per shot kept / trimmed / moved / removed,
+         *     clips that came from elsewhere, and the new length. Changes nothing.
+         */
+        post: operations["diff_api_projects__project_id__episodes__episode__fcp_diff_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/episodes/{episode}/fcp/final": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Final
+         * @description Upload the film finished in the editor (raw body, .mp4/.mov): it becomes the current version of the episode.
+         */
+        post: operations["final_api_projects__project_id__episodes__episode__fcp_final_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{project_id}/episodes/{episode}/package": {
         parameters: {
             query?: never;
@@ -2274,6 +2336,39 @@ export interface components {
             target_sec: number | null;
             /** Width */
             width: number;
+        };
+        /** EditAddedOut */
+        EditAddedOut: {
+            /** Duration */
+            duration: number;
+            /** Media */
+            media: string;
+            /** Name */
+            name: string;
+        };
+        /** EditDiffOut */
+        EditDiffOut: {
+            /** Added */
+            added: components["schemas"]["EditAddedOut"][];
+            /** Changed */
+            changed: number;
+            /** Edited Sec */
+            edited_sec: number;
+            /** Original Sec */
+            original_sec: number;
+            /** Shots */
+            shots: components["schemas"]["EditShotOut"][];
+        };
+        /** EditShotOut */
+        EditShotOut: {
+            /** Duration */
+            duration: number;
+            /** New Duration */
+            new_duration: number;
+            /** Shot Id */
+            shot_id: number;
+            /** Status */
+            status: string;
         };
         /** EstimateOut */
         EstimateOut: {
@@ -6023,6 +6118,109 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_fcp_api_projects__project_id__episodes__episode__fcp_get: {
+        parameters: {
+            query?: {
+                absolute?: boolean;
+            };
+            header?: never;
+            path: {
+                project_id: number;
+                episode: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    diff_api_projects__project_id__episodes__episode__fcp_diff_post: {
+        parameters: {
+            query?: {
+                filename?: string;
+            };
+            header?: never;
+            path: {
+                project_id: number;
+                episode: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EditDiffOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    final_api_projects__project_id__episodes__episode__fcp_final_post: {
+        parameters: {
+            query: {
+                filename: string;
+                note?: string;
+            };
+            header?: never;
+            path: {
+                project_id: number;
+                episode: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetOut"];
                 };
             };
             /** @description Validation Error */

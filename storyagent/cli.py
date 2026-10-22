@@ -36,6 +36,7 @@ from typing import Any
 
 from storyagent.auth import AuthError, AuthStore
 from storyagent.compose.export import ExportError, build_package
+from storyagent.compose.interchange import InterchangeError
 from storyagent.compose.qc import ADVISORY
 from storyagent.config import ConfigError, Settings, get_settings
 from storyagent.db import Database, MigrationError, current_version, migrate
@@ -446,6 +447,45 @@ def _cmd_grammar_fix(s: Settings, a: argparse.Namespace) -> int:
                                      rules=a.rule or None)
     print(t("cli.grammar.fixed", n=len(fixed), left=len(left)))
     _print_grammar(after.as_dict())
+    return 0
+
+
+# -- Final Cut Pro interchange ---------------------------------------------------------------------
+def _cmd_fcp_export(s: Settings, a: argparse.Namespace) -> int:
+    from storyagent.compose.interchange import build_fcp_package
+
+    c = _ctx(s)
+    try:
+        manifest = build_fcp_package(s, c.ledger, a.project, a.episode, Path(a.out).expanduser(),
+                                     absolute=a.absolute)
+    except ExportError as exc:
+        raise CliError("cli.export.failed", 1, detail=str(exc)) from exc
+    print(t("cli.fcp.exported", path=a.out, files=len(manifest["files"])))
+    return 0
+
+
+def _cmd_fcp_diff(s: Settings, a: argparse.Namespace) -> int:
+    from storyagent.compose.interchange import diff_edit, parse_fcpxml
+
+    package = Path(a.package).expanduser()
+    manifest = json.loads((package / "interchange.json").read_text("utf-8"))
+    diff = diff_edit(manifest, parse_fcpxml(Path(a.edited).expanduser().read_text("utf-8")))
+    print(t("cli.fcp.diff_head", original=diff["original_sec"], edited=diff["edited_sec"], changed=diff["changed"]))
+    for shot in diff["shots"]:
+        if shot["status"] != "kept":
+            print(t("cli.fcp.diff_shot", shot=shot["shot_id"], status=t(f"interchange.status.{shot['status']}"),
+                    old=shot["duration"], new=shot["new_duration"]))
+    for extra in diff["added"]:
+        print(t("cli.fcp.diff_added", name=extra["name"] or extra["media"], seconds=extra["duration"]))
+    return 0
+
+
+def _cmd_fcp_final(s: Settings, a: argparse.Namespace) -> int:
+    from storyagent.compose.interchange import import_final
+
+    c = _ctx(s)
+    asset = import_final(s, c.ledger, a.project, a.episode, Path(a.file).expanduser(), note=a.note)
+    print(t("cli.fcp.final", id=asset.id, version=asset.version))
     return 0
 
 
@@ -953,6 +993,21 @@ def build_parser() -> argparse.ArgumentParser:
     gf.add_argument("--episode", type=int)
     gf.add_argument("--rule", action="append", help="only this rule (repeatable)")
 
+    fc = sub.add_parser("fcp").add_subparsers(dest="cmd", required=True)
+    fe = add(fc, "export", _cmd_fcp_export)
+    fe.add_argument("--project", type=int, required=True)
+    fe.add_argument("--episode", type=int, default=1)
+    fe.add_argument("--out", required=True, help="a new folder: episode.fcpxml + media/")
+    fe.add_argument("--absolute", action="store_true", help="file:// URLs of this folder instead of relative paths")
+    fd = add(fc, "diff", _cmd_fcp_diff)
+    fd.add_argument("package", help="the folder written by `fcp export`")
+    fd.add_argument("edited", help="the FCPXML exported back from Final Cut Pro")
+    ff = add(fc, "final", _cmd_fcp_final)
+    ff.add_argument("file", help="the finished film (.mp4/.mov)")
+    ff.add_argument("--project", type=int, required=True)
+    ff.add_argument("--episode", type=int, default=1)
+    ff.add_argument("--note", default="")
+
     li = sub.add_parser("library").add_subparsers(dest="cmd", required=True)
     la = add(li, "add", _cmd_library_add)
     la.add_argument("source", help="a file path, or an asset id with --asset")
@@ -1068,6 +1123,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     except SpecLocked:
         print(t("cli.spec.is_locked"), file=sys.stderr)
         return 5
+    except InterchangeError as exc:
+        print(t(f"interchange.error.{exc.code}", **exc.params), file=sys.stderr)
+        return 1
     except PackError as exc:
         print(t(f"pack.error.{exc.code}", **exc.params), file=sys.stderr)
         return 1

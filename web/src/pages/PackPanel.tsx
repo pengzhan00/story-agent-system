@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { usePack, type PackPolicy, type PackReport, type PackScope } from "../api/pack";
 import { ErrorNote } from "../components/ErrorNote";
 import { useT } from "../i18n";
+import { FcpPanel } from "./FcpPanel";
 
 function Counts({ counts }: { counts: Record<string, number> }) {
   const t = useT();
@@ -127,6 +128,7 @@ export function PackPanel({ id }: { id: number }) {
         <ErrorNote error={pack.importPack.error} />
         {pack.importPack.data ? <Report report={pack.importPack.data} /> : null}
       </section>
+      <FcpPanel id={id} />
     </div>
   );
 }

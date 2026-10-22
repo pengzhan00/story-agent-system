@@ -1056,3 +1056,25 @@ class GrammarFixOut(Strict):
     fixed: list[dict[str, Any]]
     left: list[dict[str, Any]]
     report: GrammarReportOut
+
+
+# -- edit interchange ------------------------------------------------------------------------------
+class EditShotOut(Strict):
+    shot_id: int
+    status: str
+    duration: float
+    new_duration: float
+
+
+class EditAddedOut(Strict):
+    name: str
+    media: str
+    duration: float
+
+
+class EditDiffOut(Strict):
+    original_sec: float
+    edited_sec: float
+    shots: list[EditShotOut]
+    added: list[EditAddedOut]
+    changed: int
