@@ -1201,5 +1201,8 @@
   "web.estimate.col_each": "每个",
   "web.estimate.col_total": "合计",
   "web.estimate.over_budget": "光视频片段的估算时间就超出了预算 {hours} 小时:降低视频占比或缩小规模。",
-  "web.estimate.loading": "正在估算…"
+  "web.estimate.loading": "正在估算…",
+  "web.workshop.plan_any": "不限(全部模型)",
+  "web.workshop.plan_hint": "选一个管线方案,各模块就从该方案的模型起步;方案之外的模型仍可在这里试用,但不属于任何项目。",
+  "web.workshop.trial": "试用,不进项目"
 }

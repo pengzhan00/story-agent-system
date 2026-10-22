@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { useJobActions } from "../api/hooks";
+import { useJobActions, useMeta } from "../api/hooks";
 import type { Asset, Job, WorkshopField, WorkshopHistoryItem, WorkshopKind, WorkshopModule } from "../api/types";
 import { type Step, useWorkshop, useWorkshopActions, useWorkshopHistory, useWorkshopParams } from "../api/workshop";
 import { AddParam } from "../components/AddParam";
@@ -341,7 +341,7 @@ function KindPanel({
             <select value={model} onChange={(e) => setModel(e.target.value)}>
               {kind.models.map((m) => (
                 <option key={m.ref} value={m.ref}>
-                  {`${m.ref} · ${m.provider}${m.available ? "" : ` (${t("health.not_running")})`}`}
+                  {`${m.ref} · ${m.provider}${m.available ? "" : ` (${t("health.not_running")})`}${m.in_plan ? "" : ` · ${t("web.workshop.trial")}`}`}
                 </option>
               ))}
             </select>
@@ -580,7 +580,9 @@ function PipelineBuilder({ modules, recents }: { modules: WorkshopModule[]; rece
 /** Every media module on its own, or chained: pick a model, tune its parameters, run, reuse the result elsewhere. */
 export function WorkshopPage() {
   const t = useT();
-  const shop = useWorkshop();
+  const plans = useMeta().data?.pipelines ?? [];
+  const [plan, setPlan] = useState("");
+  const shop = useWorkshop(plan);
   const all = useWorkshopHistory("");
   const [tab, setTab] = useState("");
   const [kindPick, setKindPick] = useState<Record<string, string>>({});
@@ -622,6 +624,18 @@ export function WorkshopPage() {
     <div className="stack">
       <h1>{t("web.workshop.title")}</h1>
       <p className="muted">{t("web.workshop.intro")}</p>
+      <label className="field">
+        <span>{t("web.plan.pipeline")}</span>
+        <select value={plan} onChange={(e) => setPlan(e.target.value)}>
+          <option value="">{t("web.workshop.plan_any")}</option>
+          {plans.map((p) => (
+            <option key={p.name} value={p.name}>
+              {p.label}
+            </option>
+          ))}
+        </select>
+        <span className="muted small">{t("web.workshop.plan_hint")}</span>
+      </label>
       <ErrorNote error={shop.error} />
       <nav className="tabs">
         {modules.map((m) => (

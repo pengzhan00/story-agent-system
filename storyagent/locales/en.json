@@ -1201,5 +1201,8 @@
   "web.estimate.col_each": "Each",
   "web.estimate.col_total": "Total",
   "web.estimate.over_budget": "The video clips alone are estimated above the budget of {hours} hours: lower the video share or the size.",
-  "web.estimate.loading": "Estimating…"
+  "web.estimate.loading": "Estimating…",
+  "web.workshop.plan_any": "Any (all models)",
+  "web.workshop.plan_hint": "Pick a pipeline plan and the modules start from its models; models outside it can still be tried here, but belong to no project.",
+  "web.workshop.trial": "trial, not for a project"
 }

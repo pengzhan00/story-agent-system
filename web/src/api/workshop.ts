@@ -13,7 +13,9 @@ export interface Step {
   seed?: number | null;
 }
 
-export const useWorkshop = () => useQuery({ queryKey: ["workshop"], queryFn: () => api<WorkshopModule[]>("/api/workshop") });
+/** The modules; with a plan, they start from that plan's models and say which models are outside it (a trial only). */
+export const useWorkshop = (pipeline = "") =>
+  useQuery({ queryKey: ["workshop", "modules", pipeline], queryFn: () => api<WorkshopModule[]>(`/api/workshop${pipeline ? `?${new URLSearchParams({ pipeline })}` : ""}`) });
 
 export const useWorkshopParams = (kind: string, model: string, tier: string) =>
   useQuery({
