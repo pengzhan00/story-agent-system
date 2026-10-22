@@ -67,7 +67,7 @@ def test_model_params_of_a_plan_merge_into_the_model_and_its_tiers(tmp_path: Pat
     s = load_settings(home_with(tmp_path, pipelines=plan_toml(extra=extra))).for_pipeline("mine")
     ltx = s.model("ltx-2.5-video")
     assert ltx.params["stage1_steps"] == 99 and ltx.params["frames"] == 121        # merged, not replaced
-    assert ltx.tiers["preview"]["stage2_steps"] == 7 and ltx.tiers["preview"]["stage1_steps"] == 12
+    assert ltx.tiers["preview"]["stage2_steps"] == 7 and ltx.tiers["preview"]["upscale"] == "off"
 
 
 @pytest.mark.parametrize(("toml", "message"), [
