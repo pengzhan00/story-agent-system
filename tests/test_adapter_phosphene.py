@@ -273,3 +273,10 @@ def test_registered_and_default_models_resolve(tmp_path: Path) -> None:
     final = s.model("ltx-2.5-av")
     assert (final.params["width"], final.params["height"], final.params["stage1_steps"]) == (832, 1536, 16)
     assert final.tiers["draft"]["quality"] == "balanced" and final.license_tag == "ltx-community"
+
+
+def test_the_style_avoid_list_is_added_to_the_models_not_a_replacement_for_it() -> None:
+    from storyagent.media.adapters.phosphene import _negatives
+
+    assert _negatives("warm colors, blurry", "blurry, banding, ghosting") == "warm colors, blurry, banding, ghosting"
+    assert _negatives("", "banding") == "banding" and _negatives(None, None) == "" and _negatives("a", "") == "a"
