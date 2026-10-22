@@ -101,6 +101,39 @@ width = 864
 height = 1536
 steps = 50
 
+# FLUX.2 klein 4B *distilled* through ComfyUI (workflow template media/workflows/flux2_klein_edit.json): composes a
+# keyframe from reference images in 4 steps without CFG - the fast alternative to the 30-step Base model above. Needs
+# flux-2-klein-4b (checkpoints), qwen_3_4b (text_encoders) and flux2-vae (vae) in ComfyUI's models folders. Apache-2.0.
+# Speed and how well it keeps a face are to be measured on this machine; `ref_megapixels` scales every reference
+# image down to that size before it is encoded (smaller = faster, less detail carried over).
+[models."flux2-klein-4b-edit-comfy"]
+kind = "image.edit"
+provider = "comfy"
+version = "klein-4b-distilled"
+family = "flux2-klein"
+heavy = false
+est_memory_gib = 16   # estimate; adjust after measuring
+license_tag = "flux2-klein-4b-apache-2.0"
+commercial_ok = true
+prompt_profile = "natural_en"
+timeout_sec = 900
+workflow = "flux2_klein_edit"
+
+[models."flux2-klein-4b-edit-comfy".params]
+width = 720
+height = 1280
+steps = 4
+sampler_name = "euler"
+ref_megapixels = 1.0
+[models."flux2-klein-4b-edit-comfy".tiers.draft]
+width = 576
+height = 1024
+ref_megapixels = 0.6
+[models."flux2-klein-4b-edit-comfy".tiers.final]
+width = 864
+height = 1536
+steps = 6
+
 # LTX-2.5 through the Phosphene panel (Pinokio app). One model, three kinds: picture+sound, picture only
 # (sound stripped) and audio-driven lip-sync. Values are the operator's measured best recipe (see the notes in
 # Obsidian "本机模型能力矩阵"); the panel silently clamps oversized resolutions, so jobs verify the rendered size.

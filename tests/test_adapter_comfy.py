@@ -13,6 +13,7 @@ from storyagent.media.contracts import HealthState
 
 from .adapter_kit import job, make_rig, make_settings, wav_bytes
 from .fakes.http_server import FakeServer
+from .test_adapter_mflux import png_bytes
 
 MODELS = """
 [models."sa-test"]
@@ -120,3 +121,75 @@ def test_service_down_is_a_transport_error_and_health_says_so(tmp_path: Path) ->
     assert adapter.health().state is HealthState.NOT_RUNNING
     rec, _ = make_rig(s, adapter).run(job(MediaKind.AUDIO_SFX, "sa-test", {"prompt": "x"}))
     assert rec.status is JobStatus.TRANSPORT_ERROR and rec.error_code == ErrorCode.SERVICE_UNREACHABLE.value
+
+
+EDIT_MODELS = """
+[models."klein-comfy"]
+kind = "image.edit"
+provider = "comfy"
+workflow = "flux2_klein_edit"
+timeout_sec = 20
+[models."klein-comfy".params]
+width = 576
+height = 1024
+steps = 4
+ref_megapixels = 0.5
+"""
+EDIT_NODES = ("CheckpointLoaderSimple", "CLIPLoader", "VAELoader", "CLIPTextEncode", "EmptyFlux2LatentImage",
+              "BasicGuider", "RandomNoise", "KSamplerSelect", "Flux2Scheduler", "SamplerCustomAdvanced", "VAEDecode",
+              "SaveImage", "LoadImage", "ImageScaleToTotalPixels", "VAEEncode", "ReferenceLatent")
+
+
+@pytest.fixture
+def edit_server() -> Any:
+    with FakeServer() as srv:
+        srv.route("GET", "/system_stats", {"system": {}})
+        files = {"CheckpointLoaderSimple": ("ckpt_name", ["flux-2-klein-4b.safetensors"]),
+                 "CLIPLoader": ("clip_name", ["qwen_3_4b.safetensors"]),
+                 "VAELoader": ("vae_name", ["flux2-vae.safetensors"])}
+        for node in EDIT_NODES:
+            field_, options = files.get(node, ("x", []))
+            srv.route("GET", f"/object_info/{node}", {node: {"input": {"required": {field_: [options]}}}})
+        srv.route("POST", "/upload/image", lambda req: {"name": "uploaded.png", "subfolder": "", "type": "input"})
+        srv.route("POST", "/prompt", {"prompt_id": "p-1"})
+        shot = {"filename": "k_00001_.png", "subfolder": "s", "type": "output"}
+        srv.route("GET", "/history/p-1", {"p-1": {"status": {"status_str": "success", "completed": True},
+                                                  "outputs": {"11": {"images": [shot]}}}})
+        srv.route("GET", "/view", png_bytes(576, 1024))
+        srv.route("POST", "/free", {})
+        yield srv
+
+
+def test_a_keyframe_is_composed_from_reference_images_through_the_chained_template(
+        tmp_path: Path, edit_server: FakeServer) -> None:
+    s = make_settings(tmp_path, services=f'[services.comfy]\nurl = "{edit_server.url}"\n', models=EDIT_MODELS)
+    adapter = ComfyAdapter(ServiceClient(s.service("comfy")), {"klein-comfy": "flux2_klein_edit"},
+                           poll_interval_sec=0.01)
+    refs = []
+    for name in ("hero.png", "scene.png"):
+        p = tmp_path / name
+        p.write_bytes(png_bytes())
+        refs.append(str(p))
+    rec, assets = make_rig(s, adapter).run(job(MediaKind.IMAGE_EDIT, "klein-comfy",
+                                               {"prompt": "the hero in the alley", "refs": refs}, seed=7))
+    assert rec.status is JobStatus.COMPLETED, (rec.error_code, rec.error_message)
+    [a] = assets
+    assert a.kind == "image.edit" and (a.width, a.height) == (576, 1024)
+    assert sum(1 for q in edit_server.requests if q.path == "/upload/image") == 2
+    graph = next(q.json for q in edit_server.requests if q.path == "/prompt")["prompt"]
+    assert graph["3"]["inputs"]["text"] == "the hero in the alley" and graph["6"]["inputs"]["noise_seed"] == 7
+    assert graph["4"]["inputs"]["width"] == graph["8"]["inputs"]["width"] == 576          # one param, two nodes
+    assert graph["8"]["inputs"]["steps"] == 4 and graph["ref0_scale"]["inputs"]["megapixels"] == 0.5
+    assert graph["ref0_ref"]["inputs"]["conditioning"] == ["3", 0]                       # the chain starts at the text
+    assert graph["ref1_ref"]["inputs"]["conditioning"] == ["ref0_ref", 0]               # ... and links one per image
+    assert graph["5"]["inputs"]["conditioning"] == ["ref1_ref", 0]                       # the guider takes its end
+    assert graph["ref1_load"]["inputs"]["image"] == "uploaded.png"
+
+
+def test_an_edit_without_a_reference_image_is_refused_before_anything_is_queued(
+        tmp_path: Path, edit_server: FakeServer) -> None:
+    s = make_settings(tmp_path, services=f'[services.comfy]\nurl = "{edit_server.url}"\n', models=EDIT_MODELS)
+    adapter = ComfyAdapter(ServiceClient(s.service("comfy")), {"klein-comfy": "flux2_klein_edit"})
+    rec, _ = make_rig(s, adapter).run(job(MediaKind.IMAGE_EDIT, "klein-comfy", {"prompt": "x"}))
+    assert rec.error_code == ErrorCode.INVALID_INPUT.value
+    assert not any(q.path == "/prompt" for q in edit_server.requests)

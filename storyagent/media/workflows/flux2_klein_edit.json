@@ -1,0 +1,33 @@
+{
+  "bindings": {
+    "prompt": ["3", "text"],
+    "seed": ["6", "noise_seed"],
+    "steps": ["8", "steps"],
+    "sampler_name": ["7", "sampler_name"],
+    "width": [["4", "width"], ["8", "width"]],
+    "height": [["4", "height"], ["8", "height"]],
+    "checkpoint": ["1", "ckpt_name"],
+    "text_encoder": ["2", "clip_name"],
+    "vae": ["12", "vae_name"]
+  },
+  "references": {"conditioning": "3", "vae": ["12", 0], "consumer": ["5", "conditioning"]},
+  "output": "11",
+  "output_type": "images",
+  "graph": {
+    "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": "flux-2-klein-4b.safetensors"}},
+    "2": {"class_type": "CLIPLoader",
+          "inputs": {"clip_name": "qwen_3_4b.safetensors", "type": "flux2", "device": "default"}},
+    "3": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["2", 0], "text": ""}},
+    "4": {"class_type": "EmptyFlux2LatentImage", "inputs": {"width": 720, "height": 1280, "batch_size": 1}},
+    "5": {"class_type": "BasicGuider", "inputs": {"model": ["1", 0], "conditioning": ["3", 0]}},
+    "6": {"class_type": "RandomNoise", "inputs": {"noise_seed": 0}},
+    "7": {"class_type": "KSamplerSelect", "inputs": {"sampler_name": "euler"}},
+    "8": {"class_type": "Flux2Scheduler", "inputs": {"steps": 4, "width": 720, "height": 1280}},
+    "9": {"class_type": "SamplerCustomAdvanced",
+          "inputs": {"noise": ["6", 0], "guider": ["5", 0], "sampler": ["7", 0], "sigmas": ["8", 0],
+                     "latent_image": ["4", 0]}},
+    "10": {"class_type": "VAEDecode", "inputs": {"samples": ["9", 0], "vae": ["12", 0]}},
+    "11": {"class_type": "SaveImage", "inputs": {"images": ["10", 0], "filename_prefix": "storyagent/keyframe"}},
+    "12": {"class_type": "VAELoader", "inputs": {"vae_name": "flux2-vae.safetensors"}}
+  }
+}

@@ -88,3 +88,11 @@ kind = "image.generate"
 4. 帧数 121(5 s)对大幅走动偏长;短一点(57/73 帧)再拼可能更稳。
 **做法:先做对比实验,再改默认。** 同一镜头、同一关键帧、同一种子,只改一个因素:A 现状(12+4,off) / B 16+5 off / C 16+5 + fit_720p / D 换干净负向词 + 步态描述 / E 73 帧。
 每个约 400 s(draft 尺寸 ~126 s 可先筛选),**需要用户明确说"开始"才跑**。结果写进对应管线方案的 `model_params` 和 `models.toml` 的档位说明。
+
+## 关键帧合成:快速候选(2026-10-22)
+
+关键帧用 `image.edit` 由人物像 + 场景图合成,Base 4B(mflux,30 步)实测约 528 s/张,是整集成本的大头。
+已登记候选模型 `flux2-klein-4b-edit-comfy`:FLUX.2 klein 4B **蒸馏版**经 ComfyUI(模板 `flux2_klein_edit`,4 步、无 CFG,Apache-2.0,权重本机已有:checkpoints/flux-2-klein-4b、text_encoders/qwen_3_4b、vae/flux2-vae)。
+**尚未实测**:耗时、人物像不像、多参考图是否稳。对比方法:同一镜头、同一批参考图、同一种子,各出一张,比耗时与脸;`ref_megapixels` 控制参考图缩放(越小越快)。
+结果好 → 在 `pipelines.toml` 加"快速关键帧"方案(`image.edit` 指向该模型),Base 4B 留作"精品"方案;方案内不混搭。
+其他候选(需下载或未验证,暂不接):klein 9B-KV(非商用)、SDXL+InstantID、Qwen-Image-Edit-2511。
