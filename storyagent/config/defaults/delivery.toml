@@ -171,6 +171,19 @@ freeze_sec = 1.5
 require_audio = true
 min_mean_volume_db = -45.0
 aspect_tolerance = 0.08
+# Picture artifacts (advisory: reported, never blocking). Measured on a small grey copy of the film; the limits are set above
+# anything seen in the pilot clips, so they flag only obvious stripes and brightness pumping. Calibrate on your own footage.
+artifacts = true               # false = skip the measurement (it decodes the whole film once)
+artifact_fps = 24              # frames analysed per second at most
+artifact_width = 128
+artifact_height = 224
+flicker_amp = 6.0              # a frame-to-frame brightness swing of this many levels (0-255), up and down in a row
+flicker_window_sec = 1.0
+max_flicker_sec = 0.5          # more flagged time than this fails the (advisory) check
+stripe_amp = 8.0               # row-to-row brightness variation (levels) inside one block of the frame
+stripe_ratio = 3.0             # ... and this many times the column-to-column variation of the same block
+stripe_min_sec = 0.25
+max_banding_sec = 0.5
 
 [estimate]
 # Assumptions for the size estimate in the creation wizard (a rough count before any story exists).

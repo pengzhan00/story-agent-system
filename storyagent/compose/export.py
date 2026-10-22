@@ -104,7 +104,7 @@ def build_package(settings: Settings, ledger: Ledger, project_id: int, episode: 
         shutil.copyfile(src, target)
 
     cfg = settings.compliance_for()
-    qc = run_qc(settings, film, profile)
+    qc = run_qc(settings, film, profile, timeline.get("segments", []))
     provenance = {
         "schema": "storyagent.package.provenance.v1", "aigc": True,
         "generator": {"app": "storyagent", "version": __version__}, "created_at": now_iso(),

@@ -489,6 +489,30 @@ def _cmd_fcp_final(s: Settings, a: argparse.Namespace) -> int:
     return 0
 
 
+# -- picture artifact check -------------------------------------------------------------------------
+def _cmd_qc_artifacts(s: Settings, a: argparse.Namespace) -> int:
+    from storyagent.compose.artifacts import measure
+    from storyagent.media.probe import find_tool, probe
+
+    path = Path(a.file).expanduser()
+    ffmpeg = find_tool(s, "ffmpeg")
+    info = probe(s, path) if path.is_file() else None
+    if ffmpeg is None or info is None:
+        raise CliError("cli.qc.unavailable", 1, path=str(path))
+    qc = dict(s.delivery["qc"])
+    for key in ("flicker_amp", "stripe_amp", "stripe_ratio"):
+        value = getattr(a, key)
+        if value is not None:
+            qc[key] = value
+    rep = measure(ffmpeg, path, qc, native_fps=info.fps)
+    print(t("cli.qc.artifacts", frames=rep.frames, flicker=round(rep.flicker_sec, 2), banding=round(rep.banding_sec, 2),
+            peak=round(rep.stripe_peak, 1)))
+    for kind, windows in (("flicker", rep.flicker_windows), ("banding", rep.banding_windows)):
+        for start, end in windows:
+            print(t("cli.qc.window", kind=kind, start=round(start, 2), end=round(end, 2)))
+    return 0
+
+
 def _library(s: Settings) -> Any:
     from storyagent.media.library import Library
 
@@ -1007,6 +1031,13 @@ def build_parser() -> argparse.ArgumentParser:
     ff.add_argument("--project", type=int, required=True)
     ff.add_argument("--episode", type=int, default=1)
     ff.add_argument("--note", default="")
+
+    qq = sub.add_parser("qc").add_subparsers(dest="cmd", required=True)
+    qa = add(qq, "artifacts", _cmd_qc_artifacts)
+    qa.add_argument("file", help="a video: an episode or one generated clip")
+    qa.add_argument("--flicker-amp", dest="flicker_amp", type=float)
+    qa.add_argument("--stripe-amp", dest="stripe_amp", type=float)
+    qa.add_argument("--stripe-ratio", dest="stripe_ratio", type=float)
 
     li = sub.add_parser("library").add_subparsers(dest="cmd", required=True)
     la = add(li, "add", _cmd_library_add)

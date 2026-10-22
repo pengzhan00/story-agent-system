@@ -476,7 +476,8 @@ def compose(ctx: Ctx) -> dict[str, Any]:
     if target:                    # an explicit target replaces the profile's length range
         profile["min_episode_sec"], profile["max_episode_sec"] = duration_window(
             target, float(ctx.settings.delivery["pacing"]["tolerance"]))
-    qc = run_qc(ctx.settings, ctx.settings.home / episode_asset.path, profile) if episode_asset else None
+    qc = run_qc(ctx.settings, ctx.settings.home / episode_asset.path, profile, timeline["segments"]) \
+        if episode_asset else None
     ctx.step(100, 100, "")
     return {"episode": episode, "asset_id": episode_asset.id if episode_asset else None, "job_id": rec.id,
             "duration_sec": timeline["total_sec"], "shots": len(timeline["segments"]),

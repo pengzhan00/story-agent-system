@@ -9,19 +9,21 @@ from __future__ import annotations
 
 import re
 import subprocess
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
 from storyagent.config import Settings
 from storyagent.media.probe import find_tool, probe
 
+from .artifacts import measure, shots_hit
+
 _MEAN = re.compile(r"mean_volume:\s*(-?[\d.]+|-inf) dB")
 _LUFS = re.compile(r"I:\s+(-?[\d.]+|-inf) LUFS")
 _BLACK = re.compile(r"black_duration:\s*([\d.]+)")
 _FREEZE = re.compile(r"freeze_duration:\s*([\d.]+)")
 LOUDNESS_TOLERANCE = 3.0     # LU around the delivery target
-ADVISORY = ("episode_length",)   # reported, never blocking: drafts and previews are meant to be short
+ADVISORY = ("episode_length", "flicker", "banding")   # reported, never blocking (short drafts; uncalibrated artifacts)
 
 
 def _check(code: str, ok: bool | None, value: Any = None, limit: Any = None) -> dict[str, Any]:
@@ -118,8 +120,30 @@ def _picture_checks(settings: Settings, ffmpeg: Path, path: Path, dur: float, ch
     checks.append(_check("frozen", frozen < max(dur * 0.5, freeze_sec), round(frozen, 2), freeze_sec))
 
 
-def run_qc(settings: Settings, path: Path, profile: Mapping[str, Any]) -> dict[str, Any]:
-    """Check one rendered episode. ``profile`` is the project's delivery profile."""
+def _artifact_checks(settings: Settings, ffmpeg: Path, path: Path, fps: float | None,
+                     segments: Sequence[Mapping[str, Any]], checks: list[dict[str, Any]],
+                     metrics: dict[str, Any]) -> None:
+    qc = settings.delivery["qc"]
+    if not qc.get("artifacts", True):
+        return
+    rep = measure(ffmpeg, path, qc, native_fps=fps)
+    if rep.frames == 0:
+        checks += [_check("flicker", None), _check("banding", None)]
+        return
+    metrics.update(artifacts=rep.as_dict())
+    if segments:
+        metrics["artifact_shots"] = {"flicker": shots_hit(rep.flicker_windows, segments),
+                                     "banding": shots_hit(rep.banding_windows, segments)}
+    checks.append(_check("flicker", rep.flicker_sec <= float(qc["max_flicker_sec"]), round(rep.flicker_sec, 2),
+                         float(qc["max_flicker_sec"])))
+    checks.append(_check("banding", rep.banding_sec <= float(qc["max_banding_sec"]), round(rep.banding_sec, 2),
+                         float(qc["max_banding_sec"])))
+
+
+def run_qc(settings: Settings, path: Path, profile: Mapping[str, Any],
+           segments: Sequence[Mapping[str, Any]] = ()) -> dict[str, Any]:
+    """Check one rendered episode. ``profile`` is the project's delivery profile; ``segments`` (the timeline's) lets
+    the artifact checks name the shots they found trouble in."""
     checks: list[dict[str, Any]] = []
     metrics: dict[str, Any] = {}
     if not path.is_file():
@@ -137,6 +161,7 @@ def run_qc(settings: Settings, path: Path, profile: Mapping[str, Any]) -> dict[s
         checks += [_check("mean_volume", False), _check("loudness", False)]
     if info.has_video:
         _picture_checks(settings, ffmpeg, path, info.duration_sec or 0.0, checks, metrics)
+        _artifact_checks(settings, ffmpeg, path, info.fps, segments, checks, metrics)
     return _verdict(checks, metrics)
 
 
