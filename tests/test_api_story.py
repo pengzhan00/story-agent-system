@@ -363,3 +363,23 @@ def test_project_edit_settings_are_validated(client: TestClient) -> None:
     assert ok.status_code == 200 and ok.json()["settings"]["edit"]["title_card"] is True
     for bad in ({"title_card": "yes"}, {"scene_fade_sec": 99}, {"bogus": 1}, {"recap_sec": -1}):
         assert client.patch(f"/api/projects/{pid}/settings", json={"edit": bad}).status_code == 422
+
+
+def test_looks_and_props_api(client: TestClient) -> None:
+    pid = new_project(client)
+    hero = client.post(f"/api/projects/{pid}/characters", json={"name": "Hero"}).json()
+    base = f"/api/projects/{pid}"
+    look = client.post(f"{base}/looks", json={"character_id": hero["id"], "label": "night", "costume": "orange vest",
+                                              "from_episode": 2})
+    assert look.status_code == 201 and look.json()["from_act"] == 1
+    assert client.post(f"{base}/looks", json={"character_id": hero["id"], "costume": " "}).status_code == 422
+    assert client.post(f"{base}/looks", json={"character_id": 999, "costume": "x"}).status_code == 404
+    assert client.patch(f"{base}/looks/{look.json()['id']}", json={"from_scene": 4}).json()["from_scene"] == 4
+    assert [lk["costume"] for lk in client.get(f"{base}/looks").json()] == ["orange vest"]
+    prop = client.post(f"{base}/props", json={"name": "Slip", "description": "yellowed paper"}).json()
+    assert client.post(f"{base}/props", json={"name": "Slip"}).status_code == 422          # names are unique
+    assert client.get(f"{base}/props").json()[0]["description"] == "yellowed paper"
+    assert client.delete(f"{base}/props/{prop['id']}").status_code == 204
+    assert client.delete(f"{base}/looks/{look.json()['id']}").status_code == 204
+    other = client.post("/api/projects", json={"name": "Other"}).json()["id"]
+    assert client.get(f"/api/projects/{other}/looks/{look.json()['id']}").status_code == 404

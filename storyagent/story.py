@@ -35,6 +35,8 @@ _JSON = {
     "sound_effects": (),
     "episodes": (),
     "seasons": (),
+    "character_looks": (),
+    "props": (),
 }
 _FIELDS: dict[str, tuple[str, ...]] = {
     "characters": ("name", "role", "age", "gender", "appearance", "personality", "background", "relationships",
@@ -51,13 +53,16 @@ _FIELDS: dict[str, tuple[str, ...]] = {
     "sound_effects": ("name", "category", "description", "tags"),
     "episodes": ("number", "title", "summary", "status", "season", "number_in_season", "hook", "cliffhanger"),
     "seasons": ("number", "title", "summary", "planned_episodes", "target_sec", "status"),
+    "character_looks": ("character_id", "label", "costume", "from_episode", "from_act", "from_scene"),
+    "props": ("name", "description", "introduced_episode"),
 }
 _CHOICES = {("shots", "treatment"): ("auto", "video", "still"),
             ("scenes", "keyframe_mode"): ("auto", "compose", "text")}
 _PARENT_ORDER = {"shots": "act_number, scene_number, shot_number, id", "scripts": "episode_no, id",
                  "episodes": "number", "seasons": "number", "characters": "id", "scenes": "id", "music_themes": "id",
-                 "sound_effects": "id"}
-_HAS_UPDATED = {"characters", "scenes", "scripts", "shots", "episodes", "seasons"}
+                 "sound_effects": "id", "character_looks": "character_id, from_episode, from_act, from_scene, id",
+                 "props": "name, id"}
+_HAS_UPDATED = {"characters", "scenes", "scripts", "shots", "episodes", "seasons", "character_looks", "props"}
 
 
 def _decode(table: str, row: Any) -> dict[str, Any]:
@@ -168,6 +173,72 @@ class StoryStore:
 
     def delete_character(self, character_id: int) -> None:
         self._delete("characters", character_id)
+
+    # -- continuity: looks (what a character wears from a point in the story) and props -----------------
+    def list_looks(self, project_id: int, character_id: int | None = None) -> list[dict[str, Any]]:
+        if character_id is None:
+            return self._list("character_looks", project_id)
+        return self._list("character_looks", project_id, "AND character_id=?", (character_id,))
+
+    def get_look(self, look_id: int) -> dict[str, Any]:
+        return self._get("character_looks", look_id)
+
+    def _check_look(self, project_id: int, data: Mapping[str, Any]) -> None:
+        if "character_id" in data and self._get("characters", int(data["character_id"]))["project_id"] != project_id:
+            raise StoryNotFound(f"unknown character {data['character_id']}")
+        if "costume" in data and not str(data["costume"]).strip():
+            raise StoryError("a look needs a costume description")
+        for key in ("from_episode", "from_act", "from_scene"):
+            if key in data and int(data[key]) < 1:
+                raise StoryError(f"{key} must be 1 or more")
+
+    def create_look(self, project_id: int, data: Mapping[str, Any]) -> dict[str, Any]:
+        if "character_id" not in data:
+            raise StoryError("a look belongs to a character (character_id)")
+        self._check_look(project_id, data)
+        if "costume" not in data:
+            raise StoryError("a look needs a costume description")
+        return self.get_look(self._insert("character_looks", project_id, data))
+
+    def update_look(self, look_id: int, data: Mapping[str, Any]) -> dict[str, Any]:
+        current = self.get_look(look_id)
+        self._check_look(current["project_id"], data)
+        self._update("character_looks", look_id, data)
+        return self.get_look(look_id)
+
+    def delete_look(self, look_id: int) -> None:
+        self._delete("character_looks", look_id)
+
+    def list_props(self, project_id: int) -> list[dict[str, Any]]:
+        return self._list("props", project_id)
+
+    def get_prop(self, prop_id: int) -> dict[str, Any]:
+        return self._get("props", prop_id)
+
+    def _check_prop(self, project_id: int, data: Mapping[str, Any], own_id: int | None = None) -> None:
+        if "name" in data:
+            name = str(data["name"]).strip()
+            clash = self.db.conn.execute(
+                "SELECT id FROM props WHERE project_id=? AND name=?", (project_id, name)).fetchone()
+            if not name or (clash and clash["id"] != own_id):
+                raise StoryError(f"prop name {name!r} is empty or taken")
+        if "introduced_episode" in data and int(data["introduced_episode"]) < 1:
+            raise StoryError("introduced_episode must be 1 or more")
+
+    def create_prop(self, project_id: int, data: Mapping[str, Any]) -> dict[str, Any]:
+        if not str(data.get("name", "")).strip():
+            raise StoryError("a prop needs a name")
+        self._check_prop(project_id, data)
+        return self.get_prop(self._insert("props", project_id, {**data, "name": str(data["name"]).strip()}))
+
+    def update_prop(self, prop_id: int, data: Mapping[str, Any]) -> dict[str, Any]:
+        current = self.get_prop(prop_id)
+        self._check_prop(current["project_id"], data, prop_id)
+        self._update("props", prop_id, {**data, **({"name": str(data["name"]).strip()} if "name" in data else {})})
+        return self.get_prop(prop_id)
+
+    def delete_prop(self, prop_id: int) -> None:
+        self._delete("props", prop_id)
 
     # -- locations (the ``scenes`` table: reusable places) --------------------------------------------
     def list_locations(self, project_id: int) -> list[dict[str, Any]]:

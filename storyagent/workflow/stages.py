@@ -197,9 +197,13 @@ def cast(ctx: Ctx) -> dict[str, Any]:
                                    [str(c.get("name", "")) for c in wanted if c is not entry], style)
         if existing:
             ctx.store.update_character(existing["id"], fields)
+            row = existing
         else:
-            ctx.store.create_character(ctx.pid, {"name": name, **fields})
+            row = ctx.store.create_character(ctx.pid, {"name": name, **fields})
             created += 1
+        costume = str(ctx.extra.get("character_extra", {}).get(name, {}).get("costume", "")).strip()
+        if costume and not ctx.store.list_looks(ctx.pid, row["id"]):      # the designed costume is the first look
+            ctx.store.create_look(ctx.pid, {"character_id": row["id"], "label": "default", "costume": costume})
     ctx.step(len(wanted), len(wanted), "done")
     return {"created": created, "skipped": skipped}
 
@@ -472,8 +476,8 @@ def shotplan(ctx: Ctx) -> dict[str, Any]:
     ep = ctx.store.ensure_episode(ctx.pid, episode, season=ctx.season_of(episode))
     rows = build_shot_rows(
         script_row, characters=ctx.store.list_characters(ctx.pid), locations=ctx.store.list_locations(ctx.pid),
-        style=_style(ctx), profile=profile,
-        min_shot_sec=float(ctx.params.get("min_shot_sec", 2.0)),
+        style=_style(ctx), profile=profile, looks=ctx.store.list_looks(ctx.pid), props=ctx.store.list_props(ctx.pid),
+        episode=episode, min_shot_sec=float(ctx.params.get("min_shot_sec", 2.0)),
         max_shot_sec=float(ctx.params.get("max_shot_sec", 8.0)),
     )
     target = ctx.target_sec()

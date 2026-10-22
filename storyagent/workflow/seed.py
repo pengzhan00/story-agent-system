@@ -61,11 +61,16 @@ class Seeder:
 def _shot_prompts(ctx: Ctx, shot: dict[str, Any], chars: dict[str, dict[str, Any]], style: dict[str, Any],
                   previous: str, use_llm: bool) -> dict[str, str]:
     payload = shot["render_payload"]
-    looks = [{"appearance": chars.get(n, {}).get("appearance", ""), "costume": chars.get(n, {}).get("costume", ""),
+    worn = {c["name"]: c.get("costume", "") for c in payload["subject"]["characters"]}
+    looks = [{"appearance": chars.get(n, {}).get("appearance", ""), "costume": worn.get(n, ""),
               "stable_description": chars.get(n, {}).get("prompt_template", "")} for n in shot["characters"]]
+    props = payload.get("continuity", {}).get("props", [])
     base_style = str(style.get("visual_style", ""))
     plain = ", ".join(x for x in (
-        payload["camera"]["shot_type"], "; ".join(f"{lk['stable_description'] or lk['appearance']}" for lk in looks),
+        payload["camera"]["shot_type"],
+        "; ".join(f"{lk['stable_description'] or lk['appearance']}"
+                  + (f", wearing {lk['costume']}" if lk["costume"] else "") for lk in looks),
+        "; ".join(f"{p['name']}: {p['description']}" if p["description"] else p["name"] for p in props),
         payload["subject"]["action"], payload["subject"]["expression"], shot["location"], payload["scene"]["lighting"],
         payload["scene"]["time_of_day"], base_style) if x)
     fallback = {"image_prompt": plain, "video_prompt": plain + (", " + payload["camera"]["movement"]
@@ -75,7 +80,8 @@ def _shot_prompts(ctx: Ctx, shot: dict[str, Any], chars: dict[str, dict[str, Any
         return fallback
     try:
         data = ctx.run_agent("shot.visual", {"shot": {k: payload[k] for k in ("subject", "scene", "camera", "story")},
-                                             "characters": looks, "scene": shot["location"], "style": base_style,
+                                             "characters": looks, "props": props, "scene": shot["location"],
+                                             "style": base_style,
                                              "previous": previous or "(start)"})
         return {k: str(data.get(k) or fallback[k]) for k in fallback}
     except Exception:  # an LLM hiccup on one shot must not stop the whole stage  # noqa: BLE001

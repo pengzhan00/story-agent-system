@@ -6,6 +6,7 @@ import { ProgressBar } from "../components/ProgressBar";
 import { useT } from "../i18n";
 import { FlowChain } from "../components/FlowChain";
 import { CreativePanel } from "./CreativePanel";
+import { ContinuityPanel } from "./ContinuityPanel";
 import { ProcessPanel } from "./ProcessPanel";
 import { ReviewPanel } from "./ReviewPanel";
 import { JobsPanel } from "./QueuePage";
@@ -84,6 +85,9 @@ export function ProjectPage() {
         <NavLink to="creative" className={({ isActive }) => (isActive ? "tab active" : "tab")}>
           {t("web.tab.creative")}
         </NavLink>
+        <NavLink to="continuity" className={({ isActive }) => (isActive ? "tab active" : "tab")}>
+          {t("web.tab.continuity")}
+        </NavLink>
         <NavLink to="review" className={({ isActive }) => (isActive ? "tab active" : "tab")}>
           {t("web.tab.review")}
         </NavLink>
@@ -103,6 +107,7 @@ export function ProjectPage() {
         <Route path="series" element={<SeriesPanel id={id} />} />
         <Route path="story" element={<StoryPanel id={id} />} />
         <Route path="creative" element={<CreativePanel id={id} />} />
+        <Route path="continuity" element={<ContinuityPanel id={id} />} />
         <Route path="review" element={<ReviewPanel id={id} />} />
         <Route path="flow" element={<FlowChain projectId={id} />} />
         <Route path="process" element={<ProcessPanel id={id} />} />

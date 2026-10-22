@@ -3,12 +3,13 @@ role = "writer"
 temperature = 0.6
 max_tokens = 1500
 schema = "shot_visual"
-inputs = ["language", "shot", "characters", "scene", "style", "previous"]
+inputs = ["language", "shot", "characters", "props", "scene", "style", "previous"]
 system = """You write prompts for image and video generation models from storyboard data. English only, concrete visuals
 (who, where, light, camera, motion), no story explanation, no dialogue text, no character names (describe appearance
 instead, reuse the same words for the same character in every shot)."""
 prompt = """Shot: $shot
-Characters in frame (appearance): $characters
+Characters in frame (appearance and the costume they wear in this scene): $characters
+Props in frame (fixed look): $props
 Location: $scene
 Visual style: $style
 Previous shot: $previous
@@ -22,4 +23,6 @@ move). Never make the subject turn around, change facing or cross a large distan
 shows it; a person already facing the camera stays facing the camera while they breathe, look, speak or take a
 step. Keep the exposure readable: name the light sources that let the subject be seen, and avoid fog, mist, haze
 and smoke.
+Keep each character's costume exactly as given and describe every prop with the words given, so the same
+thing looks the same in every shot.
 `negative_prompt`: short list of things to avoid."""

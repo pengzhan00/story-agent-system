@@ -110,13 +110,19 @@ export function useCancelRun(id: number) {
 
 export const STORY_PARTS = ["characters", "locations", "music", "sfx", "shots", "dialogue", "scripts"] as const;
 export type StoryPart = (typeof STORY_PARTS)[number];
-export const useStory = (id: number, part: StoryPart) =>
+/** Rows the story API serves; looks and props have their own page (continuity), not a tab of the story editor. */
+export type StoryRows = StoryPart | "looks" | "props";
+export const useStory = (id: number, part: StoryRows) =>
   useQuery({ queryKey: ["story", id, part], queryFn: () => api<Row[]>(`/api/projects/${id}/${part}`) });
 
-export function useStoryEdit(id: number, part: StoryPart) {
+export function useStoryEdit(id: number, part: StoryRows) {
   const qc = useQueryClient();
   const invalidate = () => qc.invalidateQueries({ queryKey: ["story", id, part] });
   return {
+    create: useMutation({
+      mutationFn: (body: Row) => post<Row>(`/api/projects/${id}/${part}`, body),
+      onSuccess: invalidate,
+    }),
     update: useMutation({
       mutationFn: ({ itemId, body }: { itemId: number; body: Row }) =>
         patch<Row>(`/api/projects/${id}/${part}/${itemId}`, body),

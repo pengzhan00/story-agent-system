@@ -67,6 +67,10 @@ PATCH /api/projects/1/specs/character.portrait/hero  {"prompt":"... at dusk"}   
 
 `WorkflowRunOut.progress`: `percent` (overall 0-100, never decreases), `stage`/`stage_index`/`stage_count`, `done`/`total` (items in the current stage, `total` 0 = not known yet), `message` (what is being done now), `elapsed_sec`, `eta_sec` (null until ~10 % is done) and `stages[]` (one bar each: `status`, `percent` — null while a running stage has not counted its items — and `seconds` once finished). It is written about once a second while the run is alive and once more at the end, so a poll or the SSE feed never shows a stalled number for a live run. A run whose worker died is requeued when its lease expires and continues from what was saved.
 
+## Continuity (costumes and props)
+
+`GET/POST /api/projects/{id}/looks`, `GET/PATCH/DELETE .../looks/{look}`: a look is `{character_id, label, costume, from_episode, from_act, from_scene}` - what the character wears from that point of the story until their next look (the costume designed with the character is created as look "default" from 1/1/1 by the cast stage). `GET/POST /api/projects/{id}/props`, `GET/PATCH/DELETE .../props/{prop}`: `{name (unique per project), description, introduced_episode}`; every shot whose text (action, expression, narration, beat, dialogue, sfx cues) mentions the name carries the prop. The shot plan resolves both into the shot payload (`subject.characters[].costume`, `continuity.props`) and the visual prompt uses exactly those words; re-run `shotplan` then `specs` after editing (changed specs make older takes outdated).
+
 ## Review loop (notes, redo, compare)
 
 A reviewer looks at a shot's takes, writes a note, redoes from it and adopts the better take. A note belongs to a spec (and may name the take it is about); statuses `open` -> `redoing` (a redo was queued) -> `resolved` | `dismissed`; reopening goes back to `open`. Authors come from the signed-in user (`local` with sign-in off); the write endpoints are audited like every write.

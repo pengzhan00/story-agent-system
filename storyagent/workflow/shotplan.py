@@ -7,6 +7,8 @@ import re
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from .continuity import look_for, props_in
+
 SHOT_SCHEMA = "shot.v3"
 DEFAULT_NEGATIVE = (
     "low quality, blurry, bad anatomy, extra fingers, duplicated person, broken face, text, watermark, logo, "
@@ -48,13 +50,17 @@ def build_payload(
     *, scene: Mapping[str, Any], shot: Mapping[str, Any], dialogue: list[dict[str, str]],
     location: Mapping[str, Any] | None, characters: Mapping[str, Mapping[str, Any]], style: Mapping[str, Any],
     profile: Mapping[str, Any], scene_id: str, duration: float, previous: str,
+    looks: Sequence[Mapping[str, Any]] = (), props: Sequence[Mapping[str, Any]] = (),
+    position: tuple[int, int, int] = (1, 1, 1),
 ) -> dict[str, Any]:
     present = [n for n in (shot.get("characters_present") or scene.get("characters") or []) if str(n).strip()]
     subject = []
     for name in present:
         c = characters.get(str(name).strip())
+        look = look_for(looks, int(c["id"]), *position) if c and "id" in c else None
         subject.append({
-            "name": str(name).strip(), "appearance": (c or {}).get("appearance", ""), "costume": "",
+            "name": str(name).strip(), "appearance": (c or {}).get("appearance", ""),
+            "costume": str(look["costume"]) if look else "", "look": str(look["label"]) if look else "",
             "voice_profile": (c or {}).get("voice_profile", ""),
             "prompt_template": (c or {}).get("prompt_template", ""),
             "voice_ref": (c or {}).get("voice_ref_audio", ""), "lora_ref": (c or {}).get("lora_ref", ""),
@@ -78,7 +84,11 @@ def build_payload(
         "style": {"visual_style": str(style.get("visual_style", "")),
                   "negative_prompt": str(style.get("negative_prompt") or DEFAULT_NEGATIVE)},
         "continuity": {"character_anchor": "|".join(sorted(str(n).strip() for n in present)),
-                       "scene_anchor": str(scene.get("location", "")), "previous_shot_summary": previous},
+                       "scene_anchor": str(scene.get("location", "")), "previous_shot_summary": previous,
+                       "props": props_in(props, [str(shot.get("action", "")), str(shot.get("expression", "")),
+                                                 str(shot.get("narration") or scene.get("narration") or ""),
+                                                 str(scene.get("beat", "")), *(d["line"] for d in dialogue),
+                                                 *(str(c) for c in shot.get("sfx_cues", []))], position[0])},
         "output_spec": {"width": int(profile.get("width", 0)), "height": int(profile.get("height", 0)),
                         "fps": int(profile.get("fps", 0))},
     }
@@ -87,6 +97,7 @@ def build_payload(
 def build_shot_rows(
     script: Mapping[str, Any], *, characters: Sequence[Mapping[str, Any]], locations: Sequence[Mapping[str, Any]],
     style: Mapping[str, Any], profile: Mapping[str, Any], min_shot_sec: float = 2.0, max_shot_sec: float = 8.0,
+    looks: Sequence[Mapping[str, Any]] = (), props: Sequence[Mapping[str, Any]] = (), episode: int = 1,
 ) -> list[dict[str, Any]]:
     by_char = {str(c["name"]).strip(): c for c in characters}
     by_loc = {str(loc["name"]).strip(): loc for loc in locations}
@@ -108,6 +119,7 @@ def build_shot_rows(
                     scene=scene, shot=shot, dialogue=dialogue,
                     location=by_loc.get(str(scene.get("location", "")).strip()), characters=by_char, style=style,
                     profile=profile, scene_id=scene_id, duration=duration, previous=previous,
+                    looks=looks, props=props, position=(episode, act_no, scene_no),
                 )
                 present = [str(n).strip() for n in (shot.get("characters_present") or scene.get("characters") or [])
                            if str(n).strip()]

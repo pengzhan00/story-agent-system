@@ -71,6 +71,8 @@ _crud("characters", "character", "get_character", "list_characters", "create_cha
       "delete_character")
 _crud("locations", "location", "get_location", "list_locations", "create_location", "update_location",
       "delete_location")
+_crud("looks", "look", "get_look", "list_looks", "create_look", "update_look", "delete_look")
+_crud("props", "prop", "get_prop", "list_props", "create_prop", "update_prop", "delete_prop")
 _crud("music", "music", "get_music", "list_music", "create_music", "update_music", "delete_music")
 _crud("sfx", "sfx", "get_sfx", "list_sfx", "create_sfx", None, "delete_sfx")
 
