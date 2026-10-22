@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ContentBar } from "../src/components/ContentBar";
+import { ContentToggle } from "../src/components/ContentToggle";
 import { I18nProvider } from "../src/i18n";
 
 const en = JSON.parse(readFileSync(join(__dirname, "..", "..", "storyagent", "locales", "en.json"), "utf-8")) as Record<string, string>;
@@ -66,5 +67,22 @@ describe("ContentBar", () => {
     fireEvent.change(screen.getByLabelText(tr("web.content.password")), { target: { value: "secret pw" } });
     expect(unlock.disabled).toBe(false);
     expect(screen.getByText(tr("web.content.vault_missing"))).toBeTruthy();
+  });
+});
+
+describe("ContentToggle (top bar of every page)", () => {
+  it("shows the lock state and opens the unlock panel on click", async () => {
+    state = status(false, false);
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <I18nProvider>
+          <ContentToggle />
+        </I18nProvider>
+      </QueryClientProvider>,
+    );
+    const chip = await screen.findByText(`${tr("web.content.title")} · ${tr("web.content.locked")}`);
+    expect(screen.queryByText(tr("web.content.unlock"))).toBeNull();
+    fireEvent.click(chip);
+    expect(await screen.findByText(tr("web.content.unlock"))).toBeTruthy();
   });
 });

@@ -377,7 +377,7 @@
   "web.content.hint": "受限内容单独存放、模糊显示、不进日志和导出,每次解锁和查看都有审计。未开账号时这只是防止误看的保险,不是安全边界:真正的保密需要把保险库放在加密卷上。",
   "web.content.rating": "内容分级",
   "web.content.rating_hint": "立项时决定:项目有文件之后就不能再改。",
-  "web.content.masked": "锁定时不显示",
+  "web.content.masked": "锁定时不显示:点右上角“受限内容”解锁",
   "web.content.confirm_export": "包含受限内容(画面中所有人均为成年人且已同意;仅限自用)",
   "web.content.adult": "已确认成年(18+)",
   "web.content.badge": "受限",

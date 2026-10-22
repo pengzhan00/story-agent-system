@@ -377,7 +377,7 @@
   "web.content.hint": "Restricted material is stored apart, shown blurred, kept out of logs and exports, and every unlock and view is audited. With accounts off this is a guard against showing it by mistake, not a security boundary: real secrecy needs the vault on an encrypted volume.",
   "web.content.rating": "Content rating",
   "web.content.rating_hint": "Decided now: it cannot change once the project has files.",
-  "web.content.masked": "Hidden while locked",
+  "web.content.masked": "Hidden while locked: unlock with “Restricted content” at the top right",
   "web.content.confirm_export": "Include restricted material (everyone shown is an adult and has consented; for private use only)",
   "web.content.adult": "Adult (18+) confirmed",
   "web.content.badge": "Restricted",

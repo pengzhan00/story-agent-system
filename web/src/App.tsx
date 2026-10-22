@@ -1,6 +1,7 @@
 import { NavLink, Navigate, Route, Routes } from "react-router-dom";
 import { useEventFeed } from "./api/events";
 import { useI18n } from "./i18n";
+import { ContentToggle } from "./components/ContentToggle";
 import { UserMenu } from "./components/UserMenu";
 import { AuditPage } from "./pages/AuditPage";
 import { UsersPage } from "./pages/UsersPage";
@@ -70,6 +71,7 @@ export function App() {
             </option>
           ))}
         </select>
+        <ContentToggle />
         <UserMenu />
       </header>
       <main className="content">
