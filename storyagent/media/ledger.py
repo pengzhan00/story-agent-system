@@ -6,6 +6,7 @@ Disk is only a cache that is verified against this ledger, never the other way r
 """
 from __future__ import annotations
 
+import json
 import random
 import statistics
 import time
@@ -244,7 +245,8 @@ class Ledger:
         with self.db.transaction() as conn:
             cur = conn.execute(
                 """UPDATE media_jobs SET status='running', lease_owner=?, lease_expires_at=?,
-                       attempt=attempt+1, started_at=?, error_code=NULL, error_message=NULL
+                       attempt=attempt+1, started_at=?, error_code=NULL, error_message=NULL,
+                       error_params='{}'
                    WHERE id=? AND status='queued' AND cancel_requested=0""",
                 (owner, self._later(lease_seconds), self._now(), job_id),
             )
@@ -332,10 +334,11 @@ class Ledger:
         row = conn.execute("SELECT started_at FROM media_jobs WHERE id=?", (job_id,)).fetchone()
         actual = _parse_iso(now) - _parse_iso(row["started_at"]) if row and row["started_at"] else None
         conn.execute(
-            """UPDATE media_jobs SET status=?, error_code=?, error_message=?, finished_at=?,
+            """UPDATE media_jobs SET status=?, error_code=?, error_message=?, error_params=?, finished_at=?,
                    actual_seconds=COALESCE(?, actual_seconds), lease_owner=NULL, lease_expires_at=NULL
                WHERE id=?""",
-            (code.status.value, code.value, message, now, actual, job_id),
+            (code.status.value, code.value, message,
+             json.dumps({k: str(v) for k, v in params.items()}, ensure_ascii=False), now, actual, job_id),
         )
         self.add_event(job_id, "failed", "error", code=code.value, message=message, params=params)
         self._cascade(conn, job_id)
@@ -435,7 +438,7 @@ class Ledger:
             conn.execute(
                 """UPDATE media_jobs SET status='completed', progress=1, finished_at=?, actual_seconds=?,
                        peak_memory_gib=?, lease_owner=NULL, lease_expires_at=NULL, error_code=NULL,
-                       error_message=NULL WHERE id=?""",
+                       error_message=NULL, error_params='{}' WHERE id=?""",
                 (now, actual, peak_memory_gib, job_id),
             )
             self.add_event(job_id, "completed", assets=len(out))

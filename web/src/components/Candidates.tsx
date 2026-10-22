@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { Asset, Job, Spec } from "../api/types";
 import { duration } from "../lib/format";
 import { useT } from "../i18n";
+import { jobError } from "../lib/jobError";
 import { ProgressBar } from "./ProgressBar";
 import { StatusChip } from "./StatusChip";
 
@@ -78,8 +79,8 @@ export function Candidates({ spec, assets, jobs, onAdopt, adopting }: Props) {
       ))}
       {failed.map((j) => (
         <div key={j.id} className="error-box small">
-          {j.error_code ? t(`error.${j.error_code}`) : t("web.error.generic")}
-          {j.error_code ? <p>{t(`error.${j.error_code}.remediation`)}</p> : null}
+          {j.error_code ? jobError(t, j).text : t("web.error.generic")}
+          {j.error_code ? <p>{jobError(t, j).remediation}</p> : null}
         </div>
       ))}
       {assets.length === 0 && running.length === 0 ? <p className="empty">{t("web.creative.no_assets")}</p> : null}

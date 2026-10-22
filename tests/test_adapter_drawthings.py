@@ -168,3 +168,13 @@ def test_a_project_of_a_restricted_plan_starts_restricted_and_stays_so(tmp_path:
     used = db.conn.execute("SELECT id FROM projects WHERE name='Used'").fetchone()["id"]
     with pytest.raises(ProjectStateError):
         store.update(used, pipeline="vertical_drama_lustify")   # files exist: the rating cannot rise afterwards
+
+
+def test_a_refused_licence_keeps_the_values_of_its_message(tmp_path: Path, server: FakeServer) -> None:
+    lic = MODELS.replace("size_multiple = 64", "size_multiple = 64\ncommercial_ok = false")
+    s = make_settings(tmp_path, services=f'[services.drawthings]\nurl = "{server.url}"\n', models=lic)
+    adapter = DrawThingsAdapter(ServiceClient(s.service("drawthings")), {"dt-test": "test_f16.ckpt"})
+    r = make_rig(s, adapter)
+    rec, assets = r.run(job(MediaKind.IMAGE_GENERATE, "dt-test", {"prompt": "x"}))
+    assert rec.error_code == ErrorCode.LICENSE_ACK_REQUIRED.value and not assets
+    assert rec.error_params == {"model": "dt-test"}

@@ -2788,6 +2788,10 @@ export interface components {
             error_code: string | null;
             /** Error Message */
             error_message: string | null;
+            /** Error Params */
+            error_params: {
+                [key: string]: string;
+            };
             /** Est Memory Gib */
             est_memory_gib: number;
             /** Est Seconds */

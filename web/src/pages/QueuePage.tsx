@@ -7,6 +7,7 @@ import { ErrorNote } from "../components/ErrorNote";
 import { ProgressBar } from "../components/ProgressBar";
 import { StatusChip } from "../components/StatusChip";
 import { duration } from "../lib/format";
+import { jobError } from "../lib/jobError";
 import { useT } from "../i18n";
 
 const ACTIVE = new Set(["queued", "running"]);
@@ -70,7 +71,7 @@ function JobRow({ job }: { job: Job }) {
       </td>
       <td>
         <StatusChip status={job.status} group="status" />
-        {job.error_code ? <div className="muted small">{t(`error.${job.error_code}`)}</div> : null}
+        {job.error_code ? <div className="muted small">{jobError(t, job).text}</div> : null}
       </td>
       <td className="muted small">{job.actual_seconds != null ? duration(job.actual_seconds) : ""}</td>
       <td className="actions">

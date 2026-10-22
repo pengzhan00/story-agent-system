@@ -12,6 +12,7 @@ import { StatusChip } from "../components/StatusChip";
 import { ValueEditor } from "../components/ValueEditor";
 import { ValueView } from "../components/ValueView";
 import { useT } from "../i18n";
+import { jobError } from "../lib/jobError";
 import { mediaOfAsset, targetsFor } from "../lib/assets";
 import { duration } from "../lib/format";
 
@@ -448,8 +449,8 @@ function JobCard({
       ) : null}
       {j.error_code ? (
         <div className="error-box small">
-          {t(`error.${j.error_code}`)}
-          <p>{t(`error.${j.error_code}.remediation`)}</p>
+          {jobError(t, j).text}
+          <p>{jobError(t, j).remediation}</p>
         </div>
       ) : null}
       {item.assets.map((a) => (

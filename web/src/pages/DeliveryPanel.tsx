@@ -4,6 +4,7 @@ import { useDeliveries, useDelivery, usePlatforms } from "../api/delivery";
 import { ErrorNote } from "../components/ErrorNote";
 import { ProgressBar } from "../components/ProgressBar";
 import { useT } from "../i18n";
+import { jobError } from "../lib/jobError";
 
 export function DeliveryPanel({ id }: { id: number }) {
   const t = useT();
@@ -99,8 +100,8 @@ export function DeliveryPanel({ id }: { id: number }) {
       ))}
       {failed.map((j) => (
         <div key={j.id} className="error-box small">
-          {j.error_code ? t(`error.${j.error_code}`) : t("web.error.generic")}
-          {j.error_code ? <p>{t(`error.${j.error_code}.remediation`)}</p> : null}
+          {j.error_code ? jobError(t, j).text : t("web.error.generic")}
+          {j.error_code ? <p>{jobError(t, j).remediation}</p> : null}
           <button className="link" disabled={retry.isPending} onClick={() => retry.mutate(j.id)}>
             {t("web.jobs.retry")}
           </button>

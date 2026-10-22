@@ -1589,6 +1589,13 @@
             ],
             "title": "Error Message"
           },
+          "error_params": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Error Params",
+            "type": "object"
+          },
           "est_memory_gib": {
             "title": "Est Memory Gib",
             "type": "number"
@@ -1800,6 +1807,7 @@
           "progress_msg",
           "error_code",
           "error_message",
+          "error_params",
           "cancel_requested",
           "created_at",
           "started_at",

@@ -188,6 +188,7 @@ class JobOut(Out):
     progress_msg: str
     error_code: str | None
     error_message: str | None
+    error_params: dict[str, str]
     cancel_requested: bool
     created_at: str
     started_at: str | None

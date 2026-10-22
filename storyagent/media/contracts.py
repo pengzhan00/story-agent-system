@@ -96,6 +96,7 @@ class JobRecord:
     depends_on: str | None = None
     pipeline_id: str | None = None
     pipeline_step: int | None = None
+    error_params: dict[str, Any] = field(default_factory=dict)  # fills the {placeholders} of error.<error_code>
 
     @classmethod
     def from_row(cls, r: sqlite3.Row) -> JobRecord:
@@ -113,7 +114,7 @@ class JobRecord:
             cancel_requested=bool(r["cancel_requested"]), created_at=r["created_at"],
             started_at=r["started_at"], finished_at=r["finished_at"], actual_seconds=r["actual_seconds"],
             peak_memory_gib=r["peak_memory_gib"], depends_on=r["depends_on"], pipeline_id=r["pipeline_id"],
-            pipeline_step=r["pipeline_step"],
+            pipeline_step=r["pipeline_step"], error_params=loads(r["error_params"], {}),
         )
 
 
