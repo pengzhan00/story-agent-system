@@ -194,6 +194,9 @@ class JobOut(Out):
     started_at: str | None
     finished_at: str | None
     actual_seconds: float | None
+    retried_by: str | None = None       # the newest retry of this job (its id) ...
+    retried_status: str | None = None   # ... and that retry's status
+    retries: int = 0                    # how many times it was retried
     locked: bool = False
 
     @model_validator(mode="after")

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { JobId } from "../components/JobId";
 import { useEpisodes, useJobActions, useJobs, useProject } from "../api/hooks";
 import { useDeliveries, useDelivery, usePlatforms } from "../api/delivery";
 import { ErrorNote } from "../components/ErrorNote";
@@ -100,11 +101,17 @@ export function DeliveryPanel({ id }: { id: number }) {
       ))}
       {failed.map((j) => (
         <div key={j.id} className="error-box small">
-          {j.error_code ? jobError(t, j).text : t("web.error.generic")}
+          <JobId id={j.id} /> {j.error_code ? jobError(t, j).text : t("web.error.generic")}
           {j.error_code ? <p>{jobError(t, j).remediation}</p> : null}
-          <button className="link" disabled={retry.isPending} onClick={() => retry.mutate(j.id)}>
-            {t("web.jobs.retry")}
-          </button>
+          {(j.retries ?? 0) > 0 && j.retried_by ? (
+            <p>
+              <span className="chip chip-stale">{t("web.jobs.retried")}</span> <JobId id={j.retried_by} />
+            </p>
+          ) : (
+            <button className="link" disabled={retry.isPending} onClick={() => retry.mutate(j.id)}>
+              {t("web.jobs.retry")}
+            </button>
+          )}
         </div>
       ))}
       {done.length === 0 && running.length === 0 ? <p className="empty">{t("web.delivery.none")}</p> : null}

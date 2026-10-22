@@ -223,6 +223,23 @@ def test_retry_links_parent_and_can_reseed(led: Ledger) -> None:
     assert reseeded.seed != rec.seed and reseeded.parent_job_id == same.id
 
 
+def test_a_retried_job_says_so_and_cannot_be_retried_twice_while_the_retry_waits(led: Ledger) -> None:
+    rec, _ = led.enqueue(job())
+    led.claim(rec.id, "w", 10)
+    led.fail(rec.id, ErrorCode.SERVICE_UNREACHABLE, "down", service="comfy")
+    assert led.get_job(rec.id).retried_by is None and led.get_job(rec.id).retries == 0
+    first = led.retry(rec.id)
+    shown = led.get_job(rec.id)
+    assert (shown.retried_by, shown.retried_status, shown.retries) == (first.id, "queued", 1)
+    assert [j.retried_by for j in led.list_jobs() if j.id == rec.id] == [first.id]
+    with pytest.raises(LedgerError, match="already retried"):
+        led.retry(rec.id)                                    # the second click on the same job
+    led.claim(first.id, "w", 10)
+    led.fail(first.id, ErrorCode.SERVICE_UNREACHABLE, "down", service="comfy")
+    again = led.retry(rec.id)                                # the retry failed too: another one is allowed
+    assert led.get_job(rec.id).retries == 2 and led.get_job(rec.id).retried_by == again.id
+
+
 def test_failure_event_carries_params_for_i18n(led: Ledger) -> None:
     rec, _ = led.enqueue(job())
     led.claim(rec.id, "w", 10)

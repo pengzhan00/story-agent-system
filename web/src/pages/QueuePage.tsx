@@ -4,6 +4,7 @@ import { formatValue, useLabel } from "../lib/labels";
 import { useJobActions, useJobEvents, useJobs, useQueueState } from "../api/hooks";
 import type { Job } from "../api/types";
 import { ErrorNote } from "../components/ErrorNote";
+import { JobId } from "../components/JobId";
 import { ProgressBar } from "../components/ProgressBar";
 import { StatusChip } from "../components/StatusChip";
 import { duration } from "../lib/format";
@@ -59,10 +60,19 @@ function JobRow({ job }: { job: Job }) {
   const t = useT();
   const { cancel, retry } = useJobActions();
   const active = ACTIVE.has(job.status);
+  const retries = job.retries ?? 0;
   const tone = job.status === "completed" ? "completed" : job.status === "running" ? "running" : job.status === "queued" ? "queued" : "failed";
   return (
     <Fragment>
     <tr>
+      <td>
+        <JobId id={job.id} />
+        {job.parent_job_id ? (
+          <div className="muted small">
+            {t("web.jobs.retry_of")} <JobId id={job.parent_job_id} />
+          </div>
+        ) : null}
+      </td>
       <td className="strong">{t(`media.kind.${job.kind}`)}</td>
       <td>{job.model_ref}</td>
       <td className="progress-cell">
@@ -72,6 +82,12 @@ function JobRow({ job }: { job: Job }) {
       <td>
         <StatusChip status={job.status} group="status" />
         {job.error_code ? <div className="muted small">{jobError(t, job).text}</div> : null}
+        {retries > 0 && job.retried_by ? (
+          <div className="small">
+            <span className="chip chip-stale">{retries > 1 ? t("web.jobs.retried_n", { n: retries }) : t("web.jobs.retried")}</span>{" "}
+            <JobId id={job.retried_by} /> {job.retried_status ? <StatusChip status={job.retried_status} group="status" /> : null}
+          </div>
+        ) : null}
       </td>
       <td className="muted small">{job.actual_seconds != null ? duration(job.actual_seconds) : ""}</td>
       <td className="actions">
@@ -82,7 +98,7 @@ function JobRow({ job }: { job: Job }) {
           <button className="link" disabled={cancel.isPending} onClick={() => cancel.mutate(job.id)}>
             {t("web.jobs.cancel")}
           </button>
-        ) : job.status !== "completed" ? (
+        ) : job.status !== "completed" && retries === 0 ? (
           <button className="link" disabled={retry.isPending} onClick={() => retry.mutate(job.id)}>
             {t("web.jobs.retry")}
           </button>
@@ -91,7 +107,7 @@ function JobRow({ job }: { job: Job }) {
     </tr>
     {open ? (
       <tr className="edit-row">
-        <td colSpan={6}>
+        <td colSpan={7}>
           <JobDetail job={job} />
         </td>
       </tr>
@@ -123,6 +139,7 @@ export function JobsPanel({ projectId }: { projectId?: number }) {
           <table>
             <thead>
               <tr>
+                <th>{t("web.jobs.id")}</th>
                 <th>{t("web.jobs.kind")}</th>
                 <th>{t("web.jobs.model")}</th>
                 <th>{t("web.jobs.progress")}</th>

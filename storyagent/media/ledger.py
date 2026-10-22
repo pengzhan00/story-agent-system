@@ -11,7 +11,7 @@ import random
 import statistics
 import time
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from typing import Any
 
@@ -185,7 +185,23 @@ class Ledger:
         row = self.db.conn.execute("SELECT * FROM media_jobs WHERE id=?", (job_id,)).fetchone()
         if row is None:
             raise LedgerError(f"unknown job {job_id}")
-        return JobRecord.from_row(row)
+        return self._with_retries([JobRecord.from_row(row)])[0]
+
+    def _with_retries(self, records: list[JobRecord]) -> list[JobRecord]:
+        """Mark the jobs that were retried: the newest retry (id, status) and how many there are."""
+        if not records:
+            return records
+        marks = ",".join("?" * len(records))
+        rows = self.db.conn.execute(
+            f"SELECT parent_job_id, id, status FROM media_jobs WHERE parent_job_id IN ({marks}) "
+            "ORDER BY created_at, rowid", [r.id for r in records]).fetchall()
+        newest: dict[str, tuple[str, str]] = {}
+        count: dict[str, int] = {}
+        for row in rows:
+            newest[row["parent_job_id"]] = (row["id"], row["status"])
+            count[row["parent_job_id"]] = count.get(row["parent_job_id"], 0) + 1
+        return [replace(r, retried_by=newest[r.id][0], retried_status=newest[r.id][1], retries=count[r.id])
+                if r.id in newest else r for r in records]
 
     def list_jobs(
         self,
@@ -225,7 +241,7 @@ class Ledger:
             f"SELECT * FROM media_jobs WHERE {' AND '.join(where)} ORDER BY created_at DESC, rowid DESC LIMIT ?",
             (*args, limit),
         ).fetchall()
-        return [JobRecord.from_row(r) for r in rows]
+        return self._with_retries([JobRecord.from_row(r) for r in rows])
 
     def queued(self, limit: int = 50) -> list[JobRecord]:
         rows = self.db.conn.execute(
@@ -450,6 +466,8 @@ class Ledger:
             old = self.get_job(job_id)
             if not old.status.is_terminal:
                 raise LedgerError(f"job {job_id} is still {old.status.value}")
+            if old.retried_status in ("queued", "running"):
+                raise LedgerError(f"job {job_id} was already retried: {old.retried_by} is {old.retried_status}")
             jid = new_id()
             seed = self._rng.randrange(2**31) if new_seed else old.seed
             conn.execute(

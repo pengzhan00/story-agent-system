@@ -97,6 +97,9 @@ class JobRecord:
     pipeline_id: str | None = None
     pipeline_step: int | None = None
     error_params: dict[str, Any] = field(default_factory=dict)  # fills the {placeholders} of error.<error_code>
+    retried_by: str | None = None       # the newest job made by retrying this one (filled in by the ledger's readers)
+    retried_status: str | None = None   # and its status
+    retries: int = 0                    # how many retries were made of this job
 
     @classmethod
     def from_row(cls, r: sqlite3.Row) -> JobRecord:

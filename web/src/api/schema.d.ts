@@ -3098,6 +3098,15 @@ export interface components {
             project_id: number | null;
             /** Provider */
             provider: string;
+            /** Retried By */
+            retried_by?: string | null;
+            /** Retried Status */
+            retried_status?: string | null;
+            /**
+             * Retries
+             * @default 0
+             */
+            retries: number;
             /** Seed */
             seed: number | null;
             /** Shot Id */

@@ -1788,6 +1788,33 @@
             "title": "Provider",
             "type": "string"
           },
+          "retried_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retried By"
+          },
+          "retried_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retried Status"
+          },
+          "retries": {
+            "default": 0,
+            "title": "Retries",
+            "type": "integer"
+          },
           "seed": {
             "anyOf": [
               {

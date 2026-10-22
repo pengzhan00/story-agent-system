@@ -6,6 +6,7 @@ import { duration } from "../lib/format";
 import { useT } from "../i18n";
 import { jobError } from "../lib/jobError";
 import { ErrorNote } from "./ErrorNote";
+import { JobId } from "./JobId";
 import { MediaLightbox } from "./MediaLightbox";
 import { ProgressBar } from "./ProgressBar";
 import { PromptAssist } from "./PromptAssist";
@@ -142,7 +143,7 @@ export function Candidates({ spec, assets, jobs, onAdopt, adopting }: Props) {
       ))}
       {failed.map((j) => (
         <div key={j.id} className="error-box small">
-          {j.error_code ? jobError(t, j).text : t("web.error.generic")}
+          <JobId id={j.id} /> {j.error_code ? jobError(t, j).text : t("web.error.generic")}
           {j.error_code ? <p>{jobError(t, j).remediation}</p> : null}
         </div>
       ))}
