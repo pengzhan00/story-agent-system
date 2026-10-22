@@ -7,6 +7,7 @@ import { ProducePlan } from "../components/ProducePlan";
 import { SeasonCard } from "../components/SeasonCard";
 import { EpisodePlayer } from "../components/EpisodePlayer";
 import { RunError, RunProgress } from "../components/RunProgress";
+import { ProjectPlan } from "../components/ProjectPlan";
 import { StatusChip } from "../components/StatusChip";
 import { duration } from "../lib/format";
 import { useT } from "../i18n";
@@ -224,6 +225,8 @@ export function WorkflowPanel({ id }: { id: number }) {
         {dirty ? <p className="hint">{t("web.workflow.save_first")}</p> : null}
         <ErrorNote error={start.error ?? cancel.error ?? update.error ?? wf.error} />
       </section>
+
+      <ProjectPlan id={id} />
 
       <Spec id={id} />
 

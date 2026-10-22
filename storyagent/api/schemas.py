@@ -644,6 +644,8 @@ class ProjectFromText(BaseModel):
     genre: str = ""
     content_language: str = ""
     delivery_profile: str = Field(default="", description="the picture frame (vertical / landscape ...), decided now")
+    kind: str = Field(default="", description="kind of work (drama_series, advert ...)")
+    pipeline: str = Field(default="", description="the pipeline plan: one complete set of models")
     start: bool = Field(default=True, description="queue the story stages (no media) right away")
 
 

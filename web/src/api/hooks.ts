@@ -1,6 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, del, patch, post, put } from "./client";
-import type { Agent, AgentEdit, AiCallDetail, AiCallRow, FlowStep, Health, Launch, ProjectCard, ProducePlan, SeriesBoard, ProjectFromText, ScriptReview, Job, Meta, Project, QueueState, Row, WorkflowOverview, WorkflowRun } from "./types";
+import type { Agent, AgentEdit, AiCallDetail, AiCallRow, BriefAnswers, Estimate, FlowStep, Health, Launch, ProjectCard, ProducePlan, SeriesBoard, ProjectFromText, ScriptReview, Job, Meta, Project, QueueState, Row, WorkflowOverview, WorkflowRun } from "./types";
 import { useI18n } from "../i18n";
 
 /** Polling is the fallback; the SSE feed (``events.ts``) pushes the same data much sooner. */
@@ -24,9 +24,32 @@ export const useProject = (id: number) =>
 export function useCreateProject() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { name: string; description: string; content_language: string; delivery_profile?: string }) =>
+    mutationFn: (body: { name: string; description: string; content_language: string; delivery_profile?: string; kind?: string; pipeline?: string; brief?: BriefAnswers }) =>
       post<Project>("/api/projects", body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["projects"] }),
+  });
+}
+
+/** How big the planned work is (tasks, machine time) before the project exists; refreshed as the answers change. */
+export const useEstimate = (body: { kind: string; pipeline: string; brief: BriefAnswers }, enabled = true) =>
+  useQuery({
+    queryKey: ["estimate", body],
+    queryFn: () => post<Estimate>("/api/projects/estimate", body),
+    enabled,
+    placeholderData: keepPreviousData,
+    retry: false,
+  });
+
+/** Change the plan made up front: more seasons/episodes or another episode length. */
+export function useProjectBrief(id: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: BriefAnswers) => patch<Project>(`/api/projects/${id}/brief`, body),
+    onSuccess: (p) => {
+      qc.setQueryData(["project", id], p);
+      void qc.invalidateQueries({ queryKey: ["series", id] });
+      void qc.invalidateQueries({ queryKey: ["seasons", id] });
+    },
   });
 }
 
@@ -52,7 +75,7 @@ export function useProjectSettings(id: number) {
 export function useUpdateProject(id: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: Partial<Pick<Project, "name" | "description" | "genre" | "delivery_profile">>) =>
+    mutationFn: (body: Partial<Pick<Project, "name" | "description" | "genre" | "delivery_profile" | "kind" | "pipeline">>) =>
       patch<Project>(`/api/projects/${id}`, body),
     onSuccess: (p) => qc.setQueryData(["project", id], p),
   });
@@ -216,7 +239,7 @@ export const useProducePlan = (id: number, tier: string, enabled: boolean) =>
 export function useProjectFromText() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { name: string; asset_id: string; delivery_profile?: string }) => post<ProjectFromText>("/api/projects/from-text", body),
+    mutationFn: (body: { name: string; asset_id: string; delivery_profile?: string; pipeline?: string }) => post<ProjectFromText>("/api/projects/from-text", body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["projects"] }),
   });
 }

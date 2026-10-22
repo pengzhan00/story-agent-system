@@ -504,6 +504,65 @@
         "title": "AssetOut",
         "type": "object"
       },
+      "BriefAnswers": {
+        "description": "The plan made up front. Anything left out takes the default of the kind of work.",
+        "properties": {
+          "audience": {
+            "default": "",
+            "title": "Audience",
+            "type": "string"
+          },
+          "episode_sec": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "target length of one episode in seconds",
+            "title": "Episode Sec"
+          },
+          "episodes_per_season": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Episodes Per Season"
+          },
+          "logline": {
+            "default": "",
+            "title": "Logline",
+            "type": "string"
+          },
+          "platform": {
+            "default": "",
+            "title": "Platform",
+            "type": "string"
+          },
+          "seasons": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seasons"
+          }
+        },
+        "title": "BriefAnswers",
+        "type": "object"
+      },
       "CancelResult": {
         "properties": {
           "status": {
@@ -569,6 +628,139 @@
           "max_episode_sec"
         ],
         "title": "DeliveryProfileOut",
+        "type": "object"
+      },
+      "EstimateOut": {
+        "properties": {
+          "brief": {
+            "additionalProperties": true,
+            "title": "Brief",
+            "type": "object"
+          },
+          "episodes": {
+            "title": "Episodes",
+            "type": "integer"
+          },
+          "hours": {
+            "title": "Hours",
+            "type": "number"
+          },
+          "over_budget": {
+            "title": "Over Budget",
+            "type": "boolean"
+          },
+          "pipeline": {
+            "title": "Pipeline",
+            "type": "string"
+          },
+          "shots": {
+            "title": "Shots",
+            "type": "integer"
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/EstimateTaskOut"
+            },
+            "title": "Tasks",
+            "type": "array"
+          },
+          "tier": {
+            "title": "Tier",
+            "type": "string"
+          },
+          "total_sec": {
+            "title": "Total Sec",
+            "type": "integer"
+          },
+          "video_budget_hours": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Video Budget Hours"
+          }
+        },
+        "required": [
+          "brief",
+          "pipeline",
+          "tier",
+          "episodes",
+          "shots",
+          "tasks",
+          "total_sec",
+          "hours",
+          "video_budget_hours",
+          "over_budget"
+        ],
+        "title": "EstimateOut",
+        "type": "object"
+      },
+      "EstimateRequest": {
+        "properties": {
+          "brief": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BriefAnswers"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "pipeline": {
+            "default": "",
+            "title": "Pipeline",
+            "type": "string"
+          }
+        },
+        "title": "EstimateRequest",
+        "type": "object"
+      },
+      "EstimateTaskOut": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "each_sec": {
+            "title": "Each Sec",
+            "type": "integer"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "known": {
+            "title": "Known",
+            "type": "boolean"
+          },
+          "model_ref": {
+            "title": "Model Ref",
+            "type": "string"
+          },
+          "total_sec": {
+            "title": "Total Sec",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "kind",
+          "model_ref",
+          "count",
+          "each_sec",
+          "known",
+          "total_sec"
+        ],
+        "title": "EstimateTaskOut",
         "type": "object"
       },
       "FlowOut": {
@@ -1504,6 +1696,14 @@
             "title": "Compliance Enabled",
             "type": "boolean"
           },
+          "default_pipeline": {
+            "title": "Default Pipeline",
+            "type": "string"
+          },
+          "default_work_kind": {
+            "title": "Default Work Kind",
+            "type": "string"
+          },
           "defaults": {
             "additionalProperties": {
               "type": "string"
@@ -1551,6 +1751,13 @@
             "title": "Models",
             "type": "array"
           },
+          "pipelines": {
+            "items": {
+              "$ref": "#/components/schemas/PlanOut"
+            },
+            "title": "Pipelines",
+            "type": "array"
+          },
           "queue": {
             "$ref": "#/components/schemas/QueueState"
           },
@@ -1586,6 +1793,13 @@
             "title": "Version",
             "type": "string"
           },
+          "work_kinds": {
+            "items": {
+              "$ref": "#/components/schemas/WorkKindOut"
+            },
+            "title": "Work Kinds",
+            "type": "array"
+          },
           "workflow_stages": {
             "items": {
               "$ref": "#/components/schemas/LabeledValue"
@@ -1614,6 +1828,10 @@
           "models",
           "defaults",
           "recipes",
+          "work_kinds",
+          "default_work_kind",
+          "pipelines",
+          "default_pipeline",
           "delivery_profiles",
           "delivery_default",
           "compliance_enabled",
@@ -1821,6 +2039,65 @@
           "kind"
         ],
         "title": "PipelineStep",
+        "type": "object"
+      },
+      "PlanOut": {
+        "properties": {
+          "delivery_profile": {
+            "title": "Delivery Profile",
+            "type": "string"
+          },
+          "height": {
+            "title": "Height",
+            "type": "integer"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "models": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Models",
+            "type": "object"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "requires": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Requires",
+            "type": "array"
+          },
+          "tier": {
+            "title": "Tier",
+            "type": "string"
+          },
+          "width": {
+            "title": "Width",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "label",
+          "note",
+          "delivery_profile",
+          "width",
+          "height",
+          "tier",
+          "models",
+          "requires"
+        ],
+        "title": "PlanOut",
         "type": "object"
       },
       "PlanTotals": {
@@ -2060,6 +2337,16 @@
       },
       "ProjectCreate": {
         "properties": {
+          "brief": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BriefAnswers"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "content_language": {
             "default": "",
             "title": "Content Language",
@@ -2081,10 +2368,22 @@
             "title": "Genre",
             "type": "string"
           },
+          "kind": {
+            "default": "",
+            "description": "kind of work (drama_series, advert ...): recommends the pipeline plan",
+            "title": "Kind",
+            "type": "string"
+          },
           "name": {
             "maxLength": 200,
             "minLength": 1,
             "title": "Name",
+            "type": "string"
+          },
+          "pipeline": {
+            "default": "",
+            "description": "the pipeline plan: one complete set of models; default = the kind's",
+            "title": "Pipeline",
             "type": "string"
           }
         },
@@ -2124,10 +2423,22 @@
             "title": "Genre",
             "type": "string"
           },
+          "kind": {
+            "default": "",
+            "description": "kind of work (drama_series, advert ...)",
+            "title": "Kind",
+            "type": "string"
+          },
           "name": {
             "maxLength": 200,
             "minLength": 1,
             "title": "Name",
+            "type": "string"
+          },
+          "pipeline": {
+            "default": "",
+            "description": "the pipeline plan: one complete set of models",
+            "title": "Pipeline",
             "type": "string"
           },
           "start": {
@@ -2177,6 +2488,11 @@
             "title": "Aspect Ratio",
             "type": "string"
           },
+          "brief": {
+            "additionalProperties": true,
+            "title": "Brief",
+            "type": "object"
+          },
           "content_language": {
             "title": "Content Language",
             "type": "string"
@@ -2201,8 +2517,16 @@
             "title": "Id",
             "type": "integer"
           },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
           "name": {
             "title": "Name",
+            "type": "string"
+          },
+          "pipeline": {
+            "title": "Pipeline",
             "type": "string"
           },
           "settings": {
@@ -2234,6 +2558,9 @@
           "aspect_ratio",
           "status",
           "settings",
+          "kind",
+          "pipeline",
+          "brief",
           "created_at",
           "updated_at"
         ],
@@ -2297,6 +2624,17 @@
             ],
             "title": "Genre"
           },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
           "name": {
             "anyOf": [
               {
@@ -2309,6 +2647,18 @@
               }
             ],
             "title": "Name"
+          },
+          "pipeline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "change the plan: the whole set of models changes with it",
+            "title": "Pipeline"
           }
         },
         "title": "ProjectPatch",
@@ -2471,6 +2821,29 @@
           "waiting"
         ],
         "title": "QueueState",
+        "type": "object"
+      },
+      "RangeOut": {
+        "properties": {
+          "default": {
+            "title": "Default",
+            "type": "number"
+          },
+          "max": {
+            "title": "Max",
+            "type": "number"
+          },
+          "min": {
+            "title": "Min",
+            "type": "number"
+          }
+        },
+        "required": [
+          "min",
+          "default",
+          "max"
+        ],
+        "title": "RangeOut",
         "type": "object"
       },
       "Ready": {
@@ -3581,6 +3954,55 @@
         "title": "VideoSummary",
         "type": "object"
       },
+      "WorkKindOut": {
+        "properties": {
+          "ask": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Ask",
+            "type": "array"
+          },
+          "episode_sec": {
+            "$ref": "#/components/schemas/RangeOut"
+          },
+          "episodes": {
+            "$ref": "#/components/schemas/RangeOut"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "pipeline": {
+            "title": "Pipeline",
+            "type": "string"
+          },
+          "seasons": {
+            "title": "Seasons",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "label",
+          "note",
+          "pipeline",
+          "seasons",
+          "episodes",
+          "episode_sec",
+          "ask"
+        ],
+        "title": "WorkKindOut",
+        "type": "object"
+      },
       "WorkflowOut": {
         "properties": {
           "active_run": {
@@ -3981,6 +4403,11 @@
             "title": "Heavy",
             "type": "boolean"
           },
+          "in_plan": {
+            "description": "false = outside the chosen pipeline plan: a trial only, not for a project",
+            "title": "In Plan",
+            "type": "boolean"
+          },
           "license_tag": {
             "title": "License Tag",
             "type": "string"
@@ -4011,7 +4438,8 @@
           "license_tag",
           "commercial_ok",
           "available",
-          "note"
+          "note",
+          "in_plan"
         ],
         "title": "WorkshopModel",
         "type": "object"
@@ -4690,8 +5118,36 @@
     },
     "/api/health": {
       "get": {
-        "description": "Same report as `storyagent media healthcheck` (probes services, tools, models, disk).",
+        "description": "Same report as `storyagent media healthcheck` (probes services, tools, models, disk). With ``pipeline`` (or\nthe ``project`` whose plan it is) what that plan needs is the required part: the exit code says if *it* can run.",
         "operationId": "pipeline_health_api_health_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "pipeline",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Pipeline",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -4702,6 +5158,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "summary": "Pipeline Health",
@@ -5691,6 +6157,7 @@
         ]
       },
       "post": {
+        "description": "A project with its plan: the kind of work, the pipeline plan (one complete set of models, picture frame) and the\nbrief (seasons, episodes, episode length) are decided here, once.",
         "operationId": "create_project_api_projects_post",
         "requestBody": {
           "content": {
@@ -5725,6 +6192,48 @@
           }
         },
         "summary": "Create Project",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/api/projects/estimate": {
+      "post": {
+        "description": "How big the planned work is (tasks, machine time) before anything is created - for the creation wizard.",
+        "operationId": "estimate_project_api_projects_estimate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EstimateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstimateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Estimate Project",
         "tags": [
           "projects"
         ]
@@ -6040,6 +6549,59 @@
         "summary": "List Calls",
         "tags": [
           "transparency"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/brief": {
+      "patch": {
+        "description": "Change the plan made up front: more seasons/episodes, another episode length (seasons are only added to).",
+        "operationId": "patch_project_brief_api_projects__project_id__brief_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BriefAnswers"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Patch Project Brief",
+        "tags": [
+          "projects"
         ]
       }
     },
@@ -7183,7 +7745,7 @@
             "name": "tier",
             "required": false,
             "schema": {
-              "default": "draft",
+              "default": "",
               "title": "Tier",
               "type": "string"
             }
@@ -9600,8 +10162,20 @@
     },
     "/api/workshop": {
       "get": {
-        "description": "Every module with its kinds: the model it starts from (and the alternatives), the effective parameters, the\nparameters the adapter understands, and the inputs it takes.",
+        "description": "Every module with its kinds: the model it starts from (and the alternatives), the effective parameters, the\nparameters the adapter understands, and the inputs it takes. With ``pipeline`` it starts from that plan's models;\nmodels outside the plan say ``in_plan: false`` (a trial only, not for a project).",
         "operationId": "modules_api_workshop_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "pipeline",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Pipeline",
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -9616,6 +10190,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "summary": "Modules",

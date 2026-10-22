@@ -205,7 +205,8 @@ export interface paths {
         };
         /**
          * Pipeline Health
-         * @description Same report as `storyagent media healthcheck` (probes services, tools, models, disk).
+         * @description Same report as `storyagent media healthcheck` (probes services, tools, models, disk). With ``pipeline`` (or
+         *     the ``project`` whose plan it is) what that plan needs is the required part: the exit code says if *it* can run.
          */
         get: operations["pipeline_health_api_health_get"];
         put?: never;
@@ -513,8 +514,32 @@ export interface paths {
          */
         get: operations["list_projects_api_projects_get"];
         put?: never;
-        /** Create Project */
+        /**
+         * Create Project
+         * @description A project with its plan: the kind of work, the pipeline plan (one complete set of models, picture frame) and the
+         *     brief (seasons, episodes, episode length) are decided here, once.
+         */
         post: operations["create_project_api_projects_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/estimate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Estimate Project
+         * @description How big the planned work is (tasks, machine time) before anything is created - for the creation wizard.
+         */
+        post: operations["estimate_project_api_projects_estimate_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -600,6 +625,26 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/brief": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Patch Project Brief
+         * @description Change the plan made up front: more seasons/episodes, another episode length (seasons are only added to).
+         */
+        patch: operations["patch_project_brief_api_projects__project_id__brief_patch"];
         trace?: never;
     };
     "/api/projects/{project_id}/characters": {
@@ -1451,7 +1496,8 @@ export interface paths {
         /**
          * Modules
          * @description Every module with its kinds: the model it starts from (and the alternatives), the effective parameters, the
-         *     parameters the adapter understands, and the inputs it takes.
+         *     parameters the adapter understands, and the inputs it takes. With ``pipeline`` it starts from that plan's models;
+         *     models outside the plan say ``in_plan: false`` (a trial only, not for a project).
          */
         get: operations["modules_api_workshop_get"];
         put?: never;
@@ -1737,6 +1783,36 @@ export interface components {
             /** Width */
             width: number | null;
         };
+        /**
+         * BriefAnswers
+         * @description The plan made up front. Anything left out takes the default of the kind of work.
+         */
+        BriefAnswers: {
+            /**
+             * Audience
+             * @default
+             */
+            audience: string;
+            /**
+             * Episode Sec
+             * @description target length of one episode in seconds
+             */
+            episode_sec?: number | null;
+            /** Episodes Per Season */
+            episodes_per_season?: number | null;
+            /**
+             * Logline
+             * @default
+             */
+            logline: string;
+            /**
+             * Platform
+             * @default
+             */
+            platform: string;
+            /** Seasons */
+            seasons?: number | null;
+        };
         /** CancelResult */
         CancelResult: {
             status: components["schemas"]["JobStatus"];
@@ -1759,6 +1835,60 @@ export interface components {
             target_sec: number | null;
             /** Width */
             width: number;
+        };
+        /** EstimateOut */
+        EstimateOut: {
+            /** Brief */
+            brief: {
+                [key: string]: unknown;
+            };
+            /** Episodes */
+            episodes: number;
+            /** Hours */
+            hours: number;
+            /** Over Budget */
+            over_budget: boolean;
+            /** Pipeline */
+            pipeline: string;
+            /** Shots */
+            shots: number;
+            /** Tasks */
+            tasks: components["schemas"]["EstimateTaskOut"][];
+            /** Tier */
+            tier: string;
+            /** Total Sec */
+            total_sec: number;
+            /** Video Budget Hours */
+            video_budget_hours: number | null;
+        };
+        /** EstimateRequest */
+        EstimateRequest: {
+            brief?: components["schemas"]["BriefAnswers"] | null;
+            /**
+             * Kind
+             * @default
+             */
+            kind: string;
+            /**
+             * Pipeline
+             * @default
+             */
+            pipeline: string;
+        };
+        /** EstimateTaskOut */
+        EstimateTaskOut: {
+            /** Count */
+            count: number;
+            /** Each Sec */
+            each_sec: number;
+            /** Kind */
+            kind: string;
+            /** Known */
+            known: boolean;
+            /** Model Ref */
+            model_ref: string;
+            /** Total Sec */
+            total_sec: number;
         };
         /** FlowOut */
         FlowOut: {
@@ -2091,6 +2221,10 @@ export interface components {
         Meta: {
             /** Compliance Enabled */
             compliance_enabled: boolean;
+            /** Default Pipeline */
+            default_pipeline: string;
+            /** Default Work Kind */
+            default_work_kind: string;
             /** Defaults */
             defaults: {
                 [key: string]: string;
@@ -2109,6 +2243,8 @@ export interface components {
             locales: string[];
             /** Models */
             models: components["schemas"]["ModelOut"][];
+            /** Pipelines */
+            pipelines: components["schemas"]["PlanOut"][];
             queue: components["schemas"]["QueueState"];
             /** Recipes */
             recipes: components["schemas"]["RecipeOut"][];
@@ -2120,6 +2256,8 @@ export interface components {
             tiers: components["schemas"]["LabeledValue"][];
             /** Version */
             version: string;
+            /** Work Kinds */
+            work_kinds: components["schemas"]["WorkKindOut"][];
             /** Workflow Stages */
             workflow_stages: components["schemas"]["LabeledValue"][];
             /** Workflow Statuses */
@@ -2218,6 +2356,29 @@ export interface components {
              * @default
              */
             tier: string;
+        };
+        /** PlanOut */
+        PlanOut: {
+            /** Delivery Profile */
+            delivery_profile: string;
+            /** Height */
+            height: number;
+            /** Label */
+            label: string;
+            /** Models */
+            models: {
+                [key: string]: string;
+            };
+            /** Name */
+            name: string;
+            /** Note */
+            note: string;
+            /** Requires */
+            requires: string[];
+            /** Tier */
+            tier: string;
+            /** Width */
+            width: number;
         };
         /** PlanTotals */
         PlanTotals: {
@@ -2322,6 +2483,7 @@ export interface components {
         };
         /** ProjectCreate */
         ProjectCreate: {
+            brief?: components["schemas"]["BriefAnswers"] | null;
             /**
              * Content Language
              * @default
@@ -2343,8 +2505,20 @@ export interface components {
              * @default
              */
             genre: string;
+            /**
+             * Kind
+             * @description kind of work (drama_series, advert ...): recommends the pipeline plan
+             * @default
+             */
+            kind: string;
             /** Name */
             name: string;
+            /**
+             * Pipeline
+             * @description the pipeline plan: one complete set of models; default = the kind's
+             * @default
+             */
+            pipeline: string;
         };
         /** ProjectFromText */
         ProjectFromText: {
@@ -2369,8 +2543,20 @@ export interface components {
              * @default
              */
             genre: string;
+            /**
+             * Kind
+             * @description kind of work (drama_series, advert ...)
+             * @default
+             */
+            kind: string;
             /** Name */
             name: string;
+            /**
+             * Pipeline
+             * @description the pipeline plan: one complete set of models
+             * @default
+             */
+            pipeline: string;
             /**
              * Start
              * @description queue the story stages (no media) right away
@@ -2392,6 +2578,10 @@ export interface components {
         ProjectOut: {
             /** Aspect Ratio */
             aspect_ratio: string;
+            /** Brief */
+            brief: {
+                [key: string]: unknown;
+            };
             /** Content Language */
             content_language: string;
             /** Created At */
@@ -2404,8 +2594,12 @@ export interface components {
             genre: string;
             /** Id */
             id: number;
+            /** Kind */
+            kind: string;
             /** Name */
             name: string;
+            /** Pipeline */
+            pipeline: string;
             /** Settings */
             settings: {
                 [key: string]: unknown;
@@ -2429,8 +2623,15 @@ export interface components {
             description?: string | null;
             /** Genre */
             genre?: string | null;
+            /** Kind */
+            kind?: string | null;
             /** Name */
             name?: string | null;
+            /**
+             * Pipeline
+             * @description change the plan: the whole set of models changes with it
+             */
+            pipeline?: string | null;
         };
         /**
          * ProjectSettingsPatch
@@ -2506,6 +2707,15 @@ export interface components {
             waiting: {
                 [key: string]: number;
             };
+        };
+        /** RangeOut */
+        RangeOut: {
+            /** Default */
+            default: number;
+            /** Max */
+            max: number;
+            /** Min */
+            min: number;
         };
         /** Ready */
         Ready: {
@@ -3004,6 +3214,23 @@ export interface components {
              */
             shots: number;
         };
+        /** WorkKindOut */
+        WorkKindOut: {
+            /** Ask */
+            ask: string[];
+            episode_sec: components["schemas"]["RangeOut"];
+            episodes: components["schemas"]["RangeOut"];
+            /** Label */
+            label: string;
+            /** Name */
+            name: string;
+            /** Note */
+            note: string;
+            /** Pipeline */
+            pipeline: string;
+            /** Seasons */
+            seasons: boolean;
+        };
         /** WorkflowOut */
         WorkflowOut: {
             active_run: components["schemas"]["WorkflowRunOut"] | null;
@@ -3148,6 +3375,11 @@ export interface components {
             est_memory_gib: number;
             /** Heavy */
             heavy: boolean;
+            /**
+             * In Plan
+             * @description false = outside the chosen pipeline plan: a trial only, not for a project
+             */
+            in_plan: boolean;
             /** License Tag */
             license_tag: string;
             /** Note */
@@ -3522,7 +3754,10 @@ export interface operations {
     };
     pipeline_health_api_health_get: {
         parameters: {
-            query?: never;
+            query?: {
+                pipeline?: string;
+                project?: number | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -3536,6 +3771,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -4175,6 +4419,39 @@ export interface operations {
             };
         };
     };
+    estimate_project_api_projects_estimate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EstimateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstimateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     create_project_from_text_api_projects_from_text_post: {
         parameters: {
             query?: never;
@@ -4358,6 +4635,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AiCallRow"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_project_brief_api_projects__project_id__brief_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BriefAnswers"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectOut"];
                 };
             };
             /** @description Validation Error */
@@ -6534,7 +6846,9 @@ export interface operations {
     };
     modules_api_workshop_get: {
         parameters: {
-            query?: never;
+            query?: {
+                pipeline?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -6548,6 +6862,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkshopModuleOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
