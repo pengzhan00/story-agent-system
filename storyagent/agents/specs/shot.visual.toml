@@ -13,6 +13,13 @@ Location: $scene
 Visual style: $style
 Previous shot: $previous
 
-`image_prompt`: the opening frame as a still (subject, pose, setting, light, framing).
-`video_prompt`: the same moment with the motion of the shot (what moves, camera movement), one paragraph.
+`image_prompt`: the opening frame as a still (subject, pose and which way they face, setting, light, framing).
+`video_prompt`: the same moment with the motion of the shot, one paragraph. It must START from exactly the pose,
+position and facing direction written in `image_prompt` and describe ONE continuous action that fits in five
+seconds: which body parts move, at what pace (for walking: a steady pace, one foot after the other, each foot
+planted on the ground, weight shifting), and the camera (locked-off unless the shot asks for a move; then one slow
+move). Never make the subject turn around, change facing or cross a large distance unless `image_prompt` already
+shows it; a person already facing the camera stays facing the camera while they breathe, look, speak or take a
+step. Keep the exposure readable: name the light sources that let the subject be seen, and avoid fog, mist, haze
+and smoke.
 `negative_prompt`: short list of things to avoid."""

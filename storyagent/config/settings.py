@@ -249,7 +249,8 @@ class Settings:
         try:
             return self.pipelines[name]
         except KeyError:
-            raise ConfigError(f"unknown pipeline: {name!r}") from None
+            raise ConfigError(
+                f"unknown pipeline: {name!r} (define it in pipelines.toml, or pick another plan)") from None
 
     def kind(self, name: str = "") -> WorkKind:
         name = name or self.default_kind

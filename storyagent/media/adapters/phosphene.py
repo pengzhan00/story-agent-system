@@ -86,6 +86,17 @@ def _role(ref: Any) -> tuple[str, str] | None:
     return None
 
 
+def _negatives(*parts: Any) -> str:
+    """The project's own avoid-list (from the style) plus the model's (motion artefacts ...), each term once: the
+    creator's list never replaces the model's, otherwise a style list written for pictures drops the video terms."""
+    seen: dict[str, None] = {}
+    for part in parts:
+        for term in str(part or "").split(","):
+            if term.strip():
+                seen.setdefault(term.strip(), None)
+    return ", ".join(seen)
+
+
 class PhospheneAdapter(AdapterBase):
     provider = "phosphene"
 
@@ -164,7 +175,7 @@ class PhospheneAdapter(AdapterBase):
         form: dict[str, Any] = {k: job.params[k] for k in _FORM if k in job.params}
         form.update(
             mode=self.mode_for(job), prompt=str(job.inputs.get("prompt", "")),
-            negative_prompt=str(job.inputs.get("negative_prompt") or job.params.get("negative_prompt", "")),
+            negative_prompt=_negatives(job.inputs.get("negative_prompt"), job.params.get("negative_prompt")),
             seed=job.seed if job.seed is not None else -1, label=f"storyagent-{job.id[:8]}",
         )
         for role, path in self._files(job, ctx).items():
