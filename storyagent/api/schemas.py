@@ -1137,14 +1137,18 @@ class DeliveryBody(Strict):
     confirm_restricted: bool = False
 
 
+class DeliveryJobOut(Strict):
+    job_id: str
+    created: bool
+
+
 class DeliveryOut(Strict):
-    name: str
-    bytes: int
+    asset: AssetOut
     platform: str
+    episode: int
     warnings: list[str]
     subtitles: list[str]
     result: dict[str, Any]
-    files: list[dict[str, Any]]
 
 
 # -- content ratings ---------------------------------------------------------------------------------

@@ -41,6 +41,7 @@ _CUE = re.compile(r"(\d+):(\d{2}):(\d{2})[,.](\d{3})")
 TRANSLATE_CHUNK = 40
 
 Translate = Callable[[Sequence[str], str], list[str]]
+Progress = Callable[[float, str], None]
 
 
 class DeliveryError(ExportError):
@@ -220,9 +221,11 @@ def _trailer(ffmpeg: Path, film: Path, out: Path, info: MediaInfo, p: Platform) 
 
 def deliver(settings: Settings, ledger: Ledger, project_id: int, episode: int, platform: str | None, dest: Path,
             *, languages: Sequence[str] = (), translate: Translate | None = None, content_language: str = "",
-            confirm_restricted: bool = False) -> dict[str, Any]:
+            confirm_restricted: bool = False, progress: Progress | None = None) -> dict[str, Any]:
     """Write ``<dest>/<platform>/`` and return its ``delivery.json``. A project of a rating that does not allow
-    export is refused (``ContentError``) unless ``confirm_restricted``."""
+    export is refused (``ContentError``) unless ``confirm_restricted``. ``progress(fraction, step)`` is called between
+    the steps (``encode``, ``cover``, ``trailer``, ``subtitles``); it may raise to stop the delivery."""
+    step: Progress = progress or (lambda *_: None)
     rating = check_export(settings, ledger.db, project_id, confirmed=confirm_restricted)
     try:
         p = settings.platforms.get(platform)
@@ -254,6 +257,7 @@ def deliver(settings: Settings, ledger: Ledger, project_id: int, episode: int, p
             warnings.append("crop_burned_subtitles")
 
     files: dict[str, Path] = {}
+    step(0.02, "encode")
     result = _encode(ffmpeg, film, out_dir / "episode.mp4", info, p, warnings)
     files["episode.mp4"] = out_dir / "episode.mp4"
     out_info = probe(settings, files["episode.mp4"])
@@ -264,9 +268,11 @@ def deliver(settings: Settings, ledger: Ledger, project_id: int, episode: int, p
         warnings.append("over_size")
     lufs = _measured_lufs(ffmpeg, files["episode.mp4"]) if info.has_audio else None
 
+    step(0.75, "cover")
     if p.cover_sec >= 0 and _cover(ffmpeg, files["episode.mp4"], out_dir / "cover.jpg",
                                    min(p.cover_sec, max(dur - 0.1, 0.0))):
         files["cover.jpg"] = out_dir / "cover.jpg"
+    step(0.8, "trailer")
     if p.trailer_sec > 0:
         if dur <= p.trailer_sec + 0.5:
             warnings.append("trailer_too_long")
@@ -274,6 +280,7 @@ def deliver(settings: Settings, ledger: Ledger, project_id: int, episode: int, p
             files["trailer.mp4"] = out_dir / "trailer.mp4"
 
     subtitles: list[str] = []
+    step(0.9, "subtitles")
     if p.subtitles == "sidecar":
         srt = next((a for a in ledger.list_assets(project_id=project_id, kind=MediaKind.COMPOSE_ASSEMBLE.value,
                                                   slot="srt")

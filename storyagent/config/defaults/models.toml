@@ -31,6 +31,7 @@
 "audio.music" = "acestep-1.5-turbo"
 "audio.sfx" = "stable-audio-3-medium"
 "compose.assemble" = "ffmpeg-assemble"
+"compose.deliver" = "ffmpeg-deliver"
 "train.lora" = "flux2-klein-4b-lora-trainer"
 
 # FLUX.2 klein through the mflux CLI (MLX). `weights` is a LOCAL directory (nothing is downloaded at run time);
@@ -499,6 +500,16 @@ est_memory_gib = 2
 license_tag = "lgpl-gpl"
 commercial_ok = true
 timeout_sec = 3600
+
+[models."ffmpeg-deliver"]
+kind = "compose.deliver"
+provider = "delivery"
+version = "ffmpeg"
+heavy = false
+est_memory_gib = 2
+license_tag = "lgpl-gpl"
+commercial_ok = true
+timeout_sec = 7200
 
 # LoRA training. Everything here is a *template* deep-merged with the job's params, so any
 # training knob (epochs, rank, layers, learning rate, resolution ...) is configurable per job.

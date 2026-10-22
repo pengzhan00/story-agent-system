@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import zipfile
 from pathlib import Path
 from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
 
+from storyagent.api.app import create_app
 from storyagent.compose.delivery import (
     Cue,
     DeliveryError,
@@ -21,7 +23,12 @@ from storyagent.compose.delivery import (
 )
 from storyagent.config import ConfigError, Settings, load_settings
 from storyagent.config.platforms import build_platforms
+from storyagent.domain import JobStatus, MediaKind
+from storyagent.media.adapters.delivery import DeliveryAdapter
+from storyagent.media.contracts import MediaJob
 from storyagent.media.probe import probe
+from storyagent.media.registry import AdapterRegistry
+from storyagent.media.worker import Worker
 
 from . import test_api as base_tests
 from .test_api import project
@@ -167,8 +174,71 @@ def test_platforms_and_delivery_over_http(client: TestClient, fsettings: Setting
     missing = client.post(f"/api/projects/{pid}/episodes/1/delivery", json={"platform": "broadcast_tv"})
     assert missing.status_code == 409
     assert client.post(f"/api/projects/{pid}/episodes/1/delivery", json={"platform": "nope"}).status_code == 404
-    assert client.get("/api/deliveries/none.zip").status_code == 404
-    assert client.get("/api/deliveries/..%2Fx.zip").status_code == 404
+    assert client.get(f"/api/projects/{pid}/deliveries").json() == []
+
+
+def _deliverer(engine: Any, settings: Settings) -> Worker:
+    reg = AdapterRegistry()
+    reg.register(DeliveryAdapter(poll_interval_sec=0.02, engine_factory=lambda s, d: engine))
+    return Worker(settings, engine.db, reg, ledger=engine.spec_store.ledger, probes=[])
+
+
+def _queue(engine: Any, **inputs: Any) -> Any:
+    rec, _ = engine.spec_store.ledger.enqueue(MediaJob(
+        kind=MediaKind.COMPOSE_DELIVER, project_id=1, slot="x",
+        inputs={"episode": 1, "content_language": "en", "languages": [], **inputs}))
+    return rec
+
+
+def test_a_delivery_runs_as_a_background_job_and_ends_as_a_zip_asset(tmp_path: Path) -> None:
+    engine, settings = _episode(tmp_path)
+    ledger = engine.spec_store.ledger
+    worker = _deliverer(engine, settings)
+    rec = _queue(engine, platform="tiny_pad", languages=["ja"])
+    assert worker.drain(120)
+    job = ledger.get_job(rec.id)
+    assert job.status is JobStatus.COMPLETED and job.progress == 1
+    [asset] = ledger.list_assets(project_id=1, kind=MediaKind.COMPOSE_DELIVER.value)
+    assert asset.slot == "x" and asset.metadata["platform"]["name"] == "tiny_pad"
+    with zipfile.ZipFile(settings.home / asset.path) as z:
+        names = set(z.namelist())
+    assert {"episode.mp4", "cover.jpg", "delivery.json", "subtitles.ja.srt", "subtitles.en.srt"} <= names
+    assert "completed" in [e["event"] for e in ledger.events(rec.id)]
+    worker.shutdown()
+
+
+def test_a_delivery_that_cannot_start_or_cannot_finish_fails_with_a_reason(tmp_path: Path) -> None:
+    engine, _ = _episode_rig(tmp_path)                     # nothing assembled yet
+    settings = tiny(engine.settings)
+    worker = _deliverer(engine, settings)
+    ledger = engine.spec_store.ledger
+    early = _queue(engine, platform="tiny_wide")
+    bad = _queue(engine, platform="nope")
+    assert worker.drain(60)
+    a, b = ledger.get_job(early.id), ledger.get_job(bad.id)
+    assert a.status is JobStatus.FAILED_VALIDATION and a.error_code == "invalid_input" and "episode" in a.error_message
+    assert b.status is JobStatus.FAILED_VALIDATION and b.error_code == "invalid_input"
+    worker.shutdown()
+
+
+def test_the_delivery_endpoint_queues_the_job_once_and_lists_the_result(tmp_path: Path) -> None:
+    engine, _ = _episode(tmp_path)
+    settings = engine.settings
+    with TestClient(create_app(settings), raise_server_exceptions=False) as c:
+        assert c.post("/api/projects/1/episodes/1/delivery", json={"platform": "nope"}).status_code == 404
+        body = {"platform": "broadcast_tv", "languages": ["ja", "en", "ja"]}
+        queued = c.post("/api/projects/1/episodes/1/delivery", json=body)
+        again = c.post("/api/projects/1/episodes/1/delivery", json={**body, "languages": ["en", "ja"]})
+        assert queued.status_code == 202 and again.json() == {"job_id": queued.json()["job_id"], "created": False}
+        assert c.get("/api/projects/1/deliveries").json() == []
+        worker = _deliverer(engine, settings)
+        assert worker.drain(180)
+        [d] = c.get("/api/projects/1/deliveries").json()
+        assert d["platform"] == "broadcast_tv" and d["episode"] == 1 and sorted(d["subtitles"]) == ["en", "ja"]
+        assert d["result"]["width"] == 1920 and d["result"]["loudness_lufs"] is not None
+        got = c.get(f"/api/assets/{d['asset']['id']}/file")
+        assert got.status_code == 200 and got.content[:2] == b"PK"
+        worker.shutdown()
 
 
 def test_the_cli_lists_platforms_and_reports_a_missing_episode(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,

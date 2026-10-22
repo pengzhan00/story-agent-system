@@ -777,23 +777,32 @@
         "title": "DeliveryBody",
         "type": "object"
       },
+      "DeliveryJobOut": {
+        "properties": {
+          "created": {
+            "title": "Created",
+            "type": "boolean"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "created"
+        ],
+        "title": "DeliveryJobOut",
+        "type": "object"
+      },
       "DeliveryOut": {
         "properties": {
-          "bytes": {
-            "title": "Bytes",
+          "asset": {
+            "$ref": "#/components/schemas/AssetOut"
+          },
+          "episode": {
+            "title": "Episode",
             "type": "integer"
-          },
-          "files": {
-            "items": {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            "title": "Files",
-            "type": "array"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
           },
           "platform": {
             "title": "Platform",
@@ -820,13 +829,12 @@
           }
         },
         "required": [
-          "name",
-          "bytes",
+          "asset",
           "platform",
+          "episode",
           "warnings",
           "subtitles",
-          "result",
-          "files"
+          "result"
         ],
         "title": "DeliveryOut",
         "type": "object"
@@ -2304,6 +2312,7 @@
           "text.script",
           "text.asr",
           "compose.assemble",
+          "compose.deliver",
           "analyze.qc",
           "train.lora"
         ],
@@ -6856,46 +6865,6 @@
         ]
       }
     },
-    "/api/deliveries/{name}": {
-      "get": {
-        "operationId": "download_api_deliveries__name__get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "title": "Name",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Download",
-        "tags": [
-          "delivery"
-        ]
-      }
-    },
     "/api/events": {
       "get": {
         "description": "SSE feed of job changes (`event: job`, data = JobOut) and story-workflow progress (`event: workflow`, data =\nWorkflowRunOut with its live `progress`). Reconnect with `?after=<last id>` to catch up.\n`timeout` (seconds) closes the stream after that long; 0 = until the client disconnects.",
@@ -9046,6 +9015,63 @@
         ]
       }
     },
+    "/api/projects/{project_id}/deliveries": {
+      "get": {
+        "description": "Finished deliveries, newest first. Download one with ``GET /api/assets/{asset.id}/file``.",
+        "operationId": "deliveries_api_projects__project_id__deliveries_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DeliveryOut"
+                  },
+                  "title": "Response Deliveries Api Projects  Project Id  Deliveries Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Deliveries",
+        "tags": [
+          "delivery"
+        ]
+      }
+    },
     "/api/projects/{project_id}/dialogue": {
       "get": {
         "description": "Every spoken line; ``character_id`` is null when the speaker matches no character (reassign or create one).",
@@ -9224,7 +9250,7 @@
     },
     "/api/projects/{project_id}/episodes/{episode}/delivery": {
       "post": {
-        "description": "Re-encode the assembled episode for a platform (can take minutes; a translation asks the language model).\nDownload the result with ``GET /api/deliveries/{name}``.",
+        "description": "Queue the re-encode of an assembled episode for a platform (a ``compose.deliver`` job: progress, cancel and retry\nlike any job; a translation asks the language model). The result is a zip asset listed by\n``GET /api/projects/{id}/deliveries``.",
         "operationId": "make_delivery_api_projects__project_id__episodes__episode__delivery_post",
         "parameters": [
           {
@@ -9257,11 +9283,11 @@
           "required": true
         },
         "responses": {
-          "201": {
+          "202": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DeliveryOut"
+                  "$ref": "#/components/schemas/DeliveryJobOut"
                 }
               }
             },

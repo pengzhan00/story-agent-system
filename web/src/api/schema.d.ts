@@ -310,23 +310,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/deliveries/{name}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Download */
-        get: operations["download_api_deliveries__name__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/events": {
         parameters: {
             query?: never;
@@ -937,6 +920,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{project_id}/deliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Deliveries
+         * @description Finished deliveries, newest first. Download one with ``GET /api/assets/{asset.id}/file``.
+         */
+        get: operations["deliveries_api_projects__project_id__deliveries_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{project_id}/dialogue": {
         parameters: {
             query?: never;
@@ -1002,8 +1005,9 @@ export interface paths {
         put?: never;
         /**
          * Make Delivery
-         * @description Re-encode the assembled episode for a platform (can take minutes; a translation asks the language model).
-         *     Download the result with ``GET /api/deliveries/{name}``.
+         * @description Queue the re-encode of an assembled episode for a platform (a ``compose.deliver`` job: progress, cancel and retry
+         *     like any job; a translation asks the language model). The result is a zip asset listed by
+         *     ``GET /api/projects/{id}/deliveries``.
          */
         post: operations["make_delivery_api_projects__project_id__episodes__episode__delivery_post"];
         delete?: never;
@@ -2476,16 +2480,18 @@ export interface components {
              */
             platform: string;
         };
+        /** DeliveryJobOut */
+        DeliveryJobOut: {
+            /** Created */
+            created: boolean;
+            /** Job Id */
+            job_id: string;
+        };
         /** DeliveryOut */
         DeliveryOut: {
-            /** Bytes */
-            bytes: number;
-            /** Files */
-            files: {
-                [key: string]: unknown;
-            }[];
-            /** Name */
-            name: string;
+            asset: components["schemas"]["AssetOut"];
+            /** Episode */
+            episode: number;
             /** Platform */
             platform: string;
             /** Result */
@@ -3030,7 +3036,7 @@ export interface components {
          *     i18n keys: ``media.kind.<value>``.
          * @enum {string}
          */
-        MediaKind: "image.generate" | "image.edit" | "video.generate" | "video.av" | "video.avatar" | "video.lipsync" | "video.enhance" | "audio.tts" | "audio.music" | "audio.sfx" | "audio.convert" | "audio.enhance" | "text.story" | "text.script" | "text.asr" | "compose.assemble" | "analyze.qc" | "train.lora";
+        MediaKind: "image.generate" | "image.edit" | "video.generate" | "video.av" | "video.avatar" | "video.lipsync" | "video.enhance" | "audio.tts" | "audio.music" | "audio.sfx" | "audio.convert" | "audio.enhance" | "text.story" | "text.script" | "text.asr" | "compose.assemble" | "compose.deliver" | "analyze.qc" | "train.lora";
         /** Meta */
         Meta: {
             /** Auth Roles */
@@ -5092,37 +5098,6 @@ export interface operations {
             };
         };
     };
-    download_api_deliveries__name__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                name: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     events_api_events_get: {
         parameters: {
             query?: {
@@ -6452,6 +6427,39 @@ export interface operations {
             };
         };
     };
+    deliveries_api_projects__project_id__deliveries_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_dialogue_api_projects__project_id__dialogue_get: {
         parameters: {
             query?: {
@@ -6577,12 +6585,12 @@ export interface operations {
         };
         responses: {
             /** @description Successful Response */
-            201: {
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DeliveryOut"];
+                    "application/json": components["schemas"]["DeliveryJobOut"];
                 };
             };
             /** @description Validation Error */

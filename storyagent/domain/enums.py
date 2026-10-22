@@ -30,6 +30,7 @@ class MediaKind(StrEnum):
     TEXT_SCRIPT = "text.script"  # story -> script (scenes, action, dialogue) written by a language model
     TEXT_ASR = "text.asr"  # transcription (subtitles, clone ref_text)
     COMPOSE_ASSEMBLE = "compose.assemble"  # shots + stems -> episode
+    COMPOSE_DELIVER = "compose.deliver"  # an assembled episode -> a platform's delivery package (zip)
     ANALYZE_QC = "analyze.qc"  # technical + semantic quality checks
     TRAIN_LORA = "train.lora"  # LoRA training; the adapter output is a LoRA asset
 
