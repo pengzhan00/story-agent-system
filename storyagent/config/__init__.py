@@ -1,4 +1,5 @@
 from .grammar import Grammar, GrammarRule
+from .platforms import Platform, Platforms
 from .settings import (
     AuthConfig,
     AuthRole,
@@ -27,6 +28,8 @@ __all__ = [
     "deep_merge",
     "Grammar",
     "GrammarRule",
+    "Platform",
+    "Platforms",
     "LLMBackend",
     "LLMRole",
     "ModelSpec",

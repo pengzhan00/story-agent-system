@@ -255,6 +255,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/deliveries/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download */
+        get: operations["download_api_deliveries__name__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/events": {
         parameters: {
             query?: never;
@@ -620,6 +637,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/platforms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Platforms */
+        get: operations["platforms_api_platforms_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects": {
         parameters: {
             query?: never;
@@ -900,6 +934,27 @@ export interface paths {
         head?: never;
         /** Update Episode */
         patch: operations["update_episode_api_projects__project_id__episodes__episode_id__patch"];
+        trace?: never;
+    };
+    "/api/projects/{project_id}/episodes/{episode}/delivery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Make Delivery
+         * @description Re-encode the assembled episode for a platform (can take minutes; a translation asks the language model).
+         *     Download the result with ``GET /api/deliveries/{name}``.
+         */
+        post: operations["make_delivery_api_projects__project_id__episodes__episode__delivery_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/projects/{project_id}/episodes/{episode}/fcp": {
@@ -2318,6 +2373,40 @@ export interface components {
         CancelResult: {
             status: components["schemas"]["JobStatus"];
         };
+        /** DeliveryBody */
+        DeliveryBody: {
+            /**
+             * Languages
+             * @default []
+             */
+            languages: string[];
+            /**
+             * Platform
+             * @default
+             */
+            platform: string;
+        };
+        /** DeliveryOut */
+        DeliveryOut: {
+            /** Bytes */
+            bytes: number;
+            /** Files */
+            files: {
+                [key: string]: unknown;
+            }[];
+            /** Name */
+            name: string;
+            /** Platform */
+            platform: string;
+            /** Result */
+            result: {
+                [key: string]: unknown;
+            };
+            /** Subtitles */
+            subtitles: string[];
+            /** Warnings */
+            warnings: string[];
+        };
         /** DeliveryProfileOut */
         DeliveryProfileOut: {
             /** Fps */
@@ -3222,6 +3311,45 @@ export interface components {
             subject_id: string;
             /** Subject Type */
             subject_type: string;
+        };
+        /** PlatformOut */
+        PlatformOut: {
+            /** Audio Bitrate */
+            audio_bitrate: string;
+            /** Cover Sec */
+            cover_sec: number;
+            /** Crf */
+            crf: number;
+            /** Default */
+            default: boolean;
+            /** Fps */
+            fps: number;
+            /** Height */
+            height: number;
+            /** Label Key */
+            label_key: string;
+            /** Loudnorm I */
+            loudnorm_i: number;
+            /** Loudnorm Lra */
+            loudnorm_lra: number;
+            /** Loudnorm Tp */
+            loudnorm_tp: number;
+            /** Max Duration Sec */
+            max_duration_sec: number;
+            /** Max Mb */
+            max_mb: number;
+            /** Name */
+            name: string;
+            /** Note Key */
+            note_key: string;
+            /** Reframe */
+            reframe: string;
+            /** Subtitles */
+            subtitles: string;
+            /** Trailer Sec */
+            trailer_sec: number;
+            /** Width */
+            width: number;
         };
         /** PresetBody */
         PresetBody: {
@@ -4714,6 +4842,37 @@ export interface operations {
             };
         };
     };
+    download_api_deliveries__name__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     events_api_events_get: {
         parameters: {
             query?: {
@@ -5406,6 +5565,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    platforms_api_platforms_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformOut"][];
                 };
             };
         };
@@ -6118,6 +6297,42 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    make_delivery_api_projects__project_id__episodes__episode__delivery_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+                episode: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeliveryBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryOut"];
                 };
             };
             /** @description Validation Error */

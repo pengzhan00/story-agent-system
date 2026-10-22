@@ -11,6 +11,7 @@
     storyagent workflow run | status | watch | review      (story pipeline with live progress bars)
     storyagent project create | estimate | update | list | trash   (kind of work, pipeline plan, seasons, episodes)
     storyagent export episode --project N [--episode 1] --out DIR   (film + subtitles + stems + provenance)
+    storyagent delivery platforms | make --project N [--episode 1] [--platform A,B] [--lang en,ja] --out DIR
     storyagent user create NAME --role R | list | set NAME [--role R] [--active|--inactive] [--reset-password]
     storyagent audit [--user U] [--action A] [--project N] [--limit N]
     storyagent llm check
@@ -774,6 +775,41 @@ def _cmd_export_episode(s: Settings, a: argparse.Namespace) -> int:
     return 0 if not failed else 6
 
 
+def _cmd_delivery_platforms(s: Settings, a: argparse.Namespace) -> int:
+    for name, p in s.platforms.items.items():
+        mark = "*" if name == s.platforms.default else " "
+        print(t("cli.delivery.platform", mark=mark, name=name, label=t(p.label_key), width=p.width, height=p.height,
+                fps=f"{p.fps:g}", reframe=p.reframe, lufs=f"{p.loudnorm_i:g}"))
+    return 0
+
+
+def _cmd_delivery_make(s: Settings, a: argparse.Namespace) -> int:
+    from storyagent.compose.delivery import DeliveryError, deliver
+
+    c = _ctx(s)
+    project = ProjectStore(c.db, s).get(a.project)
+    langs = [x.strip() for x in (a.lang or "").split(",") if x.strip()]
+    engine = WorkflowEngine(s, c.db, spec_store=c.specs)
+    names = [x.strip() for x in (a.platform or "").split(",") if x.strip()] or [s.platforms.default]
+    code = 0
+    for name in names:
+        try:
+            record = deliver(s, c.ledger, a.project, a.episode, name, Path(a.out), languages=langs,
+                             content_language=project.content_language,
+                             translate=lambda lines, lang: engine.translate_lines(a.project, lines, lang))
+        except DeliveryError as exc:
+            print(t("cli.delivery.failed", platform=name, detail=t(f"delivery.error.{exc.code}", detail=exc.detail)),
+                  file=sys.stderr)
+            code = 1
+            continue
+        res = record["result"]
+        print(t("cli.delivery.done", platform=name, path=Path(a.out) / name, files=len(record["files"]),
+                size=res["size_mb"], lufs="-" if res["loudness_lufs"] is None else f"{res['loudness_lufs']:g}"))
+        for w in record["warnings"]:
+            print("  ! " + t(f"delivery.warn.{w}"), file=sys.stderr)
+    return code
+
+
 def _cmd_workflow_review(s: Settings, a: argparse.Namespace) -> int:
     c = _ctx(s)
     try:
@@ -1120,6 +1156,14 @@ def build_parser() -> argparse.ArgumentParser:
     wp.add_argument("--project", type=int, required=True)
     wp.add_argument("--episode", type=int, default=1)
     wp.add_argument("--out", required=True, help="directory to write the package into")
+    dl = sub.add_parser("delivery").add_subparsers(dest="cmd", required=True)
+    add(dl, "platforms", _cmd_delivery_platforms)
+    wp = add(dl, "make", _cmd_delivery_make)
+    wp.add_argument("--project", type=int, required=True)
+    wp.add_argument("--episode", type=int, default=1)
+    wp.add_argument("--platform", help="comma-separated platform names (default: the configured default)")
+    wp.add_argument("--lang", help="comma-separated subtitle languages to translate into, e.g. en,ja")
+    wp.add_argument("--out", required=True, help="directory to write <platform>/ folders into")
     llm = sub.add_parser("llm").add_subparsers(dest="cmd", required=True)
     add(llm, "check", _cmd_llm_check)
 

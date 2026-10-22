@@ -34,3 +34,8 @@ model = "gemma4:31b"
 [llm.roles.reviewer]
 backend = "ollama"
 model = "gemma4:31b"
+
+# Subtitle translation for multi-language delivery (short lines, faithful register).
+[llm.roles.translator]
+backend = "ollama"
+model = "gemma4:31b"

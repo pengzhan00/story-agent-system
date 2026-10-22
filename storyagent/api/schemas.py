@@ -1078,3 +1078,40 @@ class EditDiffOut(Strict):
     shots: list[EditShotOut]
     added: list[EditAddedOut]
     changed: int
+
+
+# -- delivery platforms ----------------------------------------------------------------------------
+class PlatformOut(Strict):
+    name: str
+    label_key: str
+    note_key: str
+    width: int
+    height: int
+    fps: float
+    reframe: str
+    loudnorm_i: float
+    loudnorm_tp: float
+    loudnorm_lra: float
+    crf: int
+    max_mb: float
+    max_duration_sec: float
+    audio_bitrate: str
+    subtitles: str
+    cover_sec: float
+    trailer_sec: float
+    default: bool
+
+
+class DeliveryBody(Strict):
+    platform: str = ""
+    languages: list[str] = []
+
+
+class DeliveryOut(Strict):
+    name: str
+    bytes: int
+    platform: str
+    warnings: list[str]
+    subtitles: list[str]
+    result: dict[str, Any]
+    files: list[dict[str, Any]]

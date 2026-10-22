@@ -1,0 +1,86 @@
+# Delivery platforms: how a finished episode is re-encoded for where it will be shown. The numbers are common conventions
+# (streaming feeds ~ -14 LUFS, EBU R128 broadcast -23 LUFS), NOT the rules of any particular service: check the
+# platform's current upload specification and change them in $STORY_AGENT_HOME/config/platforms.toml.
+#
+#   width/height/fps   the picture frame to deliver
+#   reframe            when the film's aspect differs from the frame: crop | pad (black bars) | blur (blurred copy behind)
+#   loudnorm_i/tp/lra  loudness target (two-pass, linear) and true-peak ceiling
+#   crf / max_mb       quality; with max_mb > 0 the bitrate is chosen to stay under that size instead
+#   max_duration_sec   0 = no limit; longer films are reported, never cut
+#   subtitles          sidecar = a .srt per language next to the film | none
+#   cover_sec          second of the film used as the cover frame (cover is delivered at the frame size)
+#   trailer_sec        length of the teaser cut from the start of the film (0 = none)
+[default]
+platform = "vertical_feed"
+
+[platforms.vertical_feed]
+label_key = "platform.vertical_feed"
+note_key = "platform.vertical_feed.note"
+width = 1080
+height = 1920
+fps = 30
+reframe = "crop"
+loudnorm_i = -14.0
+loudnorm_tp = -1.0
+loudnorm_lra = 9.0
+crf = 20
+max_mb = 0
+max_duration_sec = 0
+audio_bitrate = "192k"
+subtitles = "sidecar"
+cover_sec = 1.5
+trailer_sec = 15
+
+[platforms.vertical_drama_app]
+label_key = "platform.vertical_drama_app"
+note_key = "platform.vertical_drama_app.note"
+width = 720
+height = 1280
+fps = 24
+reframe = "crop"
+loudnorm_i = -16.0
+loudnorm_tp = -1.5
+loudnorm_lra = 11.0
+crf = 20
+max_mb = 0
+max_duration_sec = 0
+audio_bitrate = "192k"
+subtitles = "sidecar"
+cover_sec = 1.5
+trailer_sec = 20
+
+[platforms.landscape_stream]
+label_key = "platform.landscape_stream"
+note_key = "platform.landscape_stream.note"
+width = 1920
+height = 1080
+fps = 24
+reframe = "blur"
+loudnorm_i = -14.0
+loudnorm_tp = -1.0
+loudnorm_lra = 11.0
+crf = 18
+max_mb = 0
+max_duration_sec = 0
+audio_bitrate = "256k"
+subtitles = "sidecar"
+cover_sec = 2.0
+trailer_sec = 30
+
+[platforms.broadcast_tv]
+label_key = "platform.broadcast_tv"
+note_key = "platform.broadcast_tv.note"
+width = 1920
+height = 1080
+fps = 25
+reframe = "pad"
+loudnorm_i = -23.0
+loudnorm_tp = -1.0
+loudnorm_lra = 15.0
+crf = 16
+max_mb = 0
+max_duration_sec = 0
+audio_bitrate = "256k"
+subtitles = "sidecar"
+cover_sec = 2.0
+trailer_sec = 0

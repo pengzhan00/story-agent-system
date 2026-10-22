@@ -8,6 +8,7 @@ import { FlowChain } from "../components/FlowChain";
 import { CreativePanel } from "./CreativePanel";
 import { ContinuityPanel } from "./ContinuityPanel";
 import { GrammarPanel } from "./GrammarPanel";
+import { DeliveryPanel } from "./DeliveryPanel";
 import { PackPanel } from "./PackPanel";
 import { ProcessPanel } from "./ProcessPanel";
 import { ReviewPanel } from "./ReviewPanel";
@@ -105,6 +106,9 @@ export function ProjectPage() {
         <NavLink to="jobs" className={({ isActive }) => (isActive ? "tab active" : "tab")}>
           {t("web.tab.jobs")}
         </NavLink>
+        <NavLink to="delivery" className={({ isActive }) => (isActive ? "tab active" : "tab")}>
+          {t("web.tab.delivery")}
+        </NavLink>
         <NavLink to="pack" className={({ isActive }) => (isActive ? "tab active" : "tab")}>
           {t("web.tab.pack")}
         </NavLink>
@@ -121,6 +125,7 @@ export function ProjectPage() {
         <Route path="flow" element={<FlowChain projectId={id} />} />
         <Route path="process" element={<ProcessPanel id={id} />} />
         <Route path="jobs" element={<JobsPanel projectId={id} />} />
+        <Route path="delivery" element={<DeliveryPanel id={id} />} />
         <Route path="pack" element={<PackPanel id={id} />} />
       </Routes>
     </div>

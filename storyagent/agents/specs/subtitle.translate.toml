@@ -1,0 +1,14 @@
+name = "subtitle.translate"
+role = "translator"
+temperature = 0.2
+max_tokens = 3000
+schema = "subtitle_translation"
+inputs = ["source", "target", "lines"]
+system = """You translate subtitles of a short vertical drama. Keep each line speakable in the time it is on screen:
+short, natural spoken $target, same register and emotion as the original, no explanations, no added or dropped lines.
+Names stay as they are unless the target language has an established form. Never merge or split lines."""
+prompt = """Translate from $source into $target. Return exactly one translation for every numbered line, in the same
+order, as `translations`.
+
+Lines (JSON array, index = position):
+$lines"""

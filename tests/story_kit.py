@@ -25,6 +25,7 @@ class StoryClient:
         self.unknown_speaker = False
         self.speaker: str | None = None     # who speaks in every shot (overrides the defaults)
         self.scenes_per_act = 2
+        self.translate_to = "xx"
 
     def list_models(self) -> list[str]:
         return ["fake-model"]
@@ -36,7 +37,7 @@ class StoryClient:
                              ("acts", "outline"), ("shots", "shots"), ("appearance", "character"),
                              ("sound_effects", "sound"), ("effects", "sound_cue"),
                              ("music_prompt", "music"), ("video_prompt", "visual"), ("score", "review"),
-                             ("image_prompt", "location")):
+                             ("image_prompt", "location"), ("translations", "translate")):
             if marker in keys:
                 return name
         return "?"
@@ -114,6 +115,12 @@ class StoryClient:
     def _visual(self, prompt: str) -> dict[str, Any]:
         return {"image_prompt": "a woman in a grey coat walks into a neon office",
                 "video_prompt": "she walks in, slow push", "negative_prompt": "blurry"}
+
+    def _translate(self, prompt: str) -> dict[str, Any]:
+        import json as _json
+        import re
+        lines = _json.loads(re.search(r"\[[\s\S]*\]\s*$", prompt).group(0))                  # type: ignore[union-attr]
+        return {"translations": [f"[{self.translate_to}] {x}" for x in lines]}
 
     def _review(self, prompt: str) -> dict[str, Any]:
         return {"score": 7, "summary": "fine", "issues": []}

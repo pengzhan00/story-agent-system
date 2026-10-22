@@ -685,6 +685,79 @@
         "title": "CancelResult",
         "type": "object"
       },
+      "DeliveryBody": {
+        "properties": {
+          "languages": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Languages",
+            "type": "array"
+          },
+          "platform": {
+            "default": "",
+            "title": "Platform",
+            "type": "string"
+          }
+        },
+        "title": "DeliveryBody",
+        "type": "object"
+      },
+      "DeliveryOut": {
+        "properties": {
+          "bytes": {
+            "title": "Bytes",
+            "type": "integer"
+          },
+          "files": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "platform": {
+            "title": "Platform",
+            "type": "string"
+          },
+          "result": {
+            "additionalProperties": true,
+            "title": "Result",
+            "type": "object"
+          },
+          "subtitles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Subtitles",
+            "type": "array"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "bytes",
+          "platform",
+          "warnings",
+          "subtitles",
+          "result",
+          "files"
+        ],
+        "title": "DeliveryOut",
+        "type": "object"
+      },
       "DeliveryProfileOut": {
         "properties": {
           "fps": {
@@ -3162,6 +3235,104 @@
           "needs"
         ],
         "title": "PlannedTaskOut",
+        "type": "object"
+      },
+      "PlatformOut": {
+        "properties": {
+          "audio_bitrate": {
+            "title": "Audio Bitrate",
+            "type": "string"
+          },
+          "cover_sec": {
+            "title": "Cover Sec",
+            "type": "number"
+          },
+          "crf": {
+            "title": "Crf",
+            "type": "integer"
+          },
+          "default": {
+            "title": "Default",
+            "type": "boolean"
+          },
+          "fps": {
+            "title": "Fps",
+            "type": "number"
+          },
+          "height": {
+            "title": "Height",
+            "type": "integer"
+          },
+          "label_key": {
+            "title": "Label Key",
+            "type": "string"
+          },
+          "loudnorm_i": {
+            "title": "Loudnorm I",
+            "type": "number"
+          },
+          "loudnorm_lra": {
+            "title": "Loudnorm Lra",
+            "type": "number"
+          },
+          "loudnorm_tp": {
+            "title": "Loudnorm Tp",
+            "type": "number"
+          },
+          "max_duration_sec": {
+            "title": "Max Duration Sec",
+            "type": "number"
+          },
+          "max_mb": {
+            "title": "Max Mb",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "note_key": {
+            "title": "Note Key",
+            "type": "string"
+          },
+          "reframe": {
+            "title": "Reframe",
+            "type": "string"
+          },
+          "subtitles": {
+            "title": "Subtitles",
+            "type": "string"
+          },
+          "trailer_sec": {
+            "title": "Trailer Sec",
+            "type": "number"
+          },
+          "width": {
+            "title": "Width",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "label_key",
+          "note_key",
+          "width",
+          "height",
+          "fps",
+          "reframe",
+          "loudnorm_i",
+          "loudnorm_tp",
+          "loudnorm_lra",
+          "crf",
+          "max_mb",
+          "max_duration_sec",
+          "audio_bitrate",
+          "subtitles",
+          "cover_sec",
+          "trailer_sec",
+          "default"
+        ],
+        "title": "PlatformOut",
         "type": "object"
       },
       "PresetBody": {
@@ -6398,6 +6569,46 @@
         ]
       }
     },
+    "/api/deliveries/{name}": {
+      "get": {
+        "operationId": "download_api_deliveries__name__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Download",
+        "tags": [
+          "delivery"
+        ]
+      }
+    },
     "/api/events": {
       "get": {
         "description": "SSE feed of job changes (`event: job`, data = JobOut) and story-workflow progress (`event: workflow`, data =\nWorkflowRunOut with its live `progress`). Reconnect with `?after=<last id>` to catch up.\n`timeout` (seconds) closes the stream after that long; 0 = until the client disconnects.",
@@ -7550,6 +7761,31 @@
         ]
       }
     },
+    "/api/platforms": {
+      "get": {
+        "operationId": "platforms_api_platforms_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PlatformOut"
+                  },
+                  "title": "Response Platforms Api Platforms Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Platforms",
+        "tags": [
+          "delivery"
+        ]
+      }
+    },
     "/api/projects": {
       "get": {
         "description": "Live projects; ``trashed=true`` lists the recycle bin instead.",
@@ -8696,6 +8932,68 @@
         "summary": "Update Episode",
         "tags": [
           "story"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/episodes/{episode}/delivery": {
+      "post": {
+        "description": "Re-encode the assembled episode for a platform (can take minutes; a translation asks the language model).\nDownload the result with ``GET /api/deliveries/{name}``.",
+        "operationId": "make_delivery_api_projects__project_id__episodes__episode__delivery_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "episode",
+            "required": true,
+            "schema": {
+              "title": "Episode",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeliveryBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Make Delivery",
+        "tags": [
+          "delivery"
         ]
       }
     },

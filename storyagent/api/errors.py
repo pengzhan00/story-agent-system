@@ -15,6 +15,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from storyagent.agents.registry import AgentSpecError
 from storyagent.auth import AuthError
+from storyagent.compose.delivery import DeliveryError
 from storyagent.compose.interchange import InterchangeError
 from storyagent.config import ConfigError
 from storyagent.launcher import LaunchError
@@ -119,6 +120,11 @@ def install(app: FastAPI) -> None:
     async def _pack(request: Request, exc: PackError) -> JSONResponse:
         detail = translator_of(request)(f"pack.error.{exc.code}", **exc.params)
         return respond(request, 404 if exc.code == "not_found" else 422, "invalid", detail)
+
+    @app.exception_handler(DeliveryError)
+    async def _delivery(request: Request, exc: DeliveryError) -> JSONResponse:
+        detail = translator_of(request)(f"delivery.error.{exc.code}", detail=exc.detail)
+        return respond(request, 409 if exc.code == "episode_not_ready" else 422, "invalid", detail)
 
     @app.exception_handler(InterchangeError)
     async def _interchange(request: Request, exc: InterchangeError) -> JSONResponse:

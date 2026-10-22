@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Any
 
 from storyagent.agents import AgentRunner
@@ -73,6 +73,14 @@ class WorkflowEngine:
             "language": language_name(project.content_language), "script": json.dumps(outline, ensure_ascii=False),
             "characters": json.dumps(chars, ensure_ascii=False)}, project_id=project_id).data
         return dict(data)
+
+    def translate_lines(self, project_id: int, lines: Sequence[str], target: str) -> list[str]:
+        """Subtitle lines into ``target`` (a language code) by the translator agent; one text out per text in."""
+        project = self.projects.get(project_id)
+        data = self.agents.run("subtitle.translate", {
+            "source": language_name(project.content_language), "target": language_name(target),
+            "lines": json.dumps(list(lines), ensure_ascii=False)}, project_id=project_id).data
+        return [str(x) for x in data.get("translations", [])]
 
     def run_stage(
         self, project_id: int, stage: str, params: dict[str, Any] | None = None, *, progress: Progress | None = None,

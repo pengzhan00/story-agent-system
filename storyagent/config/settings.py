@@ -23,6 +23,7 @@ from typing import Any
 from storyagent.domain import MediaKind, QualityTier
 
 from .grammar import Grammar, build_grammar
+from .platforms import Platforms, build_platforms
 
 ENV_HOME = "STORY_AGENT_HOME"
 ENV_CONFIG_DIR = "STORY_AGENT_CONFIG_DIR"
@@ -37,7 +38,7 @@ UNLOAD_POLICIES = ("never", "ask", "auto")
 EXPLICIT_LABEL_MODES = ("off", "overlay", "both")
 LLM_BACKEND_KINDS = ("ollama", "llamacpp", "openai_compat")
 _CONFIG_FILES = ("services", "models", "delivery", "compliance", "recipes", "llm", "pipelines", "kinds", "auth",
-                 "grammar")
+                 "grammar", "platforms")
 AUTH_MODES = ("off", "token")
 CORE_KINDS = ("image.generate", "video.generate", "audio.tts", "audio.music", "compose.assemble")
 BRIEF_QUESTIONS = ("seasons", "episodes", "episode_sec", "audience", "platform")
@@ -229,6 +230,7 @@ class Settings:
     default_kind: str = ""
     auth: AuthConfig = field(default_factory=AuthConfig)
     grammar: Grammar = field(default_factory=Grammar)     # grammar.toml: the shot grammar check
+    platforms: Platforms = field(default_factory=Platforms)     # platforms.toml: delivery presets per destination
 
     # -- derived paths ----------------------------------------------------
     @property
@@ -737,6 +739,7 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         default_kind=default_kind,
         auth=_build_auth(merged["auth"], env.get(ENV_AUTH)),
         grammar=build_grammar(merged["grammar"], ConfigError),
+        platforms=build_platforms(merged["platforms"], ConfigError),
     )
 
 
