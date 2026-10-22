@@ -8,6 +8,7 @@ import { LAUNCH_SEEN, LaunchPage } from "./pages/LaunchPage";
 import { LibraryPage } from "./pages/LibraryPage";
 import { ProjectPage } from "./pages/ProjectPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
+import { LlmPage } from "./pages/LlmPage";
 import { PromptsPage } from "./pages/PromptsPage";
 import { WorkshopPage } from "./pages/WorkshopPage";
 import { QueuePage } from "./pages/QueuePage";
@@ -51,6 +52,9 @@ export function App() {
           <NavLink to="/prompts" className={link}>
             {t("web.nav.prompts")}
           </NavLink>
+          <NavLink to="/llm" className={link}>
+            {t("web.nav.llm")}
+          </NavLink>
           <NavLink to="/system" className={link}>
             {t("web.nav.system")}
           </NavLink>
@@ -78,6 +82,7 @@ export function App() {
           <Route path="/library" element={<LibraryPage />} />
           <Route path="/queue" element={<QueuePage />} />
           <Route path="/prompts" element={<PromptsPage />} />
+          <Route path="/llm" element={<LlmPage />} />
           <Route path="/system" element={<SystemPage />} />
           <Route path="/users" element={<UsersPage />} />
           <Route path="/audit" element={<AuditPage />} />

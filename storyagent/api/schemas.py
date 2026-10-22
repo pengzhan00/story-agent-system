@@ -1176,3 +1176,68 @@ class ContentStatusOut(Strict):
 class UnlockBody(Strict):
     confirm_adult: bool = False
     password: str = ""
+
+
+# -- language models (which model each role uses) and the AI buttons beside prompts ------------------------
+class TextEdit(BaseModel):
+    text: str = Field(max_length=2_000_000)
+
+
+class LlmBackendOut(Strict):
+    name: str
+    kind: str
+    url: str
+    state: str = Field(description="ok | unreachable | disabled")
+    models: list[str]
+    error: str
+
+
+class LlmRoleOut(Strict):
+    name: str
+    group: str
+    backend: str
+    model: str
+    source: str = Field(description="config (llm.toml) | global (chosen on the screen) | project (chosen there)")
+    config_backend: str
+    config_model: str
+
+
+class LlmOut(Strict):
+    backends: list[LlmBackendOut]
+    roles: list[LlmRoleOut]
+    project_id: int | None
+
+
+class LlmRoleSet(BaseModel):
+    backend: str
+    model: str
+    project_id: int | None = Field(default=None, description="null = every project")
+
+
+class LlmTest(BaseModel):
+    backend: str
+    model: str
+
+
+class LlmTestOut(Strict):
+    ok: bool
+    seconds: float
+    reply: str
+
+
+class PromptAssistIn(BaseModel):
+    action: Literal["suggest", "translate"]
+    text: str = Field(min_length=1, max_length=20000)
+    purpose: str = Field(default="image", description="what it is for: image | video | music | voice | text")
+    style: str = Field(default="", description="the prompt style the model expects (models.toml prompt_profile)")
+    instruction: str = Field(default="", description="suggest: what the author wants changed")
+    source: str = Field(default="", description="translate: language code of the text; empty = detect")
+    target: str = Field(default="en", description="translate: into which language; suggest: language of the answer")
+    project_id: int | None = None
+
+
+class PromptAssistOut(Strict):
+    text: str
+    action: str
+    backend: str
+    model: str

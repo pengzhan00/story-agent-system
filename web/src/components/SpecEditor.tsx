@@ -5,6 +5,8 @@ import type { Spec, SpecEdit } from "../api/types";
 import { fieldsOfKind, textFieldKey } from "../lib/subjects";
 import { useT } from "../i18n";
 import { ErrorNote } from "./ErrorNote";
+import { PromptAssist } from "./PromptAssist";
+import { purposeOf } from "../lib/purpose";
 import { AddParam } from "./AddParam";
 import { ValueEditor } from "./ValueEditor";
 import { formatValue, useLabel } from "../lib/labels";
@@ -71,6 +73,7 @@ export function SpecEditor({ pid, spec, review, onAcknowledge }: { pid: number; 
           <label className="field">
             <span>{t("web.creative.prompt")}</span>
             <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={4} />
+            <PromptAssist text={prompt} onApply={setPrompt} purpose={purposeOf(spec.kind)} projectId={pid} />
           </label>
         ) : null}
         {f.negative ? (
@@ -82,6 +85,7 @@ export function SpecEditor({ pid, spec, review, onAcknowledge }: { pid: number; 
         <label className="field">
           <span>{t(textFieldKey(spec.subject_type))}</span>
           <textarea value={text} onChange={(e) => setText(e.target.value)} rows={spec.subject_type === "music.theme_song" ? 8 : 3} />
+          <PromptAssist text={text} onApply={setText} purpose="text" projectId={pid} />
         </label>
         <div className="row">
           <label className="field grow">

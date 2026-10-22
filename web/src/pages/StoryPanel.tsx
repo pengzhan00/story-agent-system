@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { STORY_PARTS, useStory, useStoryEdit, type StoryPart } from "../api/hooks";
 import type { Row } from "../api/types";
 import { ErrorNote } from "../components/ErrorNote";
+import { PromptAssist } from "../components/PromptAssist";
 import { ScriptOutline } from "../components/ScriptOutline";
 import { VoiceUpload } from "../components/VoiceUpload";
 import { useT } from "../i18n";
@@ -156,7 +157,7 @@ function RowView(props: { pid: number; part: StoryPart; row: Row; columns: strin
   );
 }
 
-function RowEditor({ pid, part, row, onDone }: { pid: number; part: StoryPart; row: Row; onDone: () => void }) {
+export function RowEditor({ pid, part, row, onDone }: { pid: number; part: StoryPart; row: Row; onDone: () => void }) {
   const t = useT();
   const fields = EDITABLE[part] ?? [];
   const edit = useStoryEdit(pid, part);
@@ -191,7 +192,10 @@ function RowEditor({ pid, part, row, onDone }: { pid: number; part: StoryPart; r
                 ))}
               </select>
             ) : f.type === "area" ? (
-              <textarea rows={f.rows ?? 2} value={draft[f.key] ?? ""} disabled={locked} onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })} />
+              <>
+                <textarea rows={f.rows ?? 2} value={draft[f.key] ?? ""} disabled={locked} onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })} />
+                {locked ? null : <PromptAssist text={draft[f.key] ?? ""} onApply={(x) => setDraft({ ...draft, [f.key]: x })} purpose="text" projectId={pid} />}
+              </>
             ) : (
               <input value={draft[f.key] ?? ""} disabled={locked} inputMode={f.type === "number" ? "decimal" : undefined} onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })} />
             )}

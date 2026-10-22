@@ -67,6 +67,15 @@ launcher = true
 timeout_sec = 240
 hint_key = "launch.hint.phosphene"
 
+# Draw Things: the button opens the app; its API Server (Settings -> Advanced) has to be switched on in the app itself,
+# which the system cannot do. Not part of "start everything".
+[launch.drawthings]
+argv = ["open", "-a", "Draw Things"]
+bulk = false
+launcher = true
+timeout_sec = 60
+hint_key = "launch.hint.drawthings"
+
 # Subprocess / library style tools (no service).
 [tools.h3]
 binary = "~/myworkspace/h3.c/h3"

@@ -13,6 +13,7 @@ import { ValueEditor } from "../components/ValueEditor";
 import { ValueView } from "../components/ValueView";
 import { useT } from "../i18n";
 import { LicenseAlert } from "../components/LicenseAlert";
+import { PromptAssist } from "../components/PromptAssist";
 import { jobError } from "../lib/jobError";
 import { mediaOfAsset, targetsFor } from "../lib/assets";
 import { duration } from "../lib/format";
@@ -278,7 +279,10 @@ function Inputs({
           <label key={f.name} className={f.type === "longtext" ? "field wide" : "field"}>
             <span>{label}</span>
             {f.type === "longtext" ? (
-              <textarea rows={3} value={String(v ?? "")} onChange={(e) => set(f.name, e.target.value)} />
+              <>
+                <textarea rows={3} value={String(v ?? "")} onChange={(e) => set(f.name, e.target.value)} />
+                <PromptAssist text={String(v ?? "")} onApply={(x) => set(f.name, x)} purpose="text" />
+              </>
             ) : (
               <input value={String(v ?? "")} onChange={(e) => set(f.name, e.target.value)} />
             )}
@@ -425,7 +429,9 @@ function JobCard({
   const j = item.job;
   const active = j.status === "queued" || j.status === "running";
   const waiting = j.status === "queued" && j.depends_on;
-  const main = item.assets.find((a) => a.slot === j.slot) ?? item.assets[0];
+  const [edited, setEdited] = useState<Record<string, Asset>>({});   // a text saved here: this card follows the new version
+  const shown = item.assets.map((a) => edited[a.id] ?? a);
+  const main = shown.find((a) => a.slot === j.slot) ?? shown[0];
   return (
     <li className="card stack">
       <div className="row">
@@ -456,7 +462,7 @@ function JobCard({
         </div>
       ) : null}
       {item.assets.map((a) => (
-        <AssetPreview key={a.id} asset={a} />
+        <AssetPreview key={a.id} asset={a} onSaved={(n) => setEdited({ ...edited, [a.id]: n })} />
       ))}
       {main ? (
         <div className="row small">

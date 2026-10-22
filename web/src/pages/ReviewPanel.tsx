@@ -1,3 +1,5 @@
+import { PromptAssist } from "../components/PromptAssist";
+import { purposeOf } from "../lib/purpose";
 import { useState, type FormEvent } from "react";
 import { useMe } from "../api/auth";
 import { useNotes, useReviewActions, useCompare, useReviewBoard, type Note, type ReviewShot } from "../api/review";
@@ -60,6 +62,7 @@ function RedoForm({ note, spec, actions, onDone }: { note: Note; spec: Spec | un
       <label className="field">
         <span>{t("web.review.redo_prompt")}</span>
         <textarea rows={4} value={prompt} onChange={(e) => setPrompt(e.target.value)} />
+        <PromptAssist text={prompt} onApply={setPrompt} purpose={purposeOf(spec?.kind ?? "image.generate")} projectId={spec?.project_id} />
       </label>
       <div className="row">
         <label className="field">

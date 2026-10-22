@@ -1,15 +1,29 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import type { Asset, Job, Spec } from "../api/types";
+import { put } from "../api/client";
 import { duration } from "../lib/format";
 import { useT } from "../i18n";
 import { jobError } from "../lib/jobError";
+import { ErrorNote } from "./ErrorNote";
 import { ProgressBar } from "./ProgressBar";
+import { PromptAssist } from "./PromptAssist";
 import { StatusChip } from "./StatusChip";
 
-/** A written text (story, script, transcript): shown in full, with a link to the file. */
-function TextPreview({ asset, src }: { asset: Asset; src: string }) {
+/** A written text (story, script, transcript): shown in full, editable (saved as a new version of the same slot), with
+ * the AI suggestion / translation beside it and a link to the file. */
+function TextPreview({ asset, src, onSaved }: { asset: Asset; src: string; onSaved?: (a: Asset) => void }) {
   const t = useT();
+  const qc = useQueryClient();
+  const [draft, setDraft] = useState<string | null>(null);
+  const save = useMutation({
+    mutationFn: (text: string) => put<Asset>(`/api/assets/${asset.id}/text`, { text }),
+    onSuccess: (a) => {
+      setDraft(null);
+      onSaved?.(a);
+      void qc.invalidateQueries();
+    },
+  });
   const body = useQuery({
     queryKey: ["asset-text", asset.id],
     queryFn: async () => {
@@ -19,12 +33,37 @@ function TextPreview({ asset, src }: { asset: Asset; src: string }) {
     },
     staleTime: Infinity,
   });
+  const editable = asset.kind.startsWith("text.") || asset.kind === "upload.text";
   return (
     <div className="stack">
-      <pre className="transcript">{body.data ?? (body.isError ? t("web.error.generic") : "")}</pre>
-      <a className="small" href={src} download>
-        {t("web.workshop.download")}
-      </a>
+      {draft === null ? (
+        <pre className="transcript">{body.data ?? (body.isError ? t("web.error.generic") : "")}</pre>
+      ) : (
+        <>
+          <textarea rows={16} value={draft} onChange={(e) => setDraft(e.target.value)} />
+          <PromptAssist text={draft} onApply={setDraft} purpose="text" projectId={asset.project_id} />
+          <ErrorNote error={save.error} />
+          <div className="row">
+            <button type="button" className="primary" disabled={save.isPending} onClick={() => save.mutate(draft)}>
+              {t("web.text.save")}
+            </button>
+            <button type="button" className="link" onClick={() => setDraft(null)}>
+              {t("web.close")}
+            </button>
+            <span className="muted small">{t("web.text.save_hint")}</span>
+          </div>
+        </>
+      )}
+      <div className="row small">
+        {editable && draft === null && body.data !== undefined ? (
+          <button type="button" className="link" onClick={() => setDraft(body.data ?? "")}>
+            {t("web.edit")}
+          </button>
+        ) : null}
+        <a href={src} download>
+          {t("web.workshop.download")}
+        </a>
+      </div>
     </div>
   );
 }
@@ -41,13 +80,13 @@ function MaskedPreview({ asset }: { asset: Asset }) {
   );
 }
 
-export function AssetPreview({ asset }: { asset: Asset }) {
+export function AssetPreview({ asset, onSaved }: { asset: Asset; onSaved?: (a: Asset) => void }) {
   const src = `/api/assets/${asset.id}/file`;
   if (asset.locked) return <MaskedPreview asset={asset} />;
   if (asset.kind.startsWith("image")) return <img className="preview" src={src} alt={asset.slot} loading="lazy" />;
   if (asset.kind.startsWith("video")) return <video className="preview" src={src} controls preload="metadata" />;
   if (asset.kind.startsWith("audio") || asset.kind.startsWith("upload.audio")) return <audio className="audio" src={src} controls preload="none" />;
-  if (asset.kind.startsWith("text") || asset.kind === "upload.text") return <TextPreview asset={asset} src={src} />;
+  if (asset.kind.startsWith("text") || asset.kind === "upload.text") return <TextPreview asset={asset} src={src} onSaved={onSaved} />;
   return <a href={src}>{asset.path}</a>;
 }
 

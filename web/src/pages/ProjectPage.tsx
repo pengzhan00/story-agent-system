@@ -15,6 +15,7 @@ import { ProcessPanel } from "./ProcessPanel";
 import { ReviewPanel } from "./ReviewPanel";
 import { JobsPanel } from "./QueuePage";
 import { SeriesPanel } from "./SeriesPanel";
+import { BiblePanel } from "./BiblePanel";
 import { StoryPanel } from "./StoryPanel";
 import { WorkflowPanel } from "./WorkflowPanel";
 
@@ -86,6 +87,9 @@ export function ProjectPage() {
         <NavLink to="series" className={({ isActive }) => (isActive ? "tab active" : "tab")}>
           {t("web.tab.series")}
         </NavLink>
+        <NavLink to="bible" className={({ isActive }) => (isActive ? "tab active" : "tab")}>
+          {t("web.tab.bible")}
+        </NavLink>
         <NavLink to="story" className={({ isActive }) => (isActive ? "tab active" : "tab")}>
           {t("web.tab.story")}
         </NavLink>
@@ -121,6 +125,7 @@ export function ProjectPage() {
         <Route index element={<Navigate to="workflow" replace />} />
         <Route path="workflow" element={<WorkflowPanel id={id} />} />
         <Route path="series" element={<SeriesPanel id={id} />} />
+        <Route path="bible" element={<BiblePanel id={id} />} />
         <Route path="story" element={<StoryPanel id={id} />} />
         <Route path="creative" element={<CreativePanel id={id} />} />
         <Route path="continuity" element={<ContinuityPanel id={id} />} />

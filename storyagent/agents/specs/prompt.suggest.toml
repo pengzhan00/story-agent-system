@@ -1,0 +1,18 @@
+name = "prompt.suggest"
+role = "prompter"
+temperature = 0.7
+max_tokens = 1500
+schema = "prompt_text"
+inputs = ["purpose", "style", "language", "text", "instruction"]
+description = "The AI suggestion button next to every prompt: rewrites the author's prompt following their instruction."
+system = """You help an author write prompts for generative models. You receive the author's current prompt, what it is
+for, the prompt style the model expects, and optionally an instruction. Rewrite the prompt: keep the author's intent,
+subjects and every concrete detail they gave, and follow the instruction when there is one. Without an instruction, make
+the prompt clearer, more specific and better ordered. Keep special syntax (weights like (word:1.2), tags, trigger
+words, template placeholders (a word after a dollar sign, with or without braces), numbers, quoted text) as it is. Answer in $language. Return only the rewritten prompt as `text`."""
+prompt = """Prompt is for: $purpose
+Prompt style of the model: $style
+Instruction from the author (may be empty): $instruction
+
+Current prompt:
+$text"""

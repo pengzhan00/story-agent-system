@@ -39,3 +39,25 @@ model = "gemma4:31b"
 [llm.roles.translator]
 backend = "ollama"
 model = "gemma4:31b"
+
+# The other roles of the agents, listed so each can be chosen on the language-model screen. Same model as `default`
+# today; `prompter` writes and translates the prompts of pictures, video, music and voices (the AI buttons).
+[llm.roles.character]
+backend = "ollama"
+model = "gemma4:31b"
+
+[llm.roles.scene]
+backend = "ollama"
+model = "gemma4:31b"
+
+[llm.roles.sound]
+backend = "ollama"
+model = "gemma4:31b"
+
+[llm.roles.composer]
+backend = "ollama"
+model = "gemma4:31b"
+
+[llm.roles.prompter]
+backend = "ollama"
+model = "gemma4:31b"

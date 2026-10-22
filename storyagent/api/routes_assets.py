@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import mimetypes
 from typing import Annotated
 
@@ -7,11 +8,12 @@ from fastapi import APIRouter, Query, Request
 from fastapi.responses import FileResponse
 
 from storyagent.content import mask_thumbnail
-from storyagent.util import home_file
+from storyagent.media.ledger import NewAsset
+from storyagent.util import home_file, new_id
 
 from .context import ctx_of
 from .errors import ApiError
-from .schemas import AssetOut, StaleAsset
+from .schemas import AssetOut, StaleAsset, TextEdit
 from .visibility import require_viewable
 
 router = APIRouter(prefix="/api", tags=["assets"])
@@ -72,6 +74,32 @@ def asset_mask(asset_id: str, request: Request) -> FileResponse:
     if not mask_thumbnail(ctx.settings, ctx.settings.home / asset.path, cache):
         raise ApiError(404, "not_found", asset_id)
     return FileResponse(cache, media_type="image/jpeg", content_disposition_type="inline")
+
+
+@router.put("/assets/{asset_id}/text", response_model=AssetOut)
+def edit_text_asset(asset_id: str, body: TextEdit, request: Request) -> AssetOut:
+    """Save an edited story / script / transcript as a NEW version of the same slot (the one before stays as a
+    candidate, so the edit can be undone by adopting it again)."""
+    ctx = ctx_of(request)
+    old = ctx.ledger.get_asset(asset_id)
+    if not (old.kind.startswith("text.") or old.kind == "upload.text"):
+        raise ApiError(422, "not_text_asset", old.kind)
+    require_viewable(request, old.rating, old.project_id, what=old.id)
+    src = home_file(ctx.settings.home, old.path)
+    if src is None:
+        raise ApiError(404, "not_found", "asset path outside the data home")
+    dest = src.with_name(f"{new_id()}{src.suffix or '.md'}")
+    data = body.text.encode("utf-8")
+    dest.write_bytes(data)
+    user = request.scope.get("state", {}).get("user")
+    new = ctx.ledger.register_asset(
+        NewAsset(
+            kind=old.kind, slot=old.slot, path=str(dest.relative_to(ctx.settings.home)),
+            sha256=hashlib.sha256(data).hexdigest(), bytes=len(data), metadata={**old.metadata, "edited_from": old.id},
+            provenance={**old.provenance, "edited_by": str(user.username) if user else "local", "edited_from": old.id},
+            rating=old.rating),
+        project_id=old.project_id, shot_id=old.shot_id)
+    return AssetOut.model_validate(new)
 
 
 @router.post("/assets/{asset_id}/adopt", response_model=AssetOut)

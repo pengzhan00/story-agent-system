@@ -11,6 +11,7 @@ from storyagent.config import Settings
 from storyagent.content import digest_text, project_rating
 from storyagent.db import Database
 
+from . import overrides
 from .backends import ChatResult, LLMBackendClient, build_client
 from .errors import LLMError
 from .jsonfix import parse_object
@@ -49,9 +50,18 @@ class LLMRouter:
             self._clients[backend] = build_client(spec)
         return self._clients[backend]
 
-    def resolve(self, role: str, override_model: str = "") -> tuple[str, str, dict[str, Any]]:
+    def resolve(
+        self, role: str, override_model: str = "", project_id: int | None = None
+    ) -> tuple[str, str, dict[str, Any]]:
+        """(backend, model, params): a model named by the call wins, then the project's choice, then the global
+        choice made on the screen, then ``llm.toml``."""
         r = self.settings.llm_role(role)
-        return r.backend, override_model or r.model, dict(r.params)
+        backend, model = r.backend, r.model
+        if self.db is not None:
+            chosen = overrides.get(self.db, role, project_id)
+            if chosen is not None and chosen.backend in self.settings.llm_backends:
+                backend, model = chosen.backend, chosen.model
+        return backend, override_model or model, dict(r.params)
 
     def available(self, backend: str, refresh: bool = False) -> list[str]:
         if refresh or backend not in self._models:
@@ -126,7 +136,7 @@ class LLMRouter:
         schema: dict[str, Any] | None = None, label: str = "", **opts: Any,
     ) -> ChatResult:
         self._wait_for_heavy()
-        backend, model_name, params = self.resolve(role, model)
+        backend, model_name, params = self.resolve(role, model, project_id)
         merged = {"temperature": 0.7, "max_tokens": 4096, **params, **opts}
         res = self.client(backend).chat(
             model_name, system, prompt, temperature=float(merged["temperature"]),

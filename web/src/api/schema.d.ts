@@ -59,6 +59,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ai/prompt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Prompt Assist
+         * @description The AI buttons beside a prompt: ``suggest`` rewrites it (following the author's instruction), ``translate``
+         *     puts it in another language. Nothing is saved: the screen shows the result and the author takes it or not. The
+         *     model is the one chosen for the ``prompter`` role (of the project, when one is given).
+         */
+        post: operations["prompt_assist_api_ai_prompt_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/assets": {
         parameters: {
             query?: never;
@@ -632,6 +654,61 @@ export interface paths {
         get: operations["item_file_api_library__item_id__file_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/llm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Llm State */
+        get: operations["llm_state_api_llm_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/llm/roles/{role}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Role */
+        put: operations["set_role_api_llm_roles__role__put"];
+        post?: never;
+        /** Reset Role */
+        delete: operations["reset_role_api_llm_roles__role__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/llm/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test Model
+         * @description One short question to a model: does it answer, and how long does the first answer take.
+         */
+        post: operations["test_model_api_llm_test_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2990,6 +3067,81 @@ export interface components {
             /** Tags */
             tags?: string[];
         };
+        /** LlmBackendOut */
+        LlmBackendOut: {
+            /** Error */
+            error: string;
+            /** Kind */
+            kind: string;
+            /** Models */
+            models: string[];
+            /** Name */
+            name: string;
+            /**
+             * State
+             * @description ok | unreachable | disabled
+             */
+            state: string;
+            /** Url */
+            url: string;
+        };
+        /** LlmOut */
+        LlmOut: {
+            /** Backends */
+            backends: components["schemas"]["LlmBackendOut"][];
+            /** Project Id */
+            project_id: number | null;
+            /** Roles */
+            roles: components["schemas"]["LlmRoleOut"][];
+        };
+        /** LlmRoleOut */
+        LlmRoleOut: {
+            /** Backend */
+            backend: string;
+            /** Config Backend */
+            config_backend: string;
+            /** Config Model */
+            config_model: string;
+            /** Group */
+            group: string;
+            /** Model */
+            model: string;
+            /** Name */
+            name: string;
+            /**
+             * Source
+             * @description config (llm.toml) | global (chosen on the screen) | project (chosen there)
+             */
+            source: string;
+        };
+        /** LlmRoleSet */
+        LlmRoleSet: {
+            /** Backend */
+            backend: string;
+            /** Model */
+            model: string;
+            /**
+             * Project Id
+             * @description null = every project
+             */
+            project_id?: number | null;
+        };
+        /** LlmTest */
+        LlmTest: {
+            /** Backend */
+            backend: string;
+            /** Model */
+            model: string;
+        };
+        /** LlmTestOut */
+        LlmTestOut: {
+            /** Ok */
+            ok: boolean;
+            /** Reply */
+            reply: string;
+            /** Seconds */
+            seconds: number;
+        };
         /** LockBody */
         LockBody: {
             /** Locked */
@@ -3740,6 +3892,59 @@ export interface components {
              * @description share of an episode's shots that get a video clip (0-1); null = default
              */
             video_share?: number | null;
+        };
+        /** PromptAssistIn */
+        PromptAssistIn: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "suggest" | "translate";
+            /**
+             * Instruction
+             * @description suggest: what the author wants changed
+             * @default
+             */
+            instruction: string;
+            /** Project Id */
+            project_id?: number | null;
+            /**
+             * Purpose
+             * @description what it is for: image | video | music | voice | text
+             * @default image
+             */
+            purpose: string;
+            /**
+             * Source
+             * @description translate: language code of the text; empty = detect
+             * @default
+             */
+            source: string;
+            /**
+             * Style
+             * @description the prompt style the model expects (models.toml prompt_profile)
+             * @default
+             */
+            style: string;
+            /**
+             * Target
+             * @description translate: into which language; suggest: language of the answer
+             * @default en
+             */
+            target: string;
+            /** Text */
+            text: string;
+        };
+        /** PromptAssistOut */
+        PromptAssistOut: {
+            /** Action */
+            action: string;
+            /** Backend */
+            backend: string;
+            /** Model */
+            model: string;
+            /** Text */
+            text: string;
         };
         /**
          * QualityTier
@@ -4664,6 +4869,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AiCallDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    prompt_assist_api_ai_prompt_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PromptAssistIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromptAssistOut"];
                 };
             };
             /** @description Validation Error */
@@ -5735,6 +5973,138 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    llm_state_api_llm_get: {
+        parameters: {
+            query?: {
+                project_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LlmOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_role_api_llm_roles__role__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LlmRoleSet"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LlmOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_role_api_llm_roles__role__delete: {
+        parameters: {
+            query?: {
+                project_id?: number | null;
+            };
+            header?: never;
+            path: {
+                role: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LlmOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_model_api_llm_test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LlmTest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LlmTestOut"];
+                };
             };
             /** @description Validation Error */
             422: {

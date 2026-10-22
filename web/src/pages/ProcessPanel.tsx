@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState } from "react";
-import { useAiCall, useAiCalls, useProjectData, useSaveProjectData } from "../api/hooks";
+import { useAiCall, useAiCalls } from "../api/hooks";
 import { ErrorNote } from "../components/ErrorNote";
-import { ValueEditor } from "../components/ValueEditor";
+import { DataEditor } from "../components/DataEditor";
 import { ValueView } from "../components/ValueView";
 import { useT } from "../i18n";
 import { duration } from "../lib/format";
@@ -117,35 +117,6 @@ function AiCalls({ id }: { id: number }) {
 }
 
 /** The plan / style as labelled fields (text, numbers, lists, groups), never as JSON. */
-function DataEditor({ id, name }: { id: number; name: "plan" | "style" }) {
-  const t = useT();
-  const data = useProjectData(id, name);
-  const save = useSaveProjectData(id, name);
-  const [draft, setDraft] = useState<Record<string, unknown> | null>(null);
-  const current = (data.data ?? {}) as Record<string, unknown>;
-  const values = draft ?? current;
-  const dirty = draft !== null && JSON.stringify(draft) !== JSON.stringify(current);
-  return (
-    <section className="card stack">
-      <h2>{t(`web.process.${name}`)}</h2>
-      <p className="muted small">{t(`web.process.${name}_hint`)}</p>
-      <ErrorNote error={data.error ?? save.error} />
-      {Object.keys(current).length === 0 && !data.isLoading ? <p className="empty">{t("web.process.not_yet")}</p> : null}
-      {Object.keys(values).length > 0 ? <ValueEditor value={values} onChange={setDraft} /> : null}
-      {Object.keys(values).length > 0 ? (
-        <div className="row">
-          <button className="primary" disabled={!dirty || save.isPending} onClick={() => save.mutate(values, { onSuccess: () => setDraft(null) })}>
-            {t("web.save")}
-          </button>
-          <button disabled={!dirty} onClick={() => setDraft(null)}>
-            {t("web.cancel")}
-          </button>
-        </div>
-      ) : null}
-    </section>
-  );
-}
-
 /** Behind the scenes of one project: the plan and style everything is generated from, and every model call. */
 export function ProcessPanel({ id }: { id: number }) {
   return (

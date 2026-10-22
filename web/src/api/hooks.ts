@@ -111,7 +111,7 @@ export function useCancelRun(id: number) {
 export const STORY_PARTS = ["characters", "locations", "music", "sfx", "shots", "dialogue", "scripts"] as const;
 export type StoryPart = (typeof STORY_PARTS)[number];
 /** Rows the story API serves; looks and props have their own page (continuity), not a tab of the story editor. */
-export type StoryRows = StoryPart | "looks" | "props";
+export type StoryRows = StoryPart | "looks" | "props" | "seasons" | "episodes";
 export const useStory = (id: number, part: StoryRows) =>
   useQuery({ queryKey: ["story", id, part], queryFn: () => api<Row[]>(`/api/projects/${id}/${part}`) });
 

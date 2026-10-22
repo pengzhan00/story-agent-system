@@ -1,5 +1,5 @@
 name = "shot.visual"
-role = "writer"
+role = "prompter"
 temperature = 0.6
 max_tokens = 1500
 schema = "shot_visual"

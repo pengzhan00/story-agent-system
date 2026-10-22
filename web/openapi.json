@@ -2195,6 +2195,199 @@
         "title": "LibraryPublish",
         "type": "object"
       },
+      "LlmBackendOut": {
+        "properties": {
+          "error": {
+            "title": "Error",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "models": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Models",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "state": {
+            "description": "ok | unreachable | disabled",
+            "title": "State",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "kind",
+          "url",
+          "state",
+          "models",
+          "error"
+        ],
+        "title": "LlmBackendOut",
+        "type": "object"
+      },
+      "LlmOut": {
+        "properties": {
+          "backends": {
+            "items": {
+              "$ref": "#/components/schemas/LlmBackendOut"
+            },
+            "title": "Backends",
+            "type": "array"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "roles": {
+            "items": {
+              "$ref": "#/components/schemas/LlmRoleOut"
+            },
+            "title": "Roles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "backends",
+          "roles",
+          "project_id"
+        ],
+        "title": "LlmOut",
+        "type": "object"
+      },
+      "LlmRoleOut": {
+        "properties": {
+          "backend": {
+            "title": "Backend",
+            "type": "string"
+          },
+          "config_backend": {
+            "title": "Config Backend",
+            "type": "string"
+          },
+          "config_model": {
+            "title": "Config Model",
+            "type": "string"
+          },
+          "group": {
+            "title": "Group",
+            "type": "string"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "source": {
+            "description": "config (llm.toml) | global (chosen on the screen) | project (chosen there)",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "group",
+          "backend",
+          "model",
+          "source",
+          "config_backend",
+          "config_model"
+        ],
+        "title": "LlmRoleOut",
+        "type": "object"
+      },
+      "LlmRoleSet": {
+        "properties": {
+          "backend": {
+            "title": "Backend",
+            "type": "string"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null = every project",
+            "title": "Project Id"
+          }
+        },
+        "required": [
+          "backend",
+          "model"
+        ],
+        "title": "LlmRoleSet",
+        "type": "object"
+      },
+      "LlmTest": {
+        "properties": {
+          "backend": {
+            "title": "Backend",
+            "type": "string"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          }
+        },
+        "required": [
+          "backend",
+          "model"
+        ],
+        "title": "LlmTest",
+        "type": "object"
+      },
+      "LlmTestOut": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "reply": {
+            "title": "Reply",
+            "type": "string"
+          },
+          "seconds": {
+            "title": "Seconds",
+            "type": "number"
+          }
+        },
+        "required": [
+          "ok",
+          "seconds",
+          "reply"
+        ],
+        "title": "LlmTestOut",
+        "type": "object"
+      },
       "LockBody": {
         "properties": {
           "locked": {
@@ -4062,6 +4255,99 @@
           }
         },
         "title": "ProjectSettingsPatch",
+        "type": "object"
+      },
+      "PromptAssistIn": {
+        "properties": {
+          "action": {
+            "enum": [
+              "suggest",
+              "translate"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "instruction": {
+            "default": "",
+            "description": "suggest: what the author wants changed",
+            "title": "Instruction",
+            "type": "string"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "purpose": {
+            "default": "image",
+            "description": "what it is for: image | video | music | voice | text",
+            "title": "Purpose",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "description": "translate: language code of the text; empty = detect",
+            "title": "Source",
+            "type": "string"
+          },
+          "style": {
+            "default": "",
+            "description": "the prompt style the model expects (models.toml prompt_profile)",
+            "title": "Style",
+            "type": "string"
+          },
+          "target": {
+            "default": "en",
+            "description": "translate: into which language; suggest: language of the answer",
+            "title": "Target",
+            "type": "string"
+          },
+          "text": {
+            "maxLength": 20000,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "action",
+          "text"
+        ],
+        "title": "PromptAssistIn",
+        "type": "object"
+      },
+      "PromptAssistOut": {
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "backend": {
+            "title": "Backend",
+            "type": "string"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "action",
+          "backend",
+          "model"
+        ],
+        "title": "PromptAssistOut",
         "type": "object"
       },
       "QualityTier": {
@@ -6166,6 +6452,48 @@
         ]
       }
     },
+    "/api/ai/prompt": {
+      "post": {
+        "description": "The AI buttons beside a prompt: ``suggest`` rewrites it (following the author's instruction), ``translate``\nputs it in another language. Nothing is saved: the screen shows the result and the author takes it or not. The\nmodel is the one chosen for the ``prompter`` role (of the project, when one is given).",
+        "operationId": "prompt_assist_api_ai_prompt_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromptAssistIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromptAssistOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Prompt Assist",
+        "tags": [
+          "llm"
+        ]
+      }
+    },
     "/api/assets": {
       "get": {
         "operationId": "list_assets_api_assets_get",
@@ -7960,6 +8288,205 @@
         "summary": "Item File",
         "tags": [
           "library"
+        ]
+      }
+    },
+    "/api/llm": {
+      "get": {
+        "operationId": "llm_state_api_llm_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "project_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlmOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Llm State",
+        "tags": [
+          "llm"
+        ]
+      }
+    },
+    "/api/llm/roles/{role}": {
+      "delete": {
+        "operationId": "reset_role_api_llm_roles__role__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "role",
+            "required": true,
+            "schema": {
+              "title": "Role",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "project_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlmOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reset Role",
+        "tags": [
+          "llm"
+        ]
+      },
+      "put": {
+        "operationId": "set_role_api_llm_roles__role__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "role",
+            "required": true,
+            "schema": {
+              "title": "Role",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LlmRoleSet"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlmOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Role",
+        "tags": [
+          "llm"
+        ]
+      }
+    },
+    "/api/llm/test": {
+      "post": {
+        "description": "One short question to a model: does it answer, and how long does the first answer take.",
+        "operationId": "test_model_api_llm_test_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LlmTest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlmTestOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Test Model",
+        "tags": [
+          "llm"
         ]
       }
     },

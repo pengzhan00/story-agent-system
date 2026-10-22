@@ -920,6 +920,43 @@ def _cmd_workflow_watch(s: Settings, a: argparse.Namespace) -> int:
         return 1
 
 
+def _cmd_llm_roles(s: Settings, a: argparse.Namespace) -> int:
+    """Every role with the backend and model it uses now, and where that choice comes from."""
+    from storyagent.llm import LLMRouter, overrides
+
+    c = _ctx(s)
+    router = LLMRouter(s, c.db)
+    scope = overrides.project_scope(a.project) if a.project is not None else overrides.GLOBAL
+    chosen = overrides.listing(c.db, scope)
+    for role in sorted(s.llm_roles):
+        backend, model, _ = router.resolve(role, project_id=a.project)
+        print(f"{role}\t{backend}\t{model}\t{'chosen' if role in chosen else 'config'}")
+    return 0
+
+
+def _cmd_llm_set(s: Settings, a: argparse.Namespace) -> int:
+    from storyagent.llm import overrides
+
+    if a.role not in s.llm_roles or a.backend not in s.llm_backends:
+        print(t("cli.llm.unknown", role=a.role, backend=a.backend), file=sys.stderr)
+        return 2
+    c = _ctx(s)
+    scope = overrides.project_scope(a.project) if a.project is not None else overrides.GLOBAL
+    overrides.put(c.db, scope, a.role, a.backend, a.model)
+    print(t("cli.llm.set", role=a.role, backend=a.backend, model=a.model))
+    return 0
+
+
+def _cmd_llm_unset(s: Settings, a: argparse.Namespace) -> int:
+    from storyagent.llm import overrides
+
+    c = _ctx(s)
+    scope = overrides.project_scope(a.project) if a.project is not None else overrides.GLOBAL
+    overrides.remove(c.db, scope, a.role)
+    print(t("cli.llm.unset", role=a.role))
+    return 0
+
+
 def _cmd_llm_check(s: Settings, _a: argparse.Namespace) -> int:
     from storyagent.llm import LLMError, LLMRouter
 
@@ -1207,6 +1244,16 @@ def build_parser() -> argparse.ArgumentParser:
     wp.add_argument("--confirm-restricted", action="store_true", help=CONFIRM_HELP)
     llm = sub.add_parser("llm").add_subparsers(dest="cmd", required=True)
     add(llm, "check", _cmd_llm_check)
+    wp = add(llm, "roles", _cmd_llm_roles)
+    wp.add_argument("--project", type=int, help="the choices of this project (default: every project)")
+    wp = add(llm, "set", _cmd_llm_set)
+    wp.add_argument("role")
+    wp.add_argument("backend")
+    wp.add_argument("model")
+    wp.add_argument("--project", type=int, help="only for this project (default: every project)")
+    wp = add(llm, "unset", _cmd_llm_unset)
+    wp.add_argument("role")
+    wp.add_argument("--project", type=int)
 
     api = sub.add_parser("api").add_subparsers(dest="cmd", required=True)
     wp = add(api, "openapi", _cmd_api_openapi)

@@ -1,3 +1,4 @@
+import { PromptAssist } from "../components/PromptAssist";
 import { useEffect, useRef, useState } from "react";
 import { useAgentEdit, useAgents } from "../api/hooks";
 import type { Agent } from "../api/types";
@@ -79,10 +80,12 @@ function Editor({ agent }: { agent: Agent }) {
       <label className="field wide">
         <span>{t("web.prompts.system")}</span>
         <textarea ref={system} onFocus={() => (lastBox.current = "system")} rows={6} value={d.system} onChange={(e) => setD({ ...d, system: e.target.value })} />
+        <PromptAssist text={d.system} onApply={(x) => setD({ ...d, system: x })} purpose="agent" />
       </label>
       <label className="field wide">
         <span>{t("web.prompts.prompt")}</span>
         <textarea ref={promptBox} onFocus={() => (lastBox.current = "prompt")} rows={12} value={d.prompt} onChange={(e) => setD({ ...d, prompt: e.target.value })} />
+        <PromptAssist text={d.prompt} onApply={(x) => setD({ ...d, prompt: x })} purpose="agent" />
       </label>
       <div className="form-grid">
         <label className="field">
