@@ -25,6 +25,7 @@ from storyagent.media.ledger import Ledger
 from storyagent.media.library import Library
 from storyagent.media.specs import SpecStore
 from storyagent.projects import ProjectStore
+from storyagent.review import ReviewStore
 from storyagent.story import StoryStore
 from storyagent.workflow import WorkflowState
 
@@ -37,6 +38,7 @@ from . import (
     routes_launch,
     routes_library,
     routes_projects,
+    routes_review,
     routes_specs,
     routes_story,
     routes_system,
@@ -51,9 +53,11 @@ def build_context(settings: Settings) -> ApiContext:
     db = Database(settings.db_path)
     migrate(db)
     ledger = Ledger(db, settings)
+    specs, story = SpecStore(db, settings, ledger), StoryStore(db)
     return ApiContext(
-        settings, db, ledger, SpecStore(db, settings, ledger), ProjectStore(db, settings),
-        Library(db, settings, ledger), StoryStore(db), WorkflowState(db), AuthStore(db, settings),
+        settings, db, ledger, specs, ProjectStore(db, settings),
+        Library(db, settings, ledger), story, WorkflowState(db), AuthStore(db, settings),
+        ReviewStore(db, ledger, specs, story),
     )
 
 
@@ -103,8 +107,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             expose_headers=["Content-Disposition"],
         )
     errors.install(app)
-    for module in (routes_auth, routes_projects, routes_jobs, routes_assets, routes_library, routes_specs, routes_story,
-                   routes_workflow, routes_system, routes_ai, routes_launch, routes_workshop):
+    for module in (routes_auth, routes_review, routes_projects, routes_jobs, routes_assets, routes_library,
+                   routes_specs, routes_story, routes_workflow, routes_system, routes_ai, routes_launch,
+                   routes_workshop):
         app.include_router(module.router)
     web = web_root(settings)
     if web is not None:

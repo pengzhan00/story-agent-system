@@ -927,3 +927,79 @@ class AuditOut(Strict):
     status: int | None
     detail: dict[str, Any]
     client: str
+
+
+# -- review loop ------------------------------------------------------------------------------------------
+NoteStatus = Literal["open", "redoing", "resolved", "dismissed"]
+
+
+class NoteOut(Strict):
+    id: int
+    project_id: int
+    subject_type: str
+    subject_id: str
+    slot: str
+    shot_id: int | None
+    asset_id: str | None
+    body: str
+    status: NoteStatus
+    author: str
+    resolution: str
+    resolved_by: str
+    resolved_at: str | None
+    redo_spec_version: int | None
+    redo_job_ids: list[str]
+    created_at: str
+    updated_at: str
+
+
+class NoteCreate(BaseModel):
+    subject_type: str = Field(min_length=1, max_length=80)
+    subject_id: str = Field(min_length=1, max_length=80)
+    slot: str = Field(default="main", max_length=40)
+    shot_id: int | None = None
+    asset_id: str | None = Field(default=None, max_length=64)
+    body: str = Field(min_length=1, max_length=4000)
+
+
+class NoteStatusBody(BaseModel):
+    status: Literal["open", "resolved", "dismissed"]
+    resolution: str = Field(default="", max_length=1000)
+
+
+class NoteRedoBody(BaseModel):
+    """What the reviewer wants different (only what is sent changes the spec; nothing = same spec, new seeds)."""
+
+    prompt: str | None = None
+    negative_prompt: str | None = None
+    text_payload: str | None = None
+    model_ref: str | None = None
+    seed: int | None = None
+    params_patch: dict[str, Any] | None = None
+    n_candidates: int = Field(default=1, ge=1, le=8)
+    tier: QualityTier = QualityTier.FINAL
+
+
+class NoteRedoOut(Strict):
+    note: NoteOut
+    jobs: list[JobOut]
+
+
+class NoteCompareOut(Strict):
+    note: NoteOut
+    before: AssetOut | None
+    after: list[AssetOut]
+    jobs: list[JobOut]
+
+
+class ReviewShotOut(Strict):
+    shot_id: int
+    episode: int
+    act: int
+    scene: int
+    shot: int
+    location: str
+    assets: list[AssetOut]
+    open_notes: int
+    redoing_notes: int
+    resolved_notes: int

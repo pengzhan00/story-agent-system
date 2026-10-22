@@ -21,6 +21,7 @@ from storyagent.media.ledger import LedgerError
 from storyagent.media.library import LibraryError
 from storyagent.media.specs import SpecError, SpecLocked
 from storyagent.projects import ProjectNotFound, ProjectStateError
+from storyagent.review import ReviewError
 from storyagent.story import ShotLocked, StoryError, StoryNotFound
 from storyagent.workflow import WorkflowStateError
 from storyagent.workshop import WorkshopError
@@ -61,6 +62,10 @@ def install(app: FastAPI) -> None:
     @app.exception_handler(AuthError)
     async def _auth(request: Request, exc: AuthError) -> JSONResponse:
         return respond(request, exc.status, exc.code, exc.detail)
+
+    @app.exception_handler(ReviewError)
+    async def _review(request: Request, exc: ReviewError) -> JSONResponse:
+        return respond(request, exc.status, exc.code, str(exc))
 
     @app.exception_handler(LaunchError)
     async def _launch(request: Request, exc: LaunchError) -> JSONResponse:

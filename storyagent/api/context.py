@@ -15,6 +15,7 @@ from storyagent.media.ledger import Ledger
 from storyagent.media.library import Library
 from storyagent.media.specs import SpecStore
 from storyagent.projects import ProjectStore
+from storyagent.review import ReviewStore
 from storyagent.story import StoryStore
 from storyagent.workflow import WorkflowState
 
@@ -30,6 +31,7 @@ class ApiContext:
     story: StoryStore
     workflow: WorkflowState
     auth: AuthStore
+    review: ReviewStore
 
 
 def ctx_of(request: Request) -> ApiContext:

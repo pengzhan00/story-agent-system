@@ -2135,6 +2135,362 @@
         "title": "ModelOut",
         "type": "object"
       },
+      "NoteCompareOut": {
+        "properties": {
+          "after": {
+            "items": {
+              "$ref": "#/components/schemas/AssetOut"
+            },
+            "title": "After",
+            "type": "array"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AssetOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "jobs": {
+            "items": {
+              "$ref": "#/components/schemas/JobOut"
+            },
+            "title": "Jobs",
+            "type": "array"
+          },
+          "note": {
+            "$ref": "#/components/schemas/NoteOut"
+          }
+        },
+        "required": [
+          "note",
+          "before",
+          "after",
+          "jobs"
+        ],
+        "title": "NoteCompareOut",
+        "type": "object"
+      },
+      "NoteCreate": {
+        "properties": {
+          "asset_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asset Id"
+          },
+          "body": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Body",
+            "type": "string"
+          },
+          "shot_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shot Id"
+          },
+          "slot": {
+            "default": "main",
+            "maxLength": 40,
+            "title": "Slot",
+            "type": "string"
+          },
+          "subject_id": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Subject Id",
+            "type": "string"
+          },
+          "subject_type": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Subject Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "subject_type",
+          "subject_id",
+          "body"
+        ],
+        "title": "NoteCreate",
+        "type": "object"
+      },
+      "NoteOut": {
+        "properties": {
+          "asset_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asset Id"
+          },
+          "author": {
+            "title": "Author",
+            "type": "string"
+          },
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "project_id": {
+            "title": "Project Id",
+            "type": "integer"
+          },
+          "redo_job_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Redo Job Ids",
+            "type": "array"
+          },
+          "redo_spec_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Redo Spec Version"
+          },
+          "resolution": {
+            "title": "Resolution",
+            "type": "string"
+          },
+          "resolved_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved At"
+          },
+          "resolved_by": {
+            "title": "Resolved By",
+            "type": "string"
+          },
+          "shot_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shot Id"
+          },
+          "slot": {
+            "title": "Slot",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "redoing",
+              "resolved",
+              "dismissed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "subject_id": {
+            "title": "Subject Id",
+            "type": "string"
+          },
+          "subject_type": {
+            "title": "Subject Type",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "subject_type",
+          "subject_id",
+          "slot",
+          "shot_id",
+          "asset_id",
+          "body",
+          "status",
+          "author",
+          "resolution",
+          "resolved_by",
+          "resolved_at",
+          "redo_spec_version",
+          "redo_job_ids",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "NoteOut",
+        "type": "object"
+      },
+      "NoteRedoBody": {
+        "description": "What the reviewer wants different (only what is sent changes the spec; nothing = same spec, new seeds).",
+        "properties": {
+          "model_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Ref"
+          },
+          "n_candidates": {
+            "default": 1,
+            "maximum": 8.0,
+            "minimum": 1.0,
+            "title": "N Candidates",
+            "type": "integer"
+          },
+          "negative_prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Negative Prompt"
+          },
+          "params_patch": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Params Patch"
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt"
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seed"
+          },
+          "text_payload": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text Payload"
+          },
+          "tier": {
+            "$ref": "#/components/schemas/QualityTier",
+            "default": "final"
+          }
+        },
+        "title": "NoteRedoBody",
+        "type": "object"
+      },
+      "NoteRedoOut": {
+        "properties": {
+          "jobs": {
+            "items": {
+              "$ref": "#/components/schemas/JobOut"
+            },
+            "title": "Jobs",
+            "type": "array"
+          },
+          "note": {
+            "$ref": "#/components/schemas/NoteOut"
+          }
+        },
+        "required": [
+          "note",
+          "jobs"
+        ],
+        "title": "NoteRedoOut",
+        "type": "object"
+      },
+      "NoteStatusBody": {
+        "properties": {
+          "resolution": {
+            "default": "",
+            "maxLength": 1000,
+            "title": "Resolution",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "resolved",
+              "dismissed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "NoteStatusBody",
+        "type": "object"
+      },
       "ParamsOut": {
         "properties": {
           "base": {
@@ -3274,6 +3630,67 @@
           "changed_dependencies"
         ],
         "title": "ReviewItemOut",
+        "type": "object"
+      },
+      "ReviewShotOut": {
+        "properties": {
+          "act": {
+            "title": "Act",
+            "type": "integer"
+          },
+          "assets": {
+            "items": {
+              "$ref": "#/components/schemas/AssetOut"
+            },
+            "title": "Assets",
+            "type": "array"
+          },
+          "episode": {
+            "title": "Episode",
+            "type": "integer"
+          },
+          "location": {
+            "title": "Location",
+            "type": "string"
+          },
+          "open_notes": {
+            "title": "Open Notes",
+            "type": "integer"
+          },
+          "redoing_notes": {
+            "title": "Redoing Notes",
+            "type": "integer"
+          },
+          "resolved_notes": {
+            "title": "Resolved Notes",
+            "type": "integer"
+          },
+          "scene": {
+            "title": "Scene",
+            "type": "integer"
+          },
+          "shot": {
+            "title": "Shot",
+            "type": "integer"
+          },
+          "shot_id": {
+            "title": "Shot Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "shot_id",
+          "episode",
+          "act",
+          "scene",
+          "shot",
+          "location",
+          "assets",
+          "open_notes",
+          "redoing_notes",
+          "resolved_notes"
+        ],
+        "title": "ReviewShotOut",
         "type": "object"
       },
       "RunBody": {
@@ -5255,7 +5672,7 @@
     },
     "/api/assets/{asset_id}/adopt": {
       "post": {
-        "description": "Make this candidate the current asset of its slot.",
+        "description": "Make this candidate the current asset of its slot (and resolve the review notes that asked for this redo).",
         "operationId": "adopt_asset_api_assets__asset_id__adopt_post",
         "parameters": [
           {
@@ -8330,6 +8747,335 @@
         ]
       }
     },
+    "/api/projects/{project_id}/notes": {
+      "get": {
+        "operationId": "list_notes_api_projects__project_id__notes_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Status",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "subject_type",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Subject Type",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "subject_id",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Subject Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "shot_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Shot Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 500,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/NoteOut"
+                  },
+                  "title": "Response List Notes Api Projects  Project Id  Notes Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Notes",
+        "tags": [
+          "review"
+        ]
+      },
+      "post": {
+        "operationId": "add_note_api_projects__project_id__notes_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Note",
+        "tags": [
+          "review"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/notes/{note_id}": {
+      "patch": {
+        "operationId": "set_status_api_projects__project_id__notes__note_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "note_id",
+            "required": true,
+            "schema": {
+              "title": "Note Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteStatusBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Status",
+        "tags": [
+          "review"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/notes/{note_id}/compare": {
+      "get": {
+        "description": "The take the note was about next to the takes the redo(s) made (and the jobs still running).",
+        "operationId": "compare_api_projects__project_id__notes__note_id__compare_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "note_id",
+            "required": true,
+            "schema": {
+              "title": "Note Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteCompareOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Compare",
+        "tags": [
+          "review"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/notes/{note_id}/redo": {
+      "post": {
+        "description": "Apply the requested changes to the spec (a new version that quotes the note) and queue new takes.",
+        "operationId": "redo_api_projects__project_id__notes__note_id__redo_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "note_id",
+            "required": true,
+            "schema": {
+              "title": "Note Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteRedoBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteRedoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Redo",
+        "tags": [
+          "review"
+        ]
+      }
+    },
     "/api/projects/{project_id}/produce/plan": {
       "get": {
         "description": "What producing the media would make, task by task, with models and estimates - to confirm before it runs.\nStart the confirmed part with ``POST .../workflow/runs {\"stages\": [\"produce\"], \"params\": {\"only\": [spec ids],\n\"tier\": ...}}``.",
@@ -8485,6 +9231,52 @@
         "summary": "Review Script",
         "tags": [
           "workflow"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/review/board": {
+      "get": {
+        "operationId": "board_api_projects__project_id__review_board_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ReviewShotOut"
+                  },
+                  "title": "Response Board Api Projects  Project Id  Review Board Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Board",
+        "tags": [
+          "review"
         ]
       }
     },

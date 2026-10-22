@@ -67,6 +67,21 @@ PATCH /api/projects/1/specs/character.portrait/hero  {"prompt":"... at dusk"}   
 
 `WorkflowRunOut.progress`: `percent` (overall 0-100, never decreases), `stage`/`stage_index`/`stage_count`, `done`/`total` (items in the current stage, `total` 0 = not known yet), `message` (what is being done now), `elapsed_sec`, `eta_sec` (null until ~10 % is done) and `stages[]` (one bar each: `status`, `percent` — null while a running stage has not counted its items — and `seconds` once finished). It is written about once a second while the run is alive and once more at the end, so a poll or the SSE feed never shows a stalled number for a live run. A run whose worker died is requeued when its lease expires and continues from what was saved.
 
+## Review loop (notes, redo, compare)
+
+A reviewer looks at a shot's takes, writes a note, redoes from it and adopts the better take. A note belongs to a spec (and may name the take it is about); statuses `open` -> `redoing` (a redo was queued) -> `resolved` | `dismissed`; reopening goes back to `open`. Authors come from the signed-in user (`local` with sign-in off); the write endpoints are audited like every write.
+
+| Route | Notes |
+|---|---|
+| `GET /api/projects/{id}/review/board` | every shot with the takes in use (`assets`) and its `open_notes` / `redoing_notes` / `resolved_notes` counts |
+| `GET /api/projects/{id}/notes?status=&shot_id=&subject_type=&subject_id=` | newest first |
+| `POST /api/projects/{id}/notes` | `{subject_type, subject_id, slot?, shot_id?, asset_id?, body}`; the spec must exist (404), an empty body is 422 |
+| `PATCH /api/projects/{id}/notes/{note}` | `{status: open|resolved|dismissed, resolution?}` |
+| `POST /api/projects/{id}/notes/{note}/redo` | `{prompt?, negative_prompt?, text_payload?, model_ref?, seed?, params_patch?, n_candidates (1-8), tier}`: the changes become a new spec version (author `user`, note quoting the review; a locked spec is `409 spec_locked`), then `n_candidates` takes are queued; nothing sent = same spec, new seeds. A resolved/dismissed note must be reopened first (409) |
+| `GET /api/projects/{id}/notes/{note}/compare` | `{note, before (the take the note names), after (takes made by its redo jobs), jobs}` |
+
+Adopting a take that a redo made (`POST /api/assets/{id}/adopt`) resolves the notes waiting on it (`resolution = "adopted:<asset>"`); adopting any other take leaves notes alone.
+
 ## Team access (accounts, roles, audit)
 
 `[auth] mode` in `auth.toml` (env `STORY_AGENT_AUTH`): `off` (default, one operator, no login; writes are still audited as `local`) or `token`. In token mode every `/api/*` call except the public ones (`/api/auth/login|mode|me`, `/api/i18n/*`, `/api/docs`, `/api/openapi.json`) needs a session: `Authorization: Bearer <token>` or the HttpOnly session cookie set by login (the web client uses the cookie; the live feed `/api/events` needs it too).

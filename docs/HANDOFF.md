@@ -90,12 +90,13 @@ docs/          API CONFIGURATION MEDIA_CONTRACT RUNBOOK WORKFLOW USER_GUIDE PARI
 - **适配器缺模型/缺工具 → `missing_*` 错误,绝不静默降级**。
 - **合规**默认开(AIGC 标识、授权、受限许可闸),可全局/项目/环境变量关;**溯源始终记录**。
 
-### 3.2 表(001-014)
+### 3.2 表(001-015)
 
 | 表 | 关键列 |
 |---|---|
 | projects | id slug name description genre format aspect_ratio delivery_profile content_language status **settings(JSON)** **kind pipeline brief(JSON,迁移 013)** |
 | scripts | project_id episode_no title synopsis acts(JSON) total_scenes |
+| review_notes(迁移 015:批注,状态 open→redoing→resolved/dismissed,redo_job_ids) | project_id subject_type subject_id slot shot_id asset_id body author status resolution redo_spec_version |
 | users / user_sessions / audit_log(迁移 014:账号、会话令牌只存 SHA-256、只增审计) | username role password_hash(scrypt) active failed_logins locked_until ; token_hash expires_at revoked_at ; actor action path project_id status detail |
 | characters(+introduced_episode, locked:迁移 011) | project_id name role appearance personality voice_profile voice_ref_audio/text voice_ref_consent lora_ref ref_images |
 | scenes(场景设计) / music_themes / sound_effects | 各自属于 project;music_themes 有 kind(bgm/theme) lyrics duration_sec scene_ref |
@@ -178,7 +179,7 @@ docs/          API CONFIGURATION MEDIA_CONTRACT RUNBOOK WORKFLOW USER_GUIDE PARI
 **没在真实模型上验证过**:LoRA 训练、h3、多数工坊模块的真实流水线、项目页的新控件、立项向导的多步表单(只有 vitest)、蒸馏关键帧在多镜头上的人脸一致性。
 **系列层已做**(季/集、按集状态、批量、季大纲、系列看板、人物锁定与后续集加人、镜头分层与视频预算、剪辑卡片/淡入淡出/字幕样式),见 `docs/SERIES.md`。
 **没做**:接具体云厂商(接口已留好,只缺厂商与密钥)、场景/画风锁定(S1 余下)、交叉叠化、音效合成、一集多首配乐、口型头像步骤、RIFE 补帧、EDL/FCPXML、
-网页上传项目参考图、AI 改写+变更清单。**团队底座 T1 已做(2026-10-22)**:账号/角色/令牌与会话登录/接口鉴权(`auth.toml`,默认 off)/审计表(迁移 014)/CLI `user`+`audit`/网页登录、团队、审计页,见 `docs/API.md`「Team access」。
+网页上传项目参考图、AI 改写+变更清单。**团队底座 T1 已做(2026-10-22)**:账号/角色/令牌与会话登录/接口鉴权(`auth.toml`,默认 off)/审计表(迁移 014)/CLI `user`+`audit`/网页登录、团队、审计页,见 `docs/API.md`「Team access」。**T2 审片回路已做**:镜头批注→改规格重做→前后对比→采用即解决(迁移 015,网页「审片」页),见 `docs/API.md`「Review loop」。
 
 ## 8. 下一步(按这个顺序做)
 

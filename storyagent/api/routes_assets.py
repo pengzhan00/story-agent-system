@@ -59,8 +59,12 @@ def asset_file(asset_id: str, request: Request) -> FileResponse:
 
 @router.post("/assets/{asset_id}/adopt", response_model=AssetOut)
 def adopt_asset(asset_id: str, request: Request) -> AssetOut:
-    """Make this candidate the current asset of its slot."""
-    return AssetOut.model_validate(ctx_of(request).ledger.adopt(asset_id))
+    """Make this candidate the current asset of its slot (and resolve the review notes that asked for this redo)."""
+    ctx = ctx_of(request)
+    asset = ctx.ledger.adopt(asset_id)
+    user = request.scope.get("state", {}).get("user")
+    ctx.review.adopted(asset, str(user.username) if user else "local")
+    return AssetOut.model_validate(asset)
 
 
 @router.post("/assets/{asset_id}/trash", response_model=AssetOut)

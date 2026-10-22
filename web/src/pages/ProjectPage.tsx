@@ -7,6 +7,7 @@ import { useT } from "../i18n";
 import { FlowChain } from "../components/FlowChain";
 import { CreativePanel } from "./CreativePanel";
 import { ProcessPanel } from "./ProcessPanel";
+import { ReviewPanel } from "./ReviewPanel";
 import { JobsPanel } from "./QueuePage";
 import { SeriesPanel } from "./SeriesPanel";
 import { StoryPanel } from "./StoryPanel";
@@ -83,6 +84,9 @@ export function ProjectPage() {
         <NavLink to="creative" className={({ isActive }) => (isActive ? "tab active" : "tab")}>
           {t("web.tab.creative")}
         </NavLink>
+        <NavLink to="review" className={({ isActive }) => (isActive ? "tab active" : "tab")}>
+          {t("web.tab.review")}
+        </NavLink>
         <NavLink to="flow" className={({ isActive }) => (isActive ? "tab active" : "tab")}>
           {t("web.tab.flow")}
         </NavLink>
@@ -99,6 +103,7 @@ export function ProjectPage() {
         <Route path="series" element={<SeriesPanel id={id} />} />
         <Route path="story" element={<StoryPanel id={id} />} />
         <Route path="creative" element={<CreativePanel id={id} />} />
+        <Route path="review" element={<ReviewPanel id={id} />} />
         <Route path="flow" element={<FlowChain projectId={id} />} />
         <Route path="process" element={<ProcessPanel id={id} />} />
         <Route path="jobs" element={<JobsPanel projectId={id} />} />

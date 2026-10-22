@@ -171,3 +171,13 @@ ol.flow { list-style: none; margin: 0; padding: 0; display: flex; flex-direction
 .note { padding: 8px 10px; border-radius: 8px; border: 1px dashed var(--line); font-size: 0.9rem; }
 .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 button.link { background: none; border: none; color: inherit; cursor: pointer; text-decoration: underline; padding: 4px; }
+
+/* review */
+.review-layout { display: grid; grid-template-columns: minmax(200px, 280px) 1fr; gap: 16px; align-items: start; }
+@media (max-width: 800px) { .review-layout { grid-template-columns: 1fr; } }
+.plain-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.list-item { width: 100%; display: flex; gap: 6px; align-items: center; justify-content: space-between; text-align: left; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: inherit; cursor: pointer; }
+.list-item.active { border-color: var(--accent, #4c8bf5); }
+.takes { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.compare { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 800px) { .compare { grid-template-columns: 1fr; } }

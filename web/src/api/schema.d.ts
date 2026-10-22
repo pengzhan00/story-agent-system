@@ -104,7 +104,7 @@ export interface paths {
         put?: never;
         /**
          * Adopt Asset
-         * @description Make this candidate the current asset of its slot.
+         * @description Make this candidate the current asset of its slot (and resolve the review notes that asked for this redo).
          */
         post: operations["adopt_asset_api_assets__asset_id__adopt_post"];
         delete?: never;
@@ -958,6 +958,81 @@ export interface paths {
         patch: operations["update_music_api_projects__project_id__music__item_id__patch"];
         trace?: never;
     };
+    "/api/projects/{project_id}/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Notes */
+        get: operations["list_notes_api_projects__project_id__notes_get"];
+        put?: never;
+        /** Add Note */
+        post: operations["add_note_api_projects__project_id__notes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/notes/{note_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Set Status */
+        patch: operations["set_status_api_projects__project_id__notes__note_id__patch"];
+        trace?: never;
+    };
+    "/api/projects/{project_id}/notes/{note_id}/compare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Compare
+         * @description The take the note was about next to the takes the redo(s) made (and the jobs still running).
+         */
+        get: operations["compare_api_projects__project_id__notes__note_id__compare_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/notes/{note_id}/redo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Redo
+         * @description Apply the requested changes to the spec (a new version that quotes the note) and queue new takes.
+         */
+        post: operations["redo_api_projects__project_id__notes__note_id__redo_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{project_id}/produce/plan": {
         parameters: {
             query?: never;
@@ -1011,6 +1086,23 @@ export interface paths {
          * @description Ask the script editor agent for a critique (a language-model call: can take a minute; changes nothing).
          */
         post: operations["review_script_api_projects__project_id__review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/review/board": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Board */
+        get: operations["board_api_projects__project_id__review_board_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2511,6 +2603,119 @@ export interface components {
             /** Version */
             version: string;
         };
+        /** NoteCompareOut */
+        NoteCompareOut: {
+            /** After */
+            after: components["schemas"]["AssetOut"][];
+            before: components["schemas"]["AssetOut"] | null;
+            /** Jobs */
+            jobs: components["schemas"]["JobOut"][];
+            note: components["schemas"]["NoteOut"];
+        };
+        /** NoteCreate */
+        NoteCreate: {
+            /** Asset Id */
+            asset_id?: string | null;
+            /** Body */
+            body: string;
+            /** Shot Id */
+            shot_id?: number | null;
+            /**
+             * Slot
+             * @default main
+             */
+            slot: string;
+            /** Subject Id */
+            subject_id: string;
+            /** Subject Type */
+            subject_type: string;
+        };
+        /** NoteOut */
+        NoteOut: {
+            /** Asset Id */
+            asset_id: string | null;
+            /** Author */
+            author: string;
+            /** Body */
+            body: string;
+            /** Created At */
+            created_at: string;
+            /** Id */
+            id: number;
+            /** Project Id */
+            project_id: number;
+            /** Redo Job Ids */
+            redo_job_ids: string[];
+            /** Redo Spec Version */
+            redo_spec_version: number | null;
+            /** Resolution */
+            resolution: string;
+            /** Resolved At */
+            resolved_at: string | null;
+            /** Resolved By */
+            resolved_by: string;
+            /** Shot Id */
+            shot_id: number | null;
+            /** Slot */
+            slot: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "redoing" | "resolved" | "dismissed";
+            /** Subject Id */
+            subject_id: string;
+            /** Subject Type */
+            subject_type: string;
+            /** Updated At */
+            updated_at: string;
+        };
+        /**
+         * NoteRedoBody
+         * @description What the reviewer wants different (only what is sent changes the spec; nothing = same spec, new seeds).
+         */
+        NoteRedoBody: {
+            /** Model Ref */
+            model_ref?: string | null;
+            /**
+             * N Candidates
+             * @default 1
+             */
+            n_candidates: number;
+            /** Negative Prompt */
+            negative_prompt?: string | null;
+            /** Params Patch */
+            params_patch?: {
+                [key: string]: unknown;
+            } | null;
+            /** Prompt */
+            prompt?: string | null;
+            /** Seed */
+            seed?: number | null;
+            /** Text Payload */
+            text_payload?: string | null;
+            /** @default final */
+            tier: components["schemas"]["QualityTier"];
+        };
+        /** NoteRedoOut */
+        NoteRedoOut: {
+            /** Jobs */
+            jobs: components["schemas"]["JobOut"][];
+            note: components["schemas"]["NoteOut"];
+        };
+        /** NoteStatusBody */
+        NoteStatusBody: {
+            /**
+             * Resolution
+             * @default
+             */
+            resolution: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "resolved" | "dismissed";
+        };
         /** ParamsOut */
         ParamsOut: {
             /** Base */
@@ -3035,6 +3240,29 @@ export interface components {
                 [key: string]: unknown;
             }[];
             spec: components["schemas"]["SpecOut"];
+        };
+        /** ReviewShotOut */
+        ReviewShotOut: {
+            /** Act */
+            act: number;
+            /** Assets */
+            assets: components["schemas"]["AssetOut"][];
+            /** Episode */
+            episode: number;
+            /** Location */
+            location: string;
+            /** Open Notes */
+            open_notes: number;
+            /** Redoing Notes */
+            redoing_notes: number;
+            /** Resolved Notes */
+            resolved_notes: number;
+            /** Scene */
+            scene: number;
+            /** Shot */
+            shot: number;
+            /** Shot Id */
+            shot_id: number;
         };
         /** RunBody */
         RunBody: {
@@ -5846,6 +6074,182 @@ export interface operations {
             };
         };
     };
+    list_notes_api_projects__project_id__notes_get: {
+        parameters: {
+            query?: {
+                status?: string;
+                subject_type?: string;
+                subject_id?: string;
+                shot_id?: number | null;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_note_api_projects__project_id__notes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NoteCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_status_api_projects__project_id__notes__note_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+                note_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NoteStatusBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    compare_api_projects__project_id__notes__note_id__compare_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+                note_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteCompareOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    redo_api_projects__project_id__notes__note_id__redo_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+                note_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NoteRedoBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteRedoOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_produce_plan_api_projects__project_id__produce_plan_get: {
         parameters: {
             query?: {
@@ -5931,6 +6335,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ScriptReviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    board_api_projects__project_id__review_board_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewShotOut"][];
                 };
             };
             /** @description Validation Error */
