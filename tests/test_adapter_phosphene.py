@@ -280,3 +280,16 @@ def test_the_style_avoid_list_is_added_to_the_models_not_a_replacement_for_it() 
 
     assert _negatives("warm colors, blurry", "blurry, banding, ghosting") == "warm colors, blurry, banding, ghosting"
     assert _negatives("", "banding") == "banding" and _negatives(None, None) == "" and _negatives("a", "") == "a"
+
+
+def test_default_video_models_keep_the_full_step_count_in_preview_and_a_clean_avoid_list() -> None:
+    from storyagent.config import load_settings
+
+    s = load_settings({"STORY_AGENT_HOME": "/nonexistent-home-for-defaults"})
+    for ref in ("ltx-2.5-video", "ltx-2.5-av"):
+        model = s.model(ref)
+        assert model.tiers["preview"].get("stage1_steps", model.params["stage1_steps"]) == 16
+        assert model.tiers["preview"].get("stage2_steps", model.params["stage2_steps"]) == 5
+        negative = str(model.params["negative_prompt"])
+        assert "sword" not in negative and "dark" not in negative       # leftovers of one genre, and a lit-scene bias
+        assert "banding" in negative and "flicker" in negative

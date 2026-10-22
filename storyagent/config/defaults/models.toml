@@ -140,7 +140,9 @@ steps = 6
 #   Sizes are portrait (width x height) for a vertical drama; the measurements below were taken in landscape with the
 #   same pixel counts.
 #   draft   = balanced 576x1024, 5 s: ~110-126 s measured
-#   preview = high 704x1280 12+4 steps, no upscale: not measured on its own
+#   preview = high 704x1280 16+5 steps, no upscale: 121 frames ~490 s, 73 frames ~270 s (2026-10-22 sweep: 12+4 left
+#             smeared, warping walls and hedges behind a walking figure; 16+5 was sharp and stable, see
+#             docs/reviews/2026-10-22_pilot-and-p0.md)
 #   final   = high 832x1536 16+5 steps + fit_1080p/pipersr: ~590 s measured
 # frames must satisfy frames % 8 == 1 (121 = 5 s at 24 fps); above 121 frames only quality=high keeps identity.
 [models."ltx-2.5-av"]
@@ -166,7 +168,7 @@ cfg_scale = 3.0
 upscale = "fit_1080p"
 upscale_method = "pipersr"
 enhance = false
-negative_prompt = "extra swords, duplicate weapons, multiple blades, deformed hands, extra fingers, fused fingers, blurry, soft focus, low detail, underexposed, dark, heavy fog, plastic skin, text, watermark, subtitles, logo"
+negative_prompt = "deformed hands, extra fingers, fused fingers, blurry, soft focus, low detail, horizontal stripes, banding, flicker, jitter, warped background, sliding feet, floating, ghosting, plastic skin, text, watermark, subtitles, logo"
 [models."ltx-2.5-av".tiers.draft]
 width = 576
 height = 1024
@@ -175,8 +177,6 @@ upscale = "off"
 [models."ltx-2.5-av".tiers.preview]
 width = 704
 height = 1280
-stage1_steps = 12
-stage2_steps = 4
 upscale = "off"
 
 [models."ltx-2.5-video"]
@@ -202,7 +202,7 @@ cfg_scale = 3.0
 upscale = "fit_1080p"
 upscale_method = "pipersr"
 enhance = false
-negative_prompt = "extra swords, duplicate weapons, multiple blades, deformed hands, extra fingers, fused fingers, blurry, soft focus, low detail, underexposed, dark, heavy fog, plastic skin, text, watermark, subtitles, logo"
+negative_prompt = "deformed hands, extra fingers, fused fingers, blurry, soft focus, low detail, horizontal stripes, banding, flicker, jitter, warped background, sliding feet, floating, ghosting, plastic skin, text, watermark, subtitles, logo"
 [models."ltx-2.5-video".tiers.draft]
 width = 576
 height = 1024
@@ -211,8 +211,6 @@ upscale = "off"
 [models."ltx-2.5-video".tiers.preview]
 width = 704
 height = 1280
-stage1_steps = 12
-stage2_steps = 4
 upscale = "off"
 
 # Lip-sync: a portrait image + a speech audio file (refs); the mouth follows the audio. Limited to ~5 s per clip.
