@@ -1,0 +1,69 @@
+# Shot grammar: the rules the storyboard check applies (nothing here is fixed in code; change them in
+# $STORY_AGENT_HOME/config/grammar.toml, set a rule's `enabled = false` to switch it off or change its `severity`).
+# They are rules of thumb from film practice, not laws: the report lists what breaks them so the creator decides.
+#
+#   sizes.order     framing sizes from widest to tightest; a shot's `shot_type` text is matched against the names and
+#                   the aliases (case and - _ space ignored). A shot whose size is not recognised is counted, not judged.
+#   rules.<id>      severity = error | warning | info; the other keys are that rule's own numbers.
+
+[grammar]
+enabled = true
+
+[grammar.sizes]
+order = ["extreme-wide", "wide", "full", "medium", "medium-close", "close-up", "extreme-close-up"]
+
+[grammar.sizes.aliases]
+extreme-wide = ["extremewide", "establishing", "aerial", "extreme long", "大远景"]
+wide = ["long", "long shot", "wide shot", "ws", "master", "远景"]
+full = ["full shot", "full body", "fs", "全景"]
+medium = ["mid", "medium shot", "ms", "waist", "中景"]
+medium-close = ["medium close up", "mcu", "chest", "bust", "中近景"]
+close-up = ["closeup", "cu", "close", "近景", "特写"]
+extreme-close-up = ["ecu", "extreme close", "detail", "insert", "大特写"]
+
+# The first shot of a scene that is somewhere new shows where we are: a wide-ish shot first.
+[grammar.rules.establishing]
+severity = "warning"
+max_size = "full"          # the first shot must be this size or wider
+fix_size = "wide"
+
+# Two neighbouring shots of the same people in the same place that frame almost the same read as a jump cut.
+[grammar.rules.jump_size]
+severity = "warning"
+min_step = 1               # sizes apart (0 = identical framing)
+
+# A leap across the whole scale (wide straight to an extreme detail) is jarring without a reason.
+[grammar.rules.size_leap]
+severity = "info"
+max_step = 3
+
+# A scene with several shots needs more than one framing.
+[grammar.rules.coverage]
+severity = "warning"
+min_shots = 3
+min_distinct = 2
+
+# Talk scenes need a face: at least one tight shot when there are this many lines.
+[grammar.rules.dialogue_close]
+severity = "info"
+min_lines = 3
+min_size = "medium-close"
+
+# Whoever speaks must be in the frame (or the line is off-screen on purpose: then say so with a narration shot).
+[grammar.rules.speaker_in_frame]
+severity = "error"
+
+# Screen direction: the same person facing/moving opposite ways in neighbouring shots crosses the line of action.
+[grammar.rules.axis_cross]
+severity = "warning"
+
+# One shot, one action (video models smear two); connector words that signal a second action in the action text.
+[grammar.rules.single_action]
+severity = "info"
+max_connectors = 0
+connectors = [" then ", " and then ", " after that ", " while ", " before ", "然后", "接着", "随后", "同时"]
+
+# Shot length is rhythm: a run of shots with exactly the same length reads as a metronome.
+[grammar.rules.monotone_pace]
+severity = "info"
+max_same_run = 4

@@ -890,6 +890,182 @@
         "title": "FlowOut",
         "type": "object"
       },
+      "GrammarFixBody": {
+        "properties": {
+          "episode": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Episode"
+          },
+          "rules": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rules"
+          },
+          "shot_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shot Ids"
+          }
+        },
+        "title": "GrammarFixBody",
+        "type": "object"
+      },
+      "GrammarFixOut": {
+        "properties": {
+          "fixed": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Fixed",
+            "type": "array"
+          },
+          "left": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Left",
+            "type": "array"
+          },
+          "report": {
+            "$ref": "#/components/schemas/GrammarReportOut"
+          }
+        },
+        "required": [
+          "fixed",
+          "left",
+          "report"
+        ],
+        "title": "GrammarFixOut",
+        "type": "object"
+      },
+      "GrammarReportOut": {
+        "properties": {
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Counts",
+            "type": "object"
+          },
+          "shots": {
+            "title": "Shots",
+            "type": "integer"
+          },
+          "unclassified": {
+            "title": "Unclassified",
+            "type": "integer"
+          },
+          "violations": {
+            "items": {
+              "$ref": "#/components/schemas/GrammarViolationOut"
+            },
+            "title": "Violations",
+            "type": "array"
+          }
+        },
+        "required": [
+          "shots",
+          "unclassified",
+          "counts",
+          "violations"
+        ],
+        "title": "GrammarReportOut",
+        "type": "object"
+      },
+      "GrammarViolationOut": {
+        "properties": {
+          "act": {
+            "title": "Act",
+            "type": "integer"
+          },
+          "episode": {
+            "title": "Episode",
+            "type": "integer"
+          },
+          "fix": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fix"
+          },
+          "fixable": {
+            "title": "Fixable",
+            "type": "boolean"
+          },
+          "params": {
+            "additionalProperties": true,
+            "title": "Params",
+            "type": "object"
+          },
+          "rule": {
+            "title": "Rule",
+            "type": "string"
+          },
+          "scene": {
+            "title": "Scene",
+            "type": "integer"
+          },
+          "severity": {
+            "title": "Severity",
+            "type": "string"
+          },
+          "shot": {
+            "title": "Shot",
+            "type": "integer"
+          },
+          "shot_id": {
+            "title": "Shot Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rule",
+          "severity",
+          "shot_id",
+          "episode",
+          "act",
+          "scene",
+          "shot",
+          "params",
+          "fixable",
+          "fix"
+        ],
+        "title": "GrammarViolationOut",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -8480,6 +8656,118 @@
         "summary": "Episode Package",
         "tags": [
           "workflow"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/grammar": {
+      "get": {
+        "description": "Every shot checked against `grammar.toml`; `episode` limits the check to one episode.",
+        "operationId": "report_api_projects__project_id__grammar_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "episode",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Episode"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GrammarReportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Report",
+        "tags": [
+          "grammar"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/grammar/fix": {
+      "post": {
+        "description": "Repair the fixable violations (all, or only the given rules / shots / episode). Locked shots are left alone.\nA repaired shot's image and video prompts are not rewritten: redo its specs when the repair changes the picture.",
+        "operationId": "fix_api_projects__project_id__grammar_fix_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GrammarFixBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GrammarFixOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Fix",
+        "tags": [
+          "grammar"
         ]
       }
     },

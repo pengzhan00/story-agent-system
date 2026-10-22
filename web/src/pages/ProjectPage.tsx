@@ -7,6 +7,7 @@ import { useT } from "../i18n";
 import { FlowChain } from "../components/FlowChain";
 import { CreativePanel } from "./CreativePanel";
 import { ContinuityPanel } from "./ContinuityPanel";
+import { GrammarPanel } from "./GrammarPanel";
 import { PackPanel } from "./PackPanel";
 import { ProcessPanel } from "./ProcessPanel";
 import { ReviewPanel } from "./ReviewPanel";
@@ -89,6 +90,9 @@ export function ProjectPage() {
         <NavLink to="continuity" className={({ isActive }) => (isActive ? "tab active" : "tab")}>
           {t("web.tab.continuity")}
         </NavLink>
+        <NavLink to="grammar" className={({ isActive }) => (isActive ? "tab active" : "tab")}>
+          {t("web.tab.grammar")}
+        </NavLink>
         <NavLink to="review" className={({ isActive }) => (isActive ? "tab active" : "tab")}>
           {t("web.tab.review")}
         </NavLink>
@@ -112,6 +116,7 @@ export function ProjectPage() {
         <Route path="story" element={<StoryPanel id={id} />} />
         <Route path="creative" element={<CreativePanel id={id} />} />
         <Route path="continuity" element={<ContinuityPanel id={id} />} />
+        <Route path="grammar" element={<GrammarPanel id={id} />} />
         <Route path="review" element={<ReviewPanel id={id} />} />
         <Route path="flow" element={<FlowChain projectId={id} />} />
         <Route path="process" element={<ProcessPanel id={id} />} />

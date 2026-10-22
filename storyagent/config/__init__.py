@@ -1,3 +1,4 @@
+from .grammar import Grammar, GrammarRule
 from .settings import (
     AuthConfig,
     AuthRole,
@@ -24,6 +25,8 @@ __all__ = [
     "ComplianceConfig",
     "ConfigError",
     "deep_merge",
+    "Grammar",
+    "GrammarRule",
     "LLMBackend",
     "LLMRole",
     "ModelSpec",

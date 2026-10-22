@@ -64,6 +64,24 @@
       "items": {
        "type": "string"
       }
+     },
+     "start_pose": {
+      "type": "string"
+     },
+     "end_pose": {
+      "type": "string"
+     },
+     "gait": {
+      "type": "string"
+     },
+     "camera_position": {
+      "type": "string"
+     },
+     "lens_mm": {
+      "type": "string"
+     },
+     "screen_direction": {
+      "type": "string"
      }
     },
     "required": [

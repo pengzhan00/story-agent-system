@@ -16,6 +16,7 @@ Nothing is hard-wired: pipelines differ, so defaults are layered and every layer
 
 | File | Purpose |
 |---|---|
+| `grammar.toml` | the shot grammar check: framing scale and per-rule severity/thresholds (`docs/API.md` "Shot grammar") |
 | `services.toml` | `[services.<name>]` url/health_path/enabled/probe_only (acestep 8001, comfy 8188 (Stable Audio 3 sound effects), ollama, phosphene 8198, llamacpp (off)); `[tools.<name>]` binaries and model dirs (h3, longcat, cosyvoice, lora_train, mflux, whisper, seedvc, ffmpeg); `[runtime]` worker knobs (incl. `pack_max_gib`, `loose_rules`: file-name rules for `pack import-folder`); `[healthcheck]` required + min_free_gib |
 | `auth.toml` | `[auth]` `mode` (off/token, env `STORY_AGENT_AUTH`), `session_hours`, `min_password_length`, `login_max_failures`, `lockout_minutes`, `cookie_name`, `public_prefixes` / `signed_in_prefixes` / `admin_prefixes` / `project_prefixes` (which API paths are open, any-signed-in, admin-only, project create/delete); `[auth.roles.<name>]` flags `write`, `create_project`, `admin` (add your own roles) |
 | `models.toml` | `[models.<ref>]`: kind, provider, family, version, heavy, est_memory_gib, `est_seconds` (seconds per job assumed by the estimate/plan until the ledger has history for the model; else the kind's figure), license_tag, commercial_ok, attribution, prompt_profile, timeout_sec, `params`, `tiers.draft/preview/final`, extra (e.g. `train_template`); `[defaults]` kind -> default model |

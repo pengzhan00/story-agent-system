@@ -410,6 +410,45 @@ def _cmd_pack_import_folder(s: Settings, a: argparse.Namespace) -> int:
     return 0
 
 
+# -- shot grammar -----------------------------------------------------------------------------------
+def _grammar_line(v: dict[str, Any]) -> str:
+    fix = ""
+    if v["fix"]:
+        fix = "  -> " + t(f"grammar.fix.{v['fix']['type']}", value=v["fix"]["value"])
+    return t("cli.grammar.line", severity=v["severity"], episode=v["episode"], act=v["act"], scene=v["scene"],
+             shot=v["shot"], message=t(f"grammar.msg.{v['rule']}", **v["params"]), fix=fix)
+
+
+def _print_grammar(report: dict[str, Any]) -> None:
+    for v in report["violations"]:
+        print(_grammar_line(v))
+    print(t("cli.grammar.summary", shots=report["shots"], unclassified=report["unclassified"], **report["counts"]))
+
+
+def _cmd_grammar_check(s: Settings, a: argparse.Namespace) -> int:
+    from storyagent.story import StoryStore
+    from storyagent.workflow.grammar import run_check
+
+    c = _ctx(s)
+    ProjectStore(c.db, s).get(a.project)
+    report = run_check(StoryStore(c.db), a.project, s.grammar, a.episode).as_dict()
+    _print_grammar(report)
+    return 1 if report["counts"]["error"] else 0
+
+
+def _cmd_grammar_fix(s: Settings, a: argparse.Namespace) -> int:
+    from storyagent.story import StoryStore
+    from storyagent.workflow.grammar import apply_fixes
+
+    c = _ctx(s)
+    ProjectStore(c.db, s).get(a.project)
+    fixed, left, after = apply_fixes(StoryStore(c.db), a.project, s.grammar, episode=a.episode,
+                                     rules=a.rule or None)
+    print(t("cli.grammar.fixed", n=len(fixed), left=len(left)))
+    _print_grammar(after.as_dict())
+    return 0
+
+
 def _library(s: Settings) -> Any:
     from storyagent.media.library import Library
 
@@ -904,6 +943,15 @@ def build_parser() -> argparse.ArgumentParser:
     pf.add_argument("--project", type=int, required=True)
     pf.add_argument("--on-conflict", choices=["skip", "new_version"], default="skip")
     pf.add_argument("--dry-run", action="store_true")
+
+    gr = sub.add_parser("grammar").add_subparsers(dest="cmd", required=True)
+    gc = add(gr, "check", _cmd_grammar_check)
+    gc.add_argument("--project", type=int, required=True)
+    gc.add_argument("--episode", type=int)
+    gf = add(gr, "fix", _cmd_grammar_fix)
+    gf.add_argument("--project", type=int, required=True)
+    gf.add_argument("--episode", type=int)
+    gf.add_argument("--rule", action="append", help="only this rule (repeatable)")
 
     li = sub.add_parser("library").add_subparsers(dest="cmd", required=True)
     la = add(li, "add", _cmd_library_add)

@@ -32,6 +32,7 @@ from storyagent.db import Database
 from storyagent.projects import Project, ProjectStore
 from storyagent.story import StoryStore
 
+from .grammar import run_check
 from .shotplan import build_shot_rows
 from .state import WorkflowState
 
@@ -491,7 +492,9 @@ def shotplan(ctx: Ctx) -> dict[str, Any]:
     unresolved = sorted({line["character"] for line in ctx.store.dialogue_lines(ctx.pid, ep["id"])
                          if line["character_id"] is None and line["character"]})
     ctx.step(1, 1, "done")
+    grammar = run_check(ctx.store, ctx.pid, ctx.settings.grammar, episode).counts()
     return {"episode": episode, "shots": len(created), "kept_locked": len(kept), "unresolved_speakers": unresolved,
+            "grammar": grammar,
             "duration_sec": round(sum(float(r["render_payload"]["camera"]["duration_sec"]) for r in rows), 1)}
 
 

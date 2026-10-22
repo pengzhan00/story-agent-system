@@ -922,6 +922,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{project_id}/grammar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Report
+         * @description Every shot checked against `grammar.toml`; `episode` limits the check to one episode.
+         */
+        get: operations["report_api_projects__project_id__grammar_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/grammar/fix": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Fix
+         * @description Repair the fixable violations (all, or only the given rules / shots / episode). Locked shots are left alone.
+         *     A repaired shot's image and video prompts are not rewritten: redo its specs when the repair changes the picture.
+         */
+        post: operations["fix_api_projects__project_id__grammar_fix_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{project_id}/locations": {
         parameters: {
             query?: never;
@@ -2294,6 +2335,67 @@ export interface components {
             steps: {
                 [key: string]: unknown;
             }[];
+        };
+        /** GrammarFixBody */
+        GrammarFixBody: {
+            /** Episode */
+            episode?: number | null;
+            /** Rules */
+            rules?: string[] | null;
+            /** Shot Ids */
+            shot_ids?: number[] | null;
+        };
+        /** GrammarFixOut */
+        GrammarFixOut: {
+            /** Fixed */
+            fixed: {
+                [key: string]: unknown;
+            }[];
+            /** Left */
+            left: {
+                [key: string]: unknown;
+            }[];
+            report: components["schemas"]["GrammarReportOut"];
+        };
+        /** GrammarReportOut */
+        GrammarReportOut: {
+            /** Counts */
+            counts: {
+                [key: string]: number;
+            };
+            /** Shots */
+            shots: number;
+            /** Unclassified */
+            unclassified: number;
+            /** Violations */
+            violations: components["schemas"]["GrammarViolationOut"][];
+        };
+        /** GrammarViolationOut */
+        GrammarViolationOut: {
+            /** Act */
+            act: number;
+            /** Episode */
+            episode: number;
+            /** Fix */
+            fix: {
+                [key: string]: unknown;
+            } | null;
+            /** Fixable */
+            fixable: boolean;
+            /** Params */
+            params: {
+                [key: string]: unknown;
+            };
+            /** Rule */
+            rule: string;
+            /** Scene */
+            scene: number;
+            /** Severity */
+            severity: string;
+            /** Shot */
+            shot: number;
+            /** Shot Id */
+            shot_id: number;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -5953,6 +6055,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    report_api_projects__project_id__grammar_get: {
+        parameters: {
+            query?: {
+                episode?: number | null;
+            };
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrammarReportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fix_api_projects__project_id__grammar_fix_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GrammarFixBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrammarFixOut"];
                 };
             };
             /** @description Validation Error */

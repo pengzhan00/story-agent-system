@@ -73,13 +73,19 @@ def _shot_prompts(ctx: Ctx, shot: dict[str, Any], chars: dict[str, dict[str, Any
         "; ".join(f"{p['name']}: {p['description']}" if p["description"] else p["name"] for p in props),
         payload["subject"]["action"], payload["subject"]["expression"], shot["location"], payload["scene"]["lighting"],
         payload["scene"]["time_of_day"], base_style) if x)
-    fallback = {"image_prompt": plain, "video_prompt": plain + (", " + payload["camera"]["movement"]
-                                                                  if payload["camera"]["movement"] else ""),
+    staging = payload.get("staging", {})
+    lens = f"{staging['lens_mm']}mm lens" if staging.get("lens_mm") else ""
+    opening = ", ".join(x for x in (plain, staging.get("start_pose", ""), staging.get("camera_position", ""), lens)
+                        if x)
+    motion = ", ".join(x for x in (payload["camera"]["movement"], staging.get("gait", ""),
+                                   f"ends {staging['end_pose']}" if staging.get("end_pose") else "") if x)
+    fallback = {"image_prompt": opening, "video_prompt": opening + (", " + motion if motion else ""),
                 "negative_prompt": payload["style"]["negative_prompt"]}
     if not use_llm:
         return fallback
     try:
-        data = ctx.run_agent("shot.visual", {"shot": {k: payload[k] for k in ("subject", "scene", "camera", "story")},
+        keys = ("subject", "scene", "camera", "story", "staging")
+        data = ctx.run_agent("shot.visual", {"shot": {k: payload[k] for k in keys if k in payload},
                                              "characters": looks, "props": props, "scene": shot["location"],
                                              "style": base_style,
                                              "previous": previous or "(start)"})

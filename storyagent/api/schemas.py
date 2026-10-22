@@ -1023,3 +1023,36 @@ class PackReportOut(Strict):
     assets: dict[str, int]
     warnings: list[dict[str, Any]]
     unassigned: list[str]
+
+
+# -- shot grammar ----------------------------------------------------------------------------------
+class GrammarViolationOut(Strict):
+    rule: str
+    severity: str
+    shot_id: int
+    episode: int
+    act: int
+    scene: int
+    shot: int
+    params: dict[str, Any]
+    fixable: bool
+    fix: dict[str, Any] | None
+
+
+class GrammarReportOut(Strict):
+    shots: int
+    unclassified: int
+    counts: dict[str, int]
+    violations: list[GrammarViolationOut]
+
+
+class GrammarFixBody(BaseModel):
+    episode: int | None = None
+    rules: list[str] | None = None
+    shot_ids: list[int] | None = None
+
+
+class GrammarFixOut(Strict):
+    fixed: list[dict[str, Any]]
+    left: list[dict[str, Any]]
+    report: GrammarReportOut

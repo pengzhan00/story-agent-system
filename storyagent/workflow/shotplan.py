@@ -10,6 +10,9 @@ from typing import Any
 from .continuity import look_for, props_in
 
 SHOT_SCHEMA = "shot.v3"
+# In-shot staging (optional, written by the script stage or by hand): where the person starts and ends, how they move,
+# where the camera stands, the lens and which way they face on screen (left | right | center).
+STAGING_FIELDS = ("start_pose", "end_pose", "gait", "camera_position", "lens_mm", "screen_direction")
 DEFAULT_NEGATIVE = (
     "low quality, blurry, bad anatomy, extra fingers, duplicated person, broken face, text, watermark, logo, "
     "inconsistent costume, flat lighting, overexposed, underexposed"
@@ -79,6 +82,7 @@ def build_payload(
                   "narration": str(shot.get("narration") or scene.get("narration") or ""), "dialogue": dialogue},
         "camera": {"shot_type": str(shot.get("camera_angle", "")), "movement": str(shot.get("camera_movement", "")),
                    "duration_sec": duration},
+        "staging": {k: str(shot.get(k) or "").strip() for k in STAGING_FIELDS},
         "audio": {"bgm_mood": str(scene.get("bgm_mood") or mood), "tts_required": bool(dialogue),
                   "sfx_cues": [str(c) for c in shot.get("sfx_cues", [])]},
         "style": {"visual_style": str(style.get("visual_style", "")),
