@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useProjectBin, useProjectCards } from "../api/hooks";
+import { useMeta, useProjectBin, useProjectCards } from "../api/hooks";
 import type { ProjectCard } from "../api/types";
 import { NewProject } from "../components/NewProject";
 import { PreviewDialog } from "../components/PreviewDialog";
@@ -15,6 +15,7 @@ export function ProjectsPage() {
   const projects = useProjectCards(bin);
   const [preview, setPreview] = useState<ProjectCard | null>(null);
   const binActions = useProjectBin();
+  const meta = useMeta().data;
 
   return (
     <div className="stack">
@@ -46,6 +47,10 @@ export function ProjectsPage() {
             <h3>
               <Link to={`/projects/${p.id}`}>{p.name}</Link>
             </h3>
+            <p className="badges">
+              {p.kind ? <span className="chip">{meta?.work_kinds.find((k) => k.name === p.kind)?.label ?? p.kind}</span> : null}
+              {p.pipeline ? <span className="chip">{meta?.pipelines.find((x) => x.name === p.pipeline)?.label ?? p.pipeline}</span> : null}
+            </p>
             <p className="muted clamp">{p.description || t("web.projects.no_premise")}</p>
             <div className="row small">
               <ProgressBar percent={(100 * p.stages_done) / p.stages_total} tone={p.running ? "running" : p.stages_done === p.stages_total ? "completed" : "pending"} label={t("web.projects.progress")} />

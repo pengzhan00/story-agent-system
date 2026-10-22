@@ -43,7 +43,8 @@ def overview(request: Request, trashed: bool = False) -> list[ProjectCard]:
             " AND slot LIKE 'episode\\_%' ESCAPE '\\' AND is_current=1 AND trashed_at IS NULL"
             " ORDER BY slot DESC LIMIT 1", (p.id,)).fetchone()
         cards.append(ProjectCard(
-            id=p.id, name=p.name, description=p.description, genre=p.genre, status=p.status,
+            id=p.id, name=p.name, description=p.description, genre=p.genre, status=p.status, kind=p.kind,
+            pipeline=p.pipeline,
             stages_done=sum(s["status"] == "completed" for s in states), stages_total=len(states),
             running=running is not None,
             episode_asset_id=film["id"] if film else None, episode_seconds=film["duration_sec"] if film else None,

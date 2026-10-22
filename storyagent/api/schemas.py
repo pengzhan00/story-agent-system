@@ -57,6 +57,8 @@ class ProjectCard(Strict):
     description: str
     genre: str
     status: str
+    kind: str
+    pipeline: str
     stages_done: int
     stages_total: int
     running: bool

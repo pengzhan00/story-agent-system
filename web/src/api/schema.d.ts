@@ -2468,8 +2468,12 @@ export interface components {
             genre: string;
             /** Id */
             id: number;
+            /** Kind */
+            kind: string;
             /** Name */
             name: string;
+            /** Pipeline */
+            pipeline: string;
             /** Running */
             running: boolean;
             /** Stages Done */
