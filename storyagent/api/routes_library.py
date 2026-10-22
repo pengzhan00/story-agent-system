@@ -10,6 +10,7 @@ from fastapi import APIRouter, Query, Request
 from fastapi.responses import FileResponse
 
 from storyagent.media.library import ROLES, LibraryItem, import_file
+from storyagent.util import home_file
 
 from .context import ApiContext, ctx_of
 from .errors import ApiError
@@ -132,9 +133,8 @@ def item_file(item_id: str, request: Request) -> FileResponse:
     item = ctx.library.get(item_id)
     assert item.asset is not None
     require_viewable(request, item.asset.rating, None, what=item.asset.id)
-    home = ctx.settings.home.resolve()
-    path = (home / item.asset.path).resolve()
-    if home not in path.parents or not path.is_file():
+    path = home_file(ctx.settings.home, item.asset.path)
+    if path is None or not path.is_file():
         raise ApiError(404, "asset_file_missing", item.asset.path)
     return FileResponse(path, media_type=mimetypes.guess_type(path.name)[0] or "application/octet-stream",
                         filename=path.name, content_disposition_type="inline")

@@ -7,6 +7,7 @@ from fastapi import APIRouter, Query, Request
 from fastapi.responses import FileResponse
 
 from storyagent.content import mask_thumbnail
+from storyagent.util import home_file
 
 from .context import ctx_of
 from .errors import ApiError
@@ -51,9 +52,8 @@ def asset_file(asset_id: str, request: Request) -> FileResponse:
     ctx = ctx_of(request)
     asset = ctx.ledger.get_asset(asset_id)
     require_viewable(request, asset.rating, asset.project_id, what=asset.id)
-    home = ctx.settings.home.resolve()
-    path = (home / asset.path).resolve()
-    if home not in path.parents:  # a ledger path must never escape the data home
+    path = home_file(ctx.settings.home, asset.path)
+    if path is None:  # a ledger path must never escape the data home
         raise ApiError(404, "not_found", "asset path outside the data home")
     if not path.is_file():
         raise ApiError(404, "asset_file_missing", asset.path)

@@ -270,6 +270,12 @@ def test_with_accounts_an_unlock_needs_the_users_password(fsettings: Settings, t
         assert unlock(c, password="wrong").status_code == 403
         assert c.get("/api/content/status").json()["needs_password"] is True
         assert unlock(c, password="correct horse").json()["unlocked"] is True
+        AuthStore(Database(s.db_path), s).create_user("vic", "another horse", "viewer")
+        c.post("/api/auth/logout")
+        assert c.post("/api/auth/login", json={"username": "vic", "password": "another horse"}).status_code == 200
+        assert c.post("/api/projects", json={"name": "x"}).status_code == 403          # a viewer cannot write ...
+        assert unlock(c, password="another horse").json()["unlocked"] is True            # ... but may look, for themself
+        assert c.delete("/api/content/unlock").json()["unlocked"] is False
         actions = [r["action"] for r in Database(s.db_path).conn.execute("SELECT action FROM audit_log")]
         assert "content.unlock_failed" in actions and "content.unlock" in actions
 
@@ -381,3 +387,28 @@ def test_the_cli_creates_a_restricted_project_records_adults_and_refuses_export(
     finally:
         monkeypatch.undo()
         get_settings(reload=True)
+
+
+def test_a_vault_that_is_a_link_to_another_volume_is_still_served_and_paths_cannot_escape(
+        tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    (home / "config").mkdir(parents=True)
+    (home / "config" / "models.toml").write_text(RATED_MODELS)
+    (home / "config" / "services.toml").write_text(FAKE_SERVICES)
+    volume = tmp_path / "volume"
+    volume.mkdir()
+    (home / "vault").symlink_to(volume)
+    s = load_settings({"STORY_AGENT_HOME": str(home)})
+    with TestClient(create_app(s), raise_server_exceptions=False) as c:
+        pid = restricted_project(c)
+        up = c.post(f"/api/projects/{pid}/uploads", params={"filename": "n.txt"}, content=b"notes")
+        assert up.status_code == 201
+        unlock(c)
+        asset = c.get(f"/api/assets/{up.json()['id']}").json()
+        assert asset["path"].startswith("vault/") and (volume / "private").is_dir()
+        assert c.get(f"/api/assets/{asset['id']}/file").content == b"notes"
+        db = Database(s.db_path)
+        db.conn.execute("UPDATE media_assets SET path='../outside.txt' WHERE id=?", (asset["id"],))
+        assert c.get(f"/api/assets/{asset['id']}/file").status_code == 404
+        db.conn.execute("UPDATE media_assets SET path='/etc/hosts' WHERE id=?", (asset["id"],))
+        assert c.get(f"/api/assets/{asset['id']}/file").status_code == 404

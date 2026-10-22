@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Request
 
 from storyagent.brief import estimate, resolve_brief
+from storyagent.util import home_file
 
 from .context import ctx_of
 from .errors import ApiError
@@ -91,8 +92,8 @@ def create_project_from_text(body: ProjectFromText, request: Request) -> Project
         asset = ctx.ledger.get_asset(body.asset_id)
         if asset.kind not in TEXT_KINDS:
             raise ApiError(422, "invalid", f"asset {asset.id} is {asset.kind}, not a text")
-        path = (ctx.settings.home / asset.path).resolve()
-        if ctx.settings.home.resolve() not in path.parents or not path.is_file():
+        path = home_file(ctx.settings.home, asset.path)
+        if path is None or not path.is_file():
             raise ApiError(404, "asset_file_missing", asset.path)
         text = path.read_text("utf-8", errors="replace").strip()
     if not text:
