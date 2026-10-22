@@ -1,9 +1,10 @@
 # Append to $STORY_AGENT_HOME/config/models.toml.
 # A Lustify checkpoint run by Draw Things (its own .ckpt format; ComfyUI/mflux cannot load it). `rating = "restricted"`
 # makes every picture it makes restricted: stored in the vault, masked until unlocked, left out of exports.
-# Only plumbing is set here. Steps, guidance, sampler and the LoRAs are whatever Draw Things has selected, until you
-# add them under [params] (names: width, height, steps, guidance, sampler, shift, loras; anything else under
-# `request = { ... }`, which is sent as it is).
+# Only plumbing and the sampling values read from the Draw Things app on 2026-10-22 (28 steps, Euler A Trailing, shift 3,
+# guidance_embed 3.5). Do NOT set `guidance` here: it is Draw Things' guidance_scale, which is 1 for this model; the
+# strength that matters is guidance_embed, sent through `request`. Anything else Draw Things knows (hires_fix,
+# tea_cache, loras ...) goes into `request = { ... }` as it is, or `loras = [...]`.
 [models."lustify-krea2-drawthings"]
 kind = "image.generate"
 provider = "drawthings"
@@ -20,3 +21,7 @@ api_model = "lustifynsfwcheckpoint_v10krea2_fp8_f16.ckpt"   # Draw Things' file 
 [models."lustify-krea2-drawthings".params]
 width = 704                        # multiples of 64; the picture frame is 9:16, so this is a starting point
 height = 1280
+steps = 28
+sampler = "Euler A Trailing"
+shift = 3
+request = { guidance_embed = 3.5 }

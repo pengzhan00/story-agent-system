@@ -104,7 +104,7 @@ kind = "image.generate"
 **怎么配(你自己做,5 步)**
 1. 打开 Draw Things,选中 Lustify,把你满意的设置调好(步数、CFG、采样器、尺寸、LoRA):**请求里没写的参数就是 App 当前的设置**。
 2. Draw Things → 设置 → 高级 → **API Server** 打开(协议 HTTP,端口默认 7860)。端口不同就在 `$STORY_AGENT_HOME/config/services.toml` 写 `[services.drawthings] url = "http://127.0.0.1:端口"`(或环境变量 `STORY_AGENT_DRAWTHINGS_URL`)。
-3. 把 `docs/examples/drawthings-lustify/models.toml` 追加到 `$STORY_AGENT_HOME/config/models.toml`;`api_model` 填 Draw Things 里的文件名(示例已按 `Models/custom.json` 里的登记填好;留空 = 用 App 当前选中的模型)。想固定步数等,在 `[models."lustify-krea2-drawthings".params]` 里加 `steps`、`guidance`、`sampler`、`shift`、`loras`;别的键放进 `request = { ... }`,原样发给 Draw Things。
+3. 把 `docs/examples/drawthings-lustify/models.toml` 追加到 `$STORY_AGENT_HOME/config/models.toml`;`api_model` 填 Draw Things 里的文件名(示例已按 `Models/custom.json` 里的登记填好;留空 = 用 App 当前选中的模型)。示例已写入从 App 读到的采样值(28 步、Euler A Trailing、shift 3、`request = { guidance_embed = 3.5 }`);**不要设 `guidance`**(它是 Draw Things 的 guidance_scale,此模型为 1,起作用的是 guidance_embed)。别的键(hires_fix、tea_cache、loras……)放进 `request = { ... }` 原样发出。
 4. 把 `docs/examples/drawthings-lustify/pipelines.toml` 追加到 `$STORY_AGENT_HOME/config/pipelines.toml`。重启 worker 和 server。
 5. 验证:`storyagent media healthcheck` 里 `drawthings` 应为 ok;网页「工坊」里选模型 `lustify-krea2-drawthings` 提交一张图(受限模型的产物自动进保险库,需先解锁才能看);新建项目时选方案 `vertical_drama_lustify`。
 

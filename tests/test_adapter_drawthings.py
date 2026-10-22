@@ -82,6 +82,19 @@ def test_the_request_table_is_passed_through_and_a_reference_makes_img2img(tmp_p
     assert not any(q.path == "/sdapi/v1/txt2img" for q in server.requests)
 
 
+def test_the_lustify_sampling_values_reach_the_request(tmp_path: Path, server: FakeServer) -> None:
+    from storyagent.media.params import resolve_params
+
+    lustify = lustify_settings(tmp_path / "l")
+    params = resolve_params(lustify, "lustify-krea2-drawthings", "preview", frame=(720, 1280))
+    r, _ = rig(tmp_path, server)
+    rec, _ = r.run(job(MediaKind.IMAGE_GENERATE, "dt-test", {"prompt": "x"}, params=params))
+    assert rec.status is JobStatus.COMPLETED
+    body = next(q.json for q in server.requests if q.path == "/sdapi/v1/txt2img")
+    assert (body["width"], body["height"], body["steps"], body["shift"]) == (704, 1280, 28, 3)
+    assert body["sampler"] == "Euler A Trailing" and body["guidance_embed"] == 3.5 and "guidance_scale" not in body
+
+
 def test_health_and_a_stopped_app(tmp_path: Path, server: FakeServer) -> None:
     _, adapter = rig(tmp_path, server)
     assert adapter.health().state is HealthState.OK
@@ -134,6 +147,9 @@ def test_the_lustify_example_loads_as_a_restricted_plan(tmp_path: Path) -> None:
     model = s.models["lustify-krea2-drawthings"]
     assert model.provider == "drawthings" and model.extra["rating"] == "restricted" and model.heavy
     assert s.service("drawthings").url.endswith(":7860")
+    params = model.params
+    assert params["steps"] == 28 and params["sampler"] == "Euler A Trailing" and "guidance" not in params
+    assert params["request"] == {"guidance_embed": 3.5}
 
 
 def test_a_project_of_a_restricted_plan_starts_restricted_and_stays_so(tmp_path: Path) -> None:
