@@ -15,6 +15,7 @@ from .context import ctx_of
 from .errors import ApiError
 from .routes_library import _receive
 from .schemas import PackExportOut, PackReportOut
+from .visibility import allow_export
 
 router = APIRouter(prefix="/api", tags=["packs"])
 _NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,120}\.zip$")
@@ -23,15 +24,17 @@ _NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,120}\.zip$")
 @router.post("/projects/{project_id}/pack", response_model=PackExportOut, status_code=201)
 def export(
     project_id: int, request: Request, scope: Literal["all", "assets", "story"] = "all", include_history: bool = False,
+    confirm_restricted: bool = False,
 ) -> PackExportOut:
     """Write the project to ``<home>/exports/<slug>-<time>.zip``; download it with ``GET /api/packs/{name}``."""
     ctx = ctx_of(request)
     project = ctx.projects.get(project_id)
+    confirmed = allow_export(request, project_id, confirm_restricted, what="pack")
     out_dir = ctx.settings.home / "exports"
     out_dir.mkdir(parents=True, exist_ok=True)
     name = f"{project.slug}-{now_iso().replace(':', '').replace('.', '')}.zip"
     manifest = export_pack(ctx.settings, ctx.db, project_id, out_dir / name, scope=scope,
-                           include_history=include_history)
+                           include_history=include_history, confirm_restricted=confirmed)
     return PackExportOut(name=name, bytes=(out_dir / name).stat().st_size, scope=scope, counts=manifest["counts"],
                          warnings=manifest["warnings"])
 

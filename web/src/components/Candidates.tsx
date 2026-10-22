@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import type { Asset, Job, Spec } from "../api/types";
 import { duration } from "../lib/format";
 import { useT } from "../i18n";
@@ -27,8 +28,21 @@ function TextPreview({ asset, src }: { asset: Asset; src: string }) {
   );
 }
 
+/** A restricted take while locked: the blurred thumbnail the server keeps (or a plain tile when there is none). */
+function MaskedPreview({ asset }: { asset: Asset }) {
+  const t = useT();
+  const [broken, setBroken] = useState(false);
+  return (
+    <div className="masked" role="img" aria-label={t("web.content.masked")}>
+      {broken ? null : <img className="preview" src={`/api/assets/${asset.id}/mask`} alt="" loading="lazy" onError={() => setBroken(true)} />}
+      <span className="small muted">{t("web.content.masked")}</span>
+    </div>
+  );
+}
+
 export function AssetPreview({ asset }: { asset: Asset }) {
   const src = `/api/assets/${asset.id}/file`;
+  if (asset.locked) return <MaskedPreview asset={asset} />;
   if (asset.kind.startsWith("image")) return <img className="preview" src={src} alt={asset.slot} loading="lazy" />;
   if (asset.kind.startsWith("video")) return <video className="preview" src={src} controls preload="metadata" />;
   if (asset.kind.startsWith("audio") || asset.kind.startsWith("upload.audio")) return <audio className="audio" src={src} controls preload="none" />;

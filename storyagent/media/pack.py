@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Any
 
 from storyagent.config import ConfigError, Settings
+from storyagent.content import check_export, project_rating
 from storyagent.db import Database
 from storyagent.projects import ProjectStore
 from storyagent.story import _FIELDS, StoryStore
@@ -108,10 +109,13 @@ def _story_rows(story: StoryStore, project_id: int) -> dict[str, list[dict[str, 
 
 def export_pack(
     settings: Settings, db: Database, project_id: int, out: Path, *, scope: str = "all", include_history: bool = False,
+    confirm_restricted: bool = False,
 ) -> dict[str, Any]:
-    """Write ``project_id`` to ``out`` (a directory, or a ``.zip`` file by its name). Returns the manifest."""
+    """Write ``project_id`` to ``out`` (a directory, or a ``.zip`` file by its name). Returns the manifest. A project
+    of a rating that does not allow export is refused (``ContentError``) unless ``confirm_restricted``."""
     if scope not in SCOPES:
         raise PackError("scope", scope=scope, allowed=", ".join(SCOPES))
+    rating = check_export(settings, db, project_id, confirmed=confirm_restricted)
     project = ProjectStore(db, settings).get(project_id)
     ledger = Ledger(db, settings)
     specs = SpecStore(db, settings, ledger)
@@ -160,7 +164,7 @@ def export_pack(
                     "id": a.id, "file": rel, "kind": a.kind, "slot": a.slot, "sha256": files[-1]["sha256"],
                     "bytes": a.bytes, "version": a.version, "current": a.is_current, "shot": shot_key.get(a.shot_id),
                     "duration_sec": a.duration_sec, "width": a.width, "height": a.height, "fps": a.fps,
-                    "has_audio": a.has_audio, "metadata": a.metadata,
+                    "has_audio": a.has_audio, "metadata": a.metadata, "rating": a.rating,
                     "provenance": redact_for_export(a.provenance) if a.provenance else {},
                     "spec": ({"id": a.spec_id, "version": a.spec_version} if a.spec_id else None),
                 })
@@ -171,7 +175,10 @@ def export_pack(
             "project": {"name": project.name, "slug": project.slug, "genre": project.genre,
                         "description": project.description, "content_language": project.content_language,
                         "delivery_profile": project.delivery_profile, "kind": project.kind,
-                        "pipeline": project.pipeline, "brief": project.brief, "settings": project.settings},
+                        "pipeline": project.pipeline, "brief": project.brief, "settings": project.settings,
+                        "rating": project.rating},
+            "restricted_export": ({"rating": rating, "notice_key": "content.export.personal_use"}
+                                  if not settings.content.policy(rating).allow_export else None),
             "counts": counts, "files": files, "warnings": warnings,
         }
         _dump(work / MANIFEST, manifest)
@@ -293,7 +300,8 @@ class _Importer:
                     content_language=p.get("content_language", ""))
         try:
             created = store.create(**base, delivery_profile=p.get("delivery_profile", ""), kind=p.get("kind", ""),
-                                   pipeline=p.get("pipeline", ""), brief=p.get("brief") or None)
+                                   pipeline=p.get("pipeline", ""), brief=p.get("brief") or None,
+                                   rating=p.get("rating", ""))
         except ConfigError as exc:
             self.report.warn("plan_unavailable", detail=str(exc))
             created = store.create(**base)
@@ -459,7 +467,7 @@ class _Importer:
             rec = self._register(slug, src, e["kind"], slot, shot_id, e["sha256"], bucket,
                                  current=bool(e.get("current", True)),
                                  info={k: e.get(k) for k in ("duration_sec", "width", "height", "fps", "has_audio")},
-                                 metadata=e.get("metadata") or {},
+                                 metadata=e.get("metadata") or {}, rating=e.get("rating") or "",
                                  provenance={"schema": "storyagent.provenance.v1", "origin": "pack",
                                              "pack": {"name": self.name,
                                                       "exported_at": self.manifest.get("exported_at")},
@@ -469,7 +477,8 @@ class _Importer:
 
     def _register(self, slug: str, src: Path, kind: str, slot: str, shot_id: int | None, sha: str,
                   bucket: dict[str, int], *, current: bool, info: Mapping[str, Any], metadata: Mapping[str, Any],
-                  provenance: Mapping[str, Any]) -> str | None:
+                  provenance: Mapping[str, Any], rating: str = "") -> str | None:
+        rating = self.settings.content.higher(project_rating(self.db, self.pid), rating)
         group = self.db.conn.execute(
             "SELECT id, sha256, is_current FROM media_assets WHERE project_id=? AND COALESCE(shot_id,0)=? AND kind=? "
             "AND slot=? AND trashed_at IS NULL", (self.pid, shot_id or 0, kind, slot)).fetchall()
@@ -483,7 +492,8 @@ class _Importer:
             return same["id"]
         has_current = any(r["is_current"] for r in group)
         adopt = current and (self.policy == "new_version" or not has_current)
-        dest = self.settings.project_media_dir(slug, kind, shot_id) / f"{sha[:16]}-{len(group) + 1}{src.suffix.lower()}"
+        dest = (self.settings.project_media_dir(slug, kind, shot_id, rating)
+                / f"{sha[:16]}-{len(group) + 1}{src.suffix.lower()}")
         if not self.dry:
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dest)
@@ -498,7 +508,7 @@ class _Importer:
             NewAsset(kind=kind, slot=slot, path=str(dest.relative_to(self.settings.home)), sha256=sha,
                      bytes=src.stat().st_size, duration_sec=meta.get("duration_sec"), width=meta.get("width"),
                      height=meta.get("height"), fps=meta.get("fps"), has_audio=meta.get("has_audio"),
-                     metadata=dict(metadata), provenance=dict(provenance)),
+                     metadata=dict(metadata), provenance=dict(provenance), rating=rating),
             project_id=self.pid, shot_id=shot_id, adopt=adopt)
         self.report.bump(bucket, "imported" if adopt else "candidate")
         return asset.id

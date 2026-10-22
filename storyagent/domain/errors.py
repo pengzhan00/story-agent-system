@@ -25,6 +25,8 @@ class ErrorCode(StrEnum):
     CONSENT_REQUIRED = "consent_required"
     LICENSE_ACK_REQUIRED = "license_ack_required"
     REMOTE_NOT_ALLOWED = "remote_not_allowed"      # the model runs in the cloud: data would leave this machine
+    CONTENT_BLOCKED = "content_blocked"            # a hard gate of the content rating refused the job
+    VAULT_UNAVAILABLE = "vault_unavailable"        # restricted material needs the vault volume, which is not mounted
     MISSING_CREDENTIALS = "missing_credentials"    # a cloud model whose API key is not in the environment
     OUTPUT_MISSING = "output_missing"
     OUTPUT_INVALID = "output_invalid"
@@ -51,6 +53,8 @@ _STATUS: dict[ErrorCode, JobStatus] = {
     ErrorCode.CONSENT_REQUIRED: JobStatus.FAILED_VALIDATION,
     ErrorCode.LICENSE_ACK_REQUIRED: JobStatus.FAILED_VALIDATION,
     ErrorCode.REMOTE_NOT_ALLOWED: JobStatus.FAILED_VALIDATION,
+    ErrorCode.CONTENT_BLOCKED: JobStatus.FAILED_VALIDATION,
+    ErrorCode.VAULT_UNAVAILABLE: JobStatus.FAILED_VALIDATION,
     ErrorCode.MISSING_CREDENTIALS: JobStatus.FAILED_VALIDATION,
     ErrorCode.OUTPUT_MISSING: JobStatus.FAILED_VALIDATION,
     ErrorCode.OUTPUT_INVALID: JobStatus.FAILED_VALIDATION,

@@ -61,13 +61,13 @@ def import_file(
     if not src.is_file():
         raise LibraryError(f"file not found: {src}")
     kind = upload_kind(src)
-    slug = "_unassigned"
+    slug, rating = "_unassigned", settings.content.default_rating
     if project_id is not None:
-        row = ledger.db.conn.execute("SELECT slug FROM projects WHERE id=?", (project_id,)).fetchone()
+        row = ledger.db.conn.execute("SELECT slug, rating FROM projects WHERE id=?", (project_id,)).fetchone()
         if row is None:
             raise LibraryError(f"unknown project {project_id}")
-        slug = row["slug"]
-    dest_dir = settings.project_media_dir(slug, kind, shot_id)
+        slug, rating = row["slug"], row["rating"]
+    dest_dir = settings.project_media_dir(slug, kind, shot_id, rating)
     dest_dir.mkdir(parents=True, exist_ok=True)
     dest = dest_dir / f"{new_id()}{src.suffix.lower()}"
     shutil.copy2(src, dest)
@@ -80,6 +80,7 @@ def import_file(
             width=info.width if info else None, height=info.height if info else None,
             fps=info.fps if info else None, has_audio=info.has_audio if info else None, metadata=meta,
             provenance={"schema": "storyagent.provenance.v1", "origin": "upload", "original_name": src.name},
+            rating=rating,
         ),
         project_id=project_id, shot_id=shot_id, adopt=adopt,
     )
@@ -167,7 +168,8 @@ class Library:
         existing = self.find(role, name)
         if existing and not replace:
             raise LibraryError(f"{role}/{name} already exists (use replace to overwrite)")
-        dest_dir = self.settings.home / "library" / role
+        vaulted = self.settings.content.policy(src.rating).vault          # a restricted asset stays in the vault
+        dest_dir = (self.settings.vault_dir / "_library" if vaulted else self.settings.home / "library") / role
         dest_dir.mkdir(parents=True, exist_ok=True)
         dest = dest_dir / f"{new_id()}{src_file.suffix.lower()}"
         shutil.copy2(src_file, dest)
@@ -178,6 +180,7 @@ class Library:
                 sha256=src.sha256 or _sha(dest), bytes=src.bytes, duration_sec=src.duration_sec, width=src.width,
                 height=src.height, fps=src.fps, has_audio=src.has_audio, metadata=dict(src.metadata),
                 provenance={**src.provenance, "library": {"source_asset": src.id, "source_project": src.project_id}},
+                rating=src.rating,
             ),
             project_id=None, adopt=False,
         )
@@ -188,9 +191,9 @@ class Library:
                              (existing.id,))
             conn.execute(
                 """INSERT INTO library_items(id, role, name, asset_id, description, tags, meta, source_asset_id,
-                       source_project_id) VALUES (?,?,?,?,?,?,?,?,?)""",
+                       source_project_id, rating) VALUES (?,?,?,?,?,?,?,?,?,?)""",
                 (item_id, role, name, copy.id, description, dumps(list(tags)), dumps(item_meta), src.id,
-                 src.project_id),
+                 src.project_id, src.rating),
             )
         return self.get(item_id)
 

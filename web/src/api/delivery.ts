@@ -12,7 +12,7 @@ export function usePlatforms() {
 
 export function useDelivery(pid: number, episode: number) {
   return useMutation({
-    mutationFn: ({ platform, languages }: { platform: string; languages: string[] }) =>
-      post<Delivery>(`/api/projects/${pid}/episodes/${episode}/delivery`, { platform, languages }),
+    mutationFn: ({ platform, languages, confirm }: { platform: string; languages: string[]; confirm?: boolean }) =>
+      post<Delivery>(`/api/projects/${pid}/episodes/${episode}/delivery`, { platform, languages, ...(confirm ? { confirm_restricted: true } : {}) }),
   });
 }

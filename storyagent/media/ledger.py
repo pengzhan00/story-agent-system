@@ -45,6 +45,7 @@ class NewAsset:
     has_audio: bool | None = None
     metadata: Mapping[str, Any] = field(default_factory=dict)
     provenance: Mapping[str, Any] = field(default_factory=dict)
+    rating: str = "general"
 
 
 def _parse_iso(ts: str) -> float:
@@ -383,13 +384,13 @@ class Ledger:
         conn.execute(
             """INSERT INTO media_assets(id, job_id, project_id, shot_id, spec_id, spec_version, kind,
                    slot, path, sha256, bytes, duration_sec, width, height, fps, has_audio, metadata,
-                   provenance, version, is_current, created_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                   provenance, version, is_current, created_at, rating)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 aid, job_id, project_id, shot_id, spec_id, spec_version, a.kind, a.slot,
                 a.path, a.sha256, a.bytes, a.duration_sec, a.width, a.height, a.fps,
                 None if a.has_audio is None else int(a.has_audio), dumps(dict(a.metadata)),
-                dumps(dict(a.provenance)), version, int(adopt), self._now(),
+                dumps(dict(a.provenance)), version, int(adopt), self._now(), a.rating,
             ),
         )
         return aid

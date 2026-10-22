@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
+import { useContentStatus } from "../api/content";
 import { useCreateProject, useEstimate, useMeta } from "../api/hooks";
 import type { BriefAnswers } from "../api/types";
 import { useI18n } from "../i18n";
@@ -25,6 +26,8 @@ export function NewProject() {
   const [episodeSec, setEpisodeSec] = useState("");
   const [audience, setAudience] = useState("");
   const [platform, setPlatform] = useState("");
+  const [rating, setRating] = useState("");
+  const ratings = useContentStatus().data?.ratings ?? [];
 
   const kinds = meta?.work_kinds ?? [];
   const kind = kinds.find((k) => k.name === (kindName || meta?.default_work_kind));
@@ -54,7 +57,7 @@ export function NewProject() {
   function submit(e: FormEvent) {
     e.preventDefault();
     create.mutate(
-      { name: name.trim(), description: premise.trim(), content_language: locale, kind: kind?.name ?? "", pipeline: plan, brief },
+      { name: name.trim(), description: premise.trim(), content_language: locale, kind: kind?.name ?? "", pipeline: plan, brief, rating },
       { onSuccess: (p) => nav(`/projects/${p.id}`) },
     );
   }
@@ -100,6 +103,19 @@ export function NewProject() {
         ) : null}
         <span className="muted small">{t("web.plan.pipeline_hint")}</span>
       </label>
+      {ratings.length > 1 ? (
+        <label className="field">
+          <span>{t("web.content.rating")}</span>
+          <select value={rating} onChange={(e) => setRating(e.target.value)}>
+            {ratings.map((r) => (
+              <option key={r.name} value={r.name}>
+                {t(r.label_key)}
+              </option>
+            ))}
+          </select>
+          <span className="muted small">{t("web.content.rating_hint")}</span>
+        </label>
+      ) : null}
       <div className="form-grid">
         {asks("seasons") ? (
           <label className="field">

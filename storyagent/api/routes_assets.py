@@ -6,9 +6,12 @@ from typing import Annotated
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import FileResponse
 
+from storyagent.content import mask_thumbnail
+
 from .context import ctx_of
 from .errors import ApiError
 from .schemas import AssetOut, StaleAsset
+from .visibility import require_viewable
 
 router = APIRouter(prefix="/api", tags=["assets"])
 
@@ -47,6 +50,7 @@ def asset_file(asset_id: str, request: Request) -> FileResponse:
     """Stream the stored file (range requests supported, so <video>/<audio> can seek)."""
     ctx = ctx_of(request)
     asset = ctx.ledger.get_asset(asset_id)
+    require_viewable(request, asset.rating, asset.project_id, what=asset.id)
     home = ctx.settings.home.resolve()
     path = (home / asset.path).resolve()
     if home not in path.parents:  # a ledger path must never escape the data home
@@ -55,6 +59,19 @@ def asset_file(asset_id: str, request: Request) -> FileResponse:
         raise ApiError(404, "asset_file_missing", asset.path)
     media_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
     return FileResponse(path, media_type=media_type, filename=path.name, content_disposition_type="inline")
+
+
+@router.get("/assets/{asset_id}/mask", response_class=FileResponse)
+def asset_mask(asset_id: str, request: Request) -> FileResponse:
+    """A tiny blurred picture of a restricted image or video, shown instead of the file while it is locked."""
+    ctx = ctx_of(request)
+    asset = ctx.ledger.get_asset(asset_id)
+    if not ctx.settings.content.policy(asset.rating).mask_ui:
+        raise ApiError(404, "not_found", asset_id)
+    cache = ctx.settings.home / "cache" / "mask" / f"{asset.id}.jpg"
+    if not mask_thumbnail(ctx.settings, ctx.settings.home / asset.path, cache):
+        raise ApiError(404, "not_found", asset_id)
+    return FileResponse(cache, media_type="image/jpeg", content_disposition_type="inline")
 
 
 @router.post("/assets/{asset_id}/adopt", response_model=AssetOut)

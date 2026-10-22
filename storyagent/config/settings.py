@@ -22,6 +22,7 @@ from typing import Any
 
 from storyagent.domain import MediaKind, QualityTier
 
+from .content import ContentConfig, build_content
 from .grammar import Grammar, build_grammar
 from .platforms import Platforms, build_platforms
 
@@ -38,7 +39,7 @@ UNLOAD_POLICIES = ("never", "ask", "auto")
 EXPLICIT_LABEL_MODES = ("off", "overlay", "both")
 LLM_BACKEND_KINDS = ("ollama", "llamacpp", "openai_compat")
 _CONFIG_FILES = ("services", "models", "delivery", "compliance", "recipes", "llm", "pipelines", "kinds", "auth",
-                 "grammar", "platforms")
+                 "grammar", "platforms", "content")
 AUTH_MODES = ("off", "token")
 CORE_KINDS = ("image.generate", "video.generate", "audio.tts", "audio.music", "compose.assemble")
 BRIEF_QUESTIONS = ("seasons", "episodes", "episode_sec", "audience", "platform")
@@ -231,6 +232,7 @@ class Settings:
     auth: AuthConfig = field(default_factory=AuthConfig)
     grammar: Grammar = field(default_factory=Grammar)     # grammar.toml: the shot grammar check
     platforms: Platforms = field(default_factory=Platforms)     # platforms.toml: delivery presets per destination
+    content: ContentConfig = field(default_factory=ContentConfig)   # content.toml: ratings, vault, unlock, hard gates
 
     # -- derived paths ----------------------------------------------------
     @property
@@ -245,9 +247,16 @@ class Settings:
     def logs_dir(self) -> Path:
         return self.home / "logs"
 
-    def project_media_dir(self, project_slug: str, kind: str, shot_id: int | str | None = None) -> Path:
-        """projects/<proj>/media/<kind>[/<shot_id>] — the single artifact root."""
-        base = self.projects_dir / project_slug / "media" / kind
+    @property
+    def vault_dir(self) -> Path:
+        return self.home / self.content.vault_dir
+
+    def project_media_dir(self, project_slug: str, kind: str, shot_id: int | str | None = None,
+                         rating: str | None = None) -> Path:
+        """projects/<proj>/media/<kind>[/<shot_id>] — the single artifact root; a rating whose policy says ``vault``
+        puts it under the vault instead (``<vault>/<proj>/media/...``)."""
+        root = self.vault_dir if rating and self.content.policy(rating).vault else self.projects_dir
+        base = root / project_slug / "media" / kind
         return base / str(shot_id) if shot_id is not None else base
 
     # -- lookups ----------------------------------------------------------
@@ -710,6 +719,11 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     default_kind = str(merged["kinds"].get("default", {}).get("kind", ""))
     if default_kind not in kinds:
         raise ConfigError(f"[default] kind {default_kind!r} is not defined in kinds.toml")
+    content = build_content(merged["content"], ConfigError)
+    for ref, model in models.items():
+        rating = model.extra.get("rating")
+        if rating is not None and not content.known(str(rating)):
+            raise ConfigError(f"model {ref!r}: unknown rating {rating!r}; known: {sorted(content.ratings)}")
     backends, roles = _build_llm(merged["llm"], services)
     launch = _build_launch(merged["services"].get("launch", {}), services)
     legacy = env.get(ENV_LEGACY_DB)
@@ -740,6 +754,7 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         auth=_build_auth(merged["auth"], env.get(ENV_AUTH)),
         grammar=build_grammar(merged["grammar"], ConfigError),
         platforms=build_platforms(merged["platforms"], ConfigError),
+        content=content,
     )
 
 

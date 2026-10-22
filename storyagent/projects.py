@@ -14,7 +14,7 @@ from storyagent.db import Database
 from storyagent.domain import slugify
 
 _PATCHABLE = ("name", "description", "genre", "content_language", "delivery_profile", "aspect_ratio", "kind",
-              "pipeline")
+              "pipeline", "rating")
 _SETTINGS_KEYS = ("compliance", "models", "allow_restricted_licenses", "target_sec", "allow_remote", "default_voice",
                   "video_share", "video_budget_hours", "edit")
 
@@ -44,6 +44,7 @@ class Project:
     brief: dict[str, Any] = field(default_factory=dict)
     created_at: str = ""
     updated_at: str = ""
+    rating: str = "general"
 
     @classmethod
     def from_row(cls, r: Any) -> Project:
@@ -52,7 +53,7 @@ class Project:
             content_language=r["content_language"], delivery_profile=r["delivery_profile"],
             aspect_ratio=r["aspect_ratio"], status=r["status"], settings=json.loads(r["settings"] or "{}"),
             kind=r["kind"], pipeline=r["pipeline"], brief=json.loads(r["brief"] or "{}"),
-            created_at=r["created_at"], updated_at=r["updated_at"],
+            created_at=r["created_at"], updated_at=r["updated_at"], rating=r["rating"],
         )
 
 
@@ -109,6 +110,7 @@ class ProjectStore:
     def create(
         self, name: str, *, genre: str = "", description: str = "", content_language: str = "",
         delivery_profile: str = "", kind: str = "", pipeline: str = "", brief: Mapping[str, Any] | None = None,
+        rating: str = "",
     ) -> Project:
         """A project is made with its plan: ``kind`` (drama series, advert ...) recommends a pipeline plan - one
         complete set of models and the picture frame - and ``brief`` gives the structure (seasons, episodes, episode
@@ -116,6 +118,9 @@ class ProjectStore:
         ``delivery_profile`` may refine the frame but must keep the plan's direction."""
         if kind:
             self.settings.kind(kind)
+        rating = rating or self.settings.content.default_rating
+        if not self.settings.content.known(rating):
+            raise ConfigError(f"unknown rating {rating!r}; known: {sorted(self.settings.content.ratings)}")
         plan_name = self.plan_of(pipeline, kind, delivery_profile)
         plan = self.settings.pipeline(plan_name)
         profile = delivery_profile or plan.delivery_profile
@@ -132,10 +137,10 @@ class ProjectStore:
                 slug, n = f"{base}-{n}", n + 1
             cur = conn.execute(
                 "INSERT INTO projects(slug, name, genre, description, content_language, delivery_profile, aspect_ratio,"
-                " kind, pipeline, brief, settings) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                " kind, pipeline, brief, settings, rating) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                 (slug, name, genre, description, content_language or self.settings.locale, profile,
                  self._ratio(frame), kind, plan_name, json.dumps(resolved, ensure_ascii=False),
-                 json.dumps(settings)),
+                 json.dumps(settings), rating),
             )
             assert cur.lastrowid is not None
             project_id = cur.lastrowid
@@ -213,6 +218,14 @@ class ProjectStore:
                 raise ConfigError(
                     f"pipeline {plan.name!r} fixes the direction of the frame; profile {wanted!r} differs")
             changes["delivery_profile"] = wanted
+        if "rating" in changes:
+            if not self.settings.content.known(str(changes["rating"])):
+                raise ConfigError(f"unknown rating {changes['rating']!r}; "
+                                  f"known: {sorted(self.settings.content.ratings)}")
+            if changes["rating"] != self.get(project_id).rating and self.db.conn.execute(
+                    "SELECT 1 FROM media_assets WHERE project_id=? LIMIT 1", (project_id,)).fetchone():
+                raise ProjectStateError(
+                    f"project {project_id} already has files stored by its rating; the rating is decided at the start")
         if "delivery_profile" in changes:
             before = self.get(project_id)
             old, new = self._frame(before.delivery_profile), self._frame(str(changes["delivery_profile"]))

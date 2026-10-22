@@ -19,6 +19,7 @@ from typing import Any
 
 from storyagent import __version__
 from storyagent.config import Settings
+from storyagent.content import check_export
 from storyagent.domain import MediaKind
 from storyagent.media.compliance import redact_for_export
 from storyagent.media.ledger import Ledger, LedgerError
@@ -63,8 +64,10 @@ def find_episode(ledger: Ledger, project_id: int, episode: int) -> Any:
 
 
 def build_package(settings: Settings, ledger: Ledger, project_id: int, episode: int, dest: Path,
-                  profile: dict[str, Any]) -> dict[str, Any]:
-    """Write the package into ``dest`` (created if needed) and return the manifest."""
+                  profile: dict[str, Any], *, confirm_restricted: bool = False) -> dict[str, Any]:
+    """Write the package into ``dest`` (created if needed) and return the manifest. A project of a rating that does
+    not allow export is refused (``ContentError``) unless ``confirm_restricted``."""
+    rating = check_export(settings, ledger.db, project_id, confirmed=confirm_restricted)
     main = find_episode(ledger, project_id, episode)
     film = settings.home / main.path
     if not film.is_file():
@@ -120,7 +123,8 @@ def build_package(settings: Settings, ledger: Ledger, project_id: int, episode: 
     manifest = {
         "schema": MANIFEST_SCHEMA, "created_at": provenance["created_at"], "project_id": project_id,
         "episode": episode, "duration_sec": main.duration_sec, "warnings": main.metadata.get("warnings", []),
-        "qc": qc,
+        "qc": qc, "rating": rating,
+        "notice_key": None if settings.content.policy(rating).allow_export else "content.export.personal_use",
         "files": [{"name": name, "bytes": (dest / name).stat().st_size, "sha256": _sha256(dest / name)}
                   for name in [*files, "provenance.json"]],
     }

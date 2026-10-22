@@ -133,6 +133,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/assets/{asset_id}/mask": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Asset Mask
+         * @description A tiny blurred picture of a restricted image or video, shown instead of the file while it is locked.
+         */
+        get: operations["asset_mask_api_assets__asset_id__mask_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/assets/{asset_id}/trash": {
         parameters: {
             query?: never;
@@ -250,6 +270,41 @@ export interface paths {
         /** Change Password */
         post: operations["change_password_api_auth_password_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Status */
+        get: operations["status_api_content_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/unlock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unlock */
+        post: operations["unlock_api_content_unlock_post"];
+        /** Lock */
+        delete: operations["lock_api_content_unlock_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1029,6 +1084,7 @@ export interface paths {
         /**
          * Episode Package
          * @description The delivery package of an assembled episode as one zip (film, subtitles, stems, manifest, provenance).
+         *     A project of a rating that does not allow export needs ``confirm_restricted=true`` and an unlocked session.
          */
         get: operations["episode_package_api_projects__project_id__episodes__episode__package_get"];
         put?: never;
@@ -2273,6 +2329,11 @@ export interface components {
             job_id: string | null;
             /** Kind */
             kind: string;
+            /**
+             * Locked
+             * @default false
+             */
+            locked: boolean;
             /** Metadata */
             metadata: {
                 [key: string]: unknown;
@@ -2285,6 +2346,11 @@ export interface components {
             provenance: {
                 [key: string]: unknown;
             };
+            /**
+             * Rating
+             * @default general
+             */
+            rating: string;
             /** Sha256 */
             sha256: string;
             /** Shot Id */
@@ -2373,8 +2439,32 @@ export interface components {
         CancelResult: {
             status: components["schemas"]["JobStatus"];
         };
+        /** ContentStatusOut */
+        ContentStatusOut: {
+            /** Default Rating */
+            default_rating: string;
+            /** Encryption */
+            encryption: string;
+            /** Expires At */
+            expires_at: string | null;
+            /** Needs Password */
+            needs_password: boolean;
+            /** Ratings */
+            ratings: components["schemas"]["RatingOut"][];
+            /** Ttl Sec */
+            ttl_sec: number;
+            /** Unlocked */
+            unlocked: boolean;
+            /** Vault Ready */
+            vault_ready: boolean;
+        };
         /** DeliveryBody */
         DeliveryBody: {
+            /**
+             * Confirm Restricted
+             * @default false
+             */
+            confirm_restricted: boolean;
             /**
              * Languages
              * @default []
@@ -2709,6 +2799,11 @@ export interface components {
             kind: components["schemas"]["MediaKind"];
             /** License Tag */
             license_tag: string;
+            /**
+             * Locked
+             * @default false
+             */
+            locked: boolean;
             /** Max Attempts */
             max_attempts: number;
             /** Model Ref */
@@ -3396,10 +3491,14 @@ export interface components {
             id: number;
             /** Kind */
             kind: string;
+            /** Locked */
+            locked: boolean;
             /** Name */
             name: string;
             /** Pipeline */
             pipeline: string;
+            /** Rating */
+            rating: string;
             /** Running */
             running: boolean;
             /** Stages Done */
@@ -3449,6 +3548,12 @@ export interface components {
              * @default
              */
             pipeline: string;
+            /**
+             * Rating
+             * @description content rating (content.toml); empty = the default, decided now
+             * @default
+             */
+            rating: string;
         };
         /** ProjectFromText */
         ProjectFromText: {
@@ -3530,6 +3635,11 @@ export interface components {
             name: string;
             /** Pipeline */
             pipeline: string;
+            /**
+             * Rating
+             * @default general
+             */
+            rating: string;
             /** Settings */
             settings: {
                 [key: string]: unknown;
@@ -3562,6 +3672,11 @@ export interface components {
              * @description change the plan: the whole set of models changes with it
              */
             pipeline?: string | null;
+            /**
+             * Rating
+             * @description content rating; only while the project has no files yet
+             */
+            rating?: string | null;
         };
         /**
          * ProjectSettingsPatch
@@ -3646,6 +3761,21 @@ export interface components {
             max: number;
             /** Min */
             min: number;
+        };
+        /** RatingOut */
+        RatingOut: {
+            /** Allow Export */
+            allow_export: boolean;
+            /** Label Key */
+            label_key: string;
+            /** Mask Ui */
+            mask_ui: boolean;
+            /** Name */
+            name: string;
+            /** Restricted */
+            restricted: boolean;
+            /** Vault */
+            vault: boolean;
         };
         /** Ready */
         Ready: {
@@ -4069,6 +4199,11 @@ export interface components {
              * @default false
              */
             locked: boolean;
+            /**
+             * Masked
+             * @default false
+             */
+            masked: boolean;
             /** Model Ref */
             model_ref: string;
             /** Negative Prompt */
@@ -4130,6 +4265,19 @@ export interface components {
             asset: components["schemas"]["AssetOut"];
             /** Latest Spec Version */
             latest_spec_version: number;
+        };
+        /** UnlockBody */
+        UnlockBody: {
+            /**
+             * Confirm Adult
+             * @default false
+             */
+            confirm_adult: boolean;
+            /**
+             * Password
+             * @default
+             */
+            password: string;
         };
         /** UserCreateBody */
         UserCreateBody: {
@@ -4654,6 +4802,35 @@ export interface operations {
             };
         };
     };
+    asset_mask_api_assets__asset_id__mask_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                asset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     trash_asset_api_assets__asset_id__trash_post: {
         parameters: {
             query?: never;
@@ -4838,6 +5015,79 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    status_api_content_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentStatusOut"];
+                };
+            };
+        };
+    };
+    unlock_api_content_unlock_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UnlockBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lock_api_content_unlock_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentStatusOut"];
                 };
             };
         };
@@ -6350,6 +6600,7 @@ export interface operations {
         parameters: {
             query?: {
                 absolute?: boolean;
+                confirm_restricted?: boolean;
             };
             header?: never;
             path: {
@@ -6451,7 +6702,9 @@ export interface operations {
     };
     episode_package_api_projects__project_id__episodes__episode__package_get: {
         parameters: {
-            query?: never;
+            query?: {
+                confirm_restricted?: boolean;
+            };
             header?: never;
             path: {
                 project_id: number;
@@ -7258,6 +7511,7 @@ export interface operations {
             query?: {
                 scope?: "all" | "assets" | "story";
                 include_history?: boolean;
+                confirm_restricted?: boolean;
             };
             header?: never;
             path: {

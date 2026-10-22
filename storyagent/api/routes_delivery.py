@@ -17,6 +17,7 @@ from storyagent.workflow import WorkflowEngine
 from .context import ctx_of
 from .errors import ApiError
 from .schemas import DeliveryBody, DeliveryOut, PlatformOut
+from .visibility import allow_export
 
 router = APIRouter(prefix="/api", tags=["delivery"])
 _NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,120}\.zip$")
@@ -34,6 +35,7 @@ def make_delivery(project_id: int, episode: int, body: DeliveryBody, request: Re
     Download the result with ``GET /api/deliveries/{name}``."""
     ctx = ctx_of(request)
     project = ctx.projects.get(project_id)
+    confirmed = allow_export(request, project_id, body.confirm_restricted, what=f"delivery ep{episode}")
     if body.platform and body.platform not in ctx.settings.platforms.items:
         raise ApiError(404, "not_found", body.platform)
     engine = WorkflowEngine(ctx.settings, ctx.db, spec_store=ctx.specs)
@@ -44,6 +46,7 @@ def make_delivery(project_id: int, episode: int, body: DeliveryBody, request: Re
     try:
         record = deliver(ctx.settings, ctx.ledger, project_id, episode, body.platform or None, work,
                          languages=body.languages, content_language=project.content_language,
+                         confirm_restricted=confirmed,
                          translate=lambda lines, lang: engine.translate_lines(project_id, lines, lang))
         stamp = now_iso().replace(":", "").replace(".", "")
         name = f"{project.slug}-ep{episode:02d}-{record['platform']['name']}-{stamp}.zip"

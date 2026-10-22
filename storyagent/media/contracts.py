@@ -141,6 +141,7 @@ class AssetRecord:
     is_current: bool
     created_at: str
     trashed_at: str | None
+    rating: str = "general"
 
     @classmethod
     def from_row(cls, r: sqlite3.Row) -> AssetRecord:
@@ -152,7 +153,7 @@ class AssetRecord:
             has_audio=None if r["has_audio"] is None else bool(r["has_audio"]),
             metadata=loads(r["metadata"], {}), provenance=loads(r["provenance"], {}),
             version=r["version"], is_current=bool(r["is_current"]), created_at=r["created_at"],
-            trashed_at=r["trashed_at"],
+            trashed_at=r["trashed_at"], rating=r["rating"],
         )
 
 

@@ -15,8 +15,8 @@ export function usePack(pid: number) {
   };
   return {
     exportPack: useMutation({
-      mutationFn: ({ scope, history }: { scope: PackScope; history: boolean }) =>
-        post<PackExport>(`/api/projects/${pid}/pack?scope=${scope}&include_history=${history}`),
+      mutationFn: ({ scope, history, confirm }: { scope: PackScope; history: boolean; confirm?: boolean }) =>
+        post<PackExport>(`/api/projects/${pid}/pack?scope=${scope}&include_history=${history}${confirm ? "&confirm_restricted=true" : ""}`),
     }),
     importPack: useMutation({
       mutationFn: ({ file, policy, dryRun }: { file: File; policy: PackPolicy; dryRun: boolean }) =>

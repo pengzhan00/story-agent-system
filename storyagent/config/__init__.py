@@ -1,3 +1,4 @@
+from .content import ContentConfig, RatingPolicy
 from .grammar import Grammar, GrammarRule
 from .platforms import Platform, Platforms
 from .settings import (
@@ -24,11 +25,13 @@ __all__ = [
     "AuthConfig",
     "AuthRole",
     "ComplianceConfig",
+    "ContentConfig",
     "ConfigError",
     "deep_merge",
     "Grammar",
     "GrammarRule",
     "Platform",
+    "RatingPolicy",
     "Platforms",
     "LLMBackend",
     "LLMRole",

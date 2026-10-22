@@ -3,9 +3,11 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from storyagent.domain import JobStatus, MediaKind, QualityTier
+
+from .visibility import hidden
 
 
 class Out(BaseModel):
@@ -47,6 +49,7 @@ class ProjectOut(Out):
     brief: dict[str, Any]
     created_at: str
     updated_at: str
+    rating: str = "general"
 
 
 class ProjectCard(Strict):
@@ -59,6 +62,8 @@ class ProjectCard(Strict):
     status: str
     kind: str
     pipeline: str
+    rating: str
+    locked: bool
     stages_done: int
     stages_total: int
     running: bool
@@ -88,6 +93,7 @@ class ProjectCreate(BaseModel):
     kind: str = Field(default="", description="kind of work (drama_series, advert ...): recommends the pipeline plan")
     pipeline: str = Field(default="", description="the pipeline plan: one complete set of models; default = the kind's")
     brief: BriefAnswers | None = None
+    rating: str = Field(default="", description="content rating (content.toml); empty = the default, decided now")
 
 
 class EstimateRequest(BaseModel):
@@ -127,6 +133,7 @@ class ProjectPatch(BaseModel):
     aspect_ratio: str | None = None
     kind: str | None = None
     pipeline: str | None = Field(default=None, description="change the plan: the whole set of models changes with it")
+    rating: str | None = Field(default=None, description="content rating; only while the project has no files yet")
 
 
 class ProjectSettingsPatch(BaseModel):
@@ -186,6 +193,13 @@ class JobOut(Out):
     started_at: str | None
     finished_at: str | None
     actual_seconds: float | None
+    locked: bool = False
+
+    @model_validator(mode="after")
+    def _mask(self) -> JobOut:
+        if hidden(None, self.project_id):
+            self.locked, self.inputs = True, {}
+        return self
     depends_on: str | None = None
     pipeline_id: str | None = None
     pipeline_step: int | None = None
@@ -249,6 +263,14 @@ class AssetOut(Out):
     is_current: bool
     created_at: str
     trashed_at: str | None
+    rating: str = "general"
+    locked: bool = False
+
+    @model_validator(mode="after")
+    def _mask(self) -> AssetOut:
+        if hidden(self.rating, self.project_id):
+            self.locked, self.path, self.sha256, self.metadata, self.provenance = True, "", "", {}, {}
+        return self
 
 
 class StaleAsset(BaseModel):
@@ -309,6 +331,13 @@ class SpecOut(Out):
     note: str
     created_at: str
     locked: bool = False
+    masked: bool = False
+
+    @model_validator(mode="after")
+    def _mask(self) -> SpecOut:
+        if hidden(None, self.project_id):
+            self.masked, self.prompt, self.negative_prompt, self.text_payload, self.note = True, "", "", "", ""
+        return self
 
 
 class SpecCreate(BaseModel):
@@ -1105,6 +1134,7 @@ class PlatformOut(Strict):
 class DeliveryBody(Strict):
     platform: str = ""
     languages: list[str] = []
+    confirm_restricted: bool = False
 
 
 class DeliveryOut(Strict):
@@ -1115,3 +1145,29 @@ class DeliveryOut(Strict):
     subtitles: list[str]
     result: dict[str, Any]
     files: list[dict[str, Any]]
+
+
+# -- content ratings ---------------------------------------------------------------------------------
+class RatingOut(Strict):
+    name: str
+    label_key: str
+    restricted: bool
+    mask_ui: bool
+    vault: bool
+    allow_export: bool
+
+
+class ContentStatusOut(Strict):
+    unlocked: bool
+    expires_at: str | None
+    ttl_sec: int
+    needs_password: bool
+    vault_ready: bool
+    encryption: str
+    default_rating: str
+    ratings: list[RatingOut]
+
+
+class UnlockBody(Strict):
+    confirm_adult: bool = False
+    password: str = ""

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { NavLink, Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { useProject, useProjectBin, useUpdateProject, useWorkflow } from "../api/hooks";
+import { ContentBar } from "../components/ContentBar";
 import { ErrorNote } from "../components/ErrorNote";
 import { ProgressBar } from "../components/ProgressBar";
 import { useT } from "../i18n";
@@ -26,6 +27,7 @@ export function ProjectPage() {
   const rename = useUpdateProject(id);
   const bin = useProjectBin();
   const nav = useNavigate();
+  const restricted = !!project.data && project.data.rating !== "general";
   const [draft, setDraft] = useState<string | null>(null);
   function saveName() {
     if (draft && draft.trim() && draft.trim() !== project.data?.name) rename.mutate({ name: draft.trim() });
@@ -51,6 +53,7 @@ export function ProjectPage() {
             }}
           />
         )}
+        {project.data && project.data.rating !== "general" ? <span className="chip">{t("web.content.badge")}</span> : null}
         {draft === null && project.data ? (
           <button type="button" onClick={() => setDraft(project.data?.name ?? "")}>
             {t("web.projects.rename")}
@@ -75,6 +78,7 @@ export function ProjectPage() {
       </header>
       <ErrorNote error={project.error} />
       <ErrorNote error={rename.error ?? bin.trash.error} />
+      {restricted ? <ContentBar /> : null}
       <nav className="tabs">
         <NavLink to="workflow" className={({ isActive }) => (isActive ? "tab active" : "tab")}>
           {t("web.tab.workflow")}

@@ -17,21 +17,24 @@ from .context import ctx_of
 from .errors import ApiError
 from .routes_library import _receive
 from .schemas import AssetOut, EditDiffOut
+from .visibility import allow_export
 
 router = APIRouter(prefix="/api/projects/{project_id}/episodes/{episode}/fcp", tags=["interchange"])
 
 
 @router.get("")
-def export_fcp(project_id: int, episode: int, request: Request, absolute: bool = False) -> FileResponse:
+def export_fcp(project_id: int, episode: int, request: Request, absolute: bool = False,
+               confirm_restricted: bool = False) -> FileResponse:
     """A zip with `episode.fcpxml`, the media it points to (relative paths unless `absolute`), the subtitles and
     `interchange.json`. Import the .fcpxml in Final Cut Pro (File > Import > XML) from the unzipped folder."""
     ctx = ctx_of(request)
     project = ctx.projects.get(project_id)
+    confirmed = allow_export(request, project_id, confirm_restricted, what=f"fcp ep{episode}")
     if absolute:
         raise ApiError(422, "invalid", "absolute media paths name this machine's folders: use the CLI for them")
     work = Path(tempfile.mkdtemp(prefix="fcp-", dir=ctx.settings.home))
     try:
-        build_fcp_package(ctx.settings, ctx.ledger, project_id, episode, work / "fcp")
+        build_fcp_package(ctx.settings, ctx.ledger, project_id, episode, work / "fcp", confirm_restricted=confirmed)
     except ExportError as exc:
         shutil.rmtree(work, ignore_errors=True)
         raise ApiError(409, "episode_not_ready", str(exc)) from exc

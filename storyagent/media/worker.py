@@ -24,6 +24,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from storyagent import content
 from storyagent.config import Settings
 from storyagent.db import Database
 from storyagent.domain.errors import ErrorCode
@@ -178,13 +179,15 @@ class Worker:
         return out
 
     # -- one job ------------------------------------------------------------------------------
-    def _project(self, project_id: int | None) -> tuple[str, dict[str, Any]]:
+    def _project(self, project_id: int | None) -> tuple[str, dict[str, Any], str]:
+        default = self.settings.content.default_rating
         if project_id is None:
-            return "_unassigned", {}
-        row = self.db.conn.execute("SELECT slug, settings FROM projects WHERE id=?", (project_id,)).fetchone()
+            return "_unassigned", {}, default
+        row = self.db.conn.execute("SELECT slug, settings, rating FROM projects WHERE id=?",
+                                   (project_id,)).fetchone()
         if row is None:
-            return "_unassigned", {}
-        return row["slug"], json.loads(row["settings"] or "{}")
+            return "_unassigned", {}, default
+        return row["slug"], json.loads(row["settings"] or "{}"), row["rating"]
 
     def _run(self, job: JobRecord) -> None:
         led, stop_hb = self.ledger, threading.Event()
@@ -240,7 +243,8 @@ class Worker:
         adapter = self.registry.get(job.provider)
         if adapter is None:
             raise AdapterError(ErrorCode.MISSING_TOOL, f"no adapter for provider {job.provider}", tool=job.provider)
-        slug, project_settings = self._project(job.project_id)
+        slug, project_settings, project_rating = self._project(job.project_id)
+        rating = content.job_rating(s, project_rating, job.model_ref)
         work_dir.mkdir(parents=True, exist_ok=True)
 
         def log_event(event: str, level: str = "info", **data: Any) -> None:
@@ -258,6 +262,7 @@ class Worker:
 
         # 1) gates: compliance, parameters, adapter-specific validation
         issues = compliance.check_job(s, job, project_settings) + compliance.check_remote(s, job, project_settings)
+        issues += content.gate_issues(s, self.db, job, job.project_id, rating)
         p_issues, warnings = validate_params(job.params, caps.param_schema, strict=s.strict_params)
         issues += p_issues + adapter.validate(job, ctx)
         for w in warnings:
@@ -324,13 +329,13 @@ class Worker:
 
         # 5) fetch, verify, store, record
         artifacts = adapter.fetch(ext, job, ctx)
-        assets = self._store(job, artifacts, ctx, slug, project_settings)
+        assets = self._store(job, artifacts, ctx, slug, project_settings, rating)
         led.complete(job.id, self.owner, assets)
 
     # -- storing artifacts --------------------------------------------------------------------
     def _store(
         self, job: JobRecord, artifacts: Sequence[ArtifactSpec], ctx: JobContext, slug: str,
-        project_settings: dict[str, Any],
+        project_settings: dict[str, Any], rating: str,
     ) -> list[NewAsset]:
         s = self.settings
         if not artifacts:
@@ -346,7 +351,7 @@ class Worker:
                 raise AdapterError(ErrorCode.OUTPUT_INVALID, "empty file", path=str(src))
             kind = (art.kind or job.kind).value
             slot = art.slot or job.slot
-            dest_dir = s.project_media_dir(slug, kind, job.shot_id)
+            dest_dir = s.project_media_dir(slug, kind, job.shot_id, rating)
             dest_dir.mkdir(parents=True, exist_ok=True)
             name = f"{job.id}{'' if slot == job.slot else '.' + slot}{src.suffix.lower()}"
             dest = dest_dir / name
@@ -379,6 +384,7 @@ class Worker:
                     duration_sec=info.duration_sec if info else None, width=info.width if info else None,
                     height=info.height if info else None, fps=info.fps if info else None,
                     has_audio=info.has_audio if info else None, metadata=meta, provenance=provenance,
+                    rating=rating,
                 )
             )
         return out

@@ -18,6 +18,7 @@ from storyagent.auth import AuthError
 from storyagent.compose.delivery import DeliveryError
 from storyagent.compose.interchange import InterchangeError
 from storyagent.config import ConfigError
+from storyagent.content import ContentError
 from storyagent.launcher import LaunchError
 from storyagent.media.ledger import LedgerError
 from storyagent.media.library import LibraryError
@@ -120,6 +121,13 @@ def install(app: FastAPI) -> None:
     async def _pack(request: Request, exc: PackError) -> JSONResponse:
         detail = translator_of(request)(f"pack.error.{exc.code}", **exc.params)
         return respond(request, 404 if exc.code == "not_found" else 422, "invalid", detail)
+
+    @app.exception_handler(ContentError)
+    async def _content(request: Request, exc: ContentError) -> JSONResponse:
+        detail = translator_of(request)(f"content.error.{exc.code}", **exc.params)
+        if exc.code == "export_blocked":
+            return respond(request, 403, "content_export_blocked", detail)
+        return respond(request, 422, "content_invalid", detail)
 
     @app.exception_handler(DeliveryError)
     async def _delivery(request: Request, exc: DeliveryError) -> JSONResponse:

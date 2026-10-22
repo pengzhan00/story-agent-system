@@ -11,6 +11,7 @@
     storyagent workflow run | status | watch | review      (story pipeline with live progress bars)
     storyagent project create | estimate | update | list | trash   (kind of work, pipeline plan, seasons, episodes)
     storyagent export episode --project N [--episode 1] --out DIR   (film + subtitles + stems + provenance)
+    storyagent content status --project N | adult --project N (--character NAME ... | --all)
     storyagent delivery platforms | make --project N [--episode 1] [--platform A,B] [--lang en,ja] --out DIR
     storyagent user create NAME --role R | list | set NAME [--role R] [--active|--inactive] [--reset-password]
     storyagent audit [--user U] [--action A] [--project N] [--limit N]
@@ -40,6 +41,7 @@ from storyagent.compose.export import ExportError, build_package
 from storyagent.compose.interchange import InterchangeError
 from storyagent.compose.qc import ADVISORY
 from storyagent.config import ConfigError, Settings, get_settings
+from storyagent.content import ContentError
 from storyagent.db import Database, MigrationError, current_version, migrate
 from storyagent.db.legacy_import import LegacyImportError, import_legacy
 from storyagent.domain import JobStatus, MediaKind, QualityTier
@@ -57,6 +59,8 @@ from storyagent.media.worker import Worker, run_once
 from storyagent.progressbar import render_run, render_stages
 from storyagent.projects import ProjectNotFound, ProjectStateError, ProjectStore
 from storyagent.workflow import STAGES, WorkflowEngine, WorkflowState, WorkflowStateError
+
+CONFIRM_HELP = "export a project of a restricted rating: confirms everyone shown is an adult and has consented"
 
 
 class CliError(Exception):
@@ -164,7 +168,7 @@ def _print_plan(p: Any) -> None:
 def _cmd_project_create(s: Settings, a: argparse.Namespace) -> int:
     p = ProjectStore(_ctx(s).db, s).create(
         a.name, genre=a.genre or "", delivery_profile=a.profile or "", kind=a.kind or "", pipeline=a.pipeline or "",
-        brief=_answers(a) or None)
+        brief=_answers(a) or None, rating=a.rating or "")
     print(t("cli.project.created", id=p.id, slug=p.slug))
     _print_plan(p)
     return 0
@@ -385,7 +389,7 @@ def _cmd_pack_export(s: Settings, a: argparse.Namespace) -> int:
 
     c = _ctx(s)
     manifest = export_pack(s, c.db, a.project, Path(a.out).expanduser(), scope=a.scope,
-                           include_history=a.include_history)
+                           include_history=a.include_history, confirm_restricted=a.confirm_restricted)
     print(t("cli.pack.exported", path=a.out, files=len(manifest["files"]),
             assets=manifest["counts"].get("assets", 0), specs=manifest["counts"].get("specs", 0)))
     for w in manifest["warnings"]:
@@ -458,7 +462,7 @@ def _cmd_fcp_export(s: Settings, a: argparse.Namespace) -> int:
     c = _ctx(s)
     try:
         manifest = build_fcp_package(s, c.ledger, a.project, a.episode, Path(a.out).expanduser(),
-                                     absolute=a.absolute)
+                                     absolute=a.absolute, confirm_restricted=a.confirm_restricted)
     except ExportError as exc:
         raise CliError("cli.export.failed", 1, detail=str(exc)) from exc
     print(t("cli.fcp.exported", path=a.out, files=len(manifest["files"])))
@@ -765,7 +769,7 @@ def _cmd_export_episode(s: Settings, a: argparse.Namespace) -> int:
     project = ProjectStore(c.db, s).get(a.project)
     try:
         manifest = build_package(s, c.ledger, a.project, a.episode, Path(a.out), dict(s.delivery_profile(
-            project.delivery_profile)))
+            project.delivery_profile)), confirm_restricted=a.confirm_restricted)
     except ExportError as exc:
         raise CliError("cli.export.failed", 1, detail=str(exc)) from exc
     failed = [x["code"] for x in manifest["qc"]["checks"] if x["ok"] is False and x["code"] not in ADVISORY]
@@ -795,7 +799,7 @@ def _cmd_delivery_make(s: Settings, a: argparse.Namespace) -> int:
     for name in names:
         try:
             record = deliver(s, c.ledger, a.project, a.episode, name, Path(a.out), languages=langs,
-                             content_language=project.content_language,
+                             content_language=project.content_language, confirm_restricted=a.confirm_restricted,
                              translate=lambda lines, lang: engine.translate_lines(a.project, lines, lang))
         except DeliveryError as exc:
             print(t("cli.delivery.failed", platform=name, detail=t(f"delivery.error.{exc.code}", detail=exc.detail)),
@@ -808,6 +812,31 @@ def _cmd_delivery_make(s: Settings, a: argparse.Namespace) -> int:
         for w in record["warnings"]:
             print("  ! " + t(f"delivery.warn.{w}"), file=sys.stderr)
     return code
+
+
+def _cmd_content_status(s: Settings, a: argparse.Namespace) -> int:
+    from storyagent.content import effective_rating, vault_ready
+
+    c = _ctx(s)
+    p = ProjectStore(c.db, s).get(a.project)
+    print(t("cli.content.status", project=p.name, rating=effective_rating(s, c.db, a.project),
+            vault=str(vault_ready(s)).lower()))
+    return 0
+
+
+def _cmd_content_adult(s: Settings, a: argparse.Namespace) -> int:
+    """Record that a character is an adult (the project's first hard gate); the declaration is audited."""
+    c = _ctx(s)
+    ProjectStore(c.db, s).get(a.project)
+    names = set(a.character or [])
+    rows = c.db.conn.execute("SELECT id, name FROM characters WHERE project_id=?", (a.project,)).fetchall()
+    chosen = [r for r in rows if a.all or r["name"] in names]
+    for r in chosen:
+        c.db.conn.execute("UPDATE characters SET adult_confirmed=1 WHERE id=?", (r["id"],))
+    _users(s).audit("content.adult_confirmed", actor="cli", project_id=a.project,
+                 detail={"characters": [r["name"] for r in chosen]})
+    print(t("cli.content.adult", n=len(chosen)))
+    return 0
 
 
 def _cmd_workflow_review(s: Settings, a: argparse.Namespace) -> int:
@@ -947,6 +976,7 @@ def build_parser() -> argparse.ArgumentParser:
     pc = add(pr, "create", _cmd_project_create)
     pc.add_argument("name")
     pc.add_argument("--genre")
+    pc.add_argument("--rating", help="content rating (content.toml), decided now; default: the unrestricted one")
     pc.add_argument("--profile", help="delivery profile = the picture frame (vertical / landscape), fixed at the start")
 
     def brief_args(sp: argparse.ArgumentParser) -> None:
@@ -1032,6 +1062,7 @@ def build_parser() -> argparse.ArgumentParser:
     pe.add_argument("--out", required=True, help="a new directory, or a .zip file")
     pe.add_argument("--scope", choices=["all", "assets", "story"], default="all")
     pe.add_argument("--include-history", action="store_true", help="also the earlier takes and spec versions")
+    pe.add_argument("--confirm-restricted", action="store_true", help=CONFIRM_HELP)
     pi = add(pk, "import", _cmd_pack_import)
     pi.add_argument("source", help="a pack directory or .zip")
     pi.add_argument("--into", type=int, help="project to import into (default: a new project from the manifest)")
@@ -1059,6 +1090,7 @@ def build_parser() -> argparse.ArgumentParser:
     fe.add_argument("--episode", type=int, default=1)
     fe.add_argument("--out", required=True, help="a new folder: episode.fcpxml + media/")
     fe.add_argument("--absolute", action="store_true", help="file:// URLs of this folder instead of relative paths")
+    fe.add_argument("--confirm-restricted", action="store_true", help=CONFIRM_HELP)
     fd = add(fc, "diff", _cmd_fcp_diff)
     fd.add_argument("package", help="the folder written by `fcp export`")
     fd.add_argument("edited", help="the FCPXML exported back from Final Cut Pro")
@@ -1156,6 +1188,14 @@ def build_parser() -> argparse.ArgumentParser:
     wp.add_argument("--project", type=int, required=True)
     wp.add_argument("--episode", type=int, default=1)
     wp.add_argument("--out", required=True, help="directory to write the package into")
+    wp.add_argument("--confirm-restricted", action="store_true", help=CONFIRM_HELP)
+    ct = sub.add_parser("content").add_subparsers(dest="cmd", required=True)
+    wp = add(ct, "status", _cmd_content_status)
+    wp.add_argument("--project", type=int, required=True)
+    wp = add(ct, "adult", _cmd_content_adult)
+    wp.add_argument("--project", type=int, required=True)
+    wp.add_argument("--character", action="append", help="a character name (repeat for several)")
+    wp.add_argument("--all", action="store_true", help="every character of the project")
     dl = sub.add_parser("delivery").add_subparsers(dest="cmd", required=True)
     add(dl, "platforms", _cmd_delivery_platforms)
     wp = add(dl, "make", _cmd_delivery_make)
@@ -1164,6 +1204,7 @@ def build_parser() -> argparse.ArgumentParser:
     wp.add_argument("--platform", help="comma-separated platform names (default: the configured default)")
     wp.add_argument("--lang", help="comma-separated subtitle languages to translate into, e.g. en,ja")
     wp.add_argument("--out", required=True, help="directory to write <platform>/ folders into")
+    wp.add_argument("--confirm-restricted", action="store_true", help=CONFIRM_HELP)
     llm = sub.add_parser("llm").add_subparsers(dest="cmd", required=True)
     add(llm, "check", _cmd_llm_check)
 
@@ -1200,6 +1241,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 5
     except InterchangeError as exc:
         print(t(f"interchange.error.{exc.code}", **exc.params), file=sys.stderr)
+        return 1
+    except ContentError as exc:
+        key = "cli.content.blocked" if exc.code == "export_blocked" else f"content.error.{exc.code}"
+        print(t(key, **exc.params), file=sys.stderr)
         return 1
     except PackError as exc:
         print(t(f"pack.error.{exc.code}", **exc.params), file=sys.stderr)

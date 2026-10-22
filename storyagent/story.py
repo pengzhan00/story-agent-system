@@ -41,7 +41,7 @@ _JSON = {
 _FIELDS: dict[str, tuple[str, ...]] = {
     "characters": ("name", "role", "age", "gender", "appearance", "personality", "background", "relationships",
                    "prompt_template", "voice_profile", "voice_ref_audio", "voice_ref_text", "voice_ref_consent",
-                   "voice_consent_note", "lora_ref", "ref_images", "introduced_episode", "locked"),
+                   "voice_consent_note", "lora_ref", "ref_images", "introduced_episode", "locked", "adult_confirmed"),
     "scenes": ("name", "description", "lighting", "color_palette", "atmosphere", "prompt_template", "lora_ref",
                "ref_images", "keyframe_mode"),
     "scripts": ("episode_no", "title", "synopsis", "acts", "total_scenes", "word_count", "status"),
@@ -72,6 +72,7 @@ def _decode(table: str, row: Any) -> dict[str, Any]:
         out[col] = json.loads(raw) if raw else ({} if col == "render_payload" else [])
     if table == "characters":
         out["voice_ref_consent"] = bool(out.get("voice_ref_consent"))
+        out["adult_confirmed"] = bool(out.get("adult_confirmed"))
         out["locked"] = bool(out.get("locked"))
     if table == "shots":
         out["locked"] = bool(out.get("locked"))
@@ -81,7 +82,7 @@ def _decode(table: str, row: Any) -> dict[str, Any]:
 def _encode(table: str, key: str, value: Any) -> Any:
     if key in _JSON[table]:
         return json.dumps(value, ensure_ascii=False)
-    if key in ("locked", "voice_ref_consent"):
+    if key in ("locked", "voice_ref_consent", "adult_confirmed"):
         return int(bool(value))
     return value
 

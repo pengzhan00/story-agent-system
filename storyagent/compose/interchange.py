@@ -30,6 +30,7 @@ from typing import Any
 from urllib.parse import quote, unquote, urlparse
 
 from storyagent.config import Settings
+from storyagent.content import check_export
 from storyagent.domain import MediaKind
 from storyagent.media.ledger import Ledger, LedgerError, NewAsset
 from storyagent.media.probe import probe
@@ -251,8 +252,10 @@ def episode_manifest(settings: Settings, ledger: Ledger, project_id: int, episod
 
 
 def build_fcp_package(settings: Settings, ledger: Ledger, project_id: int, episode: int, dest: Path, *,
-                      absolute: bool = False, name: str = "") -> dict[str, Any]:
-    """Write the FCP project for an assembled episode into ``dest`` (created if needed); returns the manifest."""
+                      absolute: bool = False, name: str = "", confirm_restricted: bool = False) -> dict[str, Any]:
+    """Write the FCP project for an assembled episode into ``dest`` (created if needed); returns the manifest. A
+    project of a rating that does not allow export is refused (``ContentError``) unless ``confirm_restricted``."""
+    check_export(settings, ledger.db, project_id, confirmed=confirm_restricted)
     main, timeline, media, files, core = _plan(settings, ledger, project_id, episode)
     dest.mkdir(parents=True, exist_ok=True)
     for rel, src in files.items():
@@ -369,11 +372,11 @@ def import_final(settings: Settings, ledger: Ledger, project_id: int, episode: i
     ext = src.suffix.lower()
     if ext not in (".mp4", ".mov", ".m4v"):
         raise InterchangeError("not_a_film", ext=ext)
-    row = ledger.db.conn.execute("SELECT slug FROM projects WHERE id=?", (project_id,)).fetchone()
+    row = ledger.db.conn.execute("SELECT slug, rating FROM projects WHERE id=?", (project_id,)).fetchone()
     if row is None:
         raise InterchangeError("unknown_project", id=project_id)
     kind = MediaKind.COMPOSE_ASSEMBLE.value
-    dest_dir = settings.project_media_dir(row["slug"], kind)
+    dest_dir = settings.project_media_dir(row["slug"], kind, None, row["rating"])
     dest_dir.mkdir(parents=True, exist_ok=True)
     sha = _sha256(src)
     dest = dest_dir / f"external_ep{episode:02d}_{sha[:12]}{ext}"
@@ -395,5 +398,5 @@ def import_final(settings: Settings, ledger: Ledger, project_id: int, episode: i
                            "note": note},
                  provenance={"schema": "storyagent.provenance.v1", "origin": "external_edit",
                              "original_name": src.name, "imported_at": now_iso(),
-                             "derived_from": prior.id if prior else None}),
+                             "derived_from": prior.id if prior else None}, rating=row["rating"]),
         project_id=project_id, adopt=True)

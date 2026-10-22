@@ -17,6 +17,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from storyagent.auth import SAFE_METHODS, User, decide, project_of
 
 from .errors import respond
+from .visibility import View, set_view
 
 
 def _token(scope: Scope, cookie_name: str) -> str:
@@ -64,6 +65,7 @@ class AuthMiddleware:
             await respond(Request(scope, receive), status, verdict)(scope, receive, send)
             return
         scope.setdefault("state", {})["user"] = user
+        set_view(View(ctx.settings, ctx.db, user.id if user else None))
 
         status_seen = 0
 

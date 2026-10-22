@@ -30,7 +30,7 @@ const EDITABLE: Partial<Record<StoryPart, Field[]>> = {
     { key: "appearance", type: "area", rows: 3 }, { key: "personality", type: "area" }, { key: "background", type: "area" },
     { key: "voice_profile", type: "area", rows: 2 }, { key: "prompt_template", type: "area" },
     { key: "voice_ref_audio", type: "text" }, { key: "voice_ref_text", type: "text" },
-    { key: "locked", type: "bool" },
+    { key: "adult_confirmed", type: "bool" }, { key: "locked", type: "bool" },
   ],
   locations: [
     { key: "name", type: "text" }, { key: "description", type: "area", rows: 3 }, { key: "lighting", type: "text" },

@@ -384,6 +384,11 @@
             "title": "Kind",
             "type": "string"
           },
+          "locked": {
+            "default": false,
+            "title": "Locked",
+            "type": "boolean"
+          },
           "metadata": {
             "additionalProperties": true,
             "title": "Metadata",
@@ -408,6 +413,11 @@
             "additionalProperties": true,
             "title": "Provenance",
             "type": "object"
+          },
+          "rating": {
+            "default": "general",
+            "title": "Rating",
+            "type": "string"
           },
           "sha256": {
             "title": "Sha256",
@@ -685,8 +695,71 @@
         "title": "CancelResult",
         "type": "object"
       },
+      "ContentStatusOut": {
+        "properties": {
+          "default_rating": {
+            "title": "Default Rating",
+            "type": "string"
+          },
+          "encryption": {
+            "title": "Encryption",
+            "type": "string"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "needs_password": {
+            "title": "Needs Password",
+            "type": "boolean"
+          },
+          "ratings": {
+            "items": {
+              "$ref": "#/components/schemas/RatingOut"
+            },
+            "title": "Ratings",
+            "type": "array"
+          },
+          "ttl_sec": {
+            "title": "Ttl Sec",
+            "type": "integer"
+          },
+          "unlocked": {
+            "title": "Unlocked",
+            "type": "boolean"
+          },
+          "vault_ready": {
+            "title": "Vault Ready",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "unlocked",
+          "expires_at",
+          "ttl_sec",
+          "needs_password",
+          "vault_ready",
+          "encryption",
+          "default_rating",
+          "ratings"
+        ],
+        "title": "ContentStatusOut",
+        "type": "object"
+      },
       "DeliveryBody": {
         "properties": {
+          "confirm_restricted": {
+            "default": false,
+            "title": "Confirm Restricted",
+            "type": "boolean"
+          },
           "languages": {
             "default": [],
             "items": {
@@ -1546,6 +1619,11 @@
           "license_tag": {
             "title": "License Tag",
             "type": "string"
+          },
+          "locked": {
+            "default": false,
+            "title": "Locked",
+            "type": "boolean"
           },
           "max_attempts": {
             "title": "Max Attempts",
@@ -3437,12 +3515,20 @@
             "title": "Kind",
             "type": "string"
           },
+          "locked": {
+            "title": "Locked",
+            "type": "boolean"
+          },
           "name": {
             "title": "Name",
             "type": "string"
           },
           "pipeline": {
             "title": "Pipeline",
+            "type": "string"
+          },
+          "rating": {
+            "title": "Rating",
             "type": "string"
           },
           "running": {
@@ -3474,6 +3560,8 @@
           "status",
           "kind",
           "pipeline",
+          "rating",
+          "locked",
           "stages_done",
           "stages_total",
           "running",
@@ -3534,6 +3622,12 @@
             "default": "",
             "description": "the pipeline plan: one complete set of models; default = the kind's",
             "title": "Pipeline",
+            "type": "string"
+          },
+          "rating": {
+            "default": "",
+            "description": "content rating (content.toml); empty = the default, decided now",
+            "title": "Rating",
             "type": "string"
           }
         },
@@ -3679,6 +3773,11 @@
             "title": "Pipeline",
             "type": "string"
           },
+          "rating": {
+            "default": "general",
+            "title": "Rating",
+            "type": "string"
+          },
           "settings": {
             "additionalProperties": true,
             "title": "Settings",
@@ -3809,6 +3908,18 @@
             ],
             "description": "change the plan: the whole set of models changes with it",
             "title": "Pipeline"
+          },
+          "rating": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "content rating; only while the project has no files yet",
+            "title": "Rating"
           }
         },
         "title": "ProjectPatch",
@@ -3994,6 +4105,44 @@
           "max"
         ],
         "title": "RangeOut",
+        "type": "object"
+      },
+      "RatingOut": {
+        "properties": {
+          "allow_export": {
+            "title": "Allow Export",
+            "type": "boolean"
+          },
+          "label_key": {
+            "title": "Label Key",
+            "type": "string"
+          },
+          "mask_ui": {
+            "title": "Mask Ui",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "restricted": {
+            "title": "Restricted",
+            "type": "boolean"
+          },
+          "vault": {
+            "title": "Vault",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "label_key",
+          "restricted",
+          "mask_ui",
+          "vault",
+          "allow_export"
+        ],
+        "title": "RatingOut",
         "type": "object"
       },
       "Ready": {
@@ -4895,6 +5044,11 @@
             "title": "Locked",
             "type": "boolean"
           },
+          "masked": {
+            "default": false,
+            "title": "Masked",
+            "type": "boolean"
+          },
           "model_ref": {
             "title": "Model Ref",
             "type": "string"
@@ -5084,6 +5238,22 @@
           "latest_spec_version"
         ],
         "title": "StaleAsset",
+        "type": "object"
+      },
+      "UnlockBody": {
+        "properties": {
+          "confirm_adult": {
+            "default": false,
+            "title": "Confirm Adult",
+            "type": "boolean"
+          },
+          "password": {
+            "default": "",
+            "title": "Password",
+            "type": "string"
+          }
+        },
+        "title": "UnlockBody",
         "type": "object"
       },
       "UserCreateBody": {
@@ -6300,6 +6470,42 @@
         ]
       }
     },
+    "/api/assets/{asset_id}/mask": {
+      "get": {
+        "description": "A tiny blurred picture of a restricted image or video, shown instead of the file while it is locked.",
+        "operationId": "asset_mask_api_assets__asset_id__mask_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "asset_id",
+            "required": true,
+            "schema": {
+              "title": "Asset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Asset Mask",
+        "tags": [
+          "assets"
+        ]
+      }
+    },
     "/api/assets/{asset_id}/trash": {
       "post": {
         "description": "Soft delete: the file stays on disk, the record leaves its slot.",
@@ -6566,6 +6772,87 @@
         "summary": "Change Password",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/api/content/status": {
+      "get": {
+        "operationId": "status_api_content_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContentStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Status",
+        "tags": [
+          "content"
+        ]
+      }
+    },
+    "/api/content/unlock": {
+      "delete": {
+        "operationId": "lock_api_content_unlock_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContentStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Lock",
+        "tags": [
+          "content"
+        ]
+      },
+      "post": {
+        "operationId": "unlock_api_content_unlock_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnlockBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContentStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unlock",
+        "tags": [
+          "content"
         ]
       }
     },
@@ -9029,6 +9316,16 @@
               "title": "Absolute",
               "type": "boolean"
             }
+          },
+          {
+            "in": "query",
+            "name": "confirm_restricted",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Confirm Restricted",
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -9196,7 +9493,7 @@
     },
     "/api/projects/{project_id}/episodes/{episode}/package": {
       "get": {
-        "description": "The delivery package of an assembled episode as one zip (film, subtitles, stems, manifest, provenance).",
+        "description": "The delivery package of an assembled episode as one zip (film, subtitles, stems, manifest, provenance).\nA project of a rating that does not allow export needs ``confirm_restricted=true`` and an unlocked session.",
         "operationId": "episode_package_api_projects__project_id__episodes__episode__package_get",
         "parameters": [
           {
@@ -9215,6 +9512,16 @@
             "schema": {
               "title": "Episode",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "confirm_restricted",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Confirm Restricted",
+              "type": "boolean"
             }
           }
         ],
@@ -10498,6 +10805,16 @@
             "schema": {
               "default": false,
               "title": "Include History",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "confirm_restricted",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Confirm Restricted",
               "type": "boolean"
             }
           }

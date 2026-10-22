@@ -19,6 +19,7 @@ from .schemas import (
     ProjectSettingsPatch,
     WorkflowRunOut,
 )
+from .visibility import hidden
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
@@ -42,12 +43,14 @@ def overview(request: Request, trashed: bool = False) -> list[ProjectCard]:
             "SELECT id, slot, duration_sec FROM media_assets WHERE project_id=? AND kind='compose.assemble'"
             " AND slot LIKE 'episode\\_%' ESCAPE '\\' AND is_current=1 AND trashed_at IS NULL"
             " ORDER BY slot DESC LIMIT 1", (p.id,)).fetchone()
+        locked = hidden(None, p.id)                  # a restricted project: no premise and no poster while locked
         cards.append(ProjectCard(
-            id=p.id, name=p.name, description=p.description, genre=p.genre, status=p.status, kind=p.kind,
-            pipeline=p.pipeline,
+            id=p.id, name=p.name, description="" if locked else p.description, genre=p.genre, status=p.status,
+            kind=p.kind, pipeline=p.pipeline, rating=p.rating, locked=locked,
             stages_done=sum(s["status"] == "completed" for s in states), stages_total=len(states),
             running=running is not None,
-            episode_asset_id=film["id"] if film else None, episode_seconds=film["duration_sec"] if film else None,
+            episode_asset_id=film["id"] if film and not locked else None,
+            episode_seconds=film["duration_sec"] if film else None,
             episode_number=int(str(film["slot"]).split("_")[1]) if film else None, updated_at=p.updated_at))
     return cards
 
@@ -59,7 +62,7 @@ def create_project(body: ProjectCreate, request: Request) -> ProjectOut:
     p = ctx_of(request).projects.create(
         body.name, genre=body.genre, description=body.description, content_language=body.content_language,
         delivery_profile=body.delivery_profile, kind=body.kind, pipeline=body.pipeline,
-        brief=body.brief.model_dump(exclude_none=True) if body.brief else None,
+        brief=body.brief.model_dump(exclude_none=True) if body.brief else None, rating=body.rating,
     )
     return ProjectOut.model_validate(p)
 

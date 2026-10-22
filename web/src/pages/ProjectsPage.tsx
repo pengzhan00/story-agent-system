@@ -48,6 +48,7 @@ export function ProjectsPage() {
               <Link to={`/projects/${p.id}`}>{p.name}</Link>
             </h3>
             <p className="badges">
+              {p.rating !== "general" ? <span className="chip">{t("web.content.badge")}</span> : null}
               {p.kind ? <span className="chip">{meta?.work_kinds.find((k) => k.name === p.kind)?.label ?? p.kind}</span> : null}
               {p.pipeline ? <span className="chip">{meta?.pipelines.find((x) => x.name === p.pipeline)?.label ?? p.pipeline}</span> : null}
             </p>

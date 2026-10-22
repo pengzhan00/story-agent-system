@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { useProject } from "../api/hooks";
 import { usePack, type PackPolicy, type PackReport, type PackScope } from "../api/pack";
 import { ErrorNote } from "../components/ErrorNote";
 import { useT } from "../i18n";
@@ -58,6 +59,8 @@ export function PackPanel({ id }: { id: number }) {
   const pack = usePack(id);
   const [scope, setScope] = useState<PackScope>("all");
   const [history, setHistory] = useState(false);
+  const [confirm, setConfirm] = useState(false);
+  const restricted = (useProject(id).data?.rating ?? "general") !== "general";
   const [policy, setPolicy] = useState<PackPolicy>("skip");
   const file = useRef<HTMLInputElement>(null);
   const [picked, setPicked] = useState<File | null>(null);
@@ -85,8 +88,14 @@ export function PackPanel({ id }: { id: number }) {
             <span>{t("web.pack.history")}</span>
             <input type="checkbox" checked={history} onChange={(e) => setHistory(e.target.checked)} />
           </label>
+          {restricted ? (
+            <label className="check wide">
+              <input type="checkbox" checked={confirm} onChange={(e) => setConfirm(e.target.checked)} />
+              <span>{t("web.content.confirm_export")}</span>
+            </label>
+          ) : null}
           <div className="wide">
-            <button className="primary" disabled={pack.exportPack.isPending} onClick={() => pack.exportPack.mutate({ scope, history })}>
+            <button className="primary" disabled={pack.exportPack.isPending} onClick={() => pack.exportPack.mutate({ scope, history, confirm })}>
               {t("web.pack.make")}
             </button>
           </div>

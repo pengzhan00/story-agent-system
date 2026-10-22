@@ -64,6 +64,16 @@ storyagent audit [--user U] [--action A] [--project N] [--limit N]
 
 Forgot the only admin's password: `storyagent user set NAME --reset-password` on the server. A locked account (too many wrong passwords) opens again after `lockout_minutes`, or reset its password. Listening beyond loopback (`[api] host`) also needs HTTPS in front (a reverse proxy): the session cookie is marked `Secure` only when the request arrives over https. Every write and every sign-in event is in `audit_log` (Team > Audit in the web client); the table is append-only and holds no request bodies. Jobs keep their own full event history (`media show <id>`).
 
+## Restricted content (vault on an encrypted volume)
+
+A project of the `restricted` rating writes its files to `$STORY_AGENT_HOME/vault/` instead of `projects/`. To make that folder really private, put it on an encrypted volume **you** create and mount (the system never mounts, unmounts or encrypts anything):
+
+1. Create an encrypted disk image (Disk Utility > New Image > Blank Image > encryption AES-256, or `hdiutil create -encryption AES-256 -size 200g -fs APFS -volname StoryVault ~/StoryVault.dmg`) and mount it.
+2. Make the vault a link into it: `ln -s /Volumes/StoryVault/vault "$STORY_AGENT_HOME/vault"` (create `/Volumes/StoryVault/vault` first; do this before the first restricted project, or move the existing `vault/` folder across).
+3. In `$STORY_AGENT_HOME/config/content.toml` set `[content] volume_mount = "/Volumes/StoryVault"`. While that path is not a mount point, restricted jobs fail with `vault_unavailable` (mount the volume, then retry the job from the queue); general projects are not affected.
+4. Backups: `db migrate` snapshots include the ledger (paths, ratings, prompts of restricted jobs), **not** the vault files. Back the vault up by copying the (unmounted) disk image. Do the same for the database file if its prompts must stay private - it is not encrypted by the system.
+
+Who can see what: with `[auth] mode = "off"` the unlock is only a guard against showing material by mistake; with accounts each user unlocks for themselves (adult confirmation + their password) for `unlock_ttl_sec`. `storyagent audit --action content.` lists unlock, lock, view, export and the adult declarations; failed unlocks are recorded too. Export of a restricted project always needs `--confirm-restricted` (CLI) / `confirm_restricted=true` (API) and, over the API, an active unlock.
 
 ## 生产部署与更新
 

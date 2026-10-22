@@ -32,6 +32,7 @@ from .schemas import (
     WorkflowRunOut,
     WorkflowStageOut,
 )
+from .visibility import allow_export
 
 router = APIRouter(prefix="/api", tags=["workflow"])
 
@@ -126,14 +127,17 @@ def cancel_run(run_id: str, request: Request) -> WorkflowRunOut:
 
 
 @router.get("/projects/{project_id}/episodes/{episode}/package")
-def episode_package(project_id: int, episode: int, request: Request) -> FileResponse:
-    """The delivery package of an assembled episode as one zip (film, subtitles, stems, manifest, provenance)."""
+def episode_package(project_id: int, episode: int, request: Request, confirm_restricted: bool = False
+                    ) -> FileResponse:
+    """The delivery package of an assembled episode as one zip (film, subtitles, stems, manifest, provenance).
+    A project of a rating that does not allow export needs ``confirm_restricted=true`` and an unlocked session."""
     ctx = ctx_of(request)
     project = ctx.projects.get(project_id)
+    confirmed = allow_export(request, project_id, confirm_restricted, what=f"package ep{episode}")
     work = Path(tempfile.mkdtemp(prefix="package-", dir=ctx.settings.home))
     try:
         build_package(ctx.settings, ctx.ledger, project_id, episode, work / "package",
-                      dict(ctx.settings.delivery_profile(project.delivery_profile)))
+                      dict(ctx.settings.delivery_profile(project.delivery_profile)), confirm_restricted=confirmed)
     except ExportError as exc:
         shutil.rmtree(work, ignore_errors=True)
         raise ApiError(409, "episode_not_ready", str(exc)) from exc

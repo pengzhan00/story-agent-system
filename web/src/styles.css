@@ -181,3 +181,5 @@ button.link { background: none; border: none; color: inherit; cursor: pointer; t
 .takes { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
 .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 @media (max-width: 800px) { .compare { grid-template-columns: 1fr; } }
+
+.masked { display: grid; gap: 4px; justify-items: center; padding: 8px; border: 1px dashed var(--line); border-radius: 8px; } .masked img { max-height: 120px; width: auto; filter: blur(2px); }

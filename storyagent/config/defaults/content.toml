@@ -1,0 +1,41 @@
+# Content ratings: how material of a restricted rating is stored, shown, logged and exported. This is resource
+# MANAGEMENT only (isolation, masking, access, export, audit); it is not a content filter and writes no prompts.
+# Honest limit: with auth off the "unlock" is a guard against showing or sending by mistake, not a security
+# boundary against other users of this computer. Real secrecy comes from putting the vault on an encrypted volume.
+[content]
+default_rating = "general"
+# The vault is <STORY_AGENT_HOME>/<vault_dir>. Make it a symlink to a folder on an encrypted disk image / volume
+# you mount yourself (the system never mounts or unmounts anything).
+vault_dir = "vault"
+# When set: the vault counts as available only while this path is a mount point; restricted jobs are refused
+# (failed_validation vault_unavailable, retry after mounting) while it is not.
+volume_mount = ""
+# off | volume. (Per-file encryption inside the app is not built: it needs a crypto dependency, see
+# docs/RESTRICTED_CONTENT.md.)
+encryption = "volume"
+unlock_ttl_sec = 900
+
+[content.ratings.general]
+rank = 0
+label_key = "content.rating.general"
+
+[content.ratings.restricted]
+rank = 1
+label_key = "content.rating.restricted"
+mask_ui = true          # lists and previews show a blurred thumbnail and no file name or prompt while locked
+vault = true            # files are written under the vault, not projects/<slug>/media
+log_prompts = false     # the model-call log keeps a digest and the length, not the text
+allow_export = false    # packages, packs and interchange refuse the project unless explicitly confirmed
+allow_remote = false    # never sent to a cloud model, whatever the project switch says
+gates = true            # the hard gates below apply (must stay true for any rating that uses the vault)
+
+[content.gates]
+min_adult_age = 18
+# A restricted project is refused when a prompt or character text points at a minor. Whole words for Latin text,
+# substrings for CJK. Add your own in $STORY_AGENT_HOME/config/content.toml (lists are replaced, not merged).
+blocked_terms = [
+    "child", "children", "kid", "kids", "minor", "minors", "underage", "under-age", "teen", "teens", "teenager",
+    "schoolgirl", "schoolboy", "loli", "lolita", "shota", "toddler", "infant", "baby", "preteen", "juvenile",
+    "elementary school", "middle school", "junior high", "high school",
+    "未成年", "儿童", "孩子", "幼女", "幼童", "萝莉", "正太", "小学", "初中", "高中", "中学生", "少女", "少年",
+]

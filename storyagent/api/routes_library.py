@@ -14,6 +14,7 @@ from storyagent.media.library import ROLES, LibraryItem, import_file
 from .context import ApiContext, ctx_of
 from .errors import ApiError
 from .schemas import AssetOut, LibraryItemOut, LibraryPatch, LibraryPublish
+from .visibility import require_viewable
 
 router = APIRouter(prefix="/api", tags=["library"])
 
@@ -130,6 +131,7 @@ def item_file(item_id: str, request: Request) -> FileResponse:
     ctx = ctx_of(request)
     item = ctx.library.get(item_id)
     assert item.asset is not None
+    require_viewable(request, item.asset.rating, None, what=item.asset.id)
     home = ctx.settings.home.resolve()
     path = (home / item.asset.path).resolve()
     if home not in path.parents or not path.is_file():

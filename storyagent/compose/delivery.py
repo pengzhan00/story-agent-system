@@ -24,6 +24,7 @@ from typing import Any
 
 from storyagent import __version__
 from storyagent.config import Platform, Settings
+from storyagent.content import check_export
 from storyagent.domain import MediaKind
 from storyagent.media.compliance import redact_for_export
 from storyagent.media.ledger import Ledger
@@ -219,8 +220,10 @@ def _trailer(ffmpeg: Path, film: Path, out: Path, info: MediaInfo, p: Platform) 
 
 def deliver(settings: Settings, ledger: Ledger, project_id: int, episode: int, platform: str | None, dest: Path,
             *, languages: Sequence[str] = (), translate: Translate | None = None, content_language: str = "",
-            ) -> dict[str, Any]:
-    """Write ``<dest>/<platform>/`` and return its ``delivery.json``."""
+            confirm_restricted: bool = False) -> dict[str, Any]:
+    """Write ``<dest>/<platform>/`` and return its ``delivery.json``. A project of a rating that does not allow
+    export is refused (``ContentError``) unless ``confirm_restricted``."""
+    rating = check_export(settings, ledger.db, project_id, confirmed=confirm_restricted)
     try:
         p = settings.platforms.get(platform)
     except KeyError as exc:
@@ -304,7 +307,7 @@ def deliver(settings: Settings, ledger: Ledger, project_id: int, episode: int, p
                    "duration_sec": round(out_info.duration_sec or 0.0, 3) if out_info else None,
                    "size_mb": round(size_mb, 2), "loudness_lufs": lufs, "target_lufs": p.loudnorm_i,
                    "input_loudness": result["measured"], "video_kbps": result["video_kbps"], "reframed": reframed},
-        "subtitles": subtitles, "warnings": list(dict.fromkeys(warnings)),
+        "rating": rating, "subtitles": subtitles, "warnings": list(dict.fromkeys(warnings)),
         "files": [{"name": n, "bytes": f.stat().st_size, "sha256": _sha256(f)} for n, f in files.items()],
     }
     (out_dir / "delivery.json").write_text(json.dumps(record, ensure_ascii=False, indent=2), "utf-8")

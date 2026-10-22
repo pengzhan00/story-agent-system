@@ -8,6 +8,7 @@ from collections.abc import Callable, Mapping
 from typing import Any
 
 from storyagent.config import Settings
+from storyagent.content import digest_text, project_rating
 from storyagent.db import Database
 
 from .backends import ChatResult, LLMBackendClient, build_client
@@ -78,6 +79,9 @@ class LLMRouter:
             "tokens_out": res.tokens_out if res else 0, "duration_ms": res.duration_ms if res else 0,
             "system": system[:TRANSCRIPT_CAP], "label": label,
         }
+        if self._keeps_no_text(project_id):          # a restricted rating: a digest and the length, not the words
+            for key in ("prompt", "response", "system"):
+                rec[key] = digest_text(str(rec[key]))
         if self.on_call:
             self.on_call({**rec, "backend": backend})
         if self.db is not None:
@@ -90,6 +94,14 @@ class LLMRouter:
                 )
             except Exception:  # the audit log must never break generation  # noqa: BLE001
                 log.warning("could not write generation_logs", exc_info=True)
+
+    def _keeps_no_text(self, project_id: int | None) -> bool:
+        if self.db is None or project_id is None:
+            return False
+        try:
+            return not self.settings.content.policy(project_rating(self.db, project_id)).log_prompts
+        except Exception:  # the audit log must never break generation  # noqa: BLE001
+            return False
 
     def _heavy_jobs_running(self) -> int:
         if self.db is None:

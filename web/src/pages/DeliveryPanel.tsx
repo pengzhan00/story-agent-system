@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useEpisodes } from "../api/hooks";
+import { useEpisodes, useProject } from "../api/hooks";
 import { useDelivery, usePlatforms } from "../api/delivery";
 import { ErrorNote } from "../components/ErrorNote";
 import { useT } from "../i18n";
@@ -11,6 +11,8 @@ export function DeliveryPanel({ id }: { id: number }) {
   const [episode, setEpisode] = useState(1);
   const [chosen, setChosen] = useState("");
   const [languages, setLanguages] = useState("");
+  const [confirm, setConfirm] = useState(false);
+  const restricted = (useProject(id).data?.rating ?? "general") !== "general";
   const make = useDelivery(id, episode);
   const list = platforms.data ?? [];
   const platform = list.find((p) => p.name === chosen) ?? list.find((p) => p.default) ?? list[0];
@@ -52,6 +54,12 @@ export function DeliveryPanel({ id }: { id: number }) {
         </p>
       ) : null}
       <p className="muted small">{t("web.delivery.languages_hint")}</p>
+      {restricted ? (
+        <label className="check">
+          <input type="checkbox" checked={confirm} onChange={(e) => setConfirm(e.target.checked)} />
+          <span>{t("web.content.confirm_export")}</span>
+        </label>
+      ) : null}
       <div>
         <button
           className="primary"
@@ -64,6 +72,7 @@ export function DeliveryPanel({ id }: { id: number }) {
                 .split(",")
                 .map((x) => x.trim())
                 .filter(Boolean),
+              confirm,
             })
           }
         >
