@@ -1,6 +1,47 @@
 {
   "components": {
     "schemas": {
+      "AgeClaimBody": {
+        "properties": {
+          "birth_date": {
+            "maxLength": 10,
+            "minLength": 1,
+            "title": "Birth Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "birth_date"
+        ],
+        "title": "AgeClaimBody",
+        "type": "object"
+      },
+      "AgeReviewBody": {
+        "properties": {
+          "approve": {
+            "title": "Approve",
+            "type": "boolean"
+          },
+          "birth_date": {
+            "default": "",
+            "description": "the corrected birth date; empty = the claimed one",
+            "maxLength": 10,
+            "title": "Birth Date",
+            "type": "string"
+          },
+          "note": {
+            "default": "",
+            "maxLength": 300,
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "approve"
+        ],
+        "title": "AgeReviewBody",
+        "type": "object"
+      },
       "AgentEdit": {
         "properties": {
           "attempts": {
@@ -596,6 +637,10 @@
       },
       "AuthModeOut": {
         "properties": {
+          "allow_registration": {
+            "title": "Allow Registration",
+            "type": "boolean"
+          },
           "first_user": {
             "title": "First User",
             "type": "boolean"
@@ -619,6 +664,7 @@
         "required": [
           "mode",
           "first_user",
+          "allow_registration",
           "locales"
         ],
         "title": "AuthModeOut",
@@ -697,6 +743,17 @@
       },
       "ContentStatusOut": {
         "properties": {
+          "age_status": {
+            "enum": [
+              "off",
+              "none",
+              "pending",
+              "approved",
+              "rejected"
+            ],
+            "title": "Age Status",
+            "type": "string"
+          },
           "default_rating": {
             "title": "Default Rating",
             "type": "string"
@@ -715,6 +772,10 @@
               }
             ],
             "title": "Expires At"
+          },
+          "min_adult_age": {
+            "title": "Min Adult Age",
+            "type": "integer"
           },
           "needs_password": {
             "title": "Needs Password",
@@ -738,6 +799,17 @@
           "vault_ready": {
             "title": "Vault Ready",
             "type": "boolean"
+          },
+          "viewer_age": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Viewer Age"
           }
         },
         "required": [
@@ -748,6 +820,9 @@
           "vault_ready",
           "encryption",
           "default_rating",
+          "min_adult_age",
+          "viewer_age",
+          "age_status",
           "ratings"
         ],
         "title": "ContentStatusOut",
@@ -4416,6 +4491,10 @@
             "title": "Allow Export",
             "type": "boolean"
           },
+          "allowed": {
+            "title": "Allowed",
+            "type": "boolean"
+          },
           "label_key": {
             "title": "Label Key",
             "type": "string"
@@ -4423,6 +4502,10 @@
           "mask_ui": {
             "title": "Mask Ui",
             "type": "boolean"
+          },
+          "min_age": {
+            "title": "Min Age",
+            "type": "integer"
           },
           "name": {
             "title": "Name",
@@ -4443,7 +4526,9 @@
           "restricted",
           "mask_ui",
           "vault",
-          "allow_export"
+          "allow_export",
+          "min_age",
+          "allowed"
         ],
         "title": "RatingOut",
         "type": "object"
@@ -4569,6 +4654,48 @@
           }
         },
         "title": "RegenerateRequest",
+        "type": "object"
+      },
+      "RegisterBody": {
+        "properties": {
+          "birth_date": {
+            "description": "YYYY-MM-DD; a claim an admin has to approve",
+            "maxLength": 10,
+            "minLength": 1,
+            "title": "Birth Date",
+            "type": "string"
+          },
+          "display_name": {
+            "default": "",
+            "maxLength": 80,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "label": {
+            "default": "",
+            "maxLength": 80,
+            "title": "Label",
+            "type": "string"
+          },
+          "password": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Password",
+            "type": "string"
+          },
+          "username": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "password",
+          "birth_date"
+        ],
+        "title": "RegisterBody",
         "type": "object"
       },
       "RetryRequest": {
@@ -5543,6 +5670,20 @@
         "title": "StaleAsset",
         "type": "object"
       },
+      "TextEdit": {
+        "properties": {
+          "text": {
+            "maxLength": 2000000,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "TextEdit",
+        "type": "object"
+      },
       "UnlockBody": {
         "properties": {
           "confirm_adult": {
@@ -5561,6 +5702,13 @@
       },
       "UserCreateBody": {
         "properties": {
+          "birth_date": {
+            "default": "",
+            "description": "YYYY-MM-DD; given by an admin it counts at once",
+            "maxLength": 10,
+            "title": "Birth Date",
+            "type": "string"
+          },
           "display_name": {
             "default": "",
             "maxLength": 80,
@@ -5597,6 +5745,75 @@
           "active": {
             "title": "Active",
             "type": "boolean"
+          },
+          "age": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age"
+          },
+          "age_claim": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Claim"
+          },
+          "age_note": {
+            "title": "Age Note",
+            "type": "string"
+          },
+          "age_reviewed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Reviewed At"
+          },
+          "age_reviewed_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Reviewed By"
+          },
+          "age_status": {
+            "enum": [
+              "none",
+              "pending",
+              "approved",
+              "rejected"
+            ],
+            "title": "Age Status",
+            "type": "string"
+          },
+          "birth_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Birth Date"
           },
           "created_at": {
             "title": "Created At",
@@ -5637,7 +5854,14 @@
           "role",
           "active",
           "last_login_at",
-          "created_at"
+          "created_at",
+          "age",
+          "age_status",
+          "age_claim",
+          "birth_date",
+          "age_note",
+          "age_reviewed_by",
+          "age_reviewed_at"
         ],
         "title": "UserOut",
         "type": "object"
@@ -6851,6 +7075,59 @@
         ]
       }
     },
+    "/api/assets/{asset_id}/text": {
+      "put": {
+        "description": "Save an edited story / script / transcript as a NEW version of the same slot (the one before stays as a\ncandidate, so the edit can be undone by adopting it again).",
+        "operationId": "edit_text_asset_api_assets__asset_id__text_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "asset_id",
+            "required": true,
+            "schema": {
+              "title": "Asset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TextEdit"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Edit Text Asset",
+        "tags": [
+          "assets"
+        ]
+      }
+    },
     "/api/assets/{asset_id}/trash": {
       "post": {
         "description": "Soft delete: the file stays on disk, the record leaves its slot.",
@@ -6989,6 +7266,48 @@
         ]
       }
     },
+    "/api/auth/age": {
+      "post": {
+        "description": "The signed-in person gives (again) their birth date; it waits for an admin.",
+        "operationId": "claim_age_api_auth_age_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgeClaimBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Claim Age",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/auth/login": {
       "post": {
         "operationId": "login_api_auth_login_post",
@@ -7115,6 +7434,48 @@
           }
         },
         "summary": "Change Password",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/register": {
+      "post": {
+        "description": "Ask for an account: it is created with the registration role and the birth date as a claim, and the person is\nsigned in at once. What the age unlocks waits for an admin's approval (Team page).",
+        "operationId": "register_api_auth_register_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Register",
         "tags": [
           "auth"
         ]
@@ -14173,6 +14534,59 @@
           }
         },
         "summary": "Patch User",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/users/{user_id}/age": {
+      "post": {
+        "description": "An admin approves (optionally correcting the birth date) or rejects the age of an account. The age is worked\nout from the approved birth date every time, so it grows by itself.",
+        "operationId": "review_age_api_users__user_id__age_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgeReviewBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Review Age",
         "tags": [
           "auth"
         ]

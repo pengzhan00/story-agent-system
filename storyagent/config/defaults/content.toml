@@ -21,8 +21,22 @@ unlock_ttl_sec = 0
 rank = 0
 label_key = "content.rating.general"
 
-[content.ratings.restricted]
+# Age ratings. min_age is the age a viewer must have (approved by an admin, worked out from the birth date) to see
+# anything of this rating; a younger viewer, or one without an approved age, gets the masked tile and is refused the
+# project. With auth off the operator counts as an adult. A rating can also mask / vault / gate, like `restricted`.
+[content.ratings.pg13]
 rank = 1
+label_key = "content.rating.pg13"
+min_age = 13
+
+[content.ratings.age15]
+rank = 2
+label_key = "content.rating.age15"
+min_age = 15
+
+[content.ratings.restricted]
+rank = 3
+min_age = 18
 label_key = "content.rating.restricted"
 mask_ui = true          # lists and previews show a blurred thumbnail and no file name or prompt while locked
 vault = true            # files are written under the vault, not projects/<slug>/media

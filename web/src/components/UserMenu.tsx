@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { NavLink } from "react-router-dom";
-import { useChangePassword, useLogout, useMe } from "../api/auth";
+import { useChangePassword, useClaimAge, useLogout, useMe, type AccountRow } from "../api/auth";
 import { useT } from "../i18n";
 import { roleLabel } from "../lib/labels";
 import { ErrorNote } from "./ErrorNote";
@@ -32,6 +32,37 @@ function PasswordForm({ onDone }: { onDone: () => void }) {
   );
 }
 
+/** The age that counts (approved by an admin), or where the request stands, with the form to give a birth date. */
+function AgeSection({ user }: { user: AccountRow }) {
+  const t = useT();
+  const claim = useClaimAge();
+  const [date, setDate] = useState("");
+  return (
+    <section className="stack small" aria-label={t("web.auth.age_title")}>
+      <strong>{t("web.auth.age_title")}</strong>
+      {user.age_status === "approved" && user.age !== null ? <span>{t("web.auth.age_approved", { n: user.age })}</span> : null}
+      {user.age_status === "pending" ? <span className="muted">{t("web.auth.age_pending")}</span> : null}
+      {user.age_status === "rejected" ? <span className="error-box">{t("web.auth.age_rejected", { note: user.age_note })}</span> : null}
+      {user.age_status === "none" ? <span className="muted">{t("web.auth.age_none")}</span> : null}
+      {user.age_status !== "approved" ? (
+        <form
+          className="row"
+          onSubmit={(e) => {
+            e.preventDefault();
+            claim.mutate(date, { onSuccess: () => setDate("") });
+          }}
+        >
+          <input type="date" aria-label={t("web.auth.birth_date")} value={date} onChange={(e) => setDate(e.target.value)} required />
+          <button type="submit" disabled={claim.isPending || !date}>
+            {t("web.auth.age_submit")}
+          </button>
+        </form>
+      ) : null}
+      <ErrorNote error={claim.error} />
+    </section>
+  );
+}
+
 /** The signed-in user in the top bar: who, which role, change password, sign out (nothing shows with sign-in off). */
 export function UserMenu() {
   const t = useT();
@@ -55,8 +86,10 @@ export function UserMenu() {
       <button className="link" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
         {user.display_name || user.username} · {roleLabel(t, user.role)}
       </button>
+      {user.age_status === "pending" ? <span className="chip chip-stale">{t("web.users.age_status.pending")}</span> : null}
       {open ? (
         <div className="popover stack">
+          <AgeSection user={user} />
           <PasswordForm onDone={() => setOpen(false)} />
           <button onClick={() => logout.mutate()}>{t("web.auth.signout")}</button>
         </div>

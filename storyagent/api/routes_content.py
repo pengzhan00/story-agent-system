@@ -30,12 +30,16 @@ def _status(request: Request) -> ContentStatusOut:
     user = _user(request)
     active = UnlockStore(ctx.db, ctx.settings).active(user.id if user else None)
     ends = active["expires_at"] if active and active["expires_at"] != NO_EXPIRY else None
+    age = ctx.auth.age_of(user)
+    auth_on = ctx.settings.auth.enabled
     return ContentStatusOut(
         unlocked=active is not None, expires_at=ends, ttl_sec=cfg.unlock_ttl_sec,
         needs_password=ctx.settings.auth.enabled, vault_ready=vault_ready(ctx.settings), encryption=cfg.encryption,
-        default_rating=cfg.default_rating,
+        default_rating=cfg.default_rating, min_adult_age=cfg.min_adult_age,
+        viewer_age=(user.age if user else None) if auth_on else None,
+        age_status=(user.age_status if user else "none") if auth_on else "off",
         ratings=[RatingOut(name=p.name, label_key=p.label_key, restricted=p.restricted, mask_ui=p.mask_ui,
-                           vault=p.vault, allow_export=p.allow_export)
+                           vault=p.vault, allow_export=p.allow_export, min_age=p.min_age, allowed=p.min_age <= age)
                  for p in sorted(cfg.ratings.values(), key=lambda p: p.rank)])
 
 
@@ -52,6 +56,10 @@ def unlock(body: UnlockBody, request: Request) -> ContentStatusOut:
     if not body.confirm_adult:
         raise ContentError("confirm_adult")
     if ctx.settings.auth.enabled:
+        if auth.age_of(user) < ctx.settings.content.min_adult_age:
+            auth.audit("content.unlock_failed", user=user, actor="local", path=request.url.path, status=403,
+                       detail={"reason": "age_not_approved"})
+            raise ApiError(403, "age_restricted")
         row: Any = ctx.db.conn.execute("SELECT password_hash FROM users WHERE id=?",
                                        (user.id if user else 0,)).fetchone()
         if row is None or not verify_password(body.password, row["password_hash"]):

@@ -108,8 +108,8 @@ export function NewProject() {
           <span>{t("web.content.rating")}</span>
           <select value={rating} onChange={(e) => setRating(e.target.value)}>
             {ratings.map((r) => (
-              <option key={r.name} value={r.name}>
-                {t(r.label_key)}
+              <option key={r.name} value={r.name} disabled={!r.allowed}>
+                {r.allowed ? t(r.label_key) : t("web.content.rating_needs_age", { label: t(r.label_key), n: r.min_age })}
               </option>
             ))}
           </select>

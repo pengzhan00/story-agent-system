@@ -20,7 +20,7 @@ from .schemas import (
     ProjectSettingsPatch,
     WorkflowRunOut,
 )
-from .visibility import hidden
+from .visibility import hidden, too_young, viewer_age
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
@@ -28,7 +28,8 @@ router = APIRouter(prefix="/api/projects", tags=["projects"])
 @router.get("", response_model=list[ProjectOut])
 def list_projects(request: Request, trashed: bool = False) -> list[ProjectOut]:
     """Live projects; ``trashed=true`` lists the recycle bin instead."""
-    return [ProjectOut.model_validate(p) for p in ctx_of(request).projects.list(trashed=trashed)]
+    return [ProjectOut.model_validate(p) for p in ctx_of(request).projects.list(trashed=trashed)
+            if not too_young(p.rating, None)]
 
 
 @router.get("/overview", response_model=list[ProjectCard])
@@ -37,6 +38,8 @@ def overview(request: Request, trashed: bool = False) -> list[ProjectCard]:
     ctx = ctx_of(request)
     cards: list[ProjectCard] = []
     for p in ctx.projects.list(trashed=trashed):
+        if too_young(p.rating, None):         # not even listed for someone below the rating's age
+            continue
         states = [s for s in ctx.workflow.stages(p.id, 1) if s["stage"] != "outline" or s["status"] != "pending"]
         running = ctx.db.conn.execute(
             "SELECT 1 FROM workflow_runs WHERE project_id=? AND status IN ('queued','running')", (p.id,)).fetchone()
@@ -64,6 +67,7 @@ def create_project(body: ProjectCreate, request: Request) -> ProjectOut:
         body.name, genre=body.genre, description=body.description, content_language=body.content_language,
         delivery_profile=body.delivery_profile, kind=body.kind, pipeline=body.pipeline,
         brief=body.brief.model_dump(exclude_none=True) if body.brief else None, rating=body.rating,
+        viewer_age=viewer_age(),
     )
     return ProjectOut.model_validate(p)
 

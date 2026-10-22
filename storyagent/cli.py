@@ -13,7 +13,9 @@
     storyagent export episode --project N [--episode 1] --out DIR   (film + subtitles + stems + provenance)
     storyagent content status --project N | adult --project N (--character NAME ... | --all)
     storyagent delivery platforms | make --project N [--episode 1] [--platform A,B] [--lang en,ja] --out DIR
-    storyagent user create NAME --role R | list | set NAME [--role R] [--active|--inactive] [--reset-password]
+    storyagent user create NAME --role R [--birth-date D] | list
+    storyagent user set NAME [--role R] [--active|--inactive] [--reset-password]
+    storyagent user age NAME [--reject] [--birth-date D] [--note T]   (approve / reject an account's age)
     storyagent audit [--user U] [--action A] [--project N] [--limit N]
     storyagent llm check
     storyagent api openapi [--out FILE]
@@ -239,7 +241,7 @@ def _users(s: Settings) -> AuthStore:
 
 def _cmd_user_create(s: Settings, a: argparse.Namespace) -> int:
     store = _users(s)
-    user = store.create_user(a.username, _password(a), a.role, a.display_name or "")
+    user = store.create_user(a.username, _password(a), a.role, a.display_name or "", a.birth_date or "")
     store.audit("user.create", actor="cli", detail={"username": user.username, "role": user.role})
     print(t("cli.user.created", username=user.username, role=user.role))
     return 0
@@ -248,7 +250,23 @@ def _cmd_user_create(s: Settings, a: argparse.Namespace) -> int:
 def _cmd_user_list(s: Settings, a: argparse.Namespace) -> int:
     for u in _users(s).list_users():
         print(t("cli.user.row", id=u.id, username=u.username, role=u.role,
-                active=t("cli.user.active" if u.active else "cli.user.inactive"), last=u.last_login_at or "-"))
+                active=t("cli.user.active" if u.active else "cli.user.inactive"), last=u.last_login_at or "-",
+                age=u.age if u.age is not None else "-", age_status=t(f"web.users.age_status.{u.age_status}")))
+    return 0
+
+
+def _cmd_user_age(s: Settings, a: argparse.Namespace) -> int:
+    store = _users(s)
+    user = store.find_user(a.username)
+    if user is None:
+        raise CliError("cli.user.unknown", 1, username=a.username)
+    updated = store.review_age(user.id, approve=not a.reject, reviewer="cli", birth_date=a.birth_date or "",
+                               note=a.note or "")
+    store.audit("user.age_rejected" if a.reject else "user.age_approved", actor="cli",
+                detail={"username": updated.username, "claim": user.age_claim, "birth_date": updated.birth_date,
+                        "age": updated.age})
+    print(t("cli.user.age_set", username=updated.username, status=t(f"web.users.age_status.{updated.age_status}"),
+            age=updated.age if updated.age is not None else "-"))
     return 0
 
 
@@ -1042,6 +1060,7 @@ def build_parser() -> argparse.ArgumentParser:
     uc.add_argument("username")
     uc.add_argument("--role", required=True)
     uc.add_argument("--display-name")
+    uc.add_argument("--birth-date", help="YYYY-MM-DD; given here the age counts at once")
     uc.add_argument("--password-env", help="read the password from this environment variable (else it is asked)")
     add(us, "list", _cmd_user_list)
     uset = add(us, "set", _cmd_user_set)
@@ -1052,6 +1071,11 @@ def build_parser() -> argparse.ArgumentParser:
     uset.add_argument("--inactive", action="store_true")
     uset.add_argument("--reset-password", action="store_true")
     uset.add_argument("--password-env")
+    ua = add(us, "age", _cmd_user_age)
+    ua.add_argument("username")
+    ua.add_argument("--reject", action="store_true", help="reject the age (default: approve)")
+    ua.add_argument("--birth-date", help="approve this birth date instead of the claimed one")
+    ua.add_argument("--note")
     au = add(sub, "audit", _cmd_audit)
     au.add_argument("--user")
     au.add_argument("--action")

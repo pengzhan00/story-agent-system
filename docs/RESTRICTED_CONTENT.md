@@ -94,3 +94,10 @@ allow_remote = false            # 不送云端模型(忽略项目的 allow_remot
 - 词表只拦截提示词和角色文字,不是内容审核;"真人非自愿"靠既有的声线/肖像同意记录,系统无法核实真实性。
 
 **管线方案的分级(2026-10-22)**:`pipelines.toml` 的方案可带 `rating = "restricted"`:用它新建的项目至少是该级别(不能被调低),把普通项目切到它也升级(已有素材时拒绝,和改分级一样)。受限模型 + 受限方案的示例(Lustify 经 Draw Things)见 `docs/PIPELINES.md` 末节与 `docs/examples/drawthings-lustify/`。仍是纯管线接线:不含提示词与镜头设计。
+
+## 账号、年龄与分级门槛(2026-10-22)
+**账号年龄**:`users` 存的是管理员**批准**的出生日期(`birth_date`),年龄每次现算(随时间自动增长);自己填的只是申请(`age_claim`,`age_status = pending`),在管理员批准前年龄按 0 算。状态 `none | pending | approved | rejected`。管理员在「账号」页批准(可改正出生日期)或驳回;管理员/命令行建账号时直接填出生日期即视为批准。审计 `user.age_approved / user.age_rejected`。
+**注册**:`[auth] allow_registration`(默认开)+ `registration_role`(默认 `viewer`,只读)+ `max_pending_registrations`;登录页的"注册"创建账号并直接登录,但年龄待审。关闭 `mode = "token"` 时没有账号,操作者按成年人算。
+**分级门槛**:`content.toml` 每个分级有 `min_age`(默认 `general` 0、`pg13` 13、`age15` 15、`restricted` 18;排名越高 `min_age` 不能越低;带保险库/硬闸门的分级 `min_age` 不得低于 `min_adult_age`)。低于门槛的账号:项目列表里看不到该项目,`/api/projects/{id}/…` 一律 `403 age_restricted`(审计 `content.age_denied`),素材按遮掩处理、文件接口 403,不能新建这个分级的项目,也不能解锁(解锁要求批准的年龄 ≥ `min_adult_age`)。`mask_ui` 的分级仍要成年确认 + 解锁;`pg13/age15` 只按年龄开放,不遮掩。看过任何有年龄门槛或遮掩的文件都写审计 `content.view`(带 `rating`)。
+**命令行**:`storyagent user create NAME --role R --birth-date YYYY-MM-DD`;`storyagent user age NAME [--reject] [--birth-date D] [--note T]`;`user list` 显示年龄与状态。
+**启用**:默认 `mode = "off"`(单人,不登录)。要用账号:`data/config/auth.toml` 写 `[auth] mode = "token"`(或环境变量 `STORY_AGENT_AUTH=token`),重启后先 `storyagent user create NAME --role admin --birth-date …` 建第一个管理员。

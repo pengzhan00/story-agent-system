@@ -127,6 +127,8 @@ def install(app: FastAPI) -> None:
         detail = translator_of(request)(f"content.error.{exc.code}", **exc.params)
         if exc.code == "export_blocked":
             return respond(request, 403, "content_export_blocked", detail)
+        if exc.code == "age_restricted":
+            return respond(request, 403, "age_restricted", detail)
         return respond(request, 422, "content_invalid", detail)
 
     @app.exception_handler(DeliveryError)

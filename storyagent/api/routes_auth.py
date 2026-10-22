@@ -12,12 +12,15 @@ from storyagent.i18n import available_locales
 from .context import ctx_of
 from .errors import ApiError
 from .schemas import (
+    AgeClaimBody,
+    AgeReviewBody,
     AuditOut,
     AuthModeOut,
     LoginBody,
     LoginOut,
     MeOut,
     PasswordBody,
+    RegisterBody,
     UserCreateBody,
     UserOut,
     UserPatchBody,
@@ -28,7 +31,9 @@ router = APIRouter(tags=["auth"])
 
 def _out(u: User) -> UserOut:
     return UserOut(id=u.id, username=u.username, display_name=u.display_name, role=u.role, active=u.active,
-                   last_login_at=u.last_login_at, created_at=u.created_at)
+                   last_login_at=u.last_login_at, created_at=u.created_at, age=u.age, age_status=u.age_status,
+                   age_claim=u.age_claim, birth_date=u.birth_date, age_note=u.age_note,
+                   age_reviewed_by=u.age_reviewed_by, age_reviewed_at=u.age_reviewed_at)
 
 
 def _store(request: Request) -> AuthStore:
@@ -49,7 +54,47 @@ def _client(request: Request) -> str:
 def mode(request: Request) -> AuthModeOut:
     cfg = ctx_of(request).settings.auth
     first = cfg.enabled and _store(request).count_users() == 0
-    return AuthModeOut(mode="token" if cfg.enabled else "off", first_user=first, locales=available_locales())
+    return AuthModeOut(mode="token" if cfg.enabled else "off", first_user=first, locales=available_locales(),
+                       allow_registration=cfg.enabled and cfg.allow_registration)
+
+
+def _open_session(request: Request, response: Response, token: str) -> None:
+    cfg = ctx_of(request).settings.auth
+    response.set_cookie(cfg.cookie_name, token, max_age=cfg.session_hours * 3600, httponly=True, samesite="lax",
+                        secure=request.url.scheme == "https", path="/")
+
+
+@router.post("/api/auth/register", response_model=LoginOut, status_code=201)
+def register(body: RegisterBody, request: Request, response: Response) -> LoginOut:
+    """Ask for an account: it is created with the registration role and the birth date as a claim, and the person is
+    signed in at once. What the age unlocks waits for an admin's approval (Team page)."""
+    cfg, store = ctx_of(request).settings.auth, _store(request)
+    if not cfg.enabled:
+        raise ApiError(409, "auth_off")
+    try:
+        created = store.register(body.username, body.password, body.birth_date, body.display_name)
+    except Exception as exc:
+        store.audit("auth.register_failed", actor=body.username[:80], path=request.url.path, status=422,
+                    detail={"reason": getattr(exc, "code", "error")}, client=_client(request))
+        raise
+    store.audit("auth.register", user=created, path=request.url.path, status=201,
+                detail={"role": created.role, "age_claim": created.age_claim}, client=_client(request))
+    token, user, expires = store.login(body.username, body.password, label=body.label)
+    _open_session(request, response, token)
+    return LoginOut(token=token, expires_at=expires, user=_out(user))
+
+
+@router.post("/api/auth/age", response_model=UserOut)
+def claim_age(body: AgeClaimBody, request: Request) -> UserOut:
+    """The signed-in person gives (again) their birth date; it waits for an admin."""
+    user = _me(request)
+    if user is None:
+        raise ApiError(401, "unauthorized")
+    store = _store(request)
+    updated = store.claim_age(user.id, body.birth_date)
+    store.audit("auth.age_claimed", user=user, path=request.url.path, status=200,
+                detail={"age_claim": updated.age_claim}, client=_client(request))
+    return _out(updated)
 
 
 @router.post("/api/auth/login", response_model=LoginOut)
@@ -65,8 +110,7 @@ def login(body: LoginBody, request: Request, response: Response) -> LoginOut:
                     detail={"reason": getattr(exc, "code", "error")}, client=_client(request))
         raise
     store.audit("auth.login", user=user, path=request.url.path, status=200, client=_client(request))
-    response.set_cookie(cfg.cookie_name, token, max_age=cfg.session_hours * 3600, httponly=True, samesite="lax",
-                        secure=request.url.scheme == "https", path="/")
+    _open_session(request, response, token)
     return LoginOut(token=token, expires_at=expires, user=_out(user))
 
 
@@ -114,10 +158,25 @@ def list_users(request: Request) -> list[UserOut]:
 @router.post("/api/users", response_model=UserOut, status_code=201)
 def create_user(body: UserCreateBody, request: Request) -> UserOut:
     store = _store(request)
-    created = store.create_user(body.username, body.password, body.role, body.display_name)
+    created = store.create_user(body.username, body.password, body.role, body.display_name, body.birth_date)
     store.audit("user.create", user=_me(request), actor="local", path=request.url.path, status=201,
                 detail={"username": created.username, "role": created.role}, client=_client(request))
     return _out(created)
+
+
+@router.post("/api/users/{user_id}/age", response_model=UserOut)
+def review_age(user_id: int, body: AgeReviewBody, request: Request) -> UserOut:
+    """An admin approves (optionally correcting the birth date) or rejects the age of an account. The age is worked
+    out from the approved birth date every time, so it grows by itself."""
+    store, admin = _store(request), _me(request)
+    before = store.get_user(user_id)
+    updated = store.review_age(user_id, approve=body.approve, reviewer=admin.username if admin else "local",
+                               birth_date=body.birth_date, note=body.note)
+    store.audit("user.age_approved" if body.approve else "user.age_rejected", user=admin, actor="local",
+                path=request.url.path, status=200,
+                detail={"username": updated.username, "claim": before.age_claim, "birth_date": updated.birth_date,
+                        "age": updated.age, "note": updated.age_note}, client=_client(request))
+    return _out(updated)
 
 
 @router.patch("/api/users/{user_id}", response_model=UserOut)

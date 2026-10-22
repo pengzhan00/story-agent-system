@@ -23,6 +23,33 @@ export function useLogin() {
   });
 }
 
+export function useRegister() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { username: string; password: string; birth_date: string; display_name: string }) =>
+      post<S["LoginOut"]>("/api/auth/register", body),
+    onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
+/** The signed-in person gives (again) their birth date; it waits for an admin. */
+export function useClaimAge() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (birth_date: string) => post<AccountRow>("/api/auth/age", { birth_date }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["auth"] }),
+  });
+}
+
+/** Admin: approve (optionally with a corrected birth date) or reject the age of an account. */
+export function useReviewAge() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...body }: S["AgeReviewBody"] & { id: number }) => post<AccountRow>(`/api/users/${id}/age`, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["users"] }),
+  });
+}
+
 export function useLogout() {
   const qc = useQueryClient();
   return useMutation({
@@ -44,7 +71,7 @@ export const useAccounts = () => useQuery({ queryKey: ["users"], queryFn: () => 
 export function useCreateAccount() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { username: string; password: string; role: string; display_name: string }) =>
+    mutationFn: (body: { username: string; password: string; role: string; display_name: string; birth_date: string }) =>
       post<AccountRow>("/api/users", body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["users"] }),
   });

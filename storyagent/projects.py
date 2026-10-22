@@ -10,6 +10,7 @@ from typing import Any
 from storyagent.brief import resolve_brief
 from storyagent.compose.pacing import PacingError, parse_target
 from storyagent.config import ConfigError, Settings
+from storyagent.content import ContentError
 from storyagent.db import Database
 from storyagent.domain import slugify
 
@@ -110,7 +111,7 @@ class ProjectStore:
     def create(
         self, name: str, *, genre: str = "", description: str = "", content_language: str = "",
         delivery_profile: str = "", kind: str = "", pipeline: str = "", brief: Mapping[str, Any] | None = None,
-        rating: str = "",
+        rating: str = "", viewer_age: int | None = None,
     ) -> Project:
         """A project is made with its plan: ``kind`` (drama series, advert ...) recommends a pipeline plan - one
         complete set of models and the picture frame - and ``brief`` gives the structure (seasons, episodes, episode
@@ -124,6 +125,8 @@ class ProjectStore:
         plan_name = self.plan_of(pipeline, kind, delivery_profile)
         plan = self.settings.pipeline(plan_name)
         rating = self.settings.content.higher(rating, plan.rating or None)   # a plan's rating cannot be lowered
+        if viewer_age is not None and self.settings.content.policy(rating).min_age > viewer_age:
+            raise ContentError("age_restricted", rating=rating)     # nobody makes what they may not see
         profile = delivery_profile or plan.delivery_profile
         frame = self._frame(profile)                                 # also rejects an unknown profile
         if self._orientation(frame) != self._orientation(self._frame(plan.delivery_profile)):

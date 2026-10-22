@@ -10,8 +10,13 @@ min_password_length = 8
 login_max_failures = 5
 lockout_minutes = 10
 cookie_name = "sa_session"
+# Self-registration on the sign-in page: the account starts with this role and an unapproved age (it sees only what has
+# no age limit) until an admin approves the birth date on the Team page.
+allow_registration = true
+registration_role = "viewer"
+max_pending_registrations = 50
 # reachable without signing in (login itself, who am I, the translation catalog the login page needs, the API docs)
-public_prefixes = ["/api/auth/login", "/api/auth/mode", "/api/auth/me", "/api/i18n/", "/api/docs", "/api/openapi.json"]
+public_prefixes = ["/api/auth/login", "/api/auth/register", "/api/auth/mode", "/api/auth/me", "/api/i18n/", "/api/docs", "/api/openapi.json"]
 # any signed-in user (their own session and password), whatever the role
 signed_in_prefixes = ["/api/auth/", "/api/content/unlock"]
 # need the admin flag

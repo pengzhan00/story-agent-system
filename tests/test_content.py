@@ -279,16 +279,21 @@ def test_with_accounts_an_unlock_needs_the_users_password(fsettings: Settings, t
 
     s = load_settings({"STORY_AGENT_HOME": str(fsettings.home), "STORY_AGENT_AUTH": "token"})
     with TestClient(create_app(s), raise_server_exceptions=False) as c:
-        AuthStore(Database(s.db_path), s).create_user("ann", "correct horse", "admin")
+        AuthStore(Database(s.db_path), s).create_user("ann", "correct horse", "admin", birth_date="1990-01-01")
         assert c.post("/api/auth/login", json={"username": "ann", "password": "correct horse"}).status_code == 200
         assert unlock(c, password="wrong").status_code == 403
         assert c.get("/api/content/status").json()["needs_password"] is True
         assert unlock(c, password="correct horse").json()["unlocked"] is True
         AuthStore(Database(s.db_path), s).create_user("vic", "another horse", "viewer")
+        AuthStore(Database(s.db_path), s).create_user("wes", "third horse", "viewer", birth_date="1995-05-05")
         c.post("/api/auth/logout")
         assert c.post("/api/auth/login", json={"username": "vic", "password": "another horse"}).status_code == 200
+        refused = unlock(c, password="another horse")                              # no approved age: no unlock
+        assert refused.status_code == 403 and refused.json()["error"]["code"] == "age_restricted"
+        c.post("/api/auth/logout")
+        assert c.post("/api/auth/login", json={"username": "wes", "password": "third horse"}).status_code == 200
         assert c.post("/api/projects", json={"name": "x"}).status_code == 403      # a viewer cannot write ...
-        assert unlock(c, password="another horse").json()["unlocked"] is True      # ... but may look, for themself
+        assert unlock(c, password="third horse").json()["unlocked"] is True      # ... but may look, for themself
         assert c.delete("/api/content/unlock").json()["unlocked"] is False
         actions = [r["action"] for r in Database(s.db_path).conn.execute("SELECT action FROM audit_log")]
         assert "content.unlock_failed" in actions and "content.unlock" in actions

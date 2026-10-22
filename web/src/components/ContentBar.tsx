@@ -24,7 +24,10 @@ export function ContentBar() {
           </button>
         ) : null}
       </div>
-      {status.unlocked ? null : (
+      {!status.unlocked && status.age_status !== "off" && (status.viewer_age ?? 0) < status.min_adult_age ? (
+        <p className="note">{t("web.content.age_needed", { n: status.min_adult_age })}</p>
+      ) : null}
+      {status.unlocked || (status.age_status !== "off" && (status.viewer_age ?? 0) < status.min_adult_age) ? null : (
         <div className="stack">
           <label className="check">
             <input type="checkbox" checked={adult} onChange={(e) => setAdult(e.target.checked)} />

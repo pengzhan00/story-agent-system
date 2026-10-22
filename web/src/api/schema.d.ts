@@ -175,6 +175,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/assets/{asset_id}/text": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Edit Text Asset
+         * @description Save an edited story / script / transcript as a NEW version of the same slot (the one before stays as a
+         *     candidate, so the edit can be undone by adopting it again).
+         */
+        put: operations["edit_text_asset_api_assets__asset_id__text_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/assets/{asset_id}/trash": {
         parameters: {
             query?: never;
@@ -206,6 +227,26 @@ export interface paths {
         get: operations["audit_api_audit_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/age": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Claim Age
+         * @description The signed-in person gives (again) their birth date; it waits for an admin.
+         */
+        post: operations["claim_age_api_auth_age_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -291,6 +332,27 @@ export interface paths {
         put?: never;
         /** Change Password */
         post: operations["change_password_api_auth_password_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Register
+         * @description Ask for an account: it is created with the registration role and the birth date as a claim, and the person is
+         *     signed in at once. What the age unlocks waits for an admin's approval (Team page).
+         */
+        post: operations["register_api_auth_register_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2105,6 +2167,27 @@ export interface paths {
         patch: operations["patch_user_api_users__user_id__patch"];
         trace?: never;
     };
+    "/api/users/{user_id}/age": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Review Age
+         * @description An admin approves (optionally correcting the birth date) or rejects the age of an account. The age is worked
+         *     out from the approved birth date every time, so it grows by itself.
+         */
+        post: operations["review_age_api_users__user_id__age_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/workflow/runs/{run_id}": {
         parameters: {
             query?: never;
@@ -2290,6 +2373,27 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AgeClaimBody */
+        AgeClaimBody: {
+            /** Birth Date */
+            birth_date: string;
+        };
+        /** AgeReviewBody */
+        AgeReviewBody: {
+            /** Approve */
+            approve: boolean;
+            /**
+             * Birth Date
+             * @description the corrected birth date; empty = the claimed one
+             * @default
+             */
+            birth_date: string;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+        };
         /** AgentEdit */
         AgentEdit: {
             /** Attempts */
@@ -2476,6 +2580,8 @@ export interface components {
         };
         /** AuthModeOut */
         AuthModeOut: {
+            /** Allow Registration */
+            allow_registration: boolean;
             /** First User */
             first_user: boolean;
             /** Locales */
@@ -2522,12 +2628,19 @@ export interface components {
         };
         /** ContentStatusOut */
         ContentStatusOut: {
+            /**
+             * Age Status
+             * @enum {string}
+             */
+            age_status: "off" | "none" | "pending" | "approved" | "rejected";
             /** Default Rating */
             default_rating: string;
             /** Encryption */
             encryption: string;
             /** Expires At */
             expires_at: string | null;
+            /** Min Adult Age */
+            min_adult_age: number;
             /** Needs Password */
             needs_password: boolean;
             /** Ratings */
@@ -2538,6 +2651,8 @@ export interface components {
             unlocked: boolean;
             /** Vault Ready */
             vault_ready: boolean;
+            /** Viewer Age */
+            viewer_age: number | null;
         };
         /** DeliveryBody */
         DeliveryBody: {
@@ -3981,10 +4096,14 @@ export interface components {
         RatingOut: {
             /** Allow Export */
             allow_export: boolean;
+            /** Allowed */
+            allowed: boolean;
             /** Label Key */
             label_key: string;
             /** Mask Ui */
             mask_ui: boolean;
+            /** Min Age */
+            min_age: number;
             /** Name */
             name: string;
             /** Restricted */
@@ -4049,6 +4168,28 @@ export interface components {
              * @default true
              */
             vary_seed: boolean;
+        };
+        /** RegisterBody */
+        RegisterBody: {
+            /**
+             * Birth Date
+             * @description YYYY-MM-DD; a claim an admin has to approve
+             */
+            birth_date: string;
+            /**
+             * Display Name
+             * @default
+             */
+            display_name: string;
+            /**
+             * Label
+             * @default
+             */
+            label: string;
+            /** Password */
+            password: string;
+            /** Username */
+            username: string;
         };
         /** RetryRequest */
         RetryRequest: {
@@ -4481,6 +4622,11 @@ export interface components {
             /** Latest Spec Version */
             latest_spec_version: number;
         };
+        /** TextEdit */
+        TextEdit: {
+            /** Text */
+            text: string;
+        };
         /** UnlockBody */
         UnlockBody: {
             /**
@@ -4497,6 +4643,12 @@ export interface components {
         /** UserCreateBody */
         UserCreateBody: {
             /**
+             * Birth Date
+             * @description YYYY-MM-DD; given by an admin it counts at once
+             * @default
+             */
+            birth_date: string;
+            /**
              * Display Name
              * @default
              */
@@ -4512,6 +4664,23 @@ export interface components {
         UserOut: {
             /** Active */
             active: boolean;
+            /** Age */
+            age: number | null;
+            /** Age Claim */
+            age_claim: string | null;
+            /** Age Note */
+            age_note: string;
+            /** Age Reviewed At */
+            age_reviewed_at: string | null;
+            /** Age Reviewed By */
+            age_reviewed_by: string | null;
+            /**
+             * Age Status
+             * @enum {string}
+             */
+            age_status: "none" | "pending" | "approved" | "rejected";
+            /** Birth Date */
+            birth_date: string | null;
             /** Created At */
             created_at: string;
             /** Display Name */
@@ -5079,6 +5248,41 @@ export interface operations {
             };
         };
     };
+    edit_text_asset_api_assets__asset_id__text_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                asset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TextEdit"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     trash_asset_api_assets__asset_id__trash_post: {
         parameters: {
             query?: never;
@@ -5132,6 +5336,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuditOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    claim_age_api_auth_age_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgeClaimBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserOut"];
                 };
             };
             /** @description Validation Error */
@@ -5255,6 +5492,39 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    register_api_auth_register_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginOut"];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -9552,6 +9822,41 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["UserPatchBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_age_api_users__user_id__age_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgeReviewBody"];
             };
         };
         responses: {

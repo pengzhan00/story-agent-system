@@ -21,6 +21,7 @@ class RatingPolicy:
     allow_export: bool = True
     allow_remote: bool = True
     gates: bool = False
+    min_age: int = 0          # the age a viewer must have (approved by an admin) to see this rating at all
 
     @property
     def restricted(self) -> bool:
@@ -71,7 +72,8 @@ def build_content(raw: Mapping[str, Any], error: type[Exception]) -> ContentConf
             name=name, rank=int(spec.get("rank", 0)), label_key=str(spec.get("label_key", f"content.rating.{name}")),
             mask_ui=bool(spec.get("mask_ui", False)), vault=bool(spec.get("vault", False)),
             log_prompts=bool(spec.get("log_prompts", True)), allow_export=bool(spec.get("allow_export", True)),
-            allow_remote=bool(spec.get("allow_remote", True)), gates=bool(spec.get("gates", False)))
+            allow_remote=bool(spec.get("allow_remote", True)), gates=bool(spec.get("gates", False)),
+            min_age=int(spec.get("min_age", 0)))
         if policy.vault and not policy.gates:
             raise error(f"content.ratings.{name}: a rating stored in the vault must keep gates = true")
         ratings[name] = policy
@@ -82,6 +84,9 @@ def build_content(raw: Mapping[str, Any], error: type[Exception]) -> ContentConf
         raise error("content.default_rating must be an unrestricted rating")
     if len({p.rank for p in ratings.values()}) != len(ratings):
         raise error("content.ratings: every rating needs its own rank")
+    by_rank = sorted(ratings.values(), key=lambda p: p.rank)
+    if any(a.min_age > b.min_age for a, b in zip(by_rank, by_rank[1:], strict=False)):
+        raise error("content.ratings: min_age may not fall as the rank rises")
     encryption = str(cfg.get("encryption", "volume"))
     if encryption not in ENCRYPTIONS:
         raise error(f"content.encryption must be one of {list(ENCRYPTIONS)}")
@@ -92,6 +97,9 @@ def build_content(raw: Mapping[str, Any], error: type[Exception]) -> ContentConf
     min_age = int(gates.get("min_adult_age", 18))
     if min_age < 18:
         raise error("content.gates.min_adult_age cannot be below 18")
+    for r in ratings.values():
+        if (r.vault or r.gates) and r.min_age < min_age:
+            raise error(f"content.ratings.{r.name}: a rating with the vault or the gates needs min_age >= {min_age}")
     return ContentConfig(
         default_rating=default, vault_dir=vault_dir, volume_mount=str(cfg.get("volume_mount", "")).strip(),
         encryption=encryption, unlock_ttl_sec=int(cfg.get("unlock_ttl_sec", 900)), min_adult_age=min_age,

@@ -181,6 +181,9 @@ class AuthConfig:
     signed_in_prefixes: tuple[str, ...] = ()
     admin_prefixes: tuple[str, ...] = ()
     project_prefixes: tuple[str, ...] = ()
+    allow_registration: bool = True      # people can ask for an account on the sign-in page (an admin reviews the age)
+    registration_role: str = "viewer"    # the role of a self-registered account until an admin changes it
+    max_pending_registrations: int = 50  # age reviews waiting; more requests are refused until an admin catches up
     roles: Mapping[str, AuthRole] = field(default_factory=dict)
 
     @property
@@ -448,6 +451,8 @@ def _build_auth(raw: Mapping[str, Any], mode_override: str | None) -> AuthConfig
              for name, v in dict(a.get("roles", {})).items()}
     if not any(r.admin for r in roles.values()):
         raise ConfigError("auth.roles: at least one role needs admin = true")
+    if str(a.get("registration_role", "viewer")) not in roles:
+        raise ConfigError("auth.registration_role names no role in [auth.roles]")
     return AuthConfig(
         mode=mode, session_hours=int(a.get("session_hours", 168)),
         min_password_length=int(a.get("min_password_length", 8)),
@@ -456,6 +461,9 @@ def _build_auth(raw: Mapping[str, Any], mode_override: str | None) -> AuthConfig
         public_prefixes=tuple(a.get("public_prefixes", ())),
         signed_in_prefixes=tuple(a.get("signed_in_prefixes", ())), admin_prefixes=tuple(a.get("admin_prefixes", ())),
         project_prefixes=tuple(a.get("project_prefixes", ())), roles=roles,
+        allow_registration=bool(a.get("allow_registration", True)),
+        registration_role=str(a.get("registration_role", "viewer")),
+        max_pending_registrations=int(a.get("max_pending_registrations", 50)),
     )
 
 

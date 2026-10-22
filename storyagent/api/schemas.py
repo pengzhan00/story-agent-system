@@ -899,11 +899,19 @@ class UserOut(Strict):
     active: bool
     last_login_at: str | None
     created_at: str
+    age: int | None                                                  # full years today; None until an age is approved
+    age_status: Literal["none", "pending", "approved", "rejected"]
+    age_claim: str | None                                            # the birth date the person gave (waits for review)
+    birth_date: str | None                                           # the approved one
+    age_note: str
+    age_reviewed_by: str | None
+    age_reviewed_at: str | None
 
 
 class AuthModeOut(Strict):
     mode: Literal["off", "token"]
     first_user: bool       # token mode and no account exists yet: the first admin must be created with the CLI
+    allow_registration: bool    # the sign-in page offers "register"
     locales: list[str]     # public, so the sign-in page can offer the language choice before anyone is signed in
 
 
@@ -937,6 +945,25 @@ class UserCreateBody(Strict):
     password: str = Field(min_length=1, max_length=200)
     role: str
     display_name: str = Field(default="", max_length=80)
+    birth_date: str = Field(default="", max_length=10, description="YYYY-MM-DD; given by an admin it counts at once")
+
+
+class RegisterBody(Strict):
+    username: str = Field(min_length=1, max_length=80)
+    password: str = Field(min_length=1, max_length=200)
+    birth_date: str = Field(min_length=1, max_length=10, description="YYYY-MM-DD; a claim an admin has to approve")
+    display_name: str = Field(default="", max_length=80)
+    label: str = Field(default="", max_length=80)
+
+
+class AgeClaimBody(Strict):
+    birth_date: str = Field(min_length=1, max_length=10)
+
+
+class AgeReviewBody(Strict):
+    approve: bool
+    birth_date: str = Field(default="", max_length=10, description="the corrected birth date; empty = the claimed one")
+    note: str = Field(default="", max_length=300)
 
 
 class UserPatchBody(BaseModel):
@@ -1160,6 +1187,8 @@ class RatingOut(Strict):
     mask_ui: bool
     vault: bool
     allow_export: bool
+    min_age: int           # the approved age a viewer needs to see this rating at all (0 = anyone)
+    allowed: bool          # the caller's age reaches it
 
 
 class ContentStatusOut(Strict):
@@ -1170,6 +1199,9 @@ class ContentStatusOut(Strict):
     vault_ready: bool
     encryption: str
     default_rating: str
+    min_adult_age: int
+    viewer_age: int | None   # the caller's approved age; None when accounts are on and no age is approved
+    age_status: Literal["off", "none", "pending", "approved", "rejected"]   # "off" = accounts are off
     ratings: list[RatingOut]
 
 

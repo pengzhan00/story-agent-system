@@ -65,7 +65,16 @@ class AuthMiddleware:
             await respond(Request(scope, receive), status, verdict)(scope, receive, send)
             return
         scope.setdefault("state", {})["user"] = user
-        set_view(View(ctx.settings, ctx.db, user.id if user else None))
+        view = View(ctx.settings, ctx.db, user.id if user else None, age=store.age_of(user))
+        set_view(view)
+        project_id = project_of(path)
+        if project_id is not None and await anyio.to_thread.run_sync(view.too_young, None, project_id):
+            await anyio.to_thread.run_sync(lambda: store.audit(
+                "content.age_denied", user=user, path=path, project_id=project_id, status=403,
+                detail={"method": method, "rating": view.rating_of(project_id), "age": view.age},
+                client=_client(scope)))
+            await respond(Request(scope, receive), 403, "age_restricted")(scope, receive, send)
+            return
 
         status_seen = 0
 

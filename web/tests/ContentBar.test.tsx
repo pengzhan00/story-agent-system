@@ -10,10 +10,10 @@ import { I18nProvider } from "../src/i18n";
 const en = JSON.parse(readFileSync(join(__dirname, "..", "..", "storyagent", "locales", "en.json"), "utf-8")) as Record<string, string>;
 const tr = (k: string): string => en[k] ?? k;
 const status = (unlocked: boolean, needsPassword: boolean, vault = true) => ({
-  unlocked, expires_at: unlocked ? "2030-01-01T10:00:00.000Z" : null, ttl_sec: 900, needs_password: needsPassword, vault_ready: vault, encryption: "volume", default_rating: "general", ratings: [],
+  unlocked, expires_at: unlocked ? "2030-01-01T10:00:00.000Z" : null, ttl_sec: 900, needs_password: needsPassword, vault_ready: vault, encryption: "volume", default_rating: "general", min_adult_age: 18, viewer_age: null, age_status: "off", ratings: [],
 });
 let calls: { url: string; body: string }[] = [];
-let state = status(false, false);
+let state: Record<string, unknown> = status(false, false);
 
 beforeEach(() => {
   calls = [];
@@ -25,7 +25,7 @@ beforeEach(() => {
     else if (url.includes("/api/auth/mode")) json = { mode: "off", first_user: false, locales: ["en"] };
     else if (url.includes("/api/auth/me")) json = { mode: "off", user: null, can_write: true, can_create_project: true, is_admin: true };
     else if (url.includes("/api/content/unlock")) {
-      state = status(init?.method === "POST", state.needs_password);
+      state = status(init?.method === "POST", state.needs_password === true);
       json = state;
     } else if (url.includes("/api/content/status")) json = state;
     return { ok: true, status: 200, statusText: "", json: async () => json, text: async () => JSON.stringify(json) };
@@ -67,6 +67,18 @@ describe("ContentBar", () => {
     fireEvent.change(screen.getByLabelText(tr("web.content.password")), { target: { value: "secret pw" } });
     expect(unlock.disabled).toBe(false);
     expect(screen.getByText(tr("web.content.vault_missing"))).toBeTruthy();
+  });
+});
+
+describe("ContentBar and the age", () => {
+  it("offers no unlock to an account whose age is not approved as an adult, and says what to do", async () => {
+    state = { ...status(false, true), age_status: "pending", viewer_age: null };
+    mount();
+    expect(await screen.findByText(tr("web.content.age_needed").replace("{n}", "18"))).toBeTruthy();
+    expect(screen.queryByRole("button", { name: tr("web.content.unlock") })).toBeNull();
+    state = { ...status(false, true), age_status: "approved", viewer_age: 30 };
+    mount();
+    expect((await screen.findAllByRole("button", { name: tr("web.content.unlock") })).length).toBeGreaterThan(0);
   });
 });
 

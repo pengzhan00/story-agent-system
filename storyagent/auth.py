@@ -14,8 +14,8 @@ import re
 import secrets
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
-from typing import Any
+from datetime import UTC, date, datetime, timedelta
+from typing import Any, Literal
 
 from storyagent.config import AuthConfig, Settings
 from storyagent.db import Database
@@ -25,7 +25,9 @@ SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 _USERNAME = re.compile(r"^[A-Za-z0-9_.-]{2,40}$")
 _SCRYPT = (2 ** 14, 8, 1)
 _PROJECT_ID = re.compile(r"/api/projects/(\d+)")
+AgeStatus = Literal["none", "pending", "approved", "rejected"]
 _DUMMY_HASH = ""
+ADULT_OPERATOR = 1000        # the age of the local operator when accounts are off: no rating is above it
 
 
 class AuthError(Exception):
@@ -63,6 +65,14 @@ class UnknownUser(AuthError, LookupError):
     code, status = "not_found", 404
 
 
+class RegistrationClosed(AuthError):
+    code, status = "registration_closed", 403
+
+
+class BadBirthDate(AuthError):
+    code, status = "bad_birth_date", 422
+
+
 @dataclass(frozen=True)
 class User:
     id: int
@@ -72,11 +82,48 @@ class User:
     active: bool
     last_login_at: str | None
     created_at: str
+    birth_date: str | None = None       # only ever set by an admin's approval (or by an admin creating the account)
+    age_status: AgeStatus = "none"      # none | pending | approved | rejected
+    age_claim: str | None = None        # what the person said; it waits for the review and counts for nothing
+    age_note: str = ""
+    age_reviewed_by: str | None = None
+    age_reviewed_at: str | None = None
+
+    @property
+    def age(self) -> int | None:
+        """Full years today, from the approved birth date; ``None`` while no age is approved."""
+        return age_on(self.birth_date) if self.age_status == "approved" else None
 
 
 def _user(row: Any) -> User:
     return User(row["id"], row["username"], row["display_name"], row["role"], bool(row["active"]),
-                row["last_login_at"], row["created_at"])
+                row["last_login_at"], row["created_at"], row["birth_date"], row["age_status"], row["age_claim"],
+                row["age_note"], row["age_reviewed_by"], row["age_reviewed_at"])
+
+
+# -- age --------------------------------------------------------------------------------------------------
+def parse_birth_date(text: str, today: date | None = None) -> date:
+    """``YYYY-MM-DD``, not in the future and not older than 120 years."""
+    today = today or datetime.now(UTC).date()
+    try:
+        born = date.fromisoformat(text.strip())
+    except ValueError:
+        raise BadBirthDate("YYYY-MM-DD") from None
+    if born > today or (today - born).days > 120 * 366:
+        raise BadBirthDate(text)
+    return born
+
+
+def age_on(birth_date: str | None, today: date | None = None) -> int | None:
+    """Full years on ``today`` (default: today); it grows by itself, only the birth date is stored."""
+    if not birth_date:
+        return None
+    today = today or datetime.now(UTC).date()
+    try:
+        born = date.fromisoformat(birth_date)
+    except ValueError:
+        return None
+    return today.year - born.year - ((today.month, today.day) < (born.month, born.day))
 
 
 # -- passwords --------------------------------------------------------------------------------------------
@@ -158,20 +205,75 @@ class AuthStore:
         if role not in self.cfg.roles:
             raise AuthError(f"unknown role {role!r}; known: {sorted(self.cfg.roles)}")
 
-    def create_user(self, username: str, password: str, role: str, display_name: str = "") -> User:
+    def create_user(self, username: str, password: str, role: str, display_name: str = "",
+                    birth_date: str = "") -> User:
+        """An account made by an admin (or the CLI). With ``birth_date`` the age counts at once (the admin vouches)."""
         username = username.strip()
         if not _USERNAME.match(username):
             raise AuthError("username: 2-40 letters, digits, '.', '_' or '-'")
         self._check_role(role)
         self._check_password(password)
+        born = parse_birth_date(birth_date).isoformat() if birth_date.strip() else None
         if self.db.conn.execute("SELECT 1 FROM users WHERE username=?", (username,)).fetchone():
             raise UserExists(username)
         cur = self.db.conn.execute(
-            "INSERT INTO users(username, display_name, role, password_hash) VALUES (?,?,?,?)",
-            (username, display_name.strip(), role, hash_password(password)),
+            "INSERT INTO users(username, display_name, role, password_hash, birth_date, age_status, age_reviewed_by,"
+            " age_reviewed_at) VALUES (?,?,?,?,?,?,?,?)",
+            (username, display_name.strip(), role, hash_password(password), born, "approved" if born else "none",
+             "admin" if born else None, now_iso() if born else None),
         )
         assert cur.lastrowid is not None
         return self.get_user(cur.lastrowid)
+
+    # -- registration and the age review ------------------------------------------------------------------
+    def register(self, username: str, password: str, birth_date: str, display_name: str = "") -> User:
+        """Self-registration: a ``registration_role`` account whose age is only a claim until an admin approves it.
+        The number of waiting requests is capped (``max_pending_registrations``)."""
+        if not self.cfg.allow_registration:
+            raise RegistrationClosed()
+        claim = parse_birth_date(birth_date).isoformat()
+        if self.pending_count() >= self.cfg.max_pending_registrations:
+            raise RegistrationClosed("too many requests are waiting for a review")
+        user = self.create_user(username, password, self.cfg.registration_role, display_name)
+        self.db.conn.execute("UPDATE users SET age_status='pending', age_claim=? WHERE id=?", (claim, user.id))
+        return self.get_user(user.id)
+
+    def pending_count(self) -> int:
+        return int(self.db.conn.execute("SELECT count(*) FROM users WHERE age_status='pending'").fetchone()[0])
+
+    def claim_age(self, user_id: int, birth_date: str) -> User:
+        """Say (again) when you were born; an approved age is changed by an admin only."""
+        current = self.get_user(user_id)
+        if current.age_status == "approved":
+            raise AuthError("the age is already approved; an admin changes it")
+        claim = parse_birth_date(birth_date).isoformat()
+        self.db.conn.execute("UPDATE users SET age_status='pending', age_claim=?, age_note='' WHERE id=?",
+                             (claim, user_id))
+        return self.get_user(user_id)
+
+    def review_age(self, user_id: int, *, approve: bool, reviewer: str, birth_date: str = "", note: str = "") -> User:
+        """Approve (the claimed birth date, or the one the admin corrects it to) or reject the age of an account.
+        Sessions stay valid; the new age counts on the next request."""
+        user = self.get_user(user_id)
+        values: dict[str, Any] = {"age_status": "approved" if approve else "rejected", "age_note": note.strip()[:300],
+                                  "age_reviewed_by": reviewer, "age_reviewed_at": now_iso()}
+        if approve:
+            chosen = birth_date.strip() or user.age_claim or user.birth_date or ""
+            if not chosen:
+                raise BadBirthDate("no birth date to approve")
+            values["birth_date"] = parse_birth_date(chosen).isoformat()
+        else:
+            values["birth_date"] = None
+        marks = ", ".join(f"{k}=?" for k in values)
+        self.db.conn.execute(f"UPDATE users SET {marks} WHERE id=?", (*values.values(), user_id))
+        return self.get_user(user_id)
+
+    def age_of(self, user: User | None) -> int:
+        """The age that counts for what this caller may see. Without accounts (auth off) the operator is an adult;
+        with accounts an unapproved age is 0."""
+        if not self.cfg.enabled:
+            return ADULT_OPERATOR
+        return (user.age or 0) if user else 0
 
     def get_user(self, user_id: int) -> User:
         row = self.db.conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
