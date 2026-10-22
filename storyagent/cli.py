@@ -11,6 +11,8 @@
     storyagent workflow run | status | watch | review      (story pipeline with live progress bars)
     storyagent project create | estimate | update | list | trash   (kind of work, pipeline plan, seasons, episodes)
     storyagent export episode --project N [--episode 1] --out DIR   (film + subtitles + stems + provenance)
+    storyagent user create NAME --role R | list | set NAME [--role R] [--active|--inactive] [--reset-password]
+    storyagent audit [--user U] [--action A] [--project N] [--limit N]
     storyagent llm check
     storyagent api openapi [--out FILE]
     storyagent ops llm-unload
@@ -20,7 +22,9 @@ Commands that touch data migrate the database first (idempotent, snapshot taken 
 from __future__ import annotations
 
 import argparse
+import getpass
 import json
+import os
 import signal
 import sys
 import threading
@@ -30,6 +34,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+from storyagent.auth import AuthError, AuthStore
 from storyagent.compose.export import ExportError, build_package
 from storyagent.compose.qc import ADVISORY
 from storyagent.config import ConfigError, Settings, get_settings
@@ -205,6 +210,60 @@ def _cmd_project_trash(s: Settings, a: argparse.Namespace) -> int:
     except ProjectStateError as exc:
         raise CliError("cli.project.state", 1, detail=str(exc)) from exc
     print(t("cli.project.restored" if a.restore else "cli.project.trashed", id=project.id, name=project.name))
+    return 0
+
+
+def _password(a: argparse.Namespace, *, confirm: bool = True) -> str:
+    """From the environment variable named by ``--password-env`` (scripts), else asked twice on the terminal."""
+    if getattr(a, "password_env", None):
+        value = os.environ.get(a.password_env, "")
+        if not value:
+            raise CliError("cli.user.password_env_empty", 2, name=a.password_env)
+        return value
+    first = getpass.getpass(t("cli.user.password_prompt"))
+    if confirm and first != getpass.getpass(t("cli.user.password_again")):
+        raise CliError("cli.user.password_mismatch", 2)
+    return first
+
+
+def _users(s: Settings) -> AuthStore:
+    return AuthStore(_ctx(s).db, s)
+
+
+def _cmd_user_create(s: Settings, a: argparse.Namespace) -> int:
+    store = _users(s)
+    user = store.create_user(a.username, _password(a), a.role, a.display_name or "")
+    store.audit("user.create", actor="cli", detail={"username": user.username, "role": user.role})
+    print(t("cli.user.created", username=user.username, role=user.role))
+    return 0
+
+
+def _cmd_user_list(s: Settings, a: argparse.Namespace) -> int:
+    for u in _users(s).list_users():
+        print(t("cli.user.row", id=u.id, username=u.username, role=u.role,
+                active=t("cli.user.active" if u.active else "cli.user.inactive"), last=u.last_login_at or "-"))
+    return 0
+
+
+def _cmd_user_set(s: Settings, a: argparse.Namespace) -> int:
+    store = _users(s)
+    user = store.find_user(a.username)
+    if user is None:
+        raise CliError("cli.user.unknown", 1, username=a.username)
+    active = True if a.active else False if a.inactive else None
+    password = _password(a) if a.reset_password else None
+    updated = store.update_user(user.id, role=a.role, active=active, display_name=a.display_name, password=password)
+    changed = [k for k, v in (("role", a.role), ("active", active), ("display_name", a.display_name),
+                              ("password", password)) if v is not None]
+    store.audit("user.update", actor="cli", detail={"username": updated.username, "changed": changed})
+    print(t("cli.user.updated", username=updated.username, role=updated.role))
+    return 0
+
+
+def _cmd_audit(s: Settings, a: argparse.Namespace) -> int:
+    for r in _users(s).list_audit(user=a.user or "", action=a.action or "", project_id=a.project, limit=a.limit):
+        print(t("cli.audit.row", at=r["at"], actor=r["actor"] or "-", action=r["action"], path=r["path"] or "-",
+                status=r["status"] or "-"))
     return 0
 
 
@@ -718,6 +777,27 @@ def build_parser() -> argparse.ArgumentParser:
     pt.add_argument("project", type=int)
     pt.add_argument("--restore", action="store_true", help="bring a trashed project back")
 
+    us = sub.add_parser("user").add_subparsers(dest="cmd", required=True)
+    uc = add(us, "create", _cmd_user_create)
+    uc.add_argument("username")
+    uc.add_argument("--role", required=True)
+    uc.add_argument("--display-name")
+    uc.add_argument("--password-env", help="read the password from this environment variable (else it is asked)")
+    add(us, "list", _cmd_user_list)
+    uset = add(us, "set", _cmd_user_set)
+    uset.add_argument("username")
+    uset.add_argument("--role")
+    uset.add_argument("--display-name")
+    uset.add_argument("--active", action="store_true")
+    uset.add_argument("--inactive", action="store_true")
+    uset.add_argument("--reset-password", action="store_true")
+    uset.add_argument("--password-env")
+    au = add(sub, "audit", _cmd_audit)
+    au.add_argument("--user")
+    au.add_argument("--action")
+    au.add_argument("--project", type=int)
+    au.add_argument("--limit", type=int, default=50)
+
     me = sub.add_parser("media").add_subparsers(dest="cmd", required=True)
     hc = add(me, "healthcheck", _cmd_media_health)
     hc.add_argument("--json", action="store_true")
@@ -868,6 +948,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     except SpecLocked:
         print(t("cli.spec.is_locked"), file=sys.stderr)
         return 5
+    except AuthError as exc:
+        print(t(f"api.error.{exc.code}") + (f" ({exc.detail})" if exc.detail else ""), file=sys.stderr)
+        return 1
     except (SpecError, LedgerError) as exc:
         print(str(exc), file=sys.stderr)
         return 1

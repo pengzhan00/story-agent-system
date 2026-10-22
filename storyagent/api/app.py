@@ -18,6 +18,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 import storyagent
+from storyagent.auth import AuthStore
 from storyagent.config import Settings, get_settings
 from storyagent.db import Database, migrate
 from storyagent.media.ledger import Ledger
@@ -31,6 +32,7 @@ from . import (
     errors,
     routes_ai,
     routes_assets,
+    routes_auth,
     routes_jobs,
     routes_launch,
     routes_library,
@@ -41,6 +43,7 @@ from . import (
     routes_workflow,
     routes_workshop,
 )
+from .auth_middleware import AuthMiddleware
 from .context import ApiContext
 
 
@@ -50,7 +53,7 @@ def build_context(settings: Settings) -> ApiContext:
     ledger = Ledger(db, settings)
     return ApiContext(
         settings, db, ledger, SpecStore(db, settings, ledger), ProjectStore(db, settings),
-        Library(db, settings, ledger), StoryStore(db), WorkflowState(db),
+        Library(db, settings, ledger), StoryStore(db), WorkflowState(db), AuthStore(db, settings),
     )
 
 
@@ -92,6 +95,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         openapi_url="/api/openapi.json",
         lifespan=lifespan,
     )
+    app.add_middleware(AuthMiddleware)       # added before CORS, so CORS stays outermost (preflights pass)
     origins = list(settings.api["cors_origins"])
     if origins:
         app.add_middleware(
@@ -99,7 +103,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             expose_headers=["Content-Disposition"],
         )
     errors.install(app)
-    for module in (routes_projects, routes_jobs, routes_assets, routes_library, routes_specs, routes_story,
+    for module in (routes_auth, routes_projects, routes_jobs, routes_assets, routes_library, routes_specs, routes_story,
                    routes_workflow, routes_system, routes_ai, routes_launch, routes_workshop):
         app.include_router(module.router)
     web = web_root(settings)

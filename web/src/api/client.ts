@@ -28,6 +28,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
       /* not an envelope (proxy down, HTML error page...) */
     }
     const e = env.error ?? {};
+    if (res.status === 401 && e.code === "unauthorized") window.dispatchEvent(new Event("storyagent:unauthorized"));
     throw new ApiError(res.status, e.code ?? "internal", e.message ?? res.statusText, e.remediation ?? "", e.detail);
   }
   return res.status === 204 ? (undefined as T) : ((await res.json()) as T);

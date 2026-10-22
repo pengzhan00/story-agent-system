@@ -34,3 +34,8 @@ export function formatValue(v: unknown, t: T, label: Labeler): string {
     .map(([k, val]) => `${label(k)}: ${formatValue(val, t, label)}`)
     .join("; ");
 }
+
+/** A role's name for people; roles are configuration, so a role without a translation shows its own name. */
+export function roleLabel(t: T, role: string): string {
+  return labeler(t, "web.role")(role);
+}

@@ -474,6 +474,7 @@ class Meta(BaseModel):
     delivery_default: str
     compliance_enabled: bool
     llm_unload_policy: str
+    auth_roles: list[str]
     queue: QueueState
 
 
@@ -857,3 +858,72 @@ class PipelineOut(Strict):
 class WorkshopHistoryItem(Strict):
     job: JobOut
     assets: list[AssetOut]
+
+
+# -- team access ------------------------------------------------------------------------------------------
+class UserOut(Strict):
+    id: int
+    username: str
+    display_name: str
+    role: str
+    active: bool
+    last_login_at: str | None
+    created_at: str
+
+
+class AuthModeOut(Strict):
+    mode: Literal["off", "token"]
+    first_user: bool       # token mode and no account exists yet: the first admin must be created with the CLI
+    locales: list[str]     # public, so the sign-in page can offer the language choice before anyone is signed in
+
+
+class MeOut(Strict):
+    mode: Literal["off", "token"]
+    user: UserOut | None
+    can_write: bool
+    can_create_project: bool
+    is_admin: bool
+
+
+class LoginBody(Strict):
+    username: str = Field(min_length=1, max_length=80)
+    password: str = Field(min_length=1, max_length=200)
+    label: str = Field(default="", max_length=80)
+
+
+class LoginOut(Strict):
+    token: str
+    expires_at: str
+    user: UserOut
+
+
+class PasswordBody(Strict):
+    old_password: str = Field(min_length=1, max_length=200)
+    new_password: str = Field(min_length=1, max_length=200)
+
+
+class UserCreateBody(Strict):
+    username: str = Field(min_length=1, max_length=80)
+    password: str = Field(min_length=1, max_length=200)
+    role: str
+    display_name: str = Field(default="", max_length=80)
+
+
+class UserPatchBody(BaseModel):
+    role: str | None = None
+    active: bool | None = None
+    display_name: str | None = Field(default=None, max_length=80)
+    password: str | None = Field(default=None, max_length=200)
+
+
+class AuditOut(Strict):
+    id: int
+    at: str
+    user_id: int | None
+    actor: str
+    action: str
+    path: str
+    project_id: int | None
+    status: int | None
+    detail: dict[str, Any]
+    client: str

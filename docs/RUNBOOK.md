@@ -51,9 +51,18 @@ The DB is `$STORY_AGENT_HOME/data/*.db` (WAL). Copy with `sqlite3 <db> ".backup 
 
 Migrations only go forward. Before a schema upgrade `storyagent db migrate` copies the database to `<db>.bak-v<N>` (the version it had). To roll back: stop the worker and the server, move the current `*.db` (and its `-wal`/`-shm`) aside, copy the snapshot back as the database, and check out the matching code revision (`git checkout <tag or commit>`). The v1 implementation is the git tag `v1-final`; v1 databases are never touched (`db import-legacy` only reads them).
 
-## What is not audited yet
+## Team access and audit
 
-Destructive actions (project to recycle bin, library removal, asset trash) are reversible and logged in the application log, but there is no separate audit table; jobs keep their full event history (`media show <id>`).
+Single operator (default): `[auth] mode = "off"`, no login. For a team: set `[auth] mode = "token"` in `$STORY_AGENT_HOME/config/auth.toml` (or `STORY_AGENT_AUTH=token`), restart `storyagent serve`, then create the first administrator on the server and the others from the web client (Team page) or the CLI:
+
+```
+storyagent user create NAME --role admin            # asks for the password (or --password-env VAR)
+storyagent user list
+storyagent user set NAME --role editor | --inactive | --reset-password
+storyagent audit [--user U] [--action A] [--project N] [--limit N]
+```
+
+Forgot the only admin's password: `storyagent user set NAME --reset-password` on the server. A locked account (too many wrong passwords) opens again after `lockout_minutes`, or reset its password. Listening beyond loopback (`[api] host`) also needs HTTPS in front (a reverse proxy): the session cookie is marked `Secure` only when the request arrives over https. Every write and every sign-in event is in `audit_log` (Team > Audit in the web client); the table is append-only and holds no request bodies. Jobs keep their own full event history (`media show <id>`).
 
 
 ## 生产部署与更新

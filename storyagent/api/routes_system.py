@@ -136,6 +136,7 @@ def meta(request: Request) -> Meta:
         default_pipeline=s.default_pipeline,
         compliance_enabled=s.compliance.enabled,
         llm_unload_policy=s.llm_unload_policy,
+        auth_roles=list(s.auth.roles),
         queue=queue_state(request),
     )
 

@@ -41,7 +41,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   const [locales, setLocales] = useState<string[]>([locale]);
 
   useEffect(() => {
-    fetch("/api/meta")
+    fetch("/api/auth/mode")       // public, so the language choice exists on the sign-in page too
       .then((r) => (r.ok ? r.json() : null))
       .then((m: { locales?: string[] } | null) => m?.locales && setLocales(m.locales))
       .catch(() => undefined);

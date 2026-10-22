@@ -1,0 +1,37 @@
+# Team access. `mode = "off"` (default): a single operator on this machine, no login (everything is allowed, writes are
+# still audited as the local operator). `mode = "token"`: every /api call except the public prefixes needs a signed-in
+# user (Authorization: Bearer <token>, or the session cookie the login sets); create the first admin with
+# `storyagent user create NAME --role admin`. Roles are flags here, so a team can add its own (e.g. a "reviewer" that
+# may write comments only is a later extension of `write`). Env: STORY_AGENT_AUTH=off|token.
+[auth]
+mode = "off"
+session_hours = 168
+min_password_length = 8
+login_max_failures = 5
+lockout_minutes = 10
+cookie_name = "sa_session"
+# reachable without signing in (login itself, who am I, the translation catalog the login page needs, the API docs)
+public_prefixes = ["/api/auth/login", "/api/auth/mode", "/api/auth/me", "/api/i18n/", "/api/docs", "/api/openapi.json"]
+# any signed-in user (their own session and password), whatever the role
+signed_in_prefixes = ["/api/auth/"]
+# need the admin flag
+admin_prefixes = ["/api/users", "/api/audit", "/api/launch", "/api/config"]
+# POST/DELETE on these need the create_project flag
+project_prefixes = ["/api/projects"]
+
+[auth.roles.admin]
+write = true
+create_project = true
+admin = true
+[auth.roles.producer]
+write = true
+create_project = true
+admin = false
+[auth.roles.editor]
+write = true
+create_project = false
+admin = false
+[auth.roles.viewer]
+write = false
+create_project = false
+admin = false

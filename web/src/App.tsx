@@ -1,6 +1,9 @@
 import { NavLink, Navigate, Route, Routes } from "react-router-dom";
 import { useEventFeed } from "./api/events";
 import { useI18n } from "./i18n";
+import { UserMenu } from "./components/UserMenu";
+import { AuditPage } from "./pages/AuditPage";
+import { UsersPage } from "./pages/UsersPage";
 import { LAUNCH_SEEN, LaunchPage } from "./pages/LaunchPage";
 import { LibraryPage } from "./pages/LibraryPage";
 import { ProjectPage } from "./pages/ProjectPage";
@@ -63,6 +66,7 @@ export function App() {
             </option>
           ))}
         </select>
+        <UserMenu />
       </header>
       <main className="content">
         <Routes>
@@ -75,6 +79,8 @@ export function App() {
           <Route path="/queue" element={<QueuePage />} />
           <Route path="/prompts" element={<PromptsPage />} />
           <Route path="/system" element={<SystemPage />} />
+          <Route path="/users" element={<UsersPage />} />
+          <Route path="/audit" element={<AuditPage />} />
           <Route path="*" element={<p className="empty">{t("web.not_found")}</p>} />
         </Routes>
       </main>

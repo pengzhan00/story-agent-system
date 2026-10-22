@@ -28,12 +28,14 @@ ENV_LOCALE = "STORY_AGENT_LOCALE"
 ENV_LEGACY_DB = "STORY_AGENT_LEGACY_DB"
 ENV_UNLOAD = "STORY_AGENT_LLM_UNLOAD_POLICY"
 ENV_COMPLIANCE = "STORY_AGENT_COMPLIANCE"
+ENV_AUTH = "STORY_AGENT_AUTH"
 
 DEFAULT_LOCALE = "zh-CN"
 UNLOAD_POLICIES = ("never", "ask", "auto")
 EXPLICIT_LABEL_MODES = ("off", "overlay", "both")
 LLM_BACKEND_KINDS = ("ollama", "llamacpp", "openai_compat")
-_CONFIG_FILES = ("services", "models", "delivery", "compliance", "recipes", "llm", "pipelines", "kinds")
+_CONFIG_FILES = ("services", "models", "delivery", "compliance", "recipes", "llm", "pipelines", "kinds", "auth")
+AUTH_MODES = ("off", "token")
 CORE_KINDS = ("image.generate", "video.generate", "audio.tts", "audio.music", "compose.assemble")
 BRIEF_QUESTIONS = ("seasons", "episodes", "episode_sec", "audience", "platform")
 _VALID_KINDS = frozenset(k.value for k in MediaKind)
@@ -154,6 +156,33 @@ class WorkKind:
 
 
 @dataclass(frozen=True)
+class AuthRole:
+    name: str
+    write: bool = False
+    create_project: bool = False
+    admin: bool = False
+
+
+@dataclass(frozen=True)
+class AuthConfig:
+    mode: str = "off"
+    session_hours: int = 168
+    min_password_length: int = 8
+    login_max_failures: int = 5
+    lockout_minutes: int = 10
+    cookie_name: str = "sa_session"
+    public_prefixes: tuple[str, ...] = ()
+    signed_in_prefixes: tuple[str, ...] = ()
+    admin_prefixes: tuple[str, ...] = ()
+    project_prefixes: tuple[str, ...] = ()
+    roles: Mapping[str, AuthRole] = field(default_factory=dict)
+
+    @property
+    def enabled(self) -> bool:
+        return self.mode == "token"
+
+
+@dataclass(frozen=True)
 class LLMBackend:
     name: str
     kind: str
@@ -195,6 +224,7 @@ class Settings:
     default_pipeline: str = ""
     kinds: Mapping[str, WorkKind] = field(default_factory=dict)
     default_kind: str = ""
+    auth: AuthConfig = field(default_factory=AuthConfig)
 
     # -- derived paths ----------------------------------------------------
     @property
@@ -390,6 +420,27 @@ def _build_models(raw: Mapping[str, Any]) -> dict[str, ModelSpec]:
             extra={k: v for k, v in spec.items() if k not in _MODEL_KNOWN},
         )
     return out
+
+
+def _build_auth(raw: Mapping[str, Any], mode_override: str | None) -> AuthConfig:
+    a = dict(raw.get("auth", {}))
+    mode = (mode_override or str(a.get("mode", "off"))).strip().lower()
+    if mode not in AUTH_MODES:
+        raise ConfigError(f"auth.mode must be one of {AUTH_MODES}, got {mode!r}")
+    roles = {name: AuthRole(name, bool(v.get("write", False)), bool(v.get("create_project", False)),
+                            bool(v.get("admin", False)))
+             for name, v in dict(a.get("roles", {})).items()}
+    if not any(r.admin for r in roles.values()):
+        raise ConfigError("auth.roles: at least one role needs admin = true")
+    return AuthConfig(
+        mode=mode, session_hours=int(a.get("session_hours", 168)),
+        min_password_length=int(a.get("min_password_length", 8)),
+        login_max_failures=int(a.get("login_max_failures", 5)),
+        lockout_minutes=int(a.get("lockout_minutes", 10)), cookie_name=str(a.get("cookie_name", "sa_session")),
+        public_prefixes=tuple(a.get("public_prefixes", ())),
+        signed_in_prefixes=tuple(a.get("signed_in_prefixes", ())), admin_prefixes=tuple(a.get("admin_prefixes", ())),
+        project_prefixes=tuple(a.get("project_prefixes", ())), roles=roles,
+    )
 
 
 def _build_compliance(raw: Mapping[str, Any]) -> ComplianceConfig:
@@ -680,6 +731,7 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         default_pipeline=default_pipeline,
         kinds=kinds,
         default_kind=default_kind,
+        auth=_build_auth(merged["auth"], env.get(ENV_AUTH)),
     )
 
 

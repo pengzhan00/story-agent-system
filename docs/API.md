@@ -1,6 +1,6 @@
 # HTTP API
 
-`storyagent serve` (default `http://<[api] host>:<[api] port>`, loopback only, no authentication yet — do not expose it on a network).
+`storyagent serve` (default `http://<[api] host>:<[api] port>`, loopback only by default; for a team turn on sign-in, see "Team access" below — never expose it on a network with `[auth] mode = "off"`).
 Interactive docs: `/api/docs`. Machine contract: `/api/openapi.json` (the web client is generated from it).
 The API never generates anything itself: it reads/writes the ledger, and `storyagent worker` does the work. Either process can restart without the other.
 
@@ -67,6 +67,17 @@ PATCH /api/projects/1/specs/character.portrait/hero  {"prompt":"... at dusk"}   
 
 `WorkflowRunOut.progress`: `percent` (overall 0-100, never decreases), `stage`/`stage_index`/`stage_count`, `done`/`total` (items in the current stage, `total` 0 = not known yet), `message` (what is being done now), `elapsed_sec`, `eta_sec` (null until ~10 % is done) and `stages[]` (one bar each: `status`, `percent` — null while a running stage has not counted its items — and `seconds` once finished). It is written about once a second while the run is alive and once more at the end, so a poll or the SSE feed never shows a stalled number for a live run. A run whose worker died is requeued when its lease expires and continues from what was saved.
 
-## Not in the API
+## Team access (accounts, roles, audit)
 
-Authentication is out of scope for the single-user local deployment; add it before binding to anything but loopback.
+`[auth] mode` in `auth.toml` (env `STORY_AGENT_AUTH`): `off` (default, one operator, no login; writes are still audited as `local`) or `token`. In token mode every `/api/*` call except the public ones (`/api/auth/login|mode|me`, `/api/i18n/*`, `/api/docs`, `/api/openapi.json`) needs a session: `Authorization: Bearer <token>` or the HttpOnly session cookie set by login (the web client uses the cookie; the live feed `/api/events` needs it too).
+
+| Route | Who | Notes |
+|---|---|---|
+| `GET /api/auth/mode` | public | `{mode, first_user, locales}` (`first_user`: token mode and no account yet) |
+| `POST /api/auth/login` | public | `{username, password, label?}` -> `{token, expires_at, user}` + cookie; wrong password `401 login_failed`; too many failures `429 account_locked` |
+| `GET /api/auth/me` | public | who am I: `{mode, user\|null, can_write, can_create_project, is_admin}` |
+| `POST /api/auth/logout`, `POST /api/auth/password` | any signed-in user | end the session / change own password (ends all sessions) |
+| `GET/POST /api/users`, `PATCH /api/users/{id}` | admin | list/create; change role, `active`, name, reset password (ends that user's sessions); the last active admin cannot be demoted or deactivated (`409 last_admin`) |
+| `GET /api/audit?user=&action=&project_id=&since=&limit=` | admin | newest first |
+
+Roles are flags in `[auth.roles.<name>]`: `write` (any POST/PATCH/PUT/DELETE), `create_project` (create/from-text/restore/delete a project), `admin` (users, audit, launch, config). Reading is always allowed for a signed-in user. `401 unauthorized` = sign in; `403 forbidden` = role too low. Audit rows: `http.<METHOD>` for every write (user, path, project, status, client address; **never bodies or passwords**), plus `auth.login`, `auth.login_failed`, `auth.denied`, `auth.logout`, `auth.password_changed`, `user.create`, `user.update`.

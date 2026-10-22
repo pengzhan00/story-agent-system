@@ -1,4 +1,6 @@
 from .settings import (
+    AuthConfig,
+    AuthRole,
     ComplianceConfig,
     ConfigError,
     LLMBackend,
@@ -17,6 +19,8 @@ from .settings import (
 )
 
 __all__ = [
+    "AuthConfig",
+    "AuthRole",
     "ComplianceConfig",
     "ConfigError",
     "deep_merge",

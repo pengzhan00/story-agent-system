@@ -3,6 +3,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { App } from "./App";
+import { AuthGate } from "./components/AuthGate";
 import { I18nProvider } from "./i18n";
 import "./styles.css";
 
@@ -13,7 +14,9 @@ createRoot(document.getElementById("root")!).render(
     <QueryClientProvider client={client}>
       <I18nProvider>
         <BrowserRouter>
-          <App />
+          <AuthGate>
+            <App />
+          </AuthGate>
         </BrowserRouter>
       </I18nProvider>
     </QueryClientProvider>

@@ -90,12 +90,13 @@ docs/          API CONFIGURATION MEDIA_CONTRACT RUNBOOK WORKFLOW USER_GUIDE PARI
 - **适配器缺模型/缺工具 → `missing_*` 错误,绝不静默降级**。
 - **合规**默认开(AIGC 标识、授权、受限许可闸),可全局/项目/环境变量关;**溯源始终记录**。
 
-### 3.2 表(001-013)
+### 3.2 表(001-014)
 
 | 表 | 关键列 |
 |---|---|
 | projects | id slug name description genre format aspect_ratio delivery_profile content_language status **settings(JSON)** **kind pipeline brief(JSON,迁移 013)** |
 | scripts | project_id episode_no title synopsis acts(JSON) total_scenes |
+| users / user_sessions / audit_log(迁移 014:账号、会话令牌只存 SHA-256、只增审计) | username role password_hash(scrypt) active failed_logins locked_until ; token_hash expires_at revoked_at ; actor action path project_id status detail |
 | characters(+introduced_episode, locked:迁移 011) | project_id name role appearance personality voice_profile voice_ref_audio/text voice_ref_consent lora_ref ref_images |
 | scenes(场景设计) / music_themes / sound_effects | 各自属于 project;music_themes 有 kind(bgm/theme) lyrics duration_sec scene_ref |
 | seasons | project_id number title summary planned_episodes target_sec status(每个项目都有第 1 季) |
@@ -177,14 +178,14 @@ docs/          API CONFIGURATION MEDIA_CONTRACT RUNBOOK WORKFLOW USER_GUIDE PARI
 **没在真实模型上验证过**:LoRA 训练、h3、多数工坊模块的真实流水线、项目页的新控件、立项向导的多步表单(只有 vitest)、蒸馏关键帧在多镜头上的人脸一致性。
 **系列层已做**(季/集、按集状态、批量、季大纲、系列看板、人物锁定与后续集加人、镜头分层与视频预算、剪辑卡片/淡入淡出/字幕样式),见 `docs/SERIES.md`。
 **没做**:接具体云厂商(接口已留好,只缺厂商与密钥)、场景/画风锁定(S1 余下)、交叉叠化、音效合成、一集多首配乐、口型头像步骤、RIFE 补帧、EDL/FCPXML、
-网页上传项目参考图、AI 改写+变更清单、API 鉴权(目前仅本机回环)、审计表。
+网页上传项目参考图、AI 改写+变更清单。**团队底座 T1 已做(2026-10-22)**:账号/角色/令牌与会话登录/接口鉴权(`auth.toml`,默认 off)/审计表(迁移 014)/CLI `user`+`audit`/网页登录、团队、审计页,见 `docs/API.md`「Team access」。
 
 ## 8. 下一步(按这个顺序做)
 
 **P0 已完成(2026-10-22)**:管线方案(`pipelines.toml`:竖屏短剧、竖屏短剧·快速关键帧、横屏短剧、电视剧、广告、电影)、作品类型(`kinds.toml`,可扩展)、立项向导+规模估算(API/CLI/网页)、素材按所用模型判过期、工坊按方案选模型、视频 preview 档回到 16+5 步与干净负向词、ComfyUI 做关键帧合成(蒸馏版 56 s vs Base 575 s)。设计与实测见 `docs/PIPELINES.md`、`docs/IMPLEMENTATION_PLAN.md`、`docs/reviews/2026-10-22_*.md`。
 
 **接下来(用户逐阶段叫开工;细节见 `docs/IMPLEMENTATION_PLAN.md`)**:
-- 收口余项:多挑 2–3 个镜头复测蒸馏关键帧的人脸一致性与视频新默认;决定 `recipes.toml`(声明但不执行,删或并入方案);Playwright 冒烟;API 鉴权(受限内容管理的前提)。
+- 收口余项:多挑 2–3 个镜头复测蒸馏关键帧的人脸一致性与视频新默认;决定 `recipes.toml`(声明但不执行,删或并入方案);Playwright 冒烟。
 - P1:造型/道具/连续性账本、镜头语法层、审片回路。 P2:素材包导入导出、FCPXML(Final Cut Pro)往返、声音补齐、剪辑语法与自动质检(条纹/闪烁)。 P3:多平台规格、受限内容管理(`docs/RESTRICTED_CONTENT.md`)。
 - 用户界线:受限内容只做管理(分级/隔离/加密/遮掩/审计/AIGC 标注),不写露骨提示词、不设计镜头动作、不调相关 LoRA 参数。
 

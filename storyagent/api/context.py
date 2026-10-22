@@ -6,6 +6,7 @@ from functools import lru_cache
 
 from fastapi import Request
 
+from storyagent.auth import AuthStore
 from storyagent.config import Settings
 from storyagent.db import Database
 from storyagent.i18n import available_locales
@@ -28,6 +29,7 @@ class ApiContext:
     library: Library
     story: StoryStore
     workflow: WorkflowState
+    auth: AuthStore
 
 
 def ctx_of(request: Request) -> ApiContext:

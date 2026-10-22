@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from storyagent.agents.registry import AgentSpecError
+from storyagent.auth import AuthError
 from storyagent.config import ConfigError
 from storyagent.launcher import LaunchError
 from storyagent.media.ledger import LedgerError
@@ -55,6 +56,10 @@ def respond(request: Request, status: int, code: str, detail: object = None) -> 
 def install(app: FastAPI) -> None:
     @app.exception_handler(ApiError)
     async def _api(request: Request, exc: ApiError) -> JSONResponse:
+        return respond(request, exc.status, exc.code, exc.detail)
+
+    @app.exception_handler(AuthError)
+    async def _auth(request: Request, exc: AuthError) -> JSONResponse:
         return respond(request, exc.status, exc.code, exc.detail)
 
     @app.exception_handler(LaunchError)
