@@ -89,8 +89,8 @@ class WorkflowEngine:
         episode = int((params or {}).get("episode") or 1)
         project = self.projects.get(project_id)
         ctx = Ctx(
-            settings_for(self.settings, project.pipeline), self.db, self.store, self.state, self.agents, self.projects,
-            project,
+            settings_for(self.settings, project.pipeline, project.settings.get("pipeline_models")), self.db, self.store,
+            self.state, self.agents, self.projects, project,
             dict(params or {}), progress or (lambda *_: None), cancelled or (lambda: False), self.spec_store, stage,
         )
         self.state.set_stage(project_id, stage, "running", episode=episode)

@@ -1506,6 +1506,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{project_id}/pipeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Pipeline */
+        get: operations["get_pipeline_api_projects__project_id__pipeline_get"];
+        /**
+         * Set Pipeline
+         * @description Replace the hand-picked models (kind -> model). Models of a kind other than the plan's are refused; a changed
+         *     picture / video model pairs its edit / audio-video companion again (see the notes in the answer).
+         */
+        put: operations["set_pipeline_api_projects__project_id__pipeline_put"];
+        post?: never;
+        /**
+         * Reset Pipeline
+         * @description Back to the plan's recommended models, in one go.
+         */
+        delete: operations["reset_pipeline_api_projects__project_id__pipeline_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{project_id}/produce/plan": {
         parameters: {
             query?: never;
@@ -3606,12 +3632,66 @@ export interface components {
             /** Steps */
             steps: components["schemas"]["PipelineStep"][];
         };
+        /** PipelineCandidate */
+        PipelineCandidate: {
+            /** Commercial Ok */
+            commercial_ok: boolean;
+            /** Family */
+            family: string;
+            /** License Tag */
+            license_tag: string;
+            /** Paired */
+            paired: boolean;
+            /** Rating */
+            rating: string;
+            /** Ref */
+            ref: string;
+            /** Remote */
+            remote: boolean;
+        };
+        /** PipelineChoices */
+        PipelineChoices: {
+            /**
+             * Models
+             * @description kind -> model ref; replaces all hand-picked choices (empty = the plan's defaults)
+             */
+            models: {
+                [key: string]: string;
+            };
+        };
+        /** PipelineNote */
+        PipelineNote: {
+            /**
+             * Code
+             * @enum {string}
+             */
+            code: "auto_paired" | "dropped" | "family_mismatch" | "rated_model";
+            /** Kind */
+            kind: string;
+            /** Model */
+            model: string;
+        };
         /** PipelineOut */
         PipelineOut: {
             /** Jobs */
             jobs: components["schemas"]["JobOut"][];
             /** Pipeline Id */
             pipeline_id: string;
+        };
+        /** PipelineRow */
+        PipelineRow: {
+            /** Auto */
+            auto: boolean;
+            /** Candidates */
+            candidates: components["schemas"]["PipelineCandidate"][];
+            /** Chosen */
+            chosen: string;
+            /** Default */
+            default: string;
+            /** Kind */
+            kind: string;
+            /** Overridden */
+            overridden: boolean;
         };
         /** PipelineStep */
         PipelineStep: {
@@ -3637,6 +3717,17 @@ export interface components {
              */
             tier: string;
         };
+        /** PipelineView */
+        PipelineView: {
+            /** Notes */
+            notes: components["schemas"]["PipelineNote"][];
+            /** Overridden */
+            overridden: boolean;
+            /** Plan */
+            plan: string;
+            /** Rows */
+            rows: components["schemas"]["PipelineRow"][];
+        };
         /** PlanOut */
         PlanOut: {
             /** Delivery Profile */
@@ -3653,6 +3744,8 @@ export interface components {
             name: string;
             /** Note */
             note: string;
+            /** Rating */
+            rating: string;
             /** Requires */
             requires: string[];
             /** Tier */
@@ -8248,6 +8341,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PackExportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_pipeline_api_projects__project_id__pipeline_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PipelineView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_pipeline_api_projects__project_id__pipeline_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PipelineChoices"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PipelineView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_pipeline_api_projects__project_id__pipeline_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PipelineView"];
                 };
             };
             /** @description Validation Error */

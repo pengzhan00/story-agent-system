@@ -43,6 +43,7 @@ from . import (
     routes_library,
     routes_llm,
     routes_pack,
+    routes_pipeline,
     routes_projects,
     routes_review,
     routes_specs,
@@ -114,8 +115,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
     errors.install(app)
     for module in (routes_auth, routes_review, routes_projects, routes_jobs, routes_assets, routes_library,
-                   routes_pack, routes_delivery, routes_content, routes_grammar, routes_interchange, routes_specs,
-                   routes_story, routes_workflow, routes_system, routes_ai, routes_launch, routes_workshop, routes_llm):
+                   routes_pack, routes_pipeline, routes_delivery, routes_content, routes_grammar, routes_interchange,
+                   routes_specs, routes_story, routes_workflow, routes_system, routes_ai, routes_launch,
+                   routes_workshop, routes_llm):
         app.include_router(module.router)
     web = web_root(settings)
     if web is not None:

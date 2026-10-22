@@ -3382,6 +3382,95 @@
         "title": "PipelineBody",
         "type": "object"
       },
+      "PipelineCandidate": {
+        "properties": {
+          "commercial_ok": {
+            "title": "Commercial Ok",
+            "type": "boolean"
+          },
+          "family": {
+            "title": "Family",
+            "type": "string"
+          },
+          "license_tag": {
+            "title": "License Tag",
+            "type": "string"
+          },
+          "paired": {
+            "title": "Paired",
+            "type": "boolean"
+          },
+          "rating": {
+            "title": "Rating",
+            "type": "string"
+          },
+          "ref": {
+            "title": "Ref",
+            "type": "string"
+          },
+          "remote": {
+            "title": "Remote",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ref",
+          "family",
+          "rating",
+          "paired",
+          "remote",
+          "commercial_ok",
+          "license_tag"
+        ],
+        "title": "PipelineCandidate",
+        "type": "object"
+      },
+      "PipelineChoices": {
+        "properties": {
+          "models": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "kind -> model ref; replaces all hand-picked choices (empty = the plan's defaults)",
+            "title": "Models",
+            "type": "object"
+          }
+        },
+        "required": [
+          "models"
+        ],
+        "title": "PipelineChoices",
+        "type": "object"
+      },
+      "PipelineNote": {
+        "properties": {
+          "code": {
+            "enum": [
+              "auto_paired",
+              "dropped",
+              "family_mismatch",
+              "rated_model"
+            ],
+            "title": "Code",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "kind",
+          "model"
+        ],
+        "title": "PipelineNote",
+        "type": "object"
+      },
       "PipelineOut": {
         "properties": {
           "jobs": {
@@ -3401,6 +3490,47 @@
           "jobs"
         ],
         "title": "PipelineOut",
+        "type": "object"
+      },
+      "PipelineRow": {
+        "properties": {
+          "auto": {
+            "title": "Auto",
+            "type": "boolean"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/PipelineCandidate"
+            },
+            "title": "Candidates",
+            "type": "array"
+          },
+          "chosen": {
+            "title": "Chosen",
+            "type": "string"
+          },
+          "default": {
+            "title": "Default",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "overridden": {
+            "title": "Overridden",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "kind",
+          "default",
+          "chosen",
+          "overridden",
+          "auto",
+          "candidates"
+        ],
+        "title": "PipelineRow",
         "type": "object"
       },
       "PipelineStep": {
@@ -3446,6 +3576,40 @@
         "title": "PipelineStep",
         "type": "object"
       },
+      "PipelineView": {
+        "properties": {
+          "notes": {
+            "items": {
+              "$ref": "#/components/schemas/PipelineNote"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "overridden": {
+            "title": "Overridden",
+            "type": "boolean"
+          },
+          "plan": {
+            "title": "Plan",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/PipelineRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "plan",
+          "rows",
+          "notes",
+          "overridden"
+        ],
+        "title": "PipelineView",
+        "type": "object"
+      },
       "PlanOut": {
         "properties": {
           "delivery_profile": {
@@ -3475,6 +3639,10 @@
             "title": "Note",
             "type": "string"
           },
+          "rating": {
+            "title": "Rating",
+            "type": "string"
+          },
           "requires": {
             "items": {
               "type": "string"
@@ -3495,6 +3663,7 @@
           "name",
           "label",
           "note",
+          "rating",
           "delivery_profile",
           "width",
           "height",
@@ -11843,6 +12012,140 @@
         "summary": "Export",
         "tags": [
           "packs"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/pipeline": {
+      "delete": {
+        "description": "Back to the plan's recommended models, in one go.",
+        "operationId": "reset_pipeline_api_projects__project_id__pipeline_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PipelineView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reset Pipeline",
+        "tags": [
+          "pipeline"
+        ]
+      },
+      "get": {
+        "operationId": "get_pipeline_api_projects__project_id__pipeline_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PipelineView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Pipeline",
+        "tags": [
+          "pipeline"
+        ]
+      },
+      "put": {
+        "description": "Replace the hand-picked models (kind -> model). Models of a kind other than the plan's are refused; a changed\npicture / video model pairs its edit / audio-video companion again (see the notes in the answer).",
+        "operationId": "set_pipeline_api_projects__project_id__pipeline_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PipelineChoices"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PipelineView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Pipeline",
+        "tags": [
+          "pipeline"
         ]
       }
     },

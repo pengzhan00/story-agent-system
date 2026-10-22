@@ -458,6 +458,7 @@ class PlanOut(Strict):
     name: str
     label: str
     note: str
+    rating: str            # the content rating a project of this plan starts with ("" = the project's own choice)
     delivery_profile: str
     width: int
     height: int
@@ -1280,3 +1281,40 @@ class PromptAssistOut(Strict):
     action: str
     backend: str
     model: str
+
+
+class PipelineCandidate(Strict):
+    ref: str
+    family: str
+    rating: str
+    paired: bool           # false = another family than the picture / video model in use: not a recommended match
+    remote: bool
+    commercial_ok: bool
+    license_tag: str
+
+
+class PipelineRow(Strict):
+    kind: str
+    default: str           # what the plan recommends
+    chosen: str            # what the project runs with now
+    overridden: bool       # changed by hand
+    auto: bool             # changed by pairing with a hand-picked model
+    candidates: list[PipelineCandidate]
+
+
+class PipelineNote(Strict):
+    code: Literal["auto_paired", "dropped", "family_mismatch", "rated_model"]
+    kind: str
+    model: str
+
+
+class PipelineView(Strict):
+    plan: str
+    rows: list[PipelineRow]
+    notes: list[PipelineNote]
+    overridden: bool
+
+
+class PipelineChoices(Strict):
+    models: dict[str, str] = Field(
+        description="kind -> model ref; replaces all hand-picked choices (empty = the plan's defaults)")

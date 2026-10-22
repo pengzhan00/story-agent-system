@@ -4,6 +4,7 @@ import type { BriefAnswers } from "../api/types";
 import { useT } from "../i18n";
 import { ErrorNote } from "./ErrorNote";
 import { EstimateView } from "./EstimateView";
+import { PipelinePanel } from "./PipelinePanel";
 
 const field = (brief: Record<string, unknown>, key: string): string => (typeof brief[key] === "number" ? String(brief[key]) : "");
 
@@ -76,6 +77,7 @@ export function ProjectPlan({ id }: { id: number }) {
         ) : null}
       </div>
       <p className="muted small">{t("web.plan.pipeline_hint")}</p>
+      {project.pipeline ? <PipelinePanel projectId={id} /> : null}
       <ErrorNote error={update.error ?? setBrief.error} />
       {hasBrief ? <EstimateView estimate={estimate.data} busy={estimate.isFetching} /> : null}
     </section>

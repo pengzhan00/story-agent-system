@@ -13,11 +13,12 @@ from storyagent.config import ConfigError, Settings
 from storyagent.content import ContentError
 from storyagent.db import Database
 from storyagent.domain import slugify
+from storyagent.pipelines import check_choices
 
 _PATCHABLE = ("name", "description", "genre", "content_language", "delivery_profile", "aspect_ratio", "kind",
               "pipeline", "rating")
 _SETTINGS_KEYS = ("compliance", "models", "allow_restricted_licenses", "target_sec", "allow_remote", "default_voice",
-                  "video_share", "video_budget_hours", "edit")
+                  "video_share", "video_budget_hours", "edit", "pipeline_models")
 
 
 class ProjectNotFound(LookupError):
@@ -252,6 +253,11 @@ class ProjectStore:
                     f"UPDATE projects SET {sets}, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?",
                     (*changes.values(), project_id),
                 )
+                if "pipeline" in changes:          # the model choices belong to the plan they were made on
+                    kept = dict(self.get(project_id).settings)
+                    if kept.pop("pipeline_models", None) is not None:
+                        conn.execute("UPDATE projects SET settings=? WHERE id=?",
+                                     (json.dumps(kept, ensure_ascii=False), project_id))
         return self.get(project_id)
 
     def set_settings(self, project_id: int, patch: Mapping[str, Any]) -> Project:
@@ -279,6 +285,11 @@ class ProjectStore:
             edit = current.get("edit")
             if edit is not None:
                 _check_edit(edit)
+            if current.get("pipeline_models") is not None:
+                current["pipeline_models"] = check_choices(self.settings, self.get(project_id).pipeline,
+                                                           current["pipeline_models"]) or None
+                if current["pipeline_models"] is None:
+                    del current["pipeline_models"]
             voice = current.get("default_voice")
             if voice is not None and not (isinstance(voice, str) and voice.startswith(("library:voice/", "asset:"))):
                 raise ConfigError("default_voice must be a library:voice/<name> or asset:<id> reference")

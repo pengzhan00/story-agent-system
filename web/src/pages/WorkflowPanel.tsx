@@ -4,6 +4,7 @@ import { useCancelRun, useMeta, useProject, useProjectSettings, useReviewScript,
 import { ErrorNote } from "../components/ErrorNote";
 import { ProgressBar } from "../components/ProgressBar";
 import { ProducePlan } from "../components/ProducePlan";
+import { ProduceRoadmap } from "../components/ProduceRoadmap";
 import { SeasonCard } from "../components/SeasonCard";
 import { EpisodePlayer } from "../components/EpisodePlayer";
 import { RunError, RunProgress } from "../components/RunProgress";
@@ -165,6 +166,7 @@ export function WorkflowPanel({ id }: { id: number }) {
   const [force, setForce] = useState(false);
   const [planning, setPlanning] = useState(false);
 
+  const planTier = useMeta().data?.pipelines.find((p) => p.name === project.data?.pipeline)?.tier ?? "draft";
   const active = wf.data?.active_run ?? null;
   const last = wf.data?.recent_runs.find((r) => r.status !== "queued" && r.status !== "running") ?? null;
   const MEDIA_STAGES = ["produce", "compose"];
@@ -235,6 +237,7 @@ export function WorkflowPanel({ id }: { id: number }) {
       <SeasonCard id={id} busy={active !== null} />
 
       {active ? <RunProgress run={active} /> : null}
+      {active?.stages.includes("produce") ? <ProduceRoadmap id={id} tier={typeof active.params["tier"] === "string" ? active.params["tier"] : planTier} /> : null}
 
       {storyDone && !active ? (
         <section className="card stack">

@@ -233,12 +233,13 @@ export function useStartService() {
 }
 
 /** What producing the media would make, task by task (nothing runs): the list a person confirms. */
-export const useProducePlan = (id: number, tier: string, enabled: boolean) =>
+export const useProducePlan = (id: number, tier: string, enabled: boolean, pollMs: number | false = false) =>
   useQuery({
     queryKey: ["produce-plan", id, tier],
     queryFn: () => api<ProducePlan>(`/api/projects/${id}/produce/plan?tier=${tier}`),
     enabled,
     refetchOnWindowFocus: false,
+    refetchInterval: pollMs,
   });
 
 /** A project from a written story/script: its text becomes the premise and the source the script stage adapts. */

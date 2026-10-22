@@ -127,7 +127,7 @@ def meta(request: Request) -> Meta:
         default_work_kind=s.default_kind,
         pipelines=[
             PlanOut(
-                name=p.name, label=t(p.label_key), note=t(p.note_key) if p.note_key else "",
+                name=p.name, label=t(p.label_key), note=t(p.note_key) if p.note_key else "", rating=p.rating,
                 delivery_profile=p.delivery_profile, width=int(s.delivery["profiles"][p.delivery_profile]["width"]),
                 height=int(s.delivery["profiles"][p.delivery_profile]["height"]), tier=p.tier, models=dict(p.models),
                 requires=list(p.requires))

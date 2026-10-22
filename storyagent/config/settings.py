@@ -308,24 +308,27 @@ class Settings:
         except KeyError:
             raise ConfigError(f"unknown kind of work: {name!r}") from None
 
-    def for_pipeline(self, name: str = "") -> Settings:
+    def for_pipeline(self, name: str = "", *, models: Mapping[str, str] | None = None,
+                     workflow: Mapping[str, Any] | None = None) -> Settings:
         """The settings a project of this plan runs with: the plan's models replace the defaults of their kinds, its
         parameters/tiers are merged into those models, its workflow/edit/mix are merged over the global ones and its
-        delivery profile is the default frame. Everything else is the global configuration."""
+        delivery profile is the default frame. ``models`` / ``workflow`` are the person's changes on top of the plan
+        (see ``storyagent.pipelines``). Everything else is the global configuration."""
         plan = self.pipeline(name)
-        models = dict(self.models)
+        chosen = dict(plan.models if models is None else models)
+        models_by_ref = dict(self.models)
         for ref, over in plan.model_params.items():
-            base = models[ref]
+            base = models_by_ref[ref]
             over = dict(over)
             tiers = {t: dict(v) for t, v in base.tiers.items()}
             for tier, values in dict(over.pop("tiers", {})).items():
                 tiers[tier] = {**tiers.get(tier, {}), **values}
-            models[ref] = replace(base, params={**base.params, **over}, tiers=tiers)
+            models_by_ref[ref] = replace(base, params={**base.params, **over}, tiers=tiers)
         delivery = deep_merge(dict(self.delivery), {
             "default": {"profile": plan.delivery_profile}, "edit": dict(plan.edit), "mix": dict(plan.mix)})
         return replace(
-            self, models=models, default_models={**self.default_models, **plan.models}, delivery=delivery,
-            workflow=deep_merge(dict(self.workflow), {**plan.workflow, "tier": plan.tier}),
+            self, models=models_by_ref, default_models={**self.default_models, **chosen}, delivery=delivery,
+            workflow=deep_merge(dict(self.workflow), {**plan.workflow, "tier": plan.tier, **dict(workflow or {})}),
             default_pipeline=plan.name)
 
     def llm_role(self, role: str) -> LLMRole:

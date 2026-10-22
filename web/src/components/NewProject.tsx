@@ -28,6 +28,7 @@ export function NewProject() {
   const [platform, setPlatform] = useState("");
   const [rating, setRating] = useState("");
   const ratings = useContentStatus().data?.ratings ?? [];
+  const adultPlan = (frame: string | undefined) => (meta?.pipelines ?? []).find((p) => p.rating !== "" && p.delivery_profile === frame);
 
   const kinds = meta?.work_kinds ?? [];
   const kind = kinds.find((k) => k.name === (kindName || meta?.default_work_kind));
@@ -106,7 +107,18 @@ export function NewProject() {
       {ratings.length > 1 ? (
         <label className="field">
           <span>{t("web.content.rating")}</span>
-          <select value={rating} onChange={(e) => setRating(e.target.value)}>
+          <select
+            value={rating}
+            onChange={(e) => {
+              const next = e.target.value;
+              setRating(next);
+              // an adult rating starts from the plan that carries its picture model; back to general, the kind's own plan
+              const restricted = ratings.find((r) => r.name === next)?.mask_ui ?? false;
+              const match = restricted ? adultPlan(planInfo?.delivery_profile) : undefined;
+              if (match) setPlan(match.name);
+              else if (!restricted && planInfo && planInfo.rating !== "") setPlan("");
+            }}
+          >
             {ratings.map((r) => (
               <option key={r.name} value={r.name} disabled={!r.allowed}>
                 {r.allowed ? t(r.label_key) : t("web.content.rating_needs_age", { label: t(r.label_key), n: r.min_age })}

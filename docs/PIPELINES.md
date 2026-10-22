@@ -111,3 +111,11 @@ kind = "image.generate"
 **方案的规则**:`rating = "restricted"` → 用这个方案新建的项目一开始就是受限项目(保险库、遮掩、每个角色要"已确认成年"、导出要确认);已有素材的普通项目不能事后改成它。方案里 `keyframe_from_references = false`:关键帧由图像模型直接出,因为自带的 `image.edit` 模型是 FLUX 的,项目内不混用图像模型;`image.edit` 没列入方案,其他用到编辑的地方会落到全局默认,需要时在方案里自行指定。`heavy = true`:同一时间只跑一个重任务(Draw Things 会把模型留在内存)。
 **未验证(诚实说明)**:Draw Things 的 API 请求/回复格式是按 A1111 兼容约定写的(`POST /sdapi/v1/txt2img`,回复 `images[]` 为 base64),测试用的是假服务;还没对着真实的 Draw Things 跑过。**先用工坊提交一张图确认**;如果它拒绝某个键,日志里有它的回复,改 `request`/`params` 即可,不用改代码。Draw Things 的 HTTP 接口没有"中途取消"和步数进度:取消在图片返回后才生效,进度只显示已等待的秒数。
 **许可**:示例里 `license_tag` 留空、`commercial_ok = false`,读完该检查点的许可页再改。
+
+## 项目里调整模型,一键回默认(2026-10-22)
+方案是**推荐的整套搭配**;项目可以在它之上单独换某个模型,存在 `projects.settings.pipeline_models = {kind: 模型}`(没有这一项 = 完全用方案)。
+- **配套规则**:`image.edit` 要和 `image.generate` 同一个模型家族(`models.toml` 的 `family`),`video.av`、`video.lipsync` 同理跟着 `video.generate`。换了画面/视频模型而配套模型家族不对时:自动换成同家族的模型(提示"已自动配套");同家族没有 `image.edit` 时不再使用它,并把 `keyframe_from_references` 关掉(关键帧由画面模型直接生成,提示"已不使用")。手动选了不配套的组合会给出"不配套"警告;选了分级高于项目的模型会提示它的素材按那个分级存放。
+- **一键回默认**:每一行"恢复为 <推荐>",整套"全部恢复推荐"(`DELETE /api/projects/{id}/pipeline`)。换方案(`PATCH project.pipeline`)会清掉原来的手动选择。
+- **API**:`GET /api/projects/{id}/pipeline`(每种任务:推荐、当前、候选及是否配套、提示),`PUT`(`{models: {kind: ref}}`,整体替换,空 = 回默认),`DELETE`(回默认)。只能选方案用到的任务种类、且模型种类要对,否则 422。已做出的素材按"模型不同即过期"显示,不会被删。
+- **成人向**:新建项目选"受限"分级时自动换到带该分级的方案(例如 `vertical_drama_lustify`,画面模型 Lustify),换回普通分级则回到该类型推荐的方案;之后仍可在这里单独换模型。
+- 新的服务/依赖(例如换成 Draw Things 的模型)不会自动加进体检的"必需项";作业会在服务不可达时明确报错。
