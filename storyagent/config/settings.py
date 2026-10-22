@@ -133,6 +133,7 @@ class Pipeline:
     workflow: Mapping[str, Any] = field(default_factory=dict)
     edit: Mapping[str, Any] = field(default_factory=dict)
     mix: Mapping[str, Any] = field(default_factory=dict)
+    rating: str = ""   # a content rating every project of this plan starts with ("" = the project's own choice)
 
 
 @dataclass(frozen=True)
@@ -563,7 +564,7 @@ def _build_pipelines(
             name=name, label_key=str(spec.get("label_key", f"pipeline.{name}")),
             note_key=str(spec.get("note_key", "")), delivery_profile=profile, tier=tier, models=plan_models,
             requires=requires, model_params=params, workflow=dict(spec.get("workflow", {})),
-            edit=dict(spec.get("edit", {})), mix=dict(spec.get("mix", {})),
+            edit=dict(spec.get("edit", {})), mix=dict(spec.get("mix", {})), rating=str(spec.get("rating", "")),
         )
     return out
 
@@ -724,6 +725,9 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         rating = model.extra.get("rating")
         if rating is not None and not content.known(str(rating)):
             raise ConfigError(f"model {ref!r}: unknown rating {rating!r}; known: {sorted(content.ratings)}")
+    for name, plan in pipelines.items():
+        if plan.rating and not content.known(plan.rating):
+            raise ConfigError(f"pipeline {name!r}: unknown rating {plan.rating!r}; known: {sorted(content.ratings)}")
     backends, roles = _build_llm(merged["llm"], services)
     launch = _build_launch(merged["services"].get("launch", {}), services)
     legacy = env.get(ENV_LEGACY_DB)

@@ -12,6 +12,13 @@ health_path = "/v1/models"
 url = "http://127.0.0.1:8188"
 health_path = "/system_stats"
 
+# Draw Things (macOS app) with its API Server switched on (Advanced settings -> API Server; the app's default port is
+# 7860). Runs the models only Draw Things can run (the `drawthings` provider). Not in [healthcheck] required: only a
+# plan that lists it in `requires` needs it. The system never starts it: the operator opens the app.
+[services.drawthings]
+url = "http://127.0.0.1:7860"
+health_path = "/"
+
 [services.ollama]
 url = "http://127.0.0.1:11434"
 health_path = "/api/tags"

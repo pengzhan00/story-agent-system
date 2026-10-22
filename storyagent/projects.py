@@ -123,6 +123,7 @@ class ProjectStore:
             raise ConfigError(f"unknown rating {rating!r}; known: {sorted(self.settings.content.ratings)}")
         plan_name = self.plan_of(pipeline, kind, delivery_profile)
         plan = self.settings.pipeline(plan_name)
+        rating = self.settings.content.higher(rating, plan.rating or None)   # a plan's rating cannot be lowered
         profile = delivery_profile or plan.delivery_profile
         frame = self._frame(profile)                                 # also rejects an unknown profile
         if self._orientation(frame) != self._orientation(self._frame(plan.delivery_profile)):
@@ -218,6 +219,10 @@ class ProjectStore:
                 raise ConfigError(
                     f"pipeline {plan.name!r} fixes the direction of the frame; profile {wanted!r} differs")
             changes["delivery_profile"] = wanted
+            current = self.get(project_id).rating
+            raised = self.settings.content.higher(changes.get("rating", current), plan.rating or None)
+            if raised != current:
+                changes["rating"] = raised   # checked below like any rating change (not once files exist)
         if "rating" in changes:
             if not self.settings.content.known(str(changes["rating"])):
                 raise ConfigError(f"unknown rating {changes['rating']!r}; "

@@ -1,0 +1,22 @@
+# Append to $STORY_AGENT_HOME/config/models.toml.
+# A Lustify checkpoint run by Draw Things (its own .ckpt format; ComfyUI/mflux cannot load it). `rating = "restricted"`
+# makes every picture it makes restricted: stored in the vault, masked until unlocked, left out of exports.
+# Only plumbing is set here. Steps, guidance, sampler and the LoRAs are whatever Draw Things has selected, until you
+# add them under [params] (names: width, height, steps, guidance, sampler, shift, loras; anything else under
+# `request = { ... }`, which is sent as it is).
+[models."lustify-krea2-drawthings"]
+kind = "image.generate"
+provider = "drawthings"
+version = "krea_2"
+family = "lustify-krea2"
+rating = "restricted"
+heavy = true                       # one at a time; the app holds the model in memory while it works
+license_tag = ""                   # fill in after reading the checkpoint's licence page
+commercial_ok = false              # not verified: keep false until you have
+prompt_profile = "natural_en"      # the text encoder is a Qwen3-VL: plain sentences, not tag lists
+timeout_sec = 1800
+size_multiple = 64                 # Draw Things' size grid; the frame's shape is snapped to it
+api_model = "lustifynsfwcheckpoint_v10krea2_fp8_f16.ckpt"   # Draw Things' file name ("" = the app's selected model)
+[models."lustify-krea2-drawthings".params]
+width = 704                        # multiples of 64; the picture frame is 9:16, so this is a starting point
+height = 1280

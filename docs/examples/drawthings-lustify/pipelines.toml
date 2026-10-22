@@ -1,0 +1,26 @@
+# Append to $STORY_AGENT_HOME/config/pipelines.toml (after models.toml above is in place).
+# The vertical drama stack with Lustify as the picture model. `rating = "restricted"`: a project made with this plan
+# starts restricted (vault, masking, adult confirmation per character, export gate). Keyframes are made directly by the
+# picture model (keyframe_from_references = false) because the packaged image.edit models are FLUX ones, and one
+# project does not mix picture models.
+[pipelines.vertical_drama_lustify]
+label_key = "pipeline.vertical_drama_lustify"
+note_key = "pipeline.vertical_drama_lustify.note"
+delivery_profile = "series_vertical_720"
+tier = "preview"
+rating = "restricted"
+requires = ["ollama", "acestep", "phosphene", "drawthings", "tool.ffmpeg", "tool.cosyvoice"]
+[pipelines.vertical_drama_lustify.models]
+"image.generate" = "lustify-krea2-drawthings"
+"video.generate" = "ltx-2.5-video"
+"video.av" = "ltx-2.5-av"
+"audio.tts" = "cosyvoice3-0.5b"
+"audio.music" = "acestep-1.5-turbo"
+"audio.sfx" = "stable-audio-3-medium"
+"compose.assemble" = "ffmpeg-assemble"
+[pipelines.vertical_drama_lustify.workflow]
+video_share = 0.2
+keyframe_from_references = false
+[pipelines.vertical_drama_lustify.edit]
+title_card = false
+next_card = true

@@ -69,7 +69,8 @@ def resolve_params(
     for layer in (adapter_defaults or {}, spec.params, spec.tiers.get(tier_key, {})):
         base = deep_merge(base, layer)
     if frame:                                   # the shape comes from the project; explicit sizes below still win
-        base = orient_size(base, frame, size_multiple(spec.kind))
+        # a runtime with its own grid (Draw Things works in multiples of 64) says so in the model entry
+        base = orient_size(base, frame, int(spec.extra.get("size_multiple") or size_multiple(spec.kind)))
     out = base
     for layer in (((project_settings or {}).get("models") or {}).get(model_ref, {}), job_params or {}):
         out = deep_merge(out, layer)

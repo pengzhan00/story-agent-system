@@ -38,6 +38,16 @@ def _acestep(settings: Settings) -> Adapter:
     return AceStepAdapter(ServiceClient(settings.service("acestep")), api_models)
 
 
+def _drawthings(settings: Settings) -> Adapter:
+    from .adapters._http import ServiceClient
+    from .adapters.drawthings import DrawThingsAdapter
+
+    api_models = {
+        ref: str(m.extra.get("api_model", "")) for ref, m in settings.models.items() if m.provider == "drawthings"
+    }
+    return DrawThingsAdapter(ServiceClient(settings.service("drawthings")), api_models)
+
+
 def _comfy(settings: Settings) -> Adapter:
     from .adapters._http import ServiceClient
     from .adapters.comfy import ComfyAdapter
@@ -120,8 +130,8 @@ def _longcat(settings: Settings) -> Adapter:
 
 
 _BUILTIN: list[Callable[[Settings], Adapter]] = [
-    _acestep, _comfy, _phosphene, _cosyvoice, _whisper, _llm, _remote_video, _mflux, _lora_train, _seedvc, _ffmpeg,
-    _delivery, _h3, _longcat,
+    _acestep, _comfy, _drawthings, _phosphene, _cosyvoice, _whisper, _llm, _remote_video, _mflux, _lora_train,
+    _seedvc, _ffmpeg, _delivery, _h3, _longcat,
 ]
 
 

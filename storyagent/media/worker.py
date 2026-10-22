@@ -53,6 +53,7 @@ log = logging.getLogger(__name__)
 _MEDIA_EXT = {
     ".mp4", ".mov", ".mkv", ".webm", ".wav", ".mp3", ".m4a", ".flac", ".ogg", ".png", ".jpg", ".jpeg", ".webp",
 }
+_IMAGE_EXT = {".png", ".jpg", ".jpeg", ".webp"}
 _TRANSIENT_POLL_FAILURES = 3
 
 
@@ -377,6 +378,10 @@ class Worker:
                     else:
                         dest.unlink(missing_ok=True)
                         raise AdapterError(ErrorCode.OUTPUT_INVALID, "unreadable media", path=str(dest))
+                elif dest.suffix.lower() in _IMAGE_EXT and not (info.width and info.height):
+                    # ffprobe names a file with a good signature and no picture (a truncated or wrong reply) a 0x0 image
+                    dest.unlink(missing_ok=True)
+                    raise AdapterError(ErrorCode.OUTPUT_INVALID, "image has no pixels", path=str(dest))
             out.append(
                 NewAsset(
                     kind=kind, slot=slot, path=str(dest.relative_to(s.home)), sha256=sha.hexdigest(),

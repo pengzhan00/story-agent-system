@@ -96,3 +96,18 @@ kind = "image.generate"
 测试时系统可用内存最低约 57 GiB,没有拖垮机器。单镜头单种子,是方向性结论;"脸像不像"主观,需要再多几个镜头确认。
 结果好 → 在 `pipelines.toml` 加"快速关键帧"方案(`image.edit` 指向该模型),Base 4B 留作"精品"方案;方案内不混搭。
 其他候选(需下载或未验证,暂不接):klein 9B-KV(非商用)、SDXL+InstantID、Qwen-Image-Edit-2511。
+
+## Lustify(Draw Things)管线 — 受限方案示例(2026-10-22)
+**这是什么**:用户本机 Draw Things 里装的 Lustify(`lustifyNSFWCheckpoint_v10Krea2_fp8`,Krea-2 架构,文本编码器 Qwen3-VL 4B)只能由 Draw Things 自己运行(`.ckpt` 格式,ComfyUI / mflux 都读不了)。所以接法是 Draw Things 内置的 **HTTP API Server**(A1111 兼容,默认端口 7860)。这里只做"接线":适配器 `drawthings`、服务 `[services.drawthings]`、示例模型与示例方案;不含任何提示词或镜头设计。
+**为什么是示例而不是内置方案**:按 `docs/RESTRICTED_CONTENT.md`,程序自带的方案不含受限模型。示例文件在 `docs/examples/drawthings-lustify/`,由你拷到自己的配置里。
+
+**怎么配(你自己做,5 步)**
+1. 打开 Draw Things,选中 Lustify,把你满意的设置调好(步数、CFG、采样器、尺寸、LoRA):**请求里没写的参数就是 App 当前的设置**。
+2. Draw Things → 设置 → 高级 → **API Server** 打开(协议 HTTP,端口默认 7860)。端口不同就在 `$STORY_AGENT_HOME/config/services.toml` 写 `[services.drawthings] url = "http://127.0.0.1:端口"`(或环境变量 `STORY_AGENT_DRAWTHINGS_URL`)。
+3. 把 `docs/examples/drawthings-lustify/models.toml` 追加到 `$STORY_AGENT_HOME/config/models.toml`;`api_model` 填 Draw Things 里的文件名(示例已按 `Models/custom.json` 里的登记填好;留空 = 用 App 当前选中的模型)。想固定步数等,在 `[models."lustify-krea2-drawthings".params]` 里加 `steps`、`guidance`、`sampler`、`shift`、`loras`;别的键放进 `request = { ... }`,原样发给 Draw Things。
+4. 把 `docs/examples/drawthings-lustify/pipelines.toml` 追加到 `$STORY_AGENT_HOME/config/pipelines.toml`。重启 worker 和 server。
+5. 验证:`storyagent media healthcheck` 里 `drawthings` 应为 ok;网页「工坊」里选模型 `lustify-krea2-drawthings` 提交一张图(受限模型的产物自动进保险库,需先解锁才能看);新建项目时选方案 `vertical_drama_lustify`。
+
+**方案的规则**:`rating = "restricted"` → 用这个方案新建的项目一开始就是受限项目(保险库、遮掩、每个角色要"已确认成年"、导出要确认);已有素材的普通项目不能事后改成它。方案里 `keyframe_from_references = false`:关键帧由图像模型直接出,因为自带的 `image.edit` 模型是 FLUX 的,项目内不混用图像模型;`image.edit` 没列入方案,其他用到编辑的地方会落到全局默认,需要时在方案里自行指定。`heavy = true`:同一时间只跑一个重任务(Draw Things 会把模型留在内存)。
+**未验证(诚实说明)**:Draw Things 的 API 请求/回复格式是按 A1111 兼容约定写的(`POST /sdapi/v1/txt2img`,回复 `images[]` 为 base64),测试用的是假服务;还没对着真实的 Draw Things 跑过。**先用工坊提交一张图确认**;如果它拒绝某个键,日志里有它的回复,改 `request`/`params` 即可,不用改代码。Draw Things 的 HTTP 接口没有"中途取消"和步数进度:取消在图片返回后才生效,进度只显示已等待的秒数。
+**许可**:示例里 `license_tag` 留空、`commercial_ok = false`,读完该检查点的许可页再改。

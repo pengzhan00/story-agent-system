@@ -2,7 +2,7 @@
 #
 #   kind     : a MediaKind value (storyagent/domain/enums.py), e.g. "video.generate"
 #   provider : the runtime/adapter that executes it:
-#              llm | mflux | phosphene | acestep | comfy | cosyvoice | seedvc | whisper | h3 | longcat | lora_train | ffmpeg
+#              llm | mflux | drawthings | phosphene | acestep | comfy | cosyvoice | seedvc | whisper | h3 | longcat | lora_train | ffmpeg
 #   family   : the underlying model family — the same weights may have several runtimes
 #              (e.g. one model through several runtimes); licence applies per family
 #   heavy    : true => the broker runs at most one heavy job at a time

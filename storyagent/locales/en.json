@@ -1494,6 +1494,8 @@
   "pipeline.vertical_drama.note": "9:16 vertical. The stack validated end to end on this machine: FLUX composed keyframes, LTX video, CosyVoice voices, ACE-Step music, Stable Audio effects, ffmpeg assembly.",
   "pipeline.vertical_drama_fast": "Vertical short drama / series (fast keyframes)",
   "pipeline.vertical_drama_fast.note": "9:16 vertical, like the one above but keyframes are composed by FLUX.2 klein distilled through ComfyUI: about a minute each (the Base model takes about ten). Faces and poses are a little less faithful; good for drafts or when time matters. One project never mixes the two keyframe models.",
+  "pipeline.vertical_drama_lustify": "Vertical short drama / series (Lustify via Draw Things, restricted)",
+  "pipeline.vertical_drama_lustify.note": "9:16 vertical; pictures come from the Lustify model in Draw Things (open the app and switch its API Server on); the rest as the vertical drama. A restricted plan: projects start restricted, files go to the vault, masked by default, exports need confirmation. Parameters default to what Draw Things currently has selected.",
   "pipeline.landscape_drama": "Landscape short drama / web series",
   "pipeline.landscape_drama.note": "16:9 landscape 720p, the same models; episodes of a few minutes to ten or so.",
   "pipeline.tv_series": "TV series",
