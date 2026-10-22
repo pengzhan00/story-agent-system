@@ -44,6 +44,10 @@ enabled = false
 #   launcher       true = the command only opens an app and exits at once (the service comes up afterwards)
 #   timeout_sec    how long to wait for the health probe before the launch counts as failed
 #   hint_key       i18n key of a note shown next to the service
+#   stop           "" = this system never stops it (default); "port" = the launch screen / `ops stop NAME` may end the
+#                  process of YOUR user that listens on the service's port (SIGTERM; a second, explicit "force" =
+#                  SIGKILL), only on a click or command of yours and never while a job of that service is queued or
+#                  running (unless forced)
 [launch.ollama]
 argv = ["ollama", "serve"]
 bulk = true
@@ -55,6 +59,7 @@ argv = [".venv/bin/python3", "-m", "acestep.api_server", "--host", "127.0.0.1", 
 cwd = "~/ACE-Step-1.5"
 bulk = true
 timeout_sec = 180
+stop = "port"
 hint_key = "launch.hint.acestep"
 [launch.acestep.env]
 ACESTEP_LM_BACKEND = "mlx"

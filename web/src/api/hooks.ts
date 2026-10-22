@@ -224,6 +224,14 @@ export function useStartAll() {
     onSuccess: (data) => qc.setQueryData(["launch"], data),
   });
 }
+/** End a service's process (only the ones the operator allowed with `stop = "port"`); `force` = SIGKILL. */
+export function useStopService() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ name, force }: { name: string; force: boolean }) => post<Launch>(`/api/launch/${name}/stop`, { force }),
+    onSuccess: (data) => qc.setQueryData(["launch"], data),
+  });
+}
 export function useStartService() {
   const qc = useQueryClient();
   return useMutation({

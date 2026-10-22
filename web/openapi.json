@@ -1972,6 +1972,9 @@
             "title": "Issues",
             "type": "array"
           },
+          "memory": {
+            "$ref": "#/components/schemas/MemoryOut"
+          },
           "ready": {
             "title": "Ready",
             "type": "boolean"
@@ -1996,6 +1999,7 @@
           }
         },
         "required": [
+          "memory",
           "services",
           "issues",
           "ready",
@@ -2065,6 +2069,10 @@
             "title": "State",
             "type": "string"
           },
+          "stoppable": {
+            "title": "Stoppable",
+            "type": "boolean"
+          },
           "timeout_sec": {
             "anyOf": [
               {
@@ -2087,6 +2095,7 @@
           "state",
           "label",
           "startable",
+          "stoppable",
           "bulk",
           "required",
           "detail",
@@ -2594,6 +2603,74 @@
         ],
         "title": "MediaKind",
         "type": "string"
+      },
+      "MemoryOut": {
+        "properties": {
+          "free_gib": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Free Gib"
+          },
+          "swap_percent": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Swap Percent"
+          },
+          "swap_total_gib": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Swap Total Gib"
+          },
+          "swap_used_gib": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Swap Used Gib"
+          },
+          "total_gib": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Gib"
+          }
+        },
+        "required": [
+          "total_gib",
+          "free_gib",
+          "swap_total_gib",
+          "swap_used_gib",
+          "swap_percent"
+        ],
+        "title": "MemoryOut",
+        "type": "object"
       },
       "Meta": {
         "properties": {
@@ -5874,6 +5951,17 @@
         "title": "StaleAsset",
         "type": "object"
       },
+      "StopBody": {
+        "properties": {
+          "force": {
+            "default": false,
+            "title": "Force",
+            "type": "boolean"
+          }
+        },
+        "title": "StopBody",
+        "type": "object"
+      },
       "TextEdit": {
         "properties": {
           "text": {
@@ -8469,6 +8557,59 @@
           }
         },
         "summary": "Start One",
+        "tags": [
+          "launch"
+        ]
+      }
+    },
+    "/api/launch/{name}/stop": {
+      "post": {
+        "description": "End the service's process (the operator's own, on the service's port) - only for services whose launch entry\nsays ``stop = \"port\"``, and not while a job of that service is queued or running (``force`` overrides).",
+        "operationId": "stop_one_api_launch__name__stop_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StopBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LaunchOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stop One",
         "tags": [
           "launch"
         ]

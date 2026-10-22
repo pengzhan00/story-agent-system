@@ -642,6 +642,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/launch/{name}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Stop One
+         * @description End the service's process (the operator's own, on the service's port) - only for services whose launch entry
+         *     says ``stop = "port"``, and not while a job of that service is queued or running (``force`` overrides).
+         */
+        post: operations["stop_one_api_launch__name__stop_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/library": {
         parameters: {
             query?: never;
@@ -3126,6 +3147,7 @@ export interface components {
         LaunchOut: {
             /** Issues */
             issues: components["schemas"]["LaunchIssue"][];
+            memory: components["schemas"]["MemoryOut"];
             /** Ready */
             ready: boolean;
             /** Services */
@@ -3159,6 +3181,8 @@ export interface components {
             startable: boolean;
             /** State */
             state: string;
+            /** Stoppable */
+            stoppable: boolean;
             /** Timeout Sec */
             timeout_sec: number | null;
             /** Url */
@@ -3355,6 +3379,19 @@ export interface components {
          * @enum {string}
          */
         MediaKind: "image.generate" | "image.edit" | "video.generate" | "video.av" | "video.avatar" | "video.lipsync" | "video.enhance" | "audio.tts" | "audio.music" | "audio.sfx" | "audio.convert" | "audio.enhance" | "text.story" | "text.script" | "text.asr" | "compose.assemble" | "compose.deliver" | "analyze.qc" | "train.lora";
+        /** MemoryOut */
+        MemoryOut: {
+            /** Free Gib */
+            free_gib: number | null;
+            /** Swap Percent */
+            swap_percent: number | null;
+            /** Swap Total Gib */
+            swap_total_gib: number | null;
+            /** Swap Used Gib */
+            swap_used_gib: number | null;
+            /** Total Gib */
+            total_gib: number | null;
+        };
         /** Meta */
         Meta: {
             /** Auth Roles */
@@ -4749,6 +4786,14 @@ export interface components {
             asset: components["schemas"]["AssetOut"];
             /** Latest Spec Version */
             latest_spec_version: number;
+        };
+        /** StopBody */
+        StopBody: {
+            /**
+             * Force
+             * @default false
+             */
+            force: boolean;
         };
         /** TextEdit */
         TextEdit: {
@@ -6146,6 +6191,41 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LaunchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stop_one_api_launch__name__stop_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StopBody"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

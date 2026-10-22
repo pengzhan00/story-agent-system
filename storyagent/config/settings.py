@@ -675,7 +675,10 @@ def _build_launch(raw: Mapping[str, Any], services: Mapping[str, ServiceConfig])
             "argv": list(argv), "cwd": str(spec.get("cwd", "")), "env": dict(env),
             "bulk": bool(spec.get("bulk", True)), "launcher": bool(spec.get("launcher", False)),
             "timeout_sec": float(spec.get("timeout_sec", 120)), "hint_key": str(spec.get("hint_key", "")),
+            "stop": str(spec.get("stop", "")),
         }
+        if out[name]["stop"] not in ("", "port"):
+            raise ConfigError(f"[launch.{name}] stop must be \"\" (not stoppable from here) or \"port\"")
     return out
 
 

@@ -73,7 +73,9 @@ def install(app: FastAPI) -> None:
 
     @app.exception_handler(LaunchError)
     async def _launch(request: Request, exc: LaunchError) -> JSONResponse:
-        status = {"launch_unknown": 404, "launch_not_startable": 409, "launch_missing": 424}.get(exc.code, 500)
+        status = {"launch_unknown": 404, "launch_not_startable": 409, "launch_missing": 424,
+                  "launch_not_stoppable": 409, "launch_not_running": 409, "launch_foreign": 403,
+                  "launch_stop_timeout": 409}.get(exc.code, 500)
         return respond(request, status, exc.code, exc.detail)
 
     @app.exception_handler(WorkshopError)

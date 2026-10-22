@@ -27,6 +27,8 @@ def test_no_machine_specific_literals() -> None:
             if line.lstrip().startswith("#"):
                 continue
             for pattern, why in FORBIDDEN.items():
+                if path.name == "launcher.py" and "killall" in pattern and "os.kill(" in line and "pkill" not in line:
+                    continue      # the operator-requested stop of a service listed with `stop = "port"` (see below)
                 if re.search(pattern, line):
                     offenders.append(f"{path.relative_to(PKG.parent)}:{n}: {why}: {line.strip()}")
     assert not offenders, "\n".join(offenders)
@@ -41,3 +43,11 @@ def test_no_cjk_literals_in_code() -> None:
             if cjk.search(line) and not line.lstrip().startswith(("#", '"""', "'''")):
                 offenders.append(f"{path.relative_to(PKG.parent)}:{n}: {line.strip()}")
     assert not offenders, "\n".join(offenders)
+
+
+def test_the_only_process_signal_is_the_operator_requested_service_stop() -> None:
+    """``os.kill`` appears once, in ``Launcher._signal``, which ``Launcher.stop`` calls for a service whose
+    ``[launch.<name>]`` has ``stop = "port"``; nothing else may signal a process."""
+    users = [p for p in py_files() if "os.kill(" in p.read_text("utf-8")]
+    assert [p.name for p in users] == ["launcher.py"]
+    assert (PKG / "launcher.py").read_text("utf-8").count("os.kill(") == 1

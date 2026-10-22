@@ -2,8 +2,10 @@
 
 ``[launch.<service>]`` in ``services.toml`` says how (argv, cwd, env). Starting is detached (own session, output in
 ``<home>/logs/launch_<name>.log``) and recorded in ``<home>/run/launch_<name>.json``; the server and the worker never
-depend on it. This module never stops, restarts or kills anything: a service that is already answering is left alone,
-and one that is not startable here (no ``[launch]`` entry) is only reported.
+depend on it. A service that is already answering is left alone, and one that is not startable here (no ``[launch]``
+entry) is only reported. Stopping exists for one case: the operator clicks "stop" (or runs ``ops stop NAME``) on a
+service whose ``[launch.<name>]`` says ``stop = "port"``; then the process of the operator's own user that listens on
+that service's port gets SIGTERM (SIGKILL only with ``force``). Nothing else is ever stopped or killed.
 
 State of a service: ``running`` (health probe answers) | ``starting`` (launched, within its timeout) |
 ``failed`` (launched, no answer in time or the process died) | ``stopped`` | ``disabled`` | ``probe_only``.
@@ -13,12 +15,14 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import signal
 import subprocess
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 import requests
 
@@ -42,6 +46,7 @@ class ServiceState:
     state: str
     startable: bool
     bulk: bool
+    stoppable: bool = False
     detail: str = ""
     hint_key: str = ""
     pid: int | None = None
@@ -101,6 +106,7 @@ class Launcher:
         spec = self.settings.launch.get(name)
         base: dict[str, Any] = {"name": name, "url": svc.url, "startable": spec is not None,
                 "bulk": bool(spec and spec["bulk"]), "hint_key": spec["hint_key"] if spec else "",
+                "stoppable": bool(spec and spec["stop"] == "port"),
                 "log": str(self._log_path(name)) if spec else ""}
         if not svc.enabled:
             return ServiceState(state="disabled", **base)
@@ -181,3 +187,69 @@ class Launcher:
             except LaunchError as exc:
                 results.append((name, exc.code, exc.detail))
         return results
+
+
+    # -- stop ----------------------------------------------------------------------------------
+    def listeners(self, name: str) -> list[tuple[int, str]]:
+        """``(pid, command)`` of the processes listening on the port of service ``name`` (lsof, no shell)."""
+        port = urlparse(self.settings.service(name).url).port
+        if port is None or shutil.which("lsof") is None:
+            return []
+        try:
+            out = subprocess.run(["lsof", "-nP", f"-iTCP:{port}", "-sTCP:LISTEN", "-Fpc"], capture_output=True,
+                                 text=True, timeout=10, check=False).stdout  # noqa: S603, S607
+        except (OSError, subprocess.SubprocessError):
+            return []
+        found: list[tuple[int, str]] = []
+        pid = 0
+        for line in out.splitlines():
+            if line.startswith("p") and line[1:].isdigit():
+                pid = int(line[1:])
+            elif line.startswith("c") and pid and all(pid != p for p, _ in found):
+                found.append((pid, line[1:]))
+        return found
+
+    @staticmethod
+    def _owned(pid: int) -> bool:
+        try:
+            out = subprocess.run(["ps", "-p", str(pid), "-o", "uid="], capture_output=True, text=True, timeout=5,
+                                 check=False).stdout.strip()
+        except (OSError, subprocess.SubprocessError):
+            return False
+        return out.isdigit() and int(out) == os.getuid()
+
+    @staticmethod
+    def _signal(pid: int, sig: int) -> None:
+        try:
+            os.kill(pid, sig)       # the one place a process is signalled: operator-requested stop of a listed service
+        except ProcessLookupError:
+            pass
+        except PermissionError as exc:
+            raise LaunchError("launch_foreign", str(pid)) from exc
+
+    def stop(self, name: str, *, force: bool = False, wait_sec: float = 15.0) -> ServiceState:
+        """End the operator's own process that listens on the service's port (needs ``stop = "port"``). SIGTERM, or
+        SIGKILL with ``force``; raises ``launch_stop_timeout`` when it is still there after ``wait_sec``."""
+        if name not in self.settings.services:
+            raise LaunchError("launch_unknown", name)
+        spec = self.settings.launch.get(name)
+        if spec is None or spec["stop"] != "port":
+            raise LaunchError("launch_not_stoppable", name)
+        found = self.listeners(name)
+        if not found:
+            raise LaunchError("launch_not_running", name)
+        foreign = [pid for pid, _ in found if not self._owned(pid)]
+        if foreign:
+            raise LaunchError("launch_foreign", ", ".join(str(p) for p in foreign))
+        for pid, _ in found:
+            self._signal(pid, signal.SIGKILL if force else signal.SIGTERM)
+        deadline = time.monotonic() + wait_sec
+        while time.monotonic() < deadline:
+            if not self.listeners(name):
+                break
+            time.sleep(0.5)
+        else:
+            raise LaunchError("launch_stop_timeout", ", ".join(f"{p} {c}" for p, c in self.listeners(name)))
+        self._record_path(name).unlink(missing_ok=True)
+        _children.pop(name, None)
+        return self.status(name)

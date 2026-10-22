@@ -187,3 +187,10 @@ button.link { background: none; border: none; color: inherit; cursor: pointer; t
 .content-toggle { position: relative; }
 .content-toggle > button { cursor: pointer; background: transparent; }
 .content-pop { position: absolute; right: 0; top: calc(100% + 8px); z-index: 20; width: min(440px, 92vw); box-shadow: 0 8px 24px rgba(0,0,0,.25); }
+
+.media-wrap { position: relative; }
+.zoomable { display: block; width: 100%; padding: 0; border: 0; background: transparent; cursor: zoom-in; }
+.enlarge { position: absolute; top: 6px; right: 6px; padding: 2px 8px; font-size: 12px; opacity: 0.85; }
+dialog.lightbox { width: auto; max-width: 96vw; max-height: 96vh; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--text); }
+dialog.lightbox::backdrop { background: rgba(0, 0, 0, 0.75); }
+dialog.lightbox img, dialog.lightbox video { display: block; max-width: 92vw; max-height: 82vh; margin: 0 auto; object-fit: contain; background: #000; }

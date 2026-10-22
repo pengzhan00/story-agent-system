@@ -57,6 +57,33 @@ def system_available_gib() -> float | None:
     return parse_vm_stat(out)
 
 
+_SWAP = re.compile(r"total = ([\d.]+)M\s+used = ([\d.]+)M")
+
+
+def parse_swapusage(text: str) -> tuple[float, float] | None:
+    """``(total GiB, used GiB)`` of the swap from macOS ``sysctl -n vm.swapusage``; ``None`` when unreadable."""
+    found = _SWAP.search(text)
+    return (float(found.group(1)) / 1024, float(found.group(2)) / 1024) if found else None
+
+
+def _sysctl(name: str) -> str:
+    if shutil.which("sysctl") is None:
+        return ""
+    try:
+        return subprocess.run(["sysctl", "-n", name], capture_output=True, text=True, timeout=5,  # noqa: S603, S607
+                              check=False).stdout
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def memory_snapshot() -> dict[str, float | None]:
+    """Total, available and swap memory of the machine in GiB (macOS; every value ``None`` where it cannot be read)."""
+    total = _sysctl("hw.memsize").strip()
+    swap = parse_swapusage(_sysctl("vm.swapusage"))
+    return {"total_gib": int(total) / 2**30 if total.isdigit() else None, "free_gib": system_available_gib(),
+            "swap_total_gib": swap[0] if swap else None, "swap_used_gib": swap[1] if swap else None}
+
+
 def _remote(job: JobRecord, settings: Settings) -> bool:
     model = settings.models.get(job.model_ref)
     return bool(model and model.remote)

@@ -6,6 +6,7 @@ import { duration } from "../lib/format";
 import { useT } from "../i18n";
 import { jobError } from "../lib/jobError";
 import { ErrorNote } from "./ErrorNote";
+import { MediaLightbox } from "./MediaLightbox";
 import { ProgressBar } from "./ProgressBar";
 import { PromptAssist } from "./PromptAssist";
 import { StatusChip } from "./StatusChip";
@@ -80,11 +81,34 @@ function MaskedPreview({ asset }: { asset: Asset }) {
   );
 }
 
+/** A picture or a video with a way to open it large (click the picture, or the enlarge button on the video). */
+function Zoomable({ asset, src, kind }: { asset: Asset; src: string; kind: "image" | "video" }) {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="media-wrap">
+      {kind === "image" ? (
+        <button type="button" className="zoomable" aria-label={t("web.media.enlarge")} title={t("web.media.enlarge")} onClick={() => setOpen(true)}>
+          <img className="preview" src={src} alt={asset.slot} loading="lazy" />
+        </button>
+      ) : (
+        <>
+          <video className="preview" src={src} controls preload="metadata" />
+          <button type="button" className="enlarge" aria-label={t("web.media.enlarge")} title={t("web.media.enlarge")} onClick={() => setOpen(true)}>
+            {t("web.media.enlarge")}
+          </button>
+        </>
+      )}
+      {open ? <MediaLightbox src={src} kind={kind} title={asset.slot} onClose={() => setOpen(false)} /> : null}
+    </div>
+  );
+}
+
 export function AssetPreview({ asset, onSaved }: { asset: Asset; onSaved?: (a: Asset) => void }) {
   const src = `/api/assets/${asset.id}/file`;
   if (asset.locked) return <MaskedPreview asset={asset} />;
-  if (asset.kind.startsWith("image")) return <img className="preview" src={src} alt={asset.slot} loading="lazy" />;
-  if (asset.kind.startsWith("video")) return <video className="preview" src={src} controls preload="metadata" />;
+  if (asset.kind.startsWith("image")) return <Zoomable asset={asset} src={src} kind="image" />;
+  if (asset.kind.startsWith("video")) return <Zoomable asset={asset} src={src} kind="video" />;
   if (asset.kind.startsWith("audio") || asset.kind.startsWith("upload.audio")) return <audio className="audio" src={src} controls preload="none" />;
   if (asset.kind.startsWith("text") || asset.kind === "upload.text") return <TextPreview asset={asset} src={src} onSaved={onSaved} />;
   return <a href={src}>{asset.path}</a>;

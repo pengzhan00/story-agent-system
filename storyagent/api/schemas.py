@@ -762,6 +762,7 @@ class LaunchService(Strict):
     state: str   # running | starting | failed | stopped | disabled | probe_only
     label: str
     startable: bool
+    stoppable: bool        # the operator allowed ending it from here (`stop = "port"` in services.toml)
     bulk: bool
     required: bool
     detail: str
@@ -781,7 +782,20 @@ class LaunchIssue(Strict):
     required: bool
 
 
+class MemoryOut(Strict):
+    total_gib: float | None
+    free_gib: float | None            # what a new job could still get (free + inactive + purgeable)
+    swap_total_gib: float | None
+    swap_used_gib: float | None
+    swap_percent: int | None          # 80 or more: free memory before a heavy job
+
+
+class StopBody(BaseModel):
+    force: bool = False
+
+
 class LaunchOut(Strict):
+    memory: MemoryOut
     services: list[LaunchService]
     issues: list[LaunchIssue]
     ready: bool

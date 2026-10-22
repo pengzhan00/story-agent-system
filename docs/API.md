@@ -165,3 +165,9 @@ Roles are flags in `[auth.roles.<name>]`: `write` (any POST/PATCH/PUT/DELETE), `
 | `PUT /api/projects/{id}/pipeline` | `{models: {kind: ref}}` replaces the hand-picked models (empty = the plan's defaults); wrong kind/model `422` |
 | `DELETE /api/projects/{id}/pipeline` | back to the plan's recommended models |
 `GET /api/meta` plans carry `rating` (the rating a project of that plan starts with).
+
+## Launch screen: stop and memory
+| Route | Notes |
+|---|---|
+| `GET /api/launch` | adds `memory` (`total_gib`, `free_gib`, `swap_total_gib`, `swap_used_gib`, `swap_percent`; 80+ = free memory before a heavy job) and `stoppable` per service |
+| `POST /api/launch/{name}/stop` | `{force?}`: only for a service whose `[launch.<name>]` has `stop = "port"`. Ends the process of the same user that listens on the service's port (SIGTERM, SIGKILL with `force`); `409 service_busy` while a job of that service is queued/running (unless `force`), `409 launch_not_stoppable|launch_not_running|launch_stop_timeout`, `403 launch_foreign`. Audited as `service.stop`. CLI: `storyagent ops stop NAME [--force]` |

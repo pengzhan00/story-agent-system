@@ -6,19 +6,22 @@ from fastapi import APIRouter, Request
 from storyagent.launcher import Launcher, ServiceState
 from storyagent.llm.router import LLMRouter
 from storyagent.media import healthcheck as health
+from storyagent.media.broker import memory_snapshot
 from storyagent.media.registry import default_registry
 
 from .context import Translator, ctx_of, translator_of
-from .schemas import LaunchIssue, LaunchOut, LaunchService
+from .errors import ApiError
+from .schemas import LaunchIssue, LaunchOut, LaunchService, MemoryOut, StopBody
 
 router = APIRouter(prefix="/api/launch", tags=["launch"])
 
 
 def _service(t: Translator, s: ServiceState, required: set[str]) -> LaunchService:
     return LaunchService(
-        name=s.name, url=s.url, state=s.state, label=t(f"launch.state.{s.state}"), startable=s.startable, bulk=s.bulk,
-        required=s.name in required, detail=s.detail, hint=t(s.hint_key) if s.hint_key else "", pid=s.pid,
-        elapsed_sec=s.elapsed_sec, timeout_sec=s.timeout_sec, log=s.log,
+        name=s.name, url=s.url, state=s.state, label=t(f"launch.state.{s.state}"), startable=s.startable,
+        stoppable=s.stoppable, bulk=s.bulk, required=s.name in required, detail=s.detail,
+        hint=t(s.hint_key) if s.hint_key else "", pid=s.pid, elapsed_sec=s.elapsed_sec,
+        timeout_sec=s.timeout_sec, log=s.log,
     )
 
 
@@ -58,10 +61,14 @@ def report(request: Request) -> LaunchOut:
         if e.category != "service" and not e.ok and e.state.value != "disabled"
     ]
     issues += _model_issues(request, t)
+    mem = memory_snapshot()
+    swap_total, swap_used = mem["swap_total_gib"], mem["swap_used_gib"]
+    memory = MemoryOut(**mem, swap_percent=round(100 * swap_used / swap_total) if swap_total and swap_used is not None
+                       else None)
     blocking = [s for s in services if s.required and s.state != "running"]
     blocking_issues = [i for i in issues if i.required]
     return LaunchOut(
-        services=services, issues=issues, ready=not blocking and not blocking_issues,
+        memory=memory, services=services, issues=issues, ready=not blocking and not blocking_issues,
         starting=any(s.state == "starting" for s in services),
         startable=[s.name for s in services if s.startable and s.state in ("stopped", "failed")],
     )
@@ -83,4 +90,23 @@ def start_all(request: Request) -> LaunchOut:
 @router.post("/{name}/start", response_model=LaunchOut)
 def start_one(name: str, request: Request) -> LaunchOut:
     Launcher(ctx_of(request).settings).start(name)
+    return report(request)
+
+
+@router.post("/{name}/stop", response_model=LaunchOut)
+def stop_one(name: str, body: StopBody, request: Request) -> LaunchOut:
+    """End the service's process (the operator's own, on the service's port) - only for services whose launch entry
+    says ``stop = "port"``, and not while a job of that service is queued or running (``force`` overrides)."""
+    ctx = ctx_of(request)
+    launcher = Launcher(ctx.settings)
+    if not body.force and ctx.settings.launch.get(name, {}).get("stop") == "port" and ctx.db.conn.execute(
+            "SELECT 1 FROM media_jobs WHERE provider=? AND status IN ('queued','running') LIMIT 1",
+            (name,)).fetchone():
+        raise ApiError(409, "service_busy", name)
+    pids = launcher.listeners(name)
+    state = launcher.stop(name, force=body.force)
+    user = request.scope.get("state", {}).get("user")
+    ctx.auth.audit("service.stop", user=user, actor="local", path=request.url.path, status=200,
+                   detail={"service": name, "force": body.force, "processes": [f"{p} {c}" for p, c in pids],
+                           "state": state.state})
     return report(request)

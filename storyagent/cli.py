@@ -20,6 +20,7 @@
     storyagent llm check
     storyagent api openapi [--out FILE]
     storyagent ops llm-unload
+    storyagent ops stop NAME [--force]      (end a service listed with stop = "port" in services.toml)
 
 Commands that touch data migrate the database first (idempotent, snapshot taken before an upgrade).
 """
@@ -752,6 +753,17 @@ def _cmd_launch(s: Settings, a: argparse.Namespace) -> int:
     return 0 if not required_down else 1
 
 
+def _cmd_stop(s: Settings, a: argparse.Namespace) -> int:
+    """End the process of a service that the operator listed with `stop = "port"` (SIGTERM; `--force` = SIGKILL)."""
+    try:
+        st = Launcher(s).stop(a.name, force=a.force)
+    except LaunchError as exc:
+        print(t("cli.launch.error", name=a.name, error=t(f"api.error.{exc.code}"), detail=exc.detail), file=sys.stderr)
+        return 1
+    print(t("cli.launch.stopped", name=st.name, state=t(f"launch.state.{st.state}")))
+    return 0
+
+
 # -- story workflow ---------------------------------------------------------------------------------
 def _show_run(state: WorkflowState, run_id: str, interval: float) -> dict[str, Any]:
     """Draw the run's progress bar until it ends (a worker - or ``--inline`` - is doing the work)."""
@@ -1285,6 +1297,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     ops = sub.add_parser("ops").add_subparsers(dest="cmd", required=True)
     add(ops, "llm-unload", _cmd_llm_unload)
+    ost = add(ops, "stop", _cmd_stop)
+    ost.add_argument("name")
+    ost.add_argument("--force", action="store_true", help="SIGKILL instead of SIGTERM")
     launch = add(ops, "launch", _cmd_launch)
     launch.add_argument("name", nargs="?", default="", help="service to start (default: only show the state)")
     launch.add_argument("--all", action="store_true", help="start every startable service that is not up")

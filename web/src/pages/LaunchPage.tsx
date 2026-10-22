@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
-import { useLaunch, useStartAll, useStartService } from "../api/hooks";
+import { useLaunch, useStartAll, useStartService, useStopService } from "../api/hooks";
 import { ErrorNote } from "../components/ErrorNote";
 import { ProgressBar } from "../components/ProgressBar";
 import { useT } from "../i18n";
@@ -22,6 +22,7 @@ export function LaunchPage() {
   const launch = useLaunch();
   const startAll = useStartAll();
   const startOne = useStartService();
+  const stopOne = useStopService();
   useEffect(() => {
     try {
       sessionStorage.setItem(LAUNCH_SEEN, "1");
@@ -30,18 +31,44 @@ export function LaunchPage() {
     }
   }, []);
   const data = launch.data;
-  const busy = startAll.isPending || startOne.isPending;
+  const busy = startAll.isPending || startOne.isPending || stopOne.isPending;
+  const stopFailed = stopOne.isError ? stopOne.variables?.name : undefined;
+  const stop = (name: string, force: boolean) => {
+    if (force || window.confirm(t("web.launch.stop_confirm", { name }))) stopOne.mutate({ name, force });
+  };
   return (
     <div className="stack">
       <h1>{t("web.launch.title")}</h1>
       <p className="muted">{t("web.launch.subtitle")}</p>
-      <ErrorNote error={launch.error ?? startAll.error ?? startOne.error} />
+      <ErrorNote error={launch.error ?? startAll.error ?? startOne.error ?? stopOne.error} />
       {launch.isLoading ? <p className="muted">{t("web.loading")}</p> : null}
       {data ? (
         <>
           <div className={`banner ${data.ready ? "banner-ok" : "banner-warn"}`} role="status">
             <strong>{data.ready ? t("web.launch.ready") : t("web.launch.not_ready")}</strong>
             {data.starting ? <span className="muted"> {t("web.launch.starting")}</span> : null}
+          </div>
+          <div className="stack small" aria-label={t("web.launch.memory")}>
+            <div className="row">
+              <strong>{t("web.launch.memory")}</strong>
+              <span className="muted">
+                {data.memory.free_gib !== null && data.memory.total_gib !== null
+                  ? t("web.launch.memory_free", { free: data.memory.free_gib.toFixed(0), total: data.memory.total_gib.toFixed(0) })
+                  : "-"}
+              </span>
+            </div>
+            {data.memory.swap_percent !== null && data.memory.swap_used_gib !== null && data.memory.swap_total_gib !== null ? (
+              <>
+                <div className="row">
+                  <strong>{t("web.launch.swap")}</strong>
+                  <span className="muted">
+                    {t("web.launch.swap_used", { used: data.memory.swap_used_gib.toFixed(1), total: data.memory.swap_total_gib.toFixed(1), pct: data.memory.swap_percent })}
+                  </span>
+                </div>
+                <ProgressBar percent={data.memory.swap_percent} tone={data.memory.swap_percent >= 80 ? "failed" : "completed"} label={t("web.launch.swap")} />
+                {data.memory.swap_percent >= 80 ? <p className="error-box">{t("web.launch.swap_warn")}</p> : null}
+              </>
+            ) : null}
           </div>
           <div className="row">
             <button className="primary" onClick={() => startAll.mutate()} disabled={busy || data.startable.length === 0}>
@@ -100,6 +127,16 @@ export function LaunchPage() {
                         ) : null
                       ) : s.state === "stopped" ? (
                         <span className="muted small">{t("web.launch.manual")}</span>
+                      ) : null}
+                      {s.stoppable && s.state === "running" ? (
+                        <button onClick={() => stop(s.name, false)} disabled={busy}>
+                          {t("web.launch.stop")}
+                        </button>
+                      ) : null}
+                      {stopFailed === s.name ? (
+                        <button onClick={() => stop(s.name, true)} disabled={busy}>
+                          {t("web.launch.force_stop")}
+                        </button>
                       ) : null}
                     </td>
                   </tr>

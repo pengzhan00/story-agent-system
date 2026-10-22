@@ -158,3 +158,107 @@ def test_start_one_through_the_api(api: TestClient, fsettings: Settings, tmp_pat
     state = {s["name"]: s for s in body["services"]}["acestep"]
     assert state["state"] == "starting" and state["pid"]
     assert "acestep" not in body["startable"] and body["starting"] is True
+
+
+# ---- stop ---------------------------------------------------------------------------------------
+def _listener(port: int) -> Any:
+    import subprocess
+    proc = subprocess.Popen([sys.executable, "-m", "http.server", str(port), "--bind", "127.0.0.1"],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    import time
+    for _ in range(50):                                    # until it listens
+        if _port_open(port):
+            return proc
+        time.sleep(0.1)
+    proc.kill()
+    raise AssertionError("test server did not start")
+
+
+def _port_open(port: int) -> bool:
+    import socket
+    with socket.socket() as s:
+        s.settimeout(0.2)
+        return s.connect_ex(("127.0.0.1", port)) == 0
+
+
+def _free_port() -> int:
+    import socket
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return int(s.getsockname()[1])
+
+
+def stop_settings(tmp_path: Path, port: int, stop: str) -> Settings:
+    home = tmp_path / "home"
+    (home / "config").mkdir(parents=True)
+    (home / "config" / "services.toml").write_text(
+        f'[services.demo]\nurl = "http://127.0.0.1:{port}"\nhealth_path = "/"\n'
+        f'[launch.demo]\n{SLEEP}stop = "{stop}"\n')
+    loaded = load_settings({"STORY_AGENT_HOME": str(home)})
+    return replace(loaded, launch={k: v for k, v in loaded.launch.items() if k == "demo"})
+
+
+def test_stop_ends_only_the_listener_of_a_service_that_allows_it(tmp_path: Path) -> None:
+    port = _free_port()
+    proc = _listener(port)
+    try:
+        s = stop_settings(tmp_path, port, "port")
+        lc = Launcher(s)
+        assert lc.status("demo").stoppable and [p for p, _ in lc.listeners("demo")] == [proc.pid]
+        st = lc.stop("demo")
+        assert proc.wait(5) is not None and not _port_open(port) and st.state in ("stopped", "disabled")
+        with pytest.raises(LaunchError) as gone:
+            lc.stop("demo")
+        assert gone.value.code == "launch_not_running"
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+
+
+def test_a_service_without_stop_is_never_touched(tmp_path: Path) -> None:
+    port = _free_port()
+    proc = _listener(port)
+    try:
+        lc = Launcher(stop_settings(tmp_path, port, ""))
+        assert not lc.status("demo").stoppable
+        with pytest.raises(LaunchError) as err:
+            lc.stop("demo")
+        assert err.value.code == "launch_not_stoppable" and proc.poll() is None and _port_open(port)
+    finally:
+        proc.kill()
+
+
+def test_stop_over_the_api_is_audited_and_refused_while_jobs_wait(
+        fsettings: Settings, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(Launcher, "_answering", lambda self, name: (False, "down"))
+    calls: list[bool] = []
+
+    def fake_stop(self: Launcher, name: str, *, force: bool = False, wait_sec: float = 15.0) -> Any:
+        calls.append(force)
+        return self.status(name)
+
+    monkeypatch.setattr(Launcher, "stop", fake_stop)
+    monkeypatch.setattr(Launcher, "listeners", lambda self, name: [(4242, "demo")])
+    monkeypatch.setitem(fsettings.launch, "acestep", dict(fsettings.launch["acestep"], stop="port"))
+    with TestClient(create_app(fsettings), raise_server_exceptions=False) as c:
+        db = c.app.state.ctx.db                                              # type: ignore[attr-defined]
+        db.conn.execute(
+            "INSERT INTO media_jobs(id, kind, provider, model_ref, status, idempotency_key) "
+            "VALUES ('j1','audio.music','acestep','m','queued','k1')")
+        busy = c.post("/api/launch/acestep/stop", json={})
+        assert busy.status_code == 409 and busy.json()["error"]["code"] == "service_busy" and calls == []
+        assert c.post("/api/launch/acestep/stop", json={"force": True}).status_code == 200 and calls == [True]
+        db.conn.execute("DELETE FROM media_jobs")
+        assert c.post("/api/launch/acestep/stop", json={}).status_code == 200 and calls == [True, False]
+        actions = [r["action"] for r in db.conn.execute("SELECT action FROM audit_log")]
+        assert actions.count("service.stop") == 2
+        body = c.get("/api/launch").json()
+        assert {s["name"]: s for s in body["services"]}["acestep"]["stoppable"] is True
+        assert set(body["memory"]) == {"total_gib", "free_gib", "swap_total_gib", "swap_used_gib", "swap_percent"}
+
+
+def test_swap_usage_is_read_from_sysctl_text() -> None:
+    from storyagent.media.broker import parse_swapusage
+    got = parse_swapusage("total = 34816.00M  used = 34035.06M  free = 780.94M  (encrypted)")
+    assert got is not None and round(got[0]) == 34 and round(got[1]) == 33
+    assert parse_swapusage("nonsense") is None
