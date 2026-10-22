@@ -87,6 +87,12 @@ kind = "image.generate"
 
 关键帧用 `image.edit` 由人物像 + 场景图合成,Base 4B(mflux,30 步)实测约 528 s/张,是整集成本的大头。
 已登记候选模型 `flux2-klein-4b-edit-comfy`:FLUX.2 klein 4B **蒸馏版**经 ComfyUI(模板 `flux2_klein_edit`,4 步、无 CFG,Apache-2.0,权重本机已有:checkpoints/flux-2-klein-4b、text_encoders/qwen_3_4b、vae/flux2-vae)。
-**尚未实测**:耗时、人物像不像、多参考图是否稳。对比方法:同一镜头、同一批参考图、同一种子,各出一张,比耗时与脸;`ref_megapixels` 控制参考图缩放(越小越快)。
+**实测(2026-10-22,项目 1 第 8 镜头,同提示词、同 3 张参考图、同种子 11722323,新代码 worker)**:
+| 模型 | 尺寸/步数 | 耗时 | 看图 |
+|---|---|---|---|
+| Base 4B(mflux,原) | 720×1280 / 30 | 575 s | 基准 |
+| 蒸馏 4B(ComfyUI) | 720×1280 / 4(preview 档) | **56 s**(约 10 倍快) | 两人、场景、蓝工服都对;人物更远、脸与基准有差异、表情更夸张,纸的姿态不同 |
+| 蒸馏 4B(ComfyUI) | 864×1536 / 6(final 档) | 337 s(含冷启动模型加载,单次) | 同上,更清晰 |
+测试时系统可用内存最低约 57 GiB,没有拖垮机器。单镜头单种子,是方向性结论;"脸像不像"主观,需要再多几个镜头确认。
 结果好 → 在 `pipelines.toml` 加"快速关键帧"方案(`image.edit` 指向该模型),Base 4B 留作"精品"方案;方案内不混搭。
 其他候选(需下载或未验证,暂不接):klein 9B-KV(非商用)、SDXL+InstantID、Qwen-Image-Edit-2511。
