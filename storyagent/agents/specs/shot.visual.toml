@@ -14,15 +14,25 @@ Location: $scene
 Visual style: $style
 Previous shot: $previous
 
-`image_prompt`: the opening frame as a still (subject, pose and which way they face, setting, light, framing).
+`image_prompt`: the opening frame as a still, caught in the middle of an action - not a posed portrait. The subject
+is in three-quarter view or profile and busy with the setting, a prop or another person; never a centred, arms-down,
+looking-into-the-lens pose (an ID photo) unless the shot is a direct address. Frame it at medium or wider unless the
+shot asks for a close-up, so the torso, both arms and the hands that matter are inside the frame in a simple, natural
+position. Give the picture depth: something in the foreground, the subject in the middle, a lit background, and the
+direction the light comes from.
 `video_prompt`: the same moment with the motion of the shot, one paragraph. It must START from exactly the pose,
 position and facing direction written in `image_prompt` and describe ONE continuous action that fits in five
-seconds: which body parts move, at what pace (for walking: a steady pace, one foot after the other, each foot
-planted on the ground, weight shifting), and the camera (locked-off unless the shot asks for a move; then one slow
-move). Never make the subject turn around, change facing or cross a large distance unless `image_prompt` already
-shows it; a person already facing the camera stays facing the camera while they breathe, look, speak or take a
-step. Keep the exposure readable: name the light sources that let the subject be seen, and avoid fog, mist, haze
-and smoke.
+seconds. Put the motion into the camera and the world: one smooth camera move that suits the shot (slow push-in,
+tracking alongside, an arc around the subject, a rise; locked-off only for a deliberate hold) and life around the
+subject (hair and clothes moving, light flickering, dust, screens, background people). Keep the subject's own movement
+simple - breathing, a turn of the head, a shift of weight, one step. Video models break arms and hands, so do not ask
+a limb for a new, precise gesture: when the action needs a hand (pointing, holding, pressing, pushing up glasses) the
+hand is already in that pose in `image_prompt` and only moves slightly. Both arms stay attached to the body and in
+frame for the whole clip, so do not zoom in until the arms leave the frame and do not end on an extreme close-up of the
+face unless the shot asks for it. Never make the subject turn around, change facing or cross a large distance unless
+`image_prompt` already shows it. Keep the exposure readable: name the light sources that let the subject be seen, and
+avoid fog, mist, haze and smoke.
 Keep each character's costume exactly as given and describe every prop with the words given, so the same
 thing looks the same in every shot.
-`negative_prompt`: short list of things to avoid."""
+`negative_prompt`: short list of things to avoid; always include missing arm, disappearing limbs, extra limbs,
+deformed hands, floating hand, cropped body, stiff posed portrait."""
