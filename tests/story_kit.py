@@ -127,7 +127,7 @@ class StoryClient:
 
 
 def make_engine(
-    tmp_path: Path, client: StoryClient | None = None, *, toml: str = "", services: str = ""
+    tmp_path: Path, client: StoryClient | None = None, *, toml: str = "", services: str = "", compliance: str = ""
 ) -> tuple[WorkflowEngine, StoryClient, Settings]:
     home = tmp_path / "home"
     (home / "config").mkdir(parents=True, exist_ok=True)
@@ -135,6 +135,8 @@ def make_engine(
         (home / "config" / "models.toml").write_text(toml)
     if services:
         (home / "config" / "services.toml").write_text(services)
+    if compliance:
+        (home / "config" / "compliance.toml").write_text(compliance)
     # projects run on a pipeline plan: the default plan takes the rig's fake models and [workflow] values
     plan: dict[str, Any] = {"models": tomllib.loads(toml).get("defaults", {}) if toml else {}}
     workflow = tomllib.loads(services).get("workflow", {}) if services else {}

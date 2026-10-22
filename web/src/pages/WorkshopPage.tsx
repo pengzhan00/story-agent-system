@@ -12,6 +12,7 @@ import { StatusChip } from "../components/StatusChip";
 import { ValueEditor } from "../components/ValueEditor";
 import { ValueView } from "../components/ValueView";
 import { useT } from "../i18n";
+import { LicenseAlert } from "../components/LicenseAlert";
 import { jobError } from "../lib/jobError";
 import { mediaOfAsset, targetsFor } from "../lib/assets";
 import { duration } from "../lib/format";
@@ -366,6 +367,7 @@ function KindPanel({
             {!chosen.available ? <span className="chip chip-failed">{t("web.workshop.unavailable", { note: chosen.note })}</span> : null}
           </p>
         ) : null}
+        {chosen && !chosen.commercial_ok ? <LicenseAlert model={chosen.ref} licenseTag={chosen.license_tag} /> : null}
         <details open>
           <summary className="strong">{t("web.workshop.params")}</summary>
           <p className="muted small">{t("web.workshop.params_hint")}</p>

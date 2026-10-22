@@ -55,6 +55,17 @@ def check_remote(
     return [ValidationIssue(ErrorCode.REMOTE_NOT_ALLOWED, message, {"model": job.model_ref, "service": service})]
 
 
+def license_notice(
+    settings: Settings, job: JobRecord, project_settings: Mapping[str, Any] | None = None
+) -> dict[str, str] | None:
+    """What the job log records when a model with a commercial-use limit runs in ``alert`` mode."""
+    model = settings.models.get(job.model_ref)
+    cfg = settings.compliance_for(project_settings)
+    if model is None or model.commercial_ok or not cfg.enabled or cfg.restricted_license != "alert":
+        return None
+    return {"model": job.model_ref, "license_tag": model.license_tag}
+
+
 def check_job(
     settings: Settings, job: JobRecord, project_settings: Mapping[str, Any] | None = None
 ) -> list[ValidationIssue]:
@@ -66,7 +77,7 @@ def check_job(
     if (
         model is not None
         and not model.commercial_ok
-        and cfg.require_restricted_license_ack
+        and cfg.restricted_license == "block"
         and not (project_settings or {}).get("allow_restricted_licenses")
     ):
         issues.append(

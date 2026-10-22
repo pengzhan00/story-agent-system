@@ -1,9 +1,11 @@
+import { Fragment } from "react";
 import { Link } from "react-router-dom";
 import { ValueView } from "./ValueView";
 import { useFlow, useHealth } from "../api/hooks";
 import type { FlowMedia, FlowStep } from "../api/types";
 import { useT } from "../i18n";
 import { ErrorNote } from "./ErrorNote";
+import { LicenseAlert } from "./LicenseAlert";
 import { StatusChip } from "./StatusChip";
 
 function MediaRow({ m, health }: { m: FlowMedia; health: Map<string, { ok: boolean; label: string }> }) {
@@ -26,7 +28,9 @@ function MediaRow({ m, health }: { m: FlowMedia; health: Map<string, { ok: boole
         if (!model.ref) return <p key="none" className="small bad">{t("web.flow.no_model")}</p>;
         const h = model.provider ? health.get(`adapter.${model.provider}`) : undefined;
         return (
-          <details key={model.ref} className="flow-model">
+          <Fragment key={model.ref}>
+          {model.commercial_ok === false ? <LicenseAlert model={model.ref} licenseTag={model.license_tag} /> : null}
+          <details className="flow-model">
             <summary>
               <span className="mono">{model.ref}</span>
               <span className="muted small">{` ${model.provider ?? ""}`}</span>
@@ -54,6 +58,7 @@ function MediaRow({ m, health }: { m: FlowMedia; health: Map<string, { ok: boole
               </table>
             </div>
           </details>
+          </Fragment>
         );
       })}
     </li>

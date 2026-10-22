@@ -24,7 +24,7 @@ storyagent ops llm-unload             # unload resident LLMs (when a heavy job w
 | Job stays `queued`, `llm_resident` | An LLM is loaded. `storyagent ops llm-unload`, or set `llm_unload_policy = "auto"` |
 | Job `running` with no progress, worker dead | Wait `lease_seconds`; the next worker requeues and re-attaches (or re-submits). After `max_attempts` the job fails `worker_lost` |
 | `missing_model` / `missing_tool` | `media healthcheck` names the file; downloads are never automatic |
-| `consent_required` / `license_ack_required` | Record voice consent on the character / acknowledge the licence in project settings, or turn compliance off for the project |
+| `consent_required` / `license_ack_required` | Record voice consent on the character / `license_ack_required` only happens with `compliance.restricted_license = "block"`: acknowledge the licence in project settings, or set it to `alert` |
 | A subprocess job failed and its scratch directory is gone | `<home>/logs/jobs/<job id>.log` keeps the tool log |
 | Seed-VC job runs for minutes at 0 % CPU | The tool is stuck in the hub downloader: v2 looks up its AR/CFM checkpoints on the hub unless they are passed explicitly (the model entry does, from `checkpoints/`). Keep `[tools.seedvc] offline = true` |
 | `separate_vocals` job fails in Demucs | `~/venvs/seedvc/bin/demucs` needs the `sphn` package (installed on 2026-10-21; a fresh venv needs `python -m ensurepip` then `pip install sphn julius lameenc openunmix einops`) |

@@ -14,5 +14,10 @@ explicit_label_key = "compliance.label.aigc"
 require_voice_consent = true
 # Training a LoRA on photos of a person needs `consent = true` in the job's inputs (the person agreed).
 require_likeness_consent = true
-# Models with commercial_ok=false are blocked unless the project opts in explicitly.
-require_restricted_license_ack = true
+# Models with commercial_ok=false (a licence that limits commercial use):
+#   alert : the job runs; the screens show a notice about the licence that stays until it is dismissed, and the job log
+#           gets a `license_notice` event (default)
+#   block : the job is refused unless the project opts in (projects.settings.allow_restricted_licenses)
+#   off   : no notice at all
+# The ledger records commercial_ok / license_tag of every asset in any case.
+restricted_license = "alert"

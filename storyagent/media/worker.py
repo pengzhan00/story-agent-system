@@ -263,6 +263,9 @@ class Worker:
 
         # 1) gates: compliance, parameters, adapter-specific validation
         issues = compliance.check_job(s, job, project_settings) + compliance.check_remote(s, job, project_settings)
+        notice = compliance.license_notice(s, job, project_settings)
+        if notice:
+            log_event("license_notice", "warning", **notice)
         issues += content.gate_issues(s, self.db, job, job.project_id, rating)
         p_issues, warnings = validate_params(job.params, caps.param_schema, strict=s.strict_params)
         issues += p_issues + adapter.validate(job, ctx)

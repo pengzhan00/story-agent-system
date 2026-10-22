@@ -352,8 +352,23 @@ def test_never_policy_leaves_llms_alone(fsettings: Settings, fdb: Database) -> N
 
 
 # ---- compliance -------------------------------------------------------------------------------
-def test_restricted_licence_needs_project_ack_when_compliance_is_on(fsettings: Settings, fdb: Database) -> None:
+def test_restricted_licence_runs_with_a_notice_by_default(fsettings: Settings, fdb: Database) -> None:
     w, led, _ = make(fsettings, fdb)
+    rec = submit(led, model="fake-restricted", _seed=9)
+    assert w.drain(10) and led.get_job(rec.id).status is JobStatus.COMPLETED
+    notices = [e for e in led.events(rec.id) if e["event"] == "license_notice"]
+    assert len(notices) == 1 and notices[0]["level"] == "warning" and notices[0]["data"]["model"] == "fake-restricted"
+    plain = submit(led, model="fake-video", _seed=9)
+    assert w.drain(10) and not [e for e in led.events(plain.id) if e["event"] == "license_notice"]
+    w.shutdown()
+
+
+def test_restricted_licence_needs_project_ack_in_block_mode(fsettings: Settings, fdb: Database) -> None:
+    import dataclasses
+
+    fsettings = dataclasses.replace(fsettings, compliance=dataclasses.replace(fsettings.compliance,
+                                                                              restricted_license="block"))
+    w, led, _ = make(fsettings, fdb, ledger=Ledger(fdb, fsettings))
     blocked = submit(led, model="fake-restricted", _seed=1)
     assert w.drain(10)
     j = led.get_job(blocked.id)

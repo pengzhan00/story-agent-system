@@ -79,8 +79,10 @@ def serving(worker: Worker) -> Iterator[None]:
         t.join(timeout=10)
 
 
-def story(tmp_path: Path, adapters: list[Any]) -> tuple[WorkflowEngine, Worker, FakeAdapter | None]:
-    engine, _, settings = make_engine(tmp_path, toml=FAKE_MODELS, services=SERVICES)
+def story(
+    tmp_path: Path, adapters: list[Any], compliance: str = ""
+) -> tuple[WorkflowEngine, Worker, FakeAdapter | None]:
+    engine, _, settings = make_engine(tmp_path, toml=FAKE_MODELS, services=SERVICES, compliance=compliance)
     pid = new_project(engine)
     engine.run(pid, None, {"visual_prompts": False})
     reg = AdapterRegistry()
@@ -120,7 +122,8 @@ def test_produce_makes_every_spec_in_dependency_order_and_is_resumable(tmp_path:
 
 
 def test_a_failed_job_fails_the_stage_but_keeps_the_rest_and_a_rerun_fixes_it(tmp_path: Path) -> None:
-    engine, worker, _ = story(tmp_path, [FakeAdapter()])
+    # the refused licence (block mode) is this test's way to make one job fail
+    engine, worker, _ = story(tmp_path, [FakeAdapter()], compliance='[compliance]\nrestricted_license = "block"\n')
     shots = engine.store.list_shots(1)
     engine.spec_store.edit(1, "shot.video", str(shots[0]["id"]), model_ref="f-bad", author="user")
     with serving(worker):

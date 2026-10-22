@@ -98,7 +98,7 @@ class ComplianceConfig:
     explicit_label_key: str = "compliance.label.aigc"
     require_voice_consent: bool = True
     require_likeness_consent: bool = True
-    require_restricted_license_ack: bool = True
+    restricted_license: str = "alert"   # models with commercial_ok = false: block | alert | off
 
 
 @dataclass(frozen=True)
@@ -459,6 +459,22 @@ def _build_auth(raw: Mapping[str, Any], mode_override: str | None) -> AuthConfig
     )
 
 
+LICENSE_MODES = ("block", "alert", "off")
+
+
+def _restricted_license_mode(raw: Mapping[str, Any]) -> str:
+    """``restricted_license``; the older ``require_restricted_license_ack`` (true = block, false = off) still reads."""
+    if "restricted_license" in raw:
+        mode = str(raw["restricted_license"])
+    elif "require_restricted_license_ack" in raw:
+        mode = "block" if raw["require_restricted_license_ack"] else "off"
+    else:
+        mode = "alert"
+    if mode not in LICENSE_MODES:
+        raise ConfigError(f"compliance.restricted_license must be one of {LICENSE_MODES}, got {mode!r}")
+    return mode
+
+
 def _build_compliance(raw: Mapping[str, Any]) -> ComplianceConfig:
     cfg = ComplianceConfig(
         enabled=bool(raw.get("enabled", True)),
@@ -467,7 +483,7 @@ def _build_compliance(raw: Mapping[str, Any]) -> ComplianceConfig:
         explicit_label_key=str(raw.get("explicit_label_key", "compliance.label.aigc")),
         require_voice_consent=bool(raw.get("require_voice_consent", True)),
         require_likeness_consent=bool(raw.get("require_likeness_consent", True)),
-        require_restricted_license_ack=bool(raw.get("require_restricted_license_ack", True)),
+        restricted_license=_restricted_license_mode(raw),
     )
     if cfg.explicit_label not in EXPLICIT_LABEL_MODES:
         raise ConfigError(f"compliance.explicit_label must be one of {EXPLICIT_LABEL_MODES}")
