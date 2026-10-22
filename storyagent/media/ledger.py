@@ -383,6 +383,39 @@ class Ledger:
                 self.add_event(job_id, "cancel_requested")
         return self.get_job(job_id).status
 
+    def reprioritize(
+        self, job_ids: list[str], *, move: str | None = None, priority: int | None = None
+    ) -> list[JobRecord]:
+        """Change when queued jobs run (lower runs sooner): ``move`` = ``first`` / ``last`` puts all of ``job_ids``
+        ahead of / behind every other queued job (they keep their order among themselves), ``priority`` sets the
+        number itself. Only queued jobs can move; a running or finished job is refused and nothing changes."""
+        if (move is None) == (priority is None) or move not in (None, "first", "last"):
+            raise LedgerError("give either move=first|last or a priority")
+        ids = list(dict.fromkeys(job_ids))
+        with self.db.transaction() as conn:
+            jobs = [self.get_job(i) for i in ids]
+            for j in jobs:
+                if j.status is not JobStatus.QUEUED:
+                    raise LedgerError(f"job {j.id} is {j.status.value}: only a queued job can be moved")
+            if move is not None:
+                marks = ",".join("?" * len(ids)) or "''"
+                row = conn.execute(
+                    "SELECT MIN(priority), MAX(priority) FROM media_jobs "
+                    f"WHERE status='queued' AND id NOT IN ({marks})", ids
+                ).fetchone()
+                low, high = row[0], row[1]
+                if low is None:
+                    target = min(j.priority for j in jobs)
+                else:
+                    target = low - 1 if move == "first" else high + 1
+            else:
+                assert priority is not None
+                target = priority
+            for j in jobs:
+                conn.execute("UPDATE media_jobs SET priority=? WHERE id=?", (target, j.id))
+                self.add_event(j.id, "priority_changed", old=j.priority, new=target)
+        return [self.get_job(i) for i in ids]
+
     def _insert_asset(
         self, conn: Any, a: NewAsset, *, project_id: int | None, shot_id: int | None, job_id: str | None,
         spec_id: str | None = None, spec_version: int | None = None, auto_adopt: bool = True,

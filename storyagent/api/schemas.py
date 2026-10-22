@@ -239,6 +239,12 @@ class RetryRequest(BaseModel):
     new_seed: bool = False
 
 
+class PriorityRequest(BaseModel):
+    ids: list[str] = Field(min_length=1, max_length=200)
+    move: Literal["first", "last"] | None = None
+    priority: int | None = Field(default=None, ge=-1000, le=1000)
+
+
 class CancelResult(BaseModel):
     status: JobStatus
 

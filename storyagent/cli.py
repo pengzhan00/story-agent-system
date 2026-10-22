@@ -4,7 +4,7 @@
     storyagent db migrate | status | import-legacy [--from PATH]
     storyagent i18n check
     storyagent project create NAME | list [--trashed] | trash ID [--restore]
-    storyagent media healthcheck | submit | jobs | show | cancel | retry | adopt
+    storyagent media healthcheck | submit | jobs | show | cancel | retry | prioritize | adopt
     storyagent spec create | show | edit | diff | revert | lock | unlock | regenerate
     storyagent serve [--host H] [--port P]
     storyagent worker [--once]
@@ -361,6 +361,16 @@ def _cmd_media_cancel(s: Settings, a: argparse.Namespace) -> int:
 
 def _cmd_media_retry(s: Settings, a: argparse.Namespace) -> int:
     print(t("cli.job.retried", id=_ctx(s).ledger.retry(a.id, new_seed=a.new_seed).id))
+    return 0
+
+
+def _cmd_media_prioritize(s: Settings, a: argparse.Namespace) -> int:
+    try:
+        move = "first" if a.first else "last" if a.last else None
+        moved = _ctx(s).ledger.reprioritize(a.ids, move=move, priority=a.priority)
+    except LedgerError as e:
+        raise CliError("cli.error.job_not_movable", 1, why=str(e)) from None
+    print(t("cli.job.prioritized", n=len(moved), priority=moved[0].priority))
     return 0
 
 
@@ -1118,6 +1128,12 @@ def build_parser() -> argparse.ArgumentParser:
     mj.add_argument("--limit", type=int, default=50)
     add(me, "show", _cmd_media_show).add_argument("id")
     add(me, "cancel", _cmd_media_cancel).add_argument("id")
+    mp = add(me, "prioritize", _cmd_media_prioritize)
+    mp.add_argument("ids", nargs="+")
+    where = mp.add_mutually_exclusive_group(required=True)
+    where.add_argument("--first", action="store_true")
+    where.add_argument("--last", action="store_true")
+    where.add_argument("--priority", type=int)
     mr = add(me, "retry", _cmd_media_retry)
     mr.add_argument("id")
     mr.add_argument("--new-seed", action="store_true")

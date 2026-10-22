@@ -168,6 +168,7 @@ export function useJobActions() {
   return {
     cancel: useMutation({ mutationFn: (id: string) => post(`/api/jobs/${id}/cancel`), onSuccess: done }),
     retry: useMutation({ mutationFn: (id: string) => post(`/api/jobs/${id}/retry`), onSuccess: done }),
+    front: useMutation({ mutationFn: (ids: string[]) => post(`/api/jobs/priority`, { ids, move: "first" }), onSuccess: done }),
   };
 }
 

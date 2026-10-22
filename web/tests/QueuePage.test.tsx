@@ -28,6 +28,8 @@ beforeEach(() => {
         job("aaaaaaaa11111111", { retried_by: "cccccccc33333333", retried_status: "queued", retries: 1 }),
         job("bbbbbbbb22222222", {}),
         job("cccccccc33333333", { status: "queued", error_code: null, parent_job_id: "aaaaaaaa11111111" }),
+        job("dddddddd44444444", { status: "queued", error_code: null, kind: "audio.tts", priority: 5 }),
+        job("eeeeeeee55555555", { status: "queued", error_code: null, kind: "audio.tts", priority: 5 }),
       ];
     return { ok: true, status: 200, statusText: "", json: async () => json, text: async () => JSON.stringify(json) };
   });
@@ -52,5 +54,20 @@ describe("job list: ids and retries", () => {
     expect(buttons).toHaveLength(1);                                              // only #bbbbbbbb was not retried yet
     fireEvent.click(buttons[0]!);
     await waitFor(() => expect(calls).toContain("POST /api/jobs/bbbbbbbb22222222/retry"));
+  });
+
+  it("moves queued jobs to the front: one, or every queued job of the same kind", async () => {
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <I18nProvider>
+          <JobsPanel />
+        </I18nProvider>
+      </QueryClientProvider>,
+    );
+    await screen.findAllByText("#dddddddd");
+    expect(screen.getAllByRole("button", { name: en["web.jobs.top"]! })).toHaveLength(3);
+    expect(screen.getAllByRole("button", { name: en["web.jobs.top_kind"]! })).toHaveLength(2);   // only the two audio jobs have a sibling
+    fireEvent.click(screen.getAllByRole("button", { name: en["web.jobs.top_kind"]! })[0]!);
+    await waitFor(() => expect(calls).toContain("POST /api/jobs/priority"));
   });
 });

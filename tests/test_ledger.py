@@ -269,3 +269,27 @@ def test_list_filters(led: Ledger) -> None:
     assert [j.id for j in led.list_jobs(status=["queued"])] == [a.id]
     assert [j.id for j in led.list_jobs(shot_id=1)] == [a.id]
     assert [j.id for j in led.list_jobs(status=[JobStatus.CANCELLED])] == [b.id]
+
+
+def test_reprioritize_moves_queued_jobs_ahead_without_touching_running_ones(led: Ledger) -> None:
+    a, _ = led.enqueue(job(seed=1))
+    b, _ = led.enqueue(job(seed=2))
+    c, _ = led.enqueue(job(seed=3))
+    d, _ = led.enqueue(job(seed=4))
+    assert [j.id for j in led.queued()] == [a.id, b.id, c.id, d.id]
+    led.reprioritize([c.id, d.id], move="first")
+    assert [j.id for j in led.queued()] == [c.id, d.id, a.id, b.id]       # they keep their order among themselves
+    led.reprioritize([c.id], move="last")
+    assert [j.id for j in led.queued()] == [d.id, a.id, b.id, c.id]
+    led.reprioritize([a.id], priority=0)
+    assert led.get_job(a.id).priority == 0 and led.queued()[0].id == a.id
+    assert any(e["event"] == "priority_changed" for e in led.events(a.id))
+    led.claim(a.id, "w", 10)
+    with pytest.raises(LedgerError, match="only a queued job"):
+        led.reprioritize([a.id, b.id], move="first")                      # all or nothing
+    assert led.get_job(b.id).priority == 5
+    with pytest.raises(LedgerError):
+        led.reprioritize([b.id])
+    with pytest.raises(LedgerError):
+        led.reprioritize([b.id], move="first", priority=1)
+

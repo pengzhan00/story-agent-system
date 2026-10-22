@@ -55,10 +55,10 @@ function JobDetail({ job }: { job: Job }) {
   );
 }
 
-function JobRow({ job }: { job: Job }) {
+function JobRow({ job, siblings }: { job: Job; siblings: string[] }) {
   const [open, setOpen] = useState(false);
   const t = useT();
-  const { cancel, retry } = useJobActions();
+  const { cancel, retry, front } = useJobActions();
   const active = ACTIVE.has(job.status);
   const retries = job.retries ?? 0;
   const tone = job.status === "completed" ? "completed" : job.status === "running" ? "running" : job.status === "queued" ? "queued" : "failed";
@@ -94,6 +94,18 @@ function JobRow({ job }: { job: Job }) {
         <button className="link" aria-expanded={open} onClick={() => setOpen(!open)}>
           {open ? t("web.close") : t("web.jobs.inspect")}
         </button>
+        {job.status === "queued" ? (
+          <>
+            <button className="link" title={t("web.jobs.top_hint")} disabled={front.isPending} onClick={() => front.mutate([job.id])}>
+              {t("web.jobs.top")}
+            </button>
+            {siblings.length > 1 ? (
+              <button className="link" title={t("web.jobs.top_kind_hint")} disabled={front.isPending} onClick={() => front.mutate(siblings)}>
+                {t("web.jobs.top_kind")}
+              </button>
+            ) : null}
+          </>
+        ) : null}
         {active ? (
           <button className="link" disabled={cancel.isPending} onClick={() => cancel.mutate(job.id)}>
             {t("web.jobs.cancel")}
@@ -150,7 +162,11 @@ export function JobsPanel({ projectId }: { projectId?: number }) {
             </thead>
             <tbody>
               {jobs.data.map((j) => (
-                <JobRow key={j.id} job={j} />
+                <JobRow
+                  key={j.id}
+                  job={j}
+                  siblings={jobs.data.filter((o) => o.status === "queued" && o.kind === j.kind && o.project_id === j.project_id).map((o) => o.id)}
+                />
               ))}
             </tbody>
           </table>

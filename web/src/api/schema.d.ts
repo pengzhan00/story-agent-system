@@ -517,6 +517,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/jobs/priority": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Prioritize Jobs
+         * @description Move queued jobs ahead of / behind the rest of the queue (``move``) or give them a number (``priority``).
+         */
+        post: operations["prioritize_jobs_api_jobs_priority_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/jobs/{job_id}": {
         parameters: {
             query?: never;
@@ -3900,6 +3920,15 @@ export interface components {
              */
             tier: string;
         };
+        /** PriorityRequest */
+        PriorityRequest: {
+            /** Ids */
+            ids: string[];
+            /** Move */
+            move?: ("first" | "last") | null;
+            /** Priority */
+            priority?: number | null;
+        };
         /** ProducePlanOut */
         ProducePlanOut: {
             /** Tasks */
@@ -6007,6 +6036,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobCreated"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    prioritize_jobs_api_jobs_priority_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriorityRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobOut"][];
                 };
             };
             /** @description Validation Error */

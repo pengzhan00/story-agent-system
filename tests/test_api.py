@@ -176,6 +176,20 @@ def test_cancel_and_retry(client: TestClient) -> None:
     assert client.post("/api/jobs/nope/cancel").status_code == 404
 
 
+def test_jobs_can_be_moved_to_the_front_of_the_queue(client: TestClient) -> None:
+    p = project(client)
+    first = client.post("/api/jobs", json=job_body(p["id"], seed=1)).json()["job"]
+    second = client.post("/api/jobs", json=job_body(p["id"], seed=2)).json()["job"]
+    r = client.post("/api/jobs/priority", json={"ids": [second["id"]], "move": "first"})
+    assert r.status_code == 200 and r.json()[0]["priority"] < first["priority"]
+    assert client.get(f"/api/jobs/{first['id']}").json()["priority"] == first["priority"]
+    assert client.post("/api/jobs/priority", json={"ids": [first["id"]]}).status_code == 409  # neither
+    client.post(f"/api/jobs/{first['id']}/cancel")
+    gone = client.post("/api/jobs/priority", json={"ids": [first["id"]], "move": "last"})
+    assert gone.status_code == 409                                                           # no longer queued
+    assert client.post("/api/jobs/priority", json={"ids": ["nope"], "move": "first"}).status_code == 404
+
+
 def test_unknown_model_or_wrong_kind_is_422(client: TestClient) -> None:
     p = project(client)
     assert client.post("/api/jobs", json=job_body(p["id"], model_ref="ghost")).status_code == 422

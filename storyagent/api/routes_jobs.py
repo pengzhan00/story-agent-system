@@ -8,7 +8,7 @@ from storyagent.domain import JobStatus
 from storyagent.media.contracts import MediaJob
 
 from .context import ctx_of
-from .schemas import CancelResult, JobCreate, JobCreated, JobEvent, JobOut, QueueState, RetryRequest
+from .schemas import CancelResult, JobCreate, JobCreated, JobEvent, JobOut, PriorityRequest, QueueState, RetryRequest
 
 router = APIRouter(prefix="/api", tags=["jobs"])
 
@@ -62,6 +62,13 @@ def job_events(job_id: str, request: Request, after: int = 0) -> list[JobEvent]:
 @router.post("/jobs/{job_id}/cancel", response_model=CancelResult)
 def cancel_job(job_id: str, request: Request) -> CancelResult:
     return CancelResult(status=ctx_of(request).ledger.request_cancel(job_id))
+
+
+@router.post("/jobs/priority", response_model=list[JobOut])
+def prioritize_jobs(body: PriorityRequest, request: Request) -> list[JobOut]:
+    """Move queued jobs ahead of / behind the rest of the queue (``move``) or give them a number (``priority``)."""
+    jobs = ctx_of(request).ledger.reprioritize(body.ids, move=body.move, priority=body.priority)
+    return [JobOut.model_validate(j) for j in jobs]
 
 
 @router.post("/jobs/{job_id}/retry", response_model=JobOut, status_code=201)

@@ -3992,6 +3992,52 @@
         "title": "PresetBody",
         "type": "object"
       },
+      "PriorityRequest": {
+        "properties": {
+          "ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Ids",
+            "type": "array"
+          },
+          "move": {
+            "anyOf": [
+              {
+                "enum": [
+                  "first",
+                  "last"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Move"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "maximum": 1000.0,
+                "minimum": -1000.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority"
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PriorityRequest",
+        "type": "object"
+      },
       "ProducePlanOut": {
         "properties": {
           "tasks": {
@@ -8299,6 +8345,52 @@
           }
         },
         "summary": "Create Job",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/priority": {
+      "post": {
+        "description": "Move queued jobs ahead of / behind the rest of the queue (``move``) or give them a number (``priority``).",
+        "operationId": "prioritize_jobs_api_jobs_priority_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PriorityRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/JobOut"
+                  },
+                  "title": "Response Prioritize Jobs Api Jobs Priority Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Prioritize Jobs",
         "tags": [
           "jobs"
         ]
