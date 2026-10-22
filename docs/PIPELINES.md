@@ -1,4 +1,8 @@
-# 管线方案(Pipeline Plan)—— 设计记录(2026-10-22,**已定方案,尚未实现**)
+# 管线方案(Pipeline Plan)—— 设计记录与实现状态(2026-10-22)
+
+> **状态:已实现**(迁移 013、`pipelines.toml`/`kinds.toml`、`Settings.for_pipeline`、立项向导 API/CLI/网页、按方案取模型、按模型判过期、按方案体检、工坊按方案)。
+> 与下面设计稿的差异:`recipes.toml` 保留(不再扩展),方案的 `steps` 没有做;没有方案的老项目按全局配置运行(`projects.pipeline` 为空);
+> 方案里的 `requires` 校验并用于按方案体检。配置说明见 `docs/CONFIGURATION.md`,计划见 `docs/IMPLEMENTATION_PLAN.md`。
 
 ## 要解决的问题
 现在"用哪个模型"散在三处:`models.toml` 里每种任务的默认模型 `[defaults]`、项目设置里按模型的覆盖(`projects.settings.models`)、

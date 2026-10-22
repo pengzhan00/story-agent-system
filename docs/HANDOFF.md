@@ -90,11 +90,11 @@ docs/          API CONFIGURATION MEDIA_CONTRACT RUNBOOK WORKFLOW USER_GUIDE PARI
 - **适配器缺模型/缺工具 → `missing_*` 错误,绝不静默降级**。
 - **合规**默认开(AIGC 标识、授权、受限许可闸),可全局/项目/环境变量关;**溯源始终记录**。
 
-### 3.2 表(001-011)
+### 3.2 表(001-013)
 
 | 表 | 关键列 |
 |---|---|
-| projects | id slug name description genre format aspect_ratio delivery_profile content_language status **settings(JSON)** |
+| projects | id slug name description genre format aspect_ratio delivery_profile content_language status **settings(JSON)** **kind pipeline brief(JSON,迁移 013)** |
 | scripts | project_id episode_no title synopsis acts(JSON) total_scenes |
 | characters(+introduced_episode, locked:迁移 011) | project_id name role appearance personality voice_profile voice_ref_audio/text voice_ref_consent lora_ref ref_images |
 | scenes(场景设计) / music_themes / sound_effects | 各自属于 project;music_themes 有 kind(bgm/theme) lyrics duration_sec scene_ref |
@@ -115,7 +115,8 @@ docs/          API CONFIGURATION MEDIA_CONTRACT RUNBOOK WORKFLOW USER_GUIDE PARI
 
 出厂 `storyagent/config/defaults/*.toml` < `$STORY_AGENT_HOME/config/*.toml` < 环境变量 < `projects.settings` < 作业/规格参数。
 文件:`services`(服务地址、工具路径、`[launch.*]`、`[runtime]`、`[api]`、`[healthcheck]`)、`models`(模型注册表+`[defaults]`+参数分档)、
-`delivery`(交付档位、`[pacing]`、`[mix]`、`[subtitles]`、`[qc]`)、`compliance`、`recipes`(未被工作流使用)、`llm`(后端与角色)。
+`delivery`(交付档位、`[pacing]`、`[mix]`、`[subtitles]`、`[qc]`、`[estimate]`)、`compliance`、`recipes`(未被工作流使用)、`llm`(后端与角色)、
+**`pipelines`(管线方案:一整套模型+设置,项目立项时选一个,不能混搭)**、**`kinds`(作品类型,可扩展)**。项目的有效设置 = `Settings.for_pipeline(projects.pipeline)`(`Ledger.settings_for`);无方案的老项目用全局配置。
 参数优先级:适配器内置 < `models.X.params` < 档位 `tiers.draft|preview|final` < `projects.settings.models.X` < 作业 `params`。
 **换模型只改配置。**
 
