@@ -5199,6 +5199,41 @@
         "title": "SeriesTotals",
         "type": "object"
       },
+      "SetupBody": {
+        "properties": {
+          "birth_date": {
+            "maxLength": 10,
+            "minLength": 1,
+            "title": "Birth Date",
+            "type": "string"
+          },
+          "display_name": {
+            "default": "",
+            "maxLength": 80,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "password": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Password",
+            "type": "string"
+          },
+          "username": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "password",
+          "birth_date"
+        ],
+        "title": "SetupBody",
+        "type": "object"
+      },
       "SpeakerBody": {
         "properties": {
           "character": {
@@ -7476,6 +7511,48 @@
           }
         },
         "summary": "Register",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/setup": {
+      "post": {
+        "description": "First run with accounts on: the first person creates the administrator account here instead of on the command\nline. Works only while no account exists (afterwards ``409 setup_done``).",
+        "operationId": "setup_api_auth_setup_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetupBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Setup",
         "tags": [
           "auth"
         ]

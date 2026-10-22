@@ -32,6 +32,16 @@ export function useRegister() {
   });
 }
 
+/** First run with accounts on: the first person creates the administrator here (works while no account exists). */
+export function useSetup() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { username: string; password: string; birth_date: string; display_name: string }) =>
+      post<S["LoginOut"]>("/api/auth/setup", body),
+    onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
 /** The signed-in person gives (again) their birth date; it waits for an admin. */
 export function useClaimAge() {
   const qc = useQueryClient();

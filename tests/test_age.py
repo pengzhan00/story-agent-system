@@ -244,3 +244,15 @@ def test_registration_is_off_when_accounts_are_off_and_reported_so(fsettings: Se
         status = c.get("/api/content/status").json()
         assert status["age_status"] == "off" and status["viewer_age"] is None
         assert all(r["allowed"] for r in status["ratings"])
+
+
+def test_the_first_administrator_is_created_in_the_ui_once(api: tuple[TestClient, AuthStore]) -> None:
+    client, _ = api
+    assert client.get("/api/auth/mode").json()["first_user"] is True
+    r = client.post("/api/auth/setup", json={"username": "root", "password": PASSWORD, "birth_date": years_ago(35)})
+    assert r.status_code == 201 and r.json()["user"]["role"] == "admin" and r.json()["user"]["age"] == 35
+    me = client.get("/api/auth/me").json()                                       # signed in by the cookie
+    assert me["is_admin"] and me["user"]["age_status"] == "approved"
+    assert client.get("/api/auth/mode").json()["first_user"] is False
+    again = client.post("/api/auth/setup", json={"username": "evil", "password": PASSWORD, "birth_date": years_ago(30)})
+    assert again.status_code == 409 and again.json()["error"]["code"] == "setup_done"

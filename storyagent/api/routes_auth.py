@@ -21,6 +21,7 @@ from .schemas import (
     MeOut,
     PasswordBody,
     RegisterBody,
+    SetupBody,
     UserCreateBody,
     UserOut,
     UserPatchBody,
@@ -80,6 +81,20 @@ def register(body: RegisterBody, request: Request, response: Response) -> LoginO
     store.audit("auth.register", user=created, path=request.url.path, status=201,
                 detail={"role": created.role, "age_claim": created.age_claim}, client=_client(request))
     token, user, expires = store.login(body.username, body.password, label=body.label)
+    _open_session(request, response, token)
+    return LoginOut(token=token, expires_at=expires, user=_out(user))
+
+
+@router.post("/api/auth/setup", response_model=LoginOut, status_code=201)
+def setup(body: SetupBody, request: Request, response: Response) -> LoginOut:
+    """First run with accounts on: the first person creates the administrator account here instead of on the command
+    line. Works only while no account exists (afterwards ``409 setup_done``)."""
+    cfg, store = ctx_of(request).settings.auth, _store(request)
+    if not cfg.enabled:
+        raise ApiError(409, "auth_off")
+    created = store.setup_admin(body.username, body.password, body.birth_date, body.display_name)
+    store.audit("auth.setup", user=created, path=request.url.path, status=201, client=_client(request))
+    token, user, expires = store.login(body.username, body.password)
     _open_session(request, response, token)
     return LoginOut(token=token, expires_at=expires, user=_out(user))
 

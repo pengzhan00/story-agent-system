@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { UNAUTHORIZED_EVENT, useAuthMode, useLogin, useMe, useRegister } from "../api/auth";
+import { UNAUTHORIZED_EVENT, useAuthMode, useLogin, useMe, useRegister, useSetup } from "../api/auth";
 import { useI18n } from "../i18n";
 import { ErrorNote } from "./ErrorNote";
 
@@ -8,23 +8,26 @@ function LoginPage({ firstUser, canRegister }: { firstUser: boolean; canRegister
   const { t, locale, locales, setLocale } = useI18n();
   const login = useLogin();
   const register = useRegister();
-  const [registering, setRegistering] = useState(false);
+  const setup = useSetup();
+  const [wantsRegister, setRegistering] = useState(false);
+  const registering = wantsRegister || firstUser;           // the very first account is the administrator's
+
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [birthDate, setBirthDate] = useState("");
   const [displayName, setDisplayName] = useState("");
-  const action = registering ? register : login;
+  const action = firstUser ? setup : registering ? register : login;
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (registering) register.mutate({ username, password, birth_date: birthDate, display_name: displayName });
+    if (firstUser) setup.mutate({ username, password, birth_date: birthDate, display_name: displayName });
+    else if (registering) register.mutate({ username, password, birth_date: birthDate, display_name: displayName });
     else login.mutate({ username, password });
   };
   return (
     <div className="login">
       <form className="login-card stack" onSubmit={submit}>
         <h1>{t("web.app.name")}</h1>
-        <p className="muted">{t(registering ? "web.auth.register_hint" : "web.auth.signin_hint")}</p>
-        {firstUser ? <p className="note">{t("web.auth.first_user")}</p> : null}
+        <p className="muted">{t(firstUser ? "web.auth.setup_hint" : registering ? "web.auth.register_hint" : "web.auth.signin_hint")}</p>
         <label className="field">
           <span>{t("web.auth.username")}</span>
           <input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" autoFocus required />
@@ -48,11 +51,11 @@ function LoginPage({ firstUser, canRegister }: { firstUser: boolean; canRegister
         ) : null}
         <ErrorNote error={action.error} />
         <button className="primary" type="submit" disabled={action.isPending || !username || !password || (registering && !birthDate)}>
-          {t(registering ? "web.auth.register" : "web.auth.signin")}
+          {t(firstUser ? "web.auth.setup" : registering ? "web.auth.register" : "web.auth.signin")}
         </button>
-        {canRegister ? (
+        {canRegister && !firstUser ? (
           <button type="button" className="link" onClick={() => setRegistering((v) => !v)}>
-            {t(registering ? "web.auth.to_signin" : "web.auth.to_register")}
+            {t(wantsRegister ? "web.auth.to_signin" : "web.auth.to_register")}
           </button>
         ) : null}
         <select aria-label={t("web.language")} value={locale} onChange={(e) => setLocale(e.target.value)}>

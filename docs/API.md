@@ -137,12 +137,13 @@ Adopting a take that a redo made (`POST /api/assets/{id}/adopt`) resolves the no
 
 ## Team access (accounts, roles, audit)
 
-`[auth] mode` in `auth.toml` (env `STORY_AGENT_AUTH`): `off` (default, one operator, no login; writes are still audited as `local`) or `token`. In token mode every `/api/*` call except the public ones (`/api/auth/login|register|mode|me`, `/api/i18n/*`, `/api/docs`, `/api/openapi.json`) needs a session: `Authorization: Bearer <token>` or the HttpOnly session cookie set by login (the web client uses the cookie; the live feed `/api/events` needs it too).
+`[auth] mode` in `auth.toml` (env `STORY_AGENT_AUTH`): `off` (default, one operator, no login; writes are still audited as `local`) or `token`. In token mode every `/api/*` call except the public ones (`/api/auth/login|register|setup|mode|me`, `/api/i18n/*`, `/api/docs`, `/api/openapi.json`) needs a session: `Authorization: Bearer <token>` or the HttpOnly session cookie set by login (the web client uses the cookie; the live feed `/api/events` needs it too).
 
 | Route | Who | Notes |
 |---|---|---|
 | `GET /api/auth/mode` | public | `{mode, first_user, locales, allow_registration}` (`first_user`: token mode and no account yet) |
 | `POST /api/auth/register` | public | `{username, password, birth_date (YYYY-MM-DD), display_name?}` -> 201 `{token, expires_at, user}` + cookie. A `registration_role` account (default `viewer`) whose birth date is only a **claim** (`age_status = pending`) until an admin approves it; `409 user_exists`, `422 bad_birth_date|weak_password`, `403 registration_closed` (switched off, or `max_pending_registrations` requests already wait) |
+| `POST /api/auth/setup` | public | `{username, password, birth_date, display_name?}`: only while no account exists; creates the first administrator (age approved at once) and signs in; later `409 setup_done` |
 | `POST /api/auth/age` | any signed-in user | `{birth_date}`: give (again) the birth date after a rejection; an approved age is changed by an admin only |
 | `POST /api/auth/login` | public | `{username, password, label?}` -> `{token, expires_at, user}` + cookie; wrong password `401 login_failed`; too many failures `429 account_locked` |
 | `GET /api/auth/me` | public | who am I: `{mode, user\|null, can_write, can_create_project, is_admin}` |

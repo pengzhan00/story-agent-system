@@ -69,6 +69,10 @@ class RegistrationClosed(AuthError):
     code, status = "registration_closed", 403
 
 
+class SetupDone(AuthError):
+    code, status = "setup_done", 409
+
+
 class BadBirthDate(AuthError):
     code, status = "bad_birth_date", 422
 
@@ -237,6 +241,15 @@ class AuthStore:
         user = self.create_user(username, password, self.cfg.registration_role, display_name)
         self.db.conn.execute("UPDATE users SET age_status='pending', age_claim=? WHERE id=?", (claim, user.id))
         return self.get_user(user.id)
+
+    def setup_admin(self, username: str, password: str, birth_date: str, display_name: str = "") -> User:
+        """The first account of a fresh install: an admin whose age counts at once (the person setting up vouches for
+        themself). Only while no account exists."""
+        with self.db.transaction() as conn:
+            if int(conn.execute("SELECT count(*) FROM users").fetchone()[0]) > 0:
+                raise SetupDone()
+            admin = next((n for n, r in self.cfg.roles.items() if r.admin), "admin")
+            return self.create_user(username, password, admin, display_name, birth_date)
 
     def pending_count(self) -> int:
         return int(self.db.conn.execute("SELECT count(*) FROM users WHERE age_status='pending'").fetchone()[0])

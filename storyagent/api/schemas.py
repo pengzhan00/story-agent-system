@@ -956,6 +956,13 @@ class RegisterBody(Strict):
     label: str = Field(default="", max_length=80)
 
 
+class SetupBody(Strict):
+    username: str = Field(min_length=1, max_length=80)
+    password: str = Field(min_length=1, max_length=200)
+    birth_date: str = Field(min_length=1, max_length=10)
+    display_name: str = Field(default="", max_length=80)
+
+
 class AgeClaimBody(Strict):
     birth_date: str = Field(min_length=1, max_length=10)
 

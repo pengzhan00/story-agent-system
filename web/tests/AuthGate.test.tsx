@@ -11,6 +11,8 @@ const user = { id: 1, username: "ann", display_name: "Ann", role: "editor", acti
 
 let signedIn = false;
 let mode: "off" | "token" = "token";
+let firstUser = false;
+let setups: unknown[] = [];
 let logins: unknown[] = [];
 let registrations: unknown[] = [];
 
@@ -19,12 +21,19 @@ beforeEach(() => {
   mode = "token";
   logins = [];
   registrations = [];
+  setups = [];
+  firstUser = false;
   localStorage.setItem("storyagent.locale", "en");
   vi.stubGlobal("fetch", async (url: string, init?: { method?: string; body?: string }) => {
     let status = 200;
     let json: unknown = {};
     if (url.includes("/api/i18n")) json = en;
-    else if (url.includes("/api/auth/mode")) json = { mode, first_user: false, locales: ["en"], allow_registration: true };
+    else if (url.includes("/api/auth/mode")) json = { mode, first_user: firstUser, locales: ["en"], allow_registration: true };
+    else if (url.includes("/api/auth/setup")) {
+      setups.push(JSON.parse(init?.body ?? "{}"));
+      signedIn = true;
+      json = { token: "t", expires_at: "x", user };
+    }
     else if (url.includes("/api/auth/register")) {
       registrations.push(JSON.parse(init?.body ?? "{}"));
       signedIn = true;
@@ -89,5 +98,18 @@ describe("AuthGate", () => {
     fireEvent.click(submit);
     await waitFor(() => expect(screen.getByText("app content")).toBeTruthy());
     expect(registrations).toEqual([{ username: "kid", password: "right password", birth_date: "2012-04-01", display_name: "" }]);
+  });
+
+  it("on the first run creates the administrator right on the sign-in page", async () => {
+    firstUser = true;
+    renderGate();
+    expect(await screen.findByText(en["web.auth.setup_hint"]!)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: en["web.auth.to_register"]! })).toBeNull();
+    fireEvent.change(screen.getByLabelText(en["web.auth.username"]!), { target: { value: "root" } });
+    fireEvent.change(screen.getByLabelText(en["web.auth.password"]!), { target: { value: "right password" } });
+    fireEvent.change(screen.getByLabelText(en["web.auth.birth_date"]!, { exact: false }), { target: { value: "1990-01-01" } });
+    fireEvent.click(screen.getByRole("button", { name: en["web.auth.setup"]! }));
+    await waitFor(() => expect(screen.getByText("app content")).toBeTruthy());
+    expect(setups).toEqual([{ username: "root", password: "right password", birth_date: "1990-01-01", display_name: "" }]);
   });
 });
