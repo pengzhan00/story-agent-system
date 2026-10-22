@@ -136,11 +136,23 @@ loudnorm_i = -16.0
 loudnorm_tp = -1.5
 loudnorm_lra = 11.0
 max_slowdown = 2.2
+# Sound grammar (see compose/timeline.py). Room tone: a faint noise bed under each scene so a pause is room, not digital
+# silence (dB relative to full scale, before loudness normalisation; 0/false = off). Music: cues of several scenes are
+# cross-faded; where nobody speaks for `music_swell_min_sec` the music comes up by `music_swell_db` (0 = off).
+room_tone = true
+room_tone_db = -50.0
+room_tone_color = "brown"       # white | pink | brown
+music_crossfade_sec = 1.5
+music_swell_db = 3.0
+music_swell_min_sec = 2.0
 
 [edit]
 # Cards and transitions of the finished episode (per project: projects.settings.edit with the same keys). Off by
 # default: a series episode usually jumps straight into its hook.
 scene_fade_sec = 0.0     # dip through black at a change of scene (0 = hard cut)
+dissolve_sec = 0.0       # cross-dissolve at a change of scene (0 = none; wins over scene_fade_sec)
+j_cut_sec = 0.0          # inside a scene the next line is heard this long before its picture (0 = hard cut)
+l_cut_sec = 0.0          # inside a scene the last line runs this long over the next picture (0 = hard cut)
 title_card = false       # "S1 E3" and the episode title before the story
 recap_card = false       # "previously": the last episode's summary before the story
 next_card = false        # "to be continued" (and the next episode's title) after the story

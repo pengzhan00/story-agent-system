@@ -113,6 +113,7 @@ title_card = true
 recap_card = true
 next_card = true
 scene_fade_sec = 0.5
+j_cut_sec = 0.3
 [pipelines.tv_series.mix]
 loudnorm_i = -23.0      # broadcast loudness (EBU R128)
 
@@ -162,6 +163,7 @@ video_min_per_episode = 20
 keyframe_from_references = true
 [pipelines.feature_film.edit]
 title_card = true
-scene_fade_sec = 0.6
+dissolve_sec = 0.8
+j_cut_sec = 0.3
 [pipelines.feature_film.mix]
 loudnorm_i = -23.0

@@ -175,6 +175,7 @@ def _ffmpeg(tmp_path: Path) -> str:
 
 def _register(
     engine: WorkflowEngine, spec: Any, src: Path, kind: str, *, dur: float | None, shot: int | None,
+    slot: str = "main",
 ) -> AssetRecord:
     home = engine.settings.home
     dest = home / "projects" / "demo" / src.name.replace(".", f"_{spec.id[:6]}.")
@@ -183,7 +184,7 @@ def _register(
     ledger: Ledger = engine.spec_store.ledger
     with engine.db.transaction() as conn:
         aid = ledger._insert_asset(  # noqa: SLF001 - test setup registers spec-linked assets without running jobs
-            conn, NewAsset(kind=kind, slot="main", path=str(dest.relative_to(home)), bytes=dest.stat().st_size,
+            conn, NewAsset(kind=kind, slot=slot, path=str(dest.relative_to(home)), bytes=dest.stat().st_size,
                            duration_sec=dur), project_id=1, shot_id=shot, job_id=None, spec_id=spec.id,
             spec_version=spec.version, auto_adopt=True)
     return ledger.get_asset(aid)
@@ -467,3 +468,28 @@ def test_an_asset_is_outdated_once_what_it_was_built_on_has_been_made_again(tmp_
     stale = {p.subject_type for p in plan if p.state == "stale"}
     assert stale == {"shot.keyframe"}           # built on that portrait; the clips wait until their keyframes change
     assert all(p.state == "done" for p in plan if p.subject_type == "character.portrait")
+
+
+def test_the_episode_timeline_uses_one_music_bed_per_scene_cue_in_story_order(tmp_path: Path) -> None:
+    from storyagent.domain import MediaKind
+    from storyagent.workflow.media import build_episode_timeline
+
+    engine, _ = _episode_rig(tmp_path)
+    ctx_rows = engine.store.list_music(1)
+    first = next(m for m in ctx_rows if m["kind"] == "bgm")
+    engine.store._update("music_themes", first["id"], {"scene_ref": "ep01_act01_scene01"})   # noqa: SLF001
+    second = engine.store.create_music(1, {"name": "Later", "kind": "bgm", "scene_ref": "ep01_act02_scene01",
+                                           "gen_prompt": "calm"})
+    spec = engine.spec_store.create(1, "music.bgm", str(second["id"]), MediaKind.AUDIO_MUSIC, prompt="calm",
+                                    author="agent")
+    _register(engine, spec, tmp_path / "src" / "bgm.wav", "audio.music", dur=2.0, shot=None,
+              slot=f"music.bgm:{second['id']}")
+    from storyagent.workflow.stages import Ctx
+
+    ctx = Ctx(engine.settings, engine.db, engine.store, engine.state, engine.agents, engine.projects,
+              engine.projects.get(1), {}, spec_store=engine.spec_store)
+    tl = build_episode_timeline(ctx, 1)
+    assert len(tl["music"]) == 2 and tl["music"][0]["start"] == 0.0 and tl["music"][1]["fade_in"] > 0
+    act2 = next(s for s in tl["segments"] if s["label"].startswith("2.1."))
+    assert tl["music"][1]["start"] < act2["start"] < tl["music"][1]["start"] + 1.5 + 1e-6
+    assert tl["room_tone"] is not None and tl["room_tone"]["db"] == -50.0

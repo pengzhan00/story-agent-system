@@ -61,8 +61,12 @@ def fades(seg: dict[str, Any]) -> list[str]:
 
 def segment_cmd(
     ffmpeg: str, seg: dict[str, Any], vid: dict[str, Any], dest: Path, card_ass: str | None = None,
+    overlap: float = 0.0,
 ) -> list[str]:
-    w, h, fps, dur = vid["width"], vid["height"], vid["fps"], float(seg["duration"])
+    """One segment as an intermediate clip. ``overlap`` extra seconds are rendered after the nominal end: they are the
+    part that melts into the next shot in a cross-dissolve (the joined film is as long as the timeline says)."""
+    w, h, fps = vid["width"], vid["height"], vid["fps"]
+    dur = float(seg["duration"]) + overlap
     src = seg["source"]
     fill = f"scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h},setsar=1"
     base = [ffmpeg, "-y", "-loglevel", "error", "-nostdin"]
@@ -72,6 +76,8 @@ def segment_cmd(
         chain += [fill, f"fps={fps}"]
         if src.get("hold_after", 0) > 0:
             chain.append(f"tpad=stop_mode=clone:stop_duration={src['hold_after']}")
+        if overlap > 0:
+            chain.append(f"tpad=stop_mode=clone:stop_duration={overlap}")
         chain += tail
         return [*base, "-i", src["path"], "-vf", ",".join(chain), "-t", f"{dur}", "-an", *INTERMEDIATE, str(dest)]
     if src["type"] == "image":
@@ -85,6 +91,19 @@ def segment_cmd(
     chain += tail
     vf = ["-vf", ",".join(chain)] if chain else []
     return [*base, "-f", "lavfi", "-i", black, *vf, "-t", f"{dur}", "-an", *INTERMEDIATE, str(dest)]
+
+
+def join_cmd(ffmpeg: str, files: list[str], lengths: list[float], overlaps: list[float], dest: str) -> list[str]:
+    """One clip from ``files`` melted together: ``overlaps[k]`` seconds of file k run into file k+1 (xfade)."""
+    cmd = [ffmpeg, "-y", "-loglevel", "error", "-nostdin"]
+    for f in files:
+        cmd += ["-i", f]
+    chain, cur, length = [], "[0:v]", lengths[0]
+    for k in range(1, len(files)):
+        d = overlaps[k - 1]
+        chain.append(f"{cur}[{k}:v]xfade=transition=fade:duration={d}:offset={round(length - d, 3)}[x{k}]")
+        cur, length = f"[x{k}]", length + lengths[k] - d
+    return [*cmd, "-filter_complex", ";".join(chain), "-map", cur, "-an", *INTERMEDIATE, dest]
 
 
 def ass_colour(rgb: str, default: str) -> str:
@@ -124,6 +143,14 @@ def write_card_ass(lines: list[str], vid: dict[str, Any], font: str, duration: f
     dest.write_text("\n".join(head) + "\n", encoding="utf-8")
 
 
+def swell_expr(swell: dict[str, Any]) -> str:
+    """Volume factor over time: 1 normally, ``db`` louder inside each interval (ramped at both ends)."""
+    boost = 10 ** (float(swell["db"]) / 20) - 1.0
+    ramp = max(float(swell.get("ramp", 0.4)), 0.05)
+    terms = [f"clip(min((t-{a})/{ramp},({b}-t)/{ramp}),0,1)" for a, b in swell["intervals"][:40]]
+    return "1+" + f"{boost:.4f}*(" + "+".join(terms) + ")"
+
+
 def audio_cmd(ffmpeg: str, tl: dict[str, Any], dest: Path) -> list[str]:
     a, total = tl["audio"], float(tl["total_sec"])
     rate = a["rate"]
@@ -151,18 +178,46 @@ def audio_cmd(ffmpeg: str, tl: dict[str, Any], dest: Path) -> list[str]:
     mixed = ["[vmix]"]
     chains.append("[voice]asplit=2[vmix][vkey]")
     if tl["music"]:
-        m = tl["music"][0]
-        cmd.extend(["-stream_loop", "-1", "-i", m["path"]])
-        chains.append(f"[{n}:a]aresample={rate},aformat=channel_layouts=stereo,atrim=0:{total},"
-                      f"volume={m['gain']}[bgm]")
+        beds: list[str] = []
+        for k, m in enumerate(tl["music"]):
+            cmd.extend(["-stream_loop", "-1", "-i", m["path"]])
+            dur, ms = float(m["duration"]), int(round(float(m["start"]) * 1000))
+            fin, fout = min(float(m.get("fade_in", 0) or 0), dur / 2), min(float(m.get("fade_out", 0) or 0), dur / 2)
+            shape = (f"afade=t=in:st=0:d={fin}," if fin > 0 else "") + (
+                f"afade=t=out:st={round(dur - fout, 3)}:d={fout}," if fout > 0 else "")
+            chains.append(f"[{n}:a]aresample={rate},aformat=channel_layouts=stereo,atrim=0:{dur},{shape}"
+                          f"volume={m['gain']},adelay={ms}|{ms}[bed{k}]")
+            beds.append(f"[bed{k}]")
+            n += 1
+        if len(beds) == 1:
+            chains.append(f"{beds[0]}anull[bgm0]")
+        else:
+            chains.append(f"{''.join(beds)}amix=inputs={len(beds)}:duration=longest:normalize=0[bgm0]")
+        swell = tl.get("music_swell")
+        if swell and swell.get("intervals"):
+            chains.append(f"[bgm0]volume='{swell_expr(swell)}':eval=frame[bgm]")
+        else:
+            chains.append("[bgm0]anull[bgm]")
         chains.append("[bgm][vkey]sidechaincompress=threshold=0.04:ratio=8:attack=20:release=400[duck]")
         mixed.append("[duck]")
-        n += 1
     else:
         chains.append("[vkey]anullsink")
+    tone = tl.get("room_tone")
+    if tone and tone.get("blocks"):
+        amp = 10 ** (float(tone["db"]) / 20)
+        fade = float(tone.get("fade", 0.4))
+        for k, blk in enumerate(tone["blocks"]):
+            dur, ms = float(blk["duration"]), int(round(float(blk["start"]) * 1000))
+            f = min(fade, dur / 2)
+            cmd.extend(["-f", "lavfi", "-t", f"{dur}", "-i", f"anoisesrc=color={tone['color']}:r={rate}:a={amp:.6f}"])
+            chains.append(f"[{n}:a]aformat=sample_fmts=fltp:channel_layouts=stereo,lowpass=f=600,"
+                          f"afade=t=in:st=0:d={f},afade=t=out:st={round(dur - f, 3)}:d={f},adelay={ms}|{ms}[tone{k}]")
+            mixed.append(f"[tone{k}]")
+            n += 1
     mixed += sfx
     ln = a["loudnorm"]
-    audible = bool(tl["speech"] or tl["sfx"] or tl["music"])     # loudnorm on pure silence yields NaN and breaks aac
+    # loudnorm on pure silence yields NaN and breaks aac; a room tone alone is not content to be brought up to -16 LUFS
+    audible = bool(tl["speech"] or tl["sfx"] or tl["music"])
     norm = f"loudnorm=I={ln['i']}:TP={ln['tp']}:LRA={ln['lra']}," if audible else ""
     chains.append(f"{''.join(mixed)}amix=inputs={len(mixed)}:duration=first:normalize=0,"
                   f"{norm}aresample={rate},atrim=0:{total}[out]")
@@ -214,25 +269,48 @@ def main(config_path: str) -> int:
     total = len(segs) + 3
 
     libass = has_filter(ffmpeg, "subtitles") and has_filter(ffmpeg, "ass")
+    dissolve_ok = has_filter(ffmpeg, "xfade")
     font = str(tl["subtitles"].get("font", "Arial"))
     notes: list[dict[str, Any]] = []
     parts: list[Path] = []
+    overlaps: list[float] = []              # overlaps[i]: seconds segment i melts into segment i+1
     for i, seg in enumerate(segs):
         emit(i, total, f"shot {i + 1}/{len(segs)}")
         dest = work / f"seg_{i:03d}.mp4"
+        want = float(seg.get("dissolve_out", 0) or 0) if i + 1 < len(segs) else 0.0
+        if want and not dissolve_ok:
+            notes.append({"code": "dissolve_unavailable"})
+            want = 0.0
         card_ass: str | None = None
         if seg["source"]["type"] == "card":
             if libass:
                 card_ass = f"card_{i:03d}.ass"
-                write_card_ass(seg["source"].get("lines", []), vid, font, float(seg["duration"]), work / card_ass)
+                write_card_ass(seg["source"].get("lines", []), vid, font, float(seg["duration"]) + want,
+                               work / card_ass)
             else:
                 notes.append({"code": "card_without_libass", "card": seg["source"].get("kind", "")})
-        run(segment_cmd(ffmpeg, seg, vid, dest, card_ass), cwd=work)
+        run(segment_cmd(ffmpeg, seg, vid, dest, card_ass, want), cwd=work)
         parts.append(dest)
+        overlaps.append(want)
 
     emit(len(segs), total, "video")
+    units: list[Path] = []
+    i = 0
+    while i < len(parts):
+        j = i
+        while j < len(parts) - 1 and overlaps[j] > 0:
+            j += 1
+        if j == i:
+            units.append(parts[i])
+        else:                                  # a run of shots joined by dissolves becomes one clip
+            unit = work / f"unit_{i:03d}.mp4"
+            lengths = [float(segs[k]["duration"]) + overlaps[k] for k in range(i, j + 1)]
+            run(join_cmd(ffmpeg, [parts[k].name for k in range(i, j + 1)], lengths, overlaps[i:j], unit.name),
+                cwd=work)
+            units.append(unit)
+        i = j + 1
     listing = work / "concat.txt"
-    listing.write_text("".join(f"file '{p.name}'\n" for p in parts), "utf-8")
+    listing.write_text("".join(f"file '{p.name}'\n" for p in units), "utf-8")
     joined = work / "video_all.mp4"
     run([ffmpeg, "-y", "-loglevel", "error", "-nostdin", "-f", "concat", "-safe", "0", "-i", listing.name, "-c", "copy",
          joined.name], cwd=work)

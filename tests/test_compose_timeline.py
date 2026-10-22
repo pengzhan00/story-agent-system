@@ -103,3 +103,97 @@ def test_a_change_of_scene_gets_a_fade_and_the_timing_stays() -> None:
     assert [s["start"] for s in soft["segments"]] == [s["start"] for s in hard["segments"]] and soft["total_sec"] == 6.0
     assert "fade_out" not in soft["segments"][0] and soft["segments"][1]["fade_out"] == 0.3
     assert soft["segments"][2]["fade_in"] == 0.3 and "fade_in" not in hard["segments"][2]
+
+
+# -- sound and edit grammar --------------------------------------------------------------------------
+from storyagent.compose.timeline import MusicCue  # noqa: E402
+
+
+def talk(i: int, scene: str, *secs: float, planned: float = 3.0, video_sec: float | None = 8.0) -> ShotInput:
+    return ShotInput(i, f"{scene}.{i}", planned, video=clip(f"v{i}", video_sec), scene=scene,
+                     lines=[(f"line {i}.{n}", voice(f"s{i}{n}", sec)) for n, sec in enumerate(secs)])
+
+
+def build(shots: list[ShotInput], mix: dict | None = None, **kw) -> dict:  # noqa: ANN003
+    return build_timeline(TimelineInput(shots, PROFILE, {**MIX, **(mix or {})}, {"font": "X"}, **kw))
+
+
+def test_a_room_tone_block_runs_under_each_scene_and_is_off_by_default() -> None:
+    shots = [talk(1, "1.1", 1.0), talk(2, "1.1", 1.0), talk(3, "1.2", 1.0)]
+    assert build(shots)["room_tone"] is None
+    t = build(shots, {"room_tone": True, "room_tone_db": -48})
+    tone = t["room_tone"]
+    assert tone["db"] == -48 and tone["color"] == "brown"
+    assert [(b["scene"], b["start"]) for b in tone["blocks"]] == [("1.1", 0.0), ("1.2", t["segments"][2]["start"])]
+    assert tone["blocks"][0]["duration"] == round(t["segments"][0]["duration"] + t["segments"][1]["duration"], 3)
+
+
+def test_music_cues_start_at_their_scene_and_crossfade() -> None:
+    shots = [talk(1, "1.1", 1.0), talk(2, "1.2", 1.0), talk(3, "1.3", 1.0)]
+    cues = (MusicCue(AssetRef("m1", "audio.music", 20.0), "1.1"), MusicCue(AssetRef("m2", "audio.music", 20.0), "1.3"),
+            MusicCue(AssetRef("m3", "audio.music", 20.0), "9.9"))
+    t = build(shots, {"music_crossfade_sec": 1.0}, music_cues=cues)
+    first, second = t["music"]
+    cut = t["segments"][2]["start"]
+    assert [m["asset"] for m in t["music"]] == ["asset:m1", "asset:m2"]
+    assert first["start"] == 0.0 and first["fade_in"] == 0.0 and first["fade_out"] == 1.0
+    assert first["start"] + first["duration"] == round(cut + 0.5, 3)           # runs half a cross-fade past the change
+    assert second["start"] == round(cut - 0.5, 3) and second["fade_in"] == 1.0
+    assert second["start"] + second["duration"] == t["total_sec"] and second["fade_out"] <= 1.0
+    assert {"code": "music_cue_scene_missing", "scene": "9.9"} in t["warnings"]
+
+
+def test_a_single_bgm_is_still_one_bed_without_fades() -> None:
+    t = build([talk(1, "1.1", 1.0)], bgm=AssetRef("m", "audio.music", 30.0))
+    assert t["music"] == [{"asset": "asset:m", "start": 0.0, "duration": t["total_sec"], "loop": True, "gain": 0.16}]
+
+
+def test_the_music_swells_only_where_nobody_speaks_for_a_while() -> None:
+    quiet = ShotInput(2, "1.1.2", 6.0, video=clip("v2", 8.0), scene="1.1")
+    shots = [talk(1, "1.1", 1.0), quiet, talk(3, "1.1", 1.0)]
+    t = build(shots, {"music_swell_db": 3.0}, bgm=AssetRef("m", "audio.music", 30.0))
+    swell = t["music_swell"]
+    [(a, b)] = swell["intervals"]
+    speech = t["speech"]
+    assert swell["db"] == 3.0 and a >= speech[0]["start"] + speech[0]["duration"] and b <= speech[1]["start"]
+    assert build(shots, bgm=AssetRef("m", "audio.music", 30.0))["music_swell"] is None
+    assert build([quiet], {"music_swell_db": 3.0}, bgm=AssetRef("m", "audio.music", 30.0))["music_swell"] is None
+
+
+def test_a_j_cut_lets_the_next_line_start_before_its_picture() -> None:
+    shots = [talk(1, "1.1", 1.0, planned=4.0), talk(2, "1.1", 1.0, planned=4.0)]
+    plain, jcut = build(shots), build(shots, j_cut_sec=0.5)
+    assert plain["speech"] == jcut["speech"] and plain["total_sec"] == jcut["total_sec"]      # sound did not move
+    nominal = plain["segments"][1]["start"]
+    a, b = jcut["segments"]
+    assert b["start"] == round(nominal + 0.4 + 0.5, 3) and b["cut_in"] == "j"                  # lead 0.4 + 0.5
+    assert a["duration"] == round(plain["segments"][0]["duration"] + 0.9, 3)
+    assert round(a["duration"] + b["duration"], 3) == round(
+        plain["segments"][0]["duration"] + plain["segments"][1]["duration"], 3)
+    assert jcut["speech"][1]["start"] == round(b["start"] - 0.5, 3)                             # heard 0.5 s early
+    assert a["source"]["mode"] == "trim" and b["source"]["trim"] == b["duration"]
+
+
+def test_an_l_cut_lets_the_last_line_run_over_the_next_picture() -> None:
+    shots = [talk(1, "1.1", 3.0, planned=6.0), ShotInput(2, "1.1.2", 4.0, video=clip("v2", 8.0), scene="1.1")]
+    plain, lcut = build(shots), build(shots, l_cut_sec=0.5)
+    line_end = plain["speech"][0]["start"] + plain["speech"][0]["duration"]
+    b = lcut["segments"][1]
+    assert b["cut_in"] == "l" and b["start"] == round(line_end - 0.5, 3)
+    assert lcut["total_sec"] == plain["total_sec"]
+
+
+def test_cuts_do_not_cross_scenes_and_never_leave_a_shot_too_short() -> None:
+    shots = [talk(1, "1.1", 1.0, planned=4.0), talk(2, "1.2", 1.0, planned=4.0)]
+    assert [s.get("cut_in") for s in build(shots, j_cut_sec=0.5)["segments"]] == [None, None]
+    tight = [talk(1, "1.1", 1.0, planned=1.0), talk(2, "1.1", 0.2, planned=1.0)]
+    assert [s.get("cut_in") for s in build(tight, j_cut_sec=2.0)["segments"]] == [None, None]
+
+
+def test_a_dissolve_marks_the_shot_before_a_scene_change_and_wins_over_the_fade() -> None:
+    shots = [talk(1, "1.1", 1.0), talk(2, "1.1", 1.0), talk(3, "1.2", 1.0)]
+    t = build(shots, dissolve_sec=0.5, scene_fade_sec=0.3)
+    assert [s.get("dissolve_out") for s in t["segments"]] == [None, 0.5, None]
+    assert all("fade_out" not in s and "fade_in" not in s for s in t["segments"])
+    assert [s["start"] for s in t["segments"]] == [s["start"] for s in build(shots)["segments"]]    # timing unchanged
+    assert build(shots, scene_fade_sec=0.3)["segments"][1]["fade_out"] == 0.3

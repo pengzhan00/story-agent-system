@@ -114,18 +114,20 @@ function Spec({ id }: { id: number }) {
             <span>{t(`web.edit.${key}`)}</span>
           </label>
         ))}
-        <label className="check">
-          <span>{t("web.edit.scene_fade_sec")}</span>
-          <input
-            type="number"
-            min={0}
-            max={2}
-            step={0.1}
-            value={typeof edit["scene_fade_sec"] === "number" ? String(edit["scene_fade_sec"]) : ""}
-            placeholder="0"
-            onChange={(e) => setEdit("scene_fade_sec", e.target.value === "" ? 0 : Number(e.target.value))}
-          />
-        </label>
+        {(["scene_fade_sec", "dissolve_sec", "j_cut_sec", "l_cut_sec"] as const).map((key) => (
+          <label key={key} className="check">
+            <span>{t(`web.edit.${key}`)}</span>
+            <input
+              type="number"
+              min={0}
+              max={2}
+              step={0.1}
+              value={typeof edit[key] === "number" ? String(edit[key]) : ""}
+              placeholder="0"
+              onChange={(e) => setEdit(key, e.target.value === "" ? 0 : Number(e.target.value))}
+            />
+          </label>
+        ))}
       </div>
       <p className="muted small">{t("web.edit.hint")}</p>
       <p className="muted small">{t("web.workflow.voice_hint")}</p>

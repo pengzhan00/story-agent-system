@@ -9,6 +9,11 @@ Per shot: ``duration = max(planned, lead_in + sum(lines) + gaps + tail)``. The p
 clip that is too short is slowed down (up to ``max_slowdown``) and then holds its last frame; one that is too long is
 trimmed; a still image gets a slow push-in (Ken Burns). A shot with no picture at all becomes a black card and a
 warning - the episode still renders, and the gap is visible in the report.
+
+Sound and edit grammar (all switchable, ``delivery.toml [mix]`` / ``[edit]``): a quiet room tone under every scene so
+a pause is never dead silence; several music cues (one per run of scenes, cross-faded) instead of one bed; the music
+swells a little where nobody speaks; a J-cut (the next line is heard before its picture) or an L-cut (the picture
+changes while the last line is still being said) at a cut inside one scene; a cross-dissolve at a change of scene.
 """
 from __future__ import annotations
 
@@ -45,6 +50,14 @@ class Card:
     sec: float = 2.0
 
 
+@dataclass(frozen=True)
+class MusicCue:
+    """A music bed that plays from the first shot of ``from_scene`` ("act.scene") until the next cue starts."""
+
+    asset: AssetRef
+    from_scene: str = ""
+
+
 @dataclass
 class ShotInput:
     shot_id: int
@@ -72,6 +85,10 @@ class TimelineInput:
     intro_cards: Sequence[Card] = ()            # shown before the first shot, in order
     outro_cards: Sequence[Card] = ()            # shown after the last shot, before the AIGC end card
     scene_fade_sec: float = 0.0                 # fade out/in at a change of scene (0 = hard cut)
+    music_cues: Sequence[MusicCue] = ()         # several beds; ``bgm`` is the one-bed shorthand
+    dissolve_sec: float = 0.0                   # cross-dissolve at a change of scene (0 = none; wins over the fade)
+    j_cut_sec: float = 0.0                      # a line is heard this long before its picture, inside a scene (0 = off)
+    l_cut_sec: float = 0.0                      # the last line runs this long over the next picture (0 = off)
 
 
 Timeline = dict[str, Any]
@@ -111,6 +128,7 @@ def build_timeline(inp: TimelineInput) -> Timeline:
     add_cards(inp.intro_cards)
     story_start = len(segments)
     scene_of: list[str] = []
+    meta: list[dict[str, Any]] = []         # per shot: what the cut rules need (segment, speech span, clip length)
     for shot in inp.shots:
         t = lead
         lines_out: list[dict[str, Any]] = []
@@ -140,6 +158,12 @@ def build_timeline(inp: TimelineInput) -> Timeline:
             warnings.append({"code": "no_picture", "shot_id": shot.shot_id})
         segments.append(seg)
         scene_of.append(shot.scene)
+        meta.append({"i": len(segments) - 1, "scene": shot.scene, "start": round(cursor, 3),
+                     "duration": round(duration, 3),
+                     "clip": shot.video.duration_sec if shot.video is not None else None,
+                     "video": shot.video.ref if shot.video is not None else None,
+                     "first": lines_out[0]["offset"] if lines_out else None,
+                     "last_end": round(lines_out[-1]["offset"] + lines_out[-1]["duration"], 3) if lines_out else None})
 
         for ln in lines_out:
             start = cursor + ln["offset"]
@@ -157,12 +181,19 @@ def build_timeline(inp: TimelineInput) -> Timeline:
             sfx.append({"asset": asset.ref, "start": round(cursor + offset, 3), "duration": round(length, 3)})
         cursor += duration
 
-    fade = float(inp.scene_fade_sec)
-    if fade > 0:
-        for i in range(1, len(scene_of)):
-            if scene_of[i] != scene_of[i - 1]:       # dip through black at a change of scene (timing is unchanged)
-                segments[story_start + i - 1]["fade_out"] = fade
-                segments[story_start + i]["fade_in"] = fade
+    _adjust_cuts(inp, segments, meta, max_slow)
+    fade, dissolve = float(inp.scene_fade_sec), float(inp.dissolve_sec)
+    for i in range(1, len(scene_of)):
+        if scene_of[i] == scene_of[i - 1]:
+            continue
+        before, after = segments[story_start + i - 1], segments[story_start + i]
+        if dissolve > 0:                  # picture melts into the next scene; the runner overlaps the two shots
+            d = round(min(dissolve, before["duration"] / 2, after["duration"] / 2), 3)
+            if d > 0:
+                before["dissolve_out"] = d
+        elif fade > 0:                    # dip through black at a change of scene (timing is unchanged)
+            before["fade_out"] = fade
+            after["fade_in"] = fade
     add_cards(inp.outro_cards)
 
     label_block: dict[str, Any] | None = None
@@ -176,12 +207,9 @@ def build_timeline(inp: TimelineInput) -> Timeline:
     total = round(cursor, 3)
     if label_block is not None:
         label_block["total"] = total
-    music: list[dict[str, Any]] = []
-    if inp.bgm is not None:
-        music.append({"asset": inp.bgm.ref, "start": 0.0, "duration": total, "loop": True,
-                      "gain": float(mix.get("bgm_gain", 0.16))})
-    else:
-        warnings.append({"code": "no_bgm"})
+    music = _music(inp, mix, meta, segments, total, warnings)
+    swell = _swell(mix, speech, total) if music else None
+    tone = _room_tone(mix, meta, segments)
     return {
         "version": 1, "title": inp.title, "total_sec": total,
         "video": {"width": int(prof["width"]), "height": int(prof["height"]), "fps": int(prof["fps"]),
@@ -193,6 +221,108 @@ def build_timeline(inp: TimelineInput) -> Timeline:
                   "loudnorm": {"i": float(mix.get("loudnorm_i", -16.0)), "tp": float(mix.get("loudnorm_tp", -1.5)),
                                "lra": float(mix.get("loudnorm_lra", 11.0))}},
         "subtitles": {**dict(inp.subtitles), "cues": subtitles},
-        "segments": segments, "speech": speech, "sfx": sfx, "music": music, "warnings": warnings,
-        "label": label_block, "metadata": dict(inp.metadata),
+        "segments": segments, "speech": speech, "sfx": sfx, "music": music, "music_swell": swell,
+        "room_tone": tone, "warnings": warnings, "label": label_block, "metadata": dict(inp.metadata),
     }
+
+
+def _adjust_cuts(inp: TimelineInput, segments: list[dict[str, Any]], meta: list[dict[str, Any]],
+                 max_slow: float) -> None:
+    """J- and L-cuts. Inside one scene the picture cut moves relative to the sound: a J-cut lets the next shot's first
+    line start ``j_cut_sec`` before its picture; an L-cut lets the last line of a shot run ``l_cut_sec`` over the next
+    picture. The sound never moves (it is placed by absolute time); only the two neighbouring segments trade seconds, so
+    the total length is unchanged. A cut that would leave a shot shorter than MIN_SHOT_SEC is left alone."""
+    j, l_cut = float(inp.j_cut_sec), float(inp.l_cut_sec)
+    if (j <= 0 and l_cut <= 0) or len(meta) < 2:
+        return
+    before: dict[int, float] = {}       # segment index -> seconds the cut in front of it moved later
+    after: dict[int, float] = {}        # ... the cut behind it moved later
+    kind: dict[int, str] = {}
+    for a, b in zip(meta, meta[1:], strict=False):
+        if a["scene"] != b["scene"]:
+            continue
+        ia, ib = a["i"], b["i"]
+        if j > 0 and b["first"] is not None:
+            delta, tag = b["first"] + j, "j"
+        elif l_cut > 0 and a["last_end"] is not None:
+            delta, tag = -((a["duration"] - a["last_end"]) + l_cut), "l"
+        else:
+            continue
+        long_a = a["duration"] - before.get(ia, 0.0) + delta
+        long_b = b["duration"] - delta
+        if long_a < MIN_SHOT_SEC or long_b < MIN_SHOT_SEC:
+            continue
+        after[ia], before[ib], kind[ib] = delta, delta, tag
+    for m in meta:
+        i = m["i"]
+        if i not in before and i not in after:
+            continue
+        seg = segments[i]
+        seg["start"] = round(m["start"] + before.get(i, 0.0), 3)
+        seg["duration"] = round(m["duration"] - before.get(i, 0.0) + after.get(i, 0.0), 3)
+        if i in kind:
+            seg["cut_in"] = kind[i]
+        if m["video"] is not None:
+            seg["source"] = {"type": "video", "asset": m["video"], **_fit_video(m["clip"], seg["duration"], max_slow)}
+
+
+def _music(inp: TimelineInput, mix: Mapping[str, Any], meta: Sequence[Mapping[str, Any]],
+           segments: Sequence[Mapping[str, Any]], total: float, warnings: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    gain = float(mix.get("bgm_gain", 0.16))
+    if not inp.music_cues:
+        if inp.bgm is None:
+            warnings.append({"code": "no_bgm"})
+            return []
+        return [{"asset": inp.bgm.ref, "start": 0.0, "duration": total, "loop": True, "gain": gain}]
+    first_start: dict[str, float] = {}
+    for m in meta:
+        first_start.setdefault(m["scene"], float(segments[m["i"]]["start"]))
+    placed: list[tuple[float, MusicCue]] = []
+    for n, cue in enumerate(inp.music_cues):
+        at = 0.0 if n == 0 else first_start.get(cue.from_scene)
+        if at is None:
+            warnings.append({"code": "music_cue_scene_missing", "scene": cue.from_scene})
+            continue
+        if not placed or at > placed[-1][0] + 1e-6:          # two cues on the same scene: the first one stays
+            placed.append((at, cue))
+    xfade = max(float(mix.get("music_crossfade_sec", 1.5)), 0.0)
+    out: list[dict[str, Any]] = []
+    for k, (at, cue) in enumerate(placed):
+        end = placed[k + 1][0] if k + 1 < len(placed) else total
+        x = min(xfade, (end - at) / 2)
+        last = k + 1 == len(placed)
+        start = max(at - (x / 2 if k else 0.0), 0.0)
+        stop = min(end + (0.0 if last else x / 2), total)
+        out.append({"asset": cue.asset.ref, "start": round(start, 3), "duration": round(stop - start, 3),
+                    "loop": True, "gain": gain, "fade_in": round(x if k else 0.0, 3),
+                    "fade_out": round(min(1.0, total / 4) if last else x, 3)})
+    return out
+
+
+def _swell(mix: Mapping[str, Any], speech: Sequence[Mapping[str, Any]], total: float) -> dict[str, Any] | None:
+    """Where nobody speaks for a while the music comes up a little (``music_swell_db``); under speech it ducks."""
+    db = float(mix.get("music_swell_db", 0.0))
+    if db <= 0 or not speech:
+        return None
+    margin, minimum = 0.5, float(mix.get("music_swell_min_sec", 2.0))
+    spans = sorted((float(s["start"]), float(s["start"]) + float(s["duration"])) for s in speech)
+    edges = [0.0, *[x for span in spans for x in span], total]
+    gaps = [(a + margin, b - margin) for a, b in zip(edges[::2], edges[1::2], strict=False)
+            if b - a - 2 * margin >= minimum]
+    return {"db": db, "ramp": 0.4, "intervals": [[round(a, 3), round(b, 3)] for a, b in gaps]} if gaps else None
+
+
+def _room_tone(mix: Mapping[str, Any], meta: Sequence[Mapping[str, Any]],
+               segments: Sequence[Mapping[str, Any]]) -> dict[str, Any] | None:
+    """A faint noise bed under every run of shots of one scene: a pause between lines is room, not digital silence."""
+    if not mix.get("room_tone"):
+        return None
+    blocks: list[dict[str, Any]] = []
+    for m in meta:
+        seg = segments[m["i"]]
+        if blocks and blocks[-1]["scene"] == m["scene"]:
+            blocks[-1]["duration"] = round(float(seg["start"]) + float(seg["duration"]) - blocks[-1]["start"], 3)
+        else:
+            blocks.append({"scene": m["scene"], "start": float(seg["start"]), "duration": float(seg["duration"])})
+    return {"db": float(mix.get("room_tone_db", -50.0)), "color": str(mix.get("room_tone_color", "brown")),
+            "fade": 0.4, "blocks": blocks}

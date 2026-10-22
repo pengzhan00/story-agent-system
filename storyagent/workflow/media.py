@@ -17,13 +17,14 @@ Progress messages are ``<i18n key>|<detail>``; clients translate the part before
 """
 from __future__ import annotations
 
+import re
 import time
 from collections.abc import Callable
 from typing import Any
 
 from storyagent.compose.pacing import duration_window
 from storyagent.compose.qc import run_qc
-from storyagent.compose.timeline import AssetRef, Card, ShotInput, TimelineInput, build_timeline
+from storyagent.compose.timeline import AssetRef, Card, MusicCue, ShotInput, TimelineInput, build_timeline
 from storyagent.config import ConfigError, Settings
 from storyagent.domain import JobStatus, MediaKind, QualityTier
 from storyagent.i18n import get_catalog
@@ -393,6 +394,31 @@ def episode_cards(ctx: Ctx, episode: int, opts: dict[str, Any]) -> tuple[list[Ca
     return intro, outro
 
 
+_SCENE_REF = re.compile(r"^(?:ep\d+_)?act(\d+)_scene(\d+)$")
+
+
+def episode_music(ctx: Ctx, episode: int) -> list[MusicCue]:
+    """The music beds of this episode in story order: each plays from the scene it was written for until the next one.
+    A bed written for no scene of this episode is only used when the episode has none of its own."""
+    ledger, store = _ledger(ctx), ctx.spec_store
+    prefix = f"ep{episode:02d}_"
+    beds = [m for m in ctx.store.list_music(ctx.pid) if m["kind"] == "bgm"]
+    own = [m for m in beds if str(m["scene_ref"]).startswith(prefix)]
+    out: list[tuple[tuple[int, int], MusicCue]] = []
+    for m in own or beds:
+        spec = store.current(ctx.pid, "music.bgm", str(m["id"]))
+        asset = _asset_ref(current_asset(ledger, spec) if spec else None, "audio.music")
+        if asset is None:
+            continue
+        found = _SCENE_REF.match(str(m["scene_ref"]))
+        act, scene = (int(found.group(1)), int(found.group(2))) if found else (0, 0)
+        out.append(((act, scene), MusicCue(asset, f"{act}.{scene}" if found else "")))
+        if not own:
+            break                               # no cue belongs to this episode: one bed, from the start
+    out.sort(key=lambda x: x[0])
+    return [cue for _, cue in out]
+
+
 def build_episode_timeline(ctx: Ctx, episode: int) -> dict[str, Any]:
     ledger, store = _ledger(ctx), ctx.spec_store
     ep = next((e for e in ctx.store.list_episodes(ctx.pid) if e["number"] == episode), None)
@@ -426,14 +452,9 @@ def build_episode_timeline(ctx: Ctx, episode: int) -> dict[str, Any]:
             lines=lines, sfx=effects, narration=str(shot.get("narration", "")),
             scene=f"{shot['act_number']}.{shot['scene_number']}",
         ))
-    bgm = None
-    cues = [m for m in ctx.store.list_music(ctx.pid) if m["kind"] == "bgm"]
-    cues.sort(key=lambda m: not str(m["scene_ref"]).startswith(f"ep{episode:02d}_"))     # this episode's cues first
-    for m in cues:
-        spec = store.current(ctx.pid, "music.bgm", str(m["id"]))
-        bgm = _asset_ref(current_asset(ledger, spec) if spec else None, "audio.music")
-        if bgm:
-            break
+    bgm, music_cues = None, episode_music(ctx, episode)
+    if len(music_cues) == 1:
+        bgm, music_cues = music_cues[0].asset, []
     profile = ctx.settings.delivery_profile(ctx.project.delivery_profile)
     label, metadata = compliance_marks(ctx)
     opts = edit_options(ctx)
@@ -441,7 +462,9 @@ def build_episode_timeline(ctx: Ctx, episode: int) -> dict[str, Any]:
     return build_timeline(TimelineInput(
         inputs, profile, ctx.settings.delivery["mix"], ctx.settings.delivery["subtitles"], bgm=bgm,
         title=ctx.project.name, label=label, metadata=metadata, intro_cards=intro, outro_cards=outro,
-        scene_fade_sec=float(opts.get("scene_fade_sec", 0) or 0)))
+        scene_fade_sec=float(opts.get("scene_fade_sec", 0) or 0), music_cues=music_cues,
+        dissolve_sec=float(opts.get("dissolve_sec", 0) or 0), j_cut_sec=float(opts.get("j_cut_sec", 0) or 0),
+        l_cut_sec=float(opts.get("l_cut_sec", 0) or 0)))
 
 
 def compliance_marks(ctx: Ctx) -> tuple[dict[str, Any] | None, dict[str, str]]:

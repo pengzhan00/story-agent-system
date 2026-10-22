@@ -57,7 +57,7 @@ class Project:
 
 
 EDIT_FLAGS = ("title_card", "recap_card", "next_card")
-EDIT_SECONDS = ("scene_fade_sec", "title_sec", "recap_sec", "next_sec")
+EDIT_SECONDS = ("scene_fade_sec", "dissolve_sec", "j_cut_sec", "l_cut_sec", "title_sec", "recap_sec", "next_sec")
 
 
 def _check_edit(edit: Any) -> None:

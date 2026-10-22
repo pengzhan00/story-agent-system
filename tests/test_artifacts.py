@@ -38,7 +38,8 @@ STRIPED = "90+0.25*X+0.15*Y+if(lt(mod(Y,8),4),22,-22)"
 PUMPING = "90+0.25*X+0.15*Y+if(eq(mod(N,2),0),14,-14)"
 
 
-def test_a_smooth_picture_is_clean_stripes_are_banding_and_alternating_brightness_is_flicker(cfg, tmp_path: Path) -> None:  # noqa: ANN001
+def test_stripes_are_banding_alternating_brightness_is_flicker_and_a_smooth_picture_is_clean(
+        cfg, tmp_path: Path) -> None:  # noqa: ANN001
     s, ffmpeg = cfg
     qc = s.delivery["qc"]
     clean = measure(ffmpeg, clip(ffmpeg, tmp_path / "c.mp4", CLEAN), qc, native_fps=24)

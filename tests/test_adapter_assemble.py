@@ -190,3 +190,49 @@ def test_a_sound_effect_is_trimmed_to_its_shot_but_speech_is_not() -> None:
     graph = cmd[cmd.index("-filter_complex") + 1]
     assert "atrim=0:2.0,afade=t=out:st=1.900:d=0.1,adelay=1000|1000,volume=0.5[x0]" in graph
     assert "atrim=0:2.0" not in graph.split("[x0]")[0].split("[v0]")[0]            # the voice chain has no cut
+
+
+def mean_volume(ffmpeg: str, film: Path, start: float, length: float) -> float:
+    done = subprocess.run([ffmpeg, "-hide_banner", "-nostdin", "-ss", f"{start}", "-t", f"{length}", "-i", str(film),
+                           "-vn", "-af", "volumedetect", "-f", "null", "-"], capture_output=True, text=True, check=True)
+    line = next(x for x in done.stderr.splitlines() if "mean_volume" in x)
+    return float(line.split("mean_volume:")[1].split("dB")[0])
+
+
+def test_room_tone_music_cues_swell_j_cut_and_dissolve_render_together(tmp_path: Path) -> None:
+    from storyagent.compose.timeline import MusicCue
+
+    ff = ffmpeg_of(tmp_path)
+    m = make_media(tmp_path, ff)
+
+    def ref(name: str, kind: str, dur: float | None) -> AssetRef:
+        return AssetRef(str(m[name]), kind, dur)
+
+    shots = [
+        ShotInput(1, "1.1.1", 2.0, video=ref("clip.mp4", "video.generate", 1.0), scene="1.1",
+                  lines=[("One", ref("line1.wav", "audio.tts", 1.0))]),
+        ShotInput(2, "1.1.2", 2.0, video=ref("clip.mp4", "video.generate", 1.0), scene="1.1",
+                  lines=[("Two", ref("line2.wav", "audio.tts", 0.8))]),
+        ShotInput(3, "1.2.1", 5.0, video=ref("clip.mp4", "video.generate", 1.0), scene="1.2"),
+        ShotInput(4, "1.2.2", 2.0, image=ref("still.png", "image.generate", None), scene="1.2"),
+    ]
+    profile = {"width": 72, "height": 128, "fps": 12, "crf": 28, "pix_fmt": "yuv420p"}
+    mix = {"lead_in_sec": 0.3, "bgm_gain": 0.2, "loudnorm_i": -16.0, "room_tone": True, "room_tone_db": -40,
+           "music_swell_db": 3.0, "music_swell_min_sec": 1.5}
+    cues = (MusicCue(ref("bgm.wav", "audio.music", 2.0), "1.1"), MusicCue(ref("bgm.wav", "audio.music", 2.0), "1.2"))
+    tl = as_paths(build_timeline(TimelineInput(shots, profile, mix, {"font": "Arial", "font_size": 12},
+                                               music_cues=cues, j_cut_sec=0.3, dissolve_sec=0.5)))
+    assert len(tl["music"]) == 2 and tl["music_swell"] and tl["room_tone"]["blocks"][0]["scene"] == "1.1"
+    assert tl["segments"][1]["cut_in"] == "j" and tl["segments"][1]["dissolve_out"] == 0.5
+    rig = make_rig(make_settings(tmp_path), AssembleAdapter(poll_interval_sec=0.02))
+    rec, assets = rig.run(job(MediaKind.COMPOSE_ASSEMBLE, "ffmpeg-assemble", {"timeline": tl}, seed=5), timeout=180)
+    assert rec.status is JobStatus.COMPLETED, (rec.error_code, rec.error_message)
+    main = next(a for a in assets if a.slot == "main")
+    film = rig.settings.home / main.path
+    info = probe(rig.settings, film)
+    assert info is not None and info.has_video and info.has_audio
+    # the dissolve overlapped the two shots instead of adding to them: same length as the timeline
+    assert info.duration_sec is not None and abs(info.duration_sec - tl["total_sec"]) < 0.3
+    assert "dissolve_unavailable" not in {w["code"] for w in main.metadata["warnings"]}
+    # in the last scene nobody speaks (the music cue and the room tone are all there is) and it is not silent
+    assert mean_volume(ff, film, tl["segments"][2]["start"] + 1.0, 1.5) > -80.0
