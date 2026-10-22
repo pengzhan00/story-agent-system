@@ -128,7 +128,7 @@ def decide(cfg: AuthConfig, user: User | None, method: str, path: str) -> str | 
         return None
     for prefix in cfg.project_prefixes:
         base = re.escape(prefix)
-        is_project_op = ((method == "POST" and re.fullmatch(rf"{base}(/from-text|/\d+/restore)?", path))
+        is_project_op = ((method == "POST" and re.fullmatch(rf"{base}(/from-text|/import-pack|/\d+/restore)?", path))
                          or (method == "DELETE" and re.fullmatch(rf"{base}/\d+", path)))
         if is_project_op:
             return None if role.create_project else "forbidden"

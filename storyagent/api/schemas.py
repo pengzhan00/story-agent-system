@@ -1003,3 +1003,23 @@ class ReviewShotOut(Strict):
     open_notes: int
     redoing_notes: int
     resolved_notes: int
+
+
+# -- asset packs -----------------------------------------------------------------------------------
+class PackExportOut(Strict):
+    name: str
+    bytes: int
+    scope: str
+    counts: dict[str, int]
+    warnings: list[dict[str, Any]]
+
+
+class PackReportOut(Strict):
+    dry_run: bool
+    project_id: int | None
+    created_project: bool
+    story: dict[str, dict[str, int]]
+    specs: dict[str, int]
+    assets: dict[str, int]
+    warnings: list[dict[str, Any]]
+    unassigned: list[str]

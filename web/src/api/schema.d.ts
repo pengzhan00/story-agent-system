@@ -603,6 +603,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/packs/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download */
+        get: operations["download_api_packs__name__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects": {
         parameters: {
             query?: never;
@@ -664,6 +681,27 @@ export interface paths {
          *     the production plan.
          */
         post: operations["create_project_from_text_api_projects_from_text_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/import-pack": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Zip
+         * @description Raw-body upload of a pack ``.zip``. ``dry_run=true`` reports what would change and writes nothing; without
+         *     ``into`` a new project is made from the pack's manifest (needs the create-project right).
+         */
+        post: operations["import_zip_api_projects_import_pack_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1064,6 +1102,26 @@ export interface paths {
          * @description Apply the requested changes to the spec (a new version that quotes the note) and queue new takes.
          */
         post: operations["redo_api_projects__project_id__notes__note_id__redo_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/pack": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export
+         * @description Write the project to ``<home>/exports/<slug>-<time>.zip``; download it with ``GET /api/packs/{name}``.
+         */
+        post: operations["export_api_projects__project_id__pack_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2789,6 +2847,52 @@ export interface components {
              * @enum {string}
              */
             status: "open" | "resolved" | "dismissed";
+        };
+        /** PackExportOut */
+        PackExportOut: {
+            /** Bytes */
+            bytes: number;
+            /** Counts */
+            counts: {
+                [key: string]: number;
+            };
+            /** Name */
+            name: string;
+            /** Scope */
+            scope: string;
+            /** Warnings */
+            warnings: {
+                [key: string]: unknown;
+            }[];
+        };
+        /** PackReportOut */
+        PackReportOut: {
+            /** Assets */
+            assets: {
+                [key: string]: number;
+            };
+            /** Created Project */
+            created_project: boolean;
+            /** Dry Run */
+            dry_run: boolean;
+            /** Project Id */
+            project_id: number | null;
+            /** Specs */
+            specs: {
+                [key: string]: number;
+            };
+            /** Story */
+            story: {
+                [key: string]: {
+                    [key: string]: number;
+                };
+            };
+            /** Unassigned */
+            unassigned: string[];
+            /** Warnings */
+            warnings: {
+                [key: string]: unknown;
+            }[];
         };
         /** ParamsOut */
         ParamsOut: {
@@ -5078,6 +5182,37 @@ export interface operations {
             };
         };
     };
+    download_api_packs__name__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_projects_api_projects_get: {
         parameters: {
             query?: {
@@ -5195,6 +5330,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectFromTextOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_zip_api_projects_import_pack_post: {
+        parameters: {
+            query: {
+                filename: string;
+                into?: number | null;
+                on_conflict?: "skip" | "new_version";
+                only?: "all" | "assets" | "story";
+                dry_run?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PackReportOut"];
                 };
             };
             /** @description Validation Error */
@@ -6487,6 +6657,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NoteRedoOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_api_projects__project_id__pack_post: {
+        parameters: {
+            query?: {
+                scope?: "all" | "assets" | "story";
+                include_history?: boolean;
+            };
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PackExportOut"];
                 };
             };
             /** @description Validation Error */

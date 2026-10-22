@@ -48,6 +48,7 @@ from storyagent.media import healthcheck as health
 from storyagent.media.contracts import MediaJob
 from storyagent.media.ledger import Ledger, LedgerError
 from storyagent.media.llm_resident import build_probes
+from storyagent.media.pack import PackError
 from storyagent.media.registry import default_registry
 from storyagent.media.specs import SpecError, SpecLocked, SpecStore
 from storyagent.media.worker import Worker, run_once
@@ -353,6 +354,59 @@ def _cmd_asset_import(s: Settings, a: argparse.Namespace) -> int:
     except LibraryError as exc:
         raise CliError("cli.error.library", 1, detail=str(exc)) from exc
     print(t("cli.asset.imported", id=asset.id, kind=asset.kind))
+    return 0
+
+
+# -- asset packs ------------------------------------------------------------------------------------
+def _print_pack_report(report: Any) -> None:
+    d = report.as_dict()
+    print(t("cli.pack.dry_run" if d["dry_run"] else "cli.pack.done", project=d["project_id"] or "-"))
+    for table, counts in d["story"].items():
+        print(t("cli.pack.line", section=table, counts=_counts(counts)))
+    for section in ("specs", "assets"):
+        if d[section]:
+            print(t("cli.pack.line", section=section, counts=_counts(d[section])))
+    if d["unassigned"]:
+        print(t("cli.pack.unassigned", names=", ".join(d["unassigned"])))
+    for w in d["warnings"]:
+        detail = ", ".join(f"{k}={v}" for k, v in w.items() if k != "code")
+        print(t(f"pack.warn.{w['code']}", **{k: v for k, v in w.items() if k != "code"}) + f" ({detail})",
+              file=sys.stderr)
+
+
+def _counts(counts: dict[str, int]) -> str:
+    return ", ".join(f"{k} {v}" for k, v in counts.items())
+
+
+def _cmd_pack_export(s: Settings, a: argparse.Namespace) -> int:
+    from storyagent.media.pack import export_pack
+
+    c = _ctx(s)
+    manifest = export_pack(s, c.db, a.project, Path(a.out).expanduser(), scope=a.scope,
+                           include_history=a.include_history)
+    print(t("cli.pack.exported", path=a.out, files=len(manifest["files"]),
+            assets=manifest["counts"].get("assets", 0), specs=manifest["counts"].get("specs", 0)))
+    for w in manifest["warnings"]:
+        print(t(f"pack.warn.{w['code']}", **{k: v for k, v in w.items() if k != "code"}), file=sys.stderr)
+    return 0
+
+
+def _cmd_pack_import(s: Settings, a: argparse.Namespace) -> int:
+    from storyagent.media.pack import import_pack
+
+    c = _ctx(s)
+    report = import_pack(s, c.db, Path(a.source).expanduser(), into=a.into, policy=a.on_conflict, only=a.only,
+                         dry_run=a.dry_run)
+    _print_pack_report(report)
+    return 0
+
+
+def _cmd_pack_import_folder(s: Settings, a: argparse.Namespace) -> int:
+    from storyagent.media.pack import import_folder
+
+    c = _ctx(s)
+    report = import_folder(s, c.db, Path(a.folder).expanduser(), a.project, policy=a.on_conflict, dry_run=a.dry_run)
+    _print_pack_report(report)
     return 0
 
 
@@ -833,6 +887,24 @@ def build_parser() -> argparse.ArgumentParser:
     ai.add_argument("--project", type=int, required=True)
     ai.add_argument("--slot", default="main")
 
+    pk = sub.add_parser("pack").add_subparsers(dest="cmd", required=True)
+    pe = add(pk, "export", _cmd_pack_export)
+    pe.add_argument("--project", type=int, required=True)
+    pe.add_argument("--out", required=True, help="a new directory, or a .zip file")
+    pe.add_argument("--scope", choices=["all", "assets", "story"], default="all")
+    pe.add_argument("--include-history", action="store_true", help="also the earlier takes and spec versions")
+    pi = add(pk, "import", _cmd_pack_import)
+    pi.add_argument("source", help="a pack directory or .zip")
+    pi.add_argument("--into", type=int, help="project to import into (default: a new project from the manifest)")
+    pi.add_argument("--only", choices=["all", "assets", "story"], default="all")
+    pi.add_argument("--on-conflict", choices=["skip", "new_version"], default="skip")
+    pi.add_argument("--dry-run", action="store_true")
+    pf = add(pk, "import-folder", _cmd_pack_import_folder)
+    pf.add_argument("folder", help="plain files, mapped to slots by file name (config: [runtime] loose_rules)")
+    pf.add_argument("--project", type=int, required=True)
+    pf.add_argument("--on-conflict", choices=["skip", "new_version"], default="skip")
+    pf.add_argument("--dry-run", action="store_true")
+
     li = sub.add_parser("library").add_subparsers(dest="cmd", required=True)
     la = add(li, "add", _cmd_library_add)
     la.add_argument("source", help="a file path, or an asset id with --asset")
@@ -948,6 +1020,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     except SpecLocked:
         print(t("cli.spec.is_locked"), file=sys.stderr)
         return 5
+    except PackError as exc:
+        print(t(f"pack.error.{exc.code}", **exc.params), file=sys.stderr)
+        return 1
     except AuthError as exc:
         print(t(f"api.error.{exc.code}") + (f" ({exc.detail})" if exc.detail else ""), file=sys.stderr)
         return 1

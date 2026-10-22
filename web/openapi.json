@@ -2491,6 +2491,120 @@
         "title": "NoteStatusBody",
         "type": "object"
       },
+      "PackExportOut": {
+        "properties": {
+          "bytes": {
+            "title": "Bytes",
+            "type": "integer"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Counts",
+            "type": "object"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "scope": {
+            "title": "Scope",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "bytes",
+          "scope",
+          "counts",
+          "warnings"
+        ],
+        "title": "PackExportOut",
+        "type": "object"
+      },
+      "PackReportOut": {
+        "properties": {
+          "assets": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Assets",
+            "type": "object"
+          },
+          "created_project": {
+            "title": "Created Project",
+            "type": "boolean"
+          },
+          "dry_run": {
+            "title": "Dry Run",
+            "type": "boolean"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "specs": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Specs",
+            "type": "object"
+          },
+          "story": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "type": "object"
+            },
+            "title": "Story",
+            "type": "object"
+          },
+          "unassigned": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unassigned",
+            "type": "array"
+          },
+          "warnings": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "dry_run",
+          "project_id",
+          "created_project",
+          "story",
+          "specs",
+          "assets",
+          "warnings",
+          "unassigned"
+        ],
+        "title": "PackReportOut",
+        "type": "object"
+      },
       "ParamsOut": {
         "properties": {
           "base": {
@@ -7130,6 +7244,46 @@
         ]
       }
     },
+    "/api/packs/{name}": {
+      "get": {
+        "operationId": "download_api_packs__name__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Download",
+        "tags": [
+          "packs"
+        ]
+      }
+    },
     "/api/projects": {
       "get": {
         "description": "Live projects; ``trashed=true`` lists the recycle bin instead.",
@@ -7299,6 +7453,106 @@
         "summary": "Create Project From Text",
         "tags": [
           "projects"
+        ]
+      }
+    },
+    "/api/projects/import-pack": {
+      "post": {
+        "description": "Raw-body upload of a pack ``.zip``. ``dry_run=true`` reports what would change and writes nothing; without\n``into`` a new project is made from the pack's manifest (needs the create-project right).",
+        "operationId": "import_zip_api_projects_import_pack_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "filename",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "title": "Filename",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "into",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Into"
+            }
+          },
+          {
+            "in": "query",
+            "name": "on_conflict",
+            "required": false,
+            "schema": {
+              "default": "skip",
+              "enum": [
+                "skip",
+                "new_version"
+              ],
+              "title": "On Conflict",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "only",
+            "required": false,
+            "schema": {
+              "default": "all",
+              "enum": [
+                "all",
+                "assets",
+                "story"
+              ],
+              "title": "Only",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "dry_run",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Dry Run",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackReportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Import Zip",
+        "tags": [
+          "packs"
         ]
       }
     },
@@ -9332,6 +9586,74 @@
         "summary": "Redo",
         "tags": [
           "review"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/pack": {
+      "post": {
+        "description": "Write the project to ``<home>/exports/<slug>-<time>.zip``; download it with ``GET /api/packs/{name}``.",
+        "operationId": "export_api_projects__project_id__pack_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "scope",
+            "required": false,
+            "schema": {
+              "default": "all",
+              "enum": [
+                "all",
+                "assets",
+                "story"
+              ],
+              "title": "Scope",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_history",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include History",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackExportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export",
+        "tags": [
+          "packs"
         ]
       }
     },

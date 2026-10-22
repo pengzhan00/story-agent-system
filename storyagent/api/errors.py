@@ -19,6 +19,7 @@ from storyagent.config import ConfigError
 from storyagent.launcher import LaunchError
 from storyagent.media.ledger import LedgerError
 from storyagent.media.library import LibraryError
+from storyagent.media.pack import PackError
 from storyagent.media.specs import SpecError, SpecLocked
 from storyagent.projects import ProjectNotFound, ProjectStateError
 from storyagent.review import ReviewError
@@ -112,6 +113,11 @@ def install(app: FastAPI) -> None:
         if "already exists" in msg:
             return respond(request, 409, "conflict", msg)
         return respond(request, 422, "invalid", msg)
+
+    @app.exception_handler(PackError)
+    async def _pack(request: Request, exc: PackError) -> JSONResponse:
+        detail = translator_of(request)(f"pack.error.{exc.code}", **exc.params)
+        return respond(request, 404 if exc.code == "not_found" else 422, "invalid", detail)
 
     @app.exception_handler(StoryNotFound)
     async def _story_missing(request: Request, exc: StoryNotFound) -> JSONResponse:

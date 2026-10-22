@@ -118,6 +118,16 @@ llm_unload_policy = "never"
 strict_params = false
 # A new successful candidate becomes the current asset automatically (false = pick manually).
 auto_adopt = true
+# Asset packs: largest zip that may be unpacked (GiB).
+pack_max_gib = 50
+# Loose folder import: the first rule whose file-name pattern matches decides kind and slot. target = shot (group "n" =
+# the n-th shot of the project), character (group "name"; slot may use {id}), music (the first music theme) or none.
+loose_rules = [
+  { pattern = '^shot[_-]?(?P<n>\d+)\.(mp4|mov|webm)$', kind = "video.generate", slot = "main", target = "shot" },
+  { pattern = '^shot[_-]?(?P<n>\d+)\.(png|jpg|jpeg|webp)$', kind = "image.generate", slot = "main", target = "shot" },
+  { pattern = '^(?P<name>.+)\.(png|jpg|jpeg|webp)$', kind = "image.generate", slot = "character.portrait:{id}", target = "character" },
+  { pattern = '^bgm.*\.(wav|mp3|m4a|flac)$', kind = "audio.music", slot = "music.bgm:{id}", target = "music" },
+]
 # Local jobs running at the same time, of any kind: 1 = a strictly linear queue (one model in memory at a time, the
 # default), 0 = no overall cap (then max_light_jobs and one heavy job apply).
 max_concurrent_jobs = 1
