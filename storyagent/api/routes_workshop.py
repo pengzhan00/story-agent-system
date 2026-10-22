@@ -34,10 +34,11 @@ def shop(request: Request) -> Workshop:
 
 
 @router.get("", response_model=list[WorkshopModuleOut])
-def modules(request: Request) -> list[dict[str, Any]]:
+def modules(request: Request, pipeline: str = "") -> list[dict[str, Any]]:
     """Every module with its kinds: the model it starts from (and the alternatives), the effective parameters, the
-    parameters the adapter understands, and the inputs it takes."""
-    return shop(request).describe()
+    parameters the adapter understands, and the inputs it takes. With ``pipeline`` it starts from that plan's models;
+    models outside the plan say ``in_plan: false`` (a trial only, not for a project)."""
+    return shop(request).describe(pipeline)
 
 
 @router.get("/params", response_model=ParamsOut)

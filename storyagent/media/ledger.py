@@ -18,6 +18,7 @@ from storyagent.config import ConfigError, Settings
 from storyagent.db import Database
 from storyagent.domain import JobStatus
 from storyagent.domain.errors import ErrorCode
+from storyagent.pipelines import project_settings_for
 from storyagent.util import digest, dumps, iso_at, new_id
 
 from .contracts import AssetRecord, JobRecord, MediaJob
@@ -116,11 +117,16 @@ class Ledger:
         ).fetchall()
         return int(statistics.median(r[0] for r in rows)) if rows else 0
 
+    def settings_for(self, project_id: int | None) -> Settings:
+        """The settings the project runs with: its pipeline plan's models and options (global ones for a project that
+        predates plans, and for jobs outside any project)."""
+        return project_settings_for(self.settings, self.db, project_id)
+
     def frame_of(self, project_id: int | None) -> tuple[int, int] | None:
         """(width, height) of the project's delivery profile: the one direction every picture of it follows."""
         row = self.db.conn.execute("SELECT delivery_profile FROM projects WHERE id=?", (project_id,)).fetchone() \
             if project_id else None
-        profile = self.settings.delivery_profile((row["delivery_profile"] if row else "") or None)
+        profile = self.settings_for(project_id).delivery_profile((row["delivery_profile"] if row else "") or None)
         w, h = int(profile.get("width", 0)), int(profile.get("height", 0))
         return (w, h) if w and h else None
 
@@ -130,12 +136,13 @@ class Ledger:
     ) -> tuple[JobRecord, bool]:
         """Create a queued job. Returns (record, created); an identical active request returns the
         existing job with ``created=False`` (idempotent double-click / retry-safe)."""
-        model_ref = job.model_ref or self.settings.default_model(job.kind.value).ref
-        model = self.settings.model(model_ref)
+        cfg = self.settings_for(job.project_id)
+        model_ref = job.model_ref or cfg.default_model(job.kind.value).ref
+        model = cfg.model(model_ref)
         if model.kind != job.kind.value:
             raise ConfigError(f"model {model_ref!r} is {model.kind!r}, cannot run {job.kind.value!r}")
         params = resolve_params(
-            self.settings, model_ref, job.tier,
+            cfg, model_ref, job.tier,
             project_settings=project_settings, job_params=job.params, frame=self.frame_of(job.project_id),
         )
         key = job.idempotency_key or digest({

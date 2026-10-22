@@ -1,6 +1,8 @@
 """A fake LLM that answers every agent from its output schema, so the story pipeline can run with no model."""
 from __future__ import annotations
 
+import json
+import tomllib
 from pathlib import Path
 from typing import Any
 
@@ -126,6 +128,19 @@ def make_engine(
         (home / "config" / "models.toml").write_text(toml)
     if services:
         (home / "config" / "services.toml").write_text(services)
+    # projects run on a pipeline plan: the default plan takes the rig's fake models and [workflow] values
+    plan: dict[str, Any] = {"models": tomllib.loads(toml).get("defaults", {}) if toml else {}}
+    workflow = tomllib.loads(services).get("workflow", {}) if services else {}
+    if workflow:
+        plan["workflow"] = {k: v for k, v in workflow.items() if k != "tier"}
+    plan["tier"] = workflow.get("tier", "draft")         # the rig's own default, not the shipped plan's
+    if plan["models"] or workflow:
+        body = ["[pipelines.vertical_drama]", f'tier = "{plan["tier"]}"']
+        body += ["[pipelines.vertical_drama.models]"] + [f'"{k}" = "{v}"' for k, v in plan["models"].items()]
+        body += ["[pipelines.vertical_drama.workflow]"]
+        body += [f"{k} = {json.dumps(v)}" for k, v in plan.get("workflow", {}).items()]
+        body += ["[pipelines.vertical_drama.edit]", "title_card = false", "next_card = false"]   # global default
+        (home / "config" / "pipelines.toml").write_text("\n".join(body) + "\n")
     settings = load_settings({"STORY_AGENT_HOME": str(home), "STORY_AGENT_LOCALE": "en"})
     db = Database(settings.db_path)
     migrate(db)

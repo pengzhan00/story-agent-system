@@ -12,6 +12,7 @@ from starlette.background import BackgroundTask
 from storyagent.compose.export import ExportError, build_package
 from storyagent.domain import QualityTier
 from storyagent.llm import LLMError
+from storyagent.pipelines import project_settings_for
 from storyagent.workflow import STAGES, WorkflowEngine, WorkflowStateError
 from storyagent.workflow.plan import produce_plan, totals, video_summary
 from storyagent.workflow.series import series_board
@@ -75,23 +76,27 @@ def get_series(project_id: int, request: Request) -> SeriesBoardOut:
     shot and asset lists)."""
     ctx = ctx_of(request)
     ctx.projects.get(project_id)
-    return SeriesBoardOut.model_validate(series_board(ctx.story, ctx.workflow, ctx.specs, ctx.ledger, project_id))
+    return SeriesBoardOut.model_validate(series_board(
+        ctx.story, ctx.workflow, ctx.specs, ctx.ledger, project_id,
+        project_settings_for(ctx.settings, ctx.db, project_id)))
 
 
 @router.get("/projects/{project_id}/produce/plan", response_model=ProducePlanOut)
-def get_produce_plan(project_id: int, request: Request, tier: str = "draft", force: bool = False) -> ProducePlanOut:
+def get_produce_plan(project_id: int, request: Request, tier: str = "", force: bool = False) -> ProducePlanOut:
     """What producing the media would make, task by task, with models and estimates - to confirm before it runs.
     Start the confirmed part with ``POST .../workflow/runs {"stages": ["produce"], "params": {"only": [spec ids],
     "tier": ...}}``."""
     ctx = ctx_of(request)
     project = ctx.projects.get(project_id)
+    cfg = project_settings_for(ctx.settings, ctx.db, project_id)    # the models of the project's pipeline plan
+    tier = tier or str(cfg.workflow.get("tier", "draft"))           # no tier asked: the plan's own
     try:
         level = QualityTier(tier)
     except ValueError:
         raise ApiError(422, "invalid", f"unknown tier {tier!r}") from None
-    tasks = produce_plan(ctx.settings, ctx.story, ctx.specs, ctx.ledger, project_id, level, force=force,
+    tasks = produce_plan(cfg, ctx.story, ctx.specs, ctx.ledger, project_id, level, force=force,
                          project_settings=project.settings)
-    budget = policy_from(ctx.settings.workflow, project.settings, 1.0).budget_sec
+    budget = policy_from(cfg.workflow, project.settings, 1.0).budget_sec
     return ProducePlanOut(tier=level.value, tasks=[PlannedTaskOut.model_validate(t.__dict__) for t in tasks],
                           totals=PlanTotals.model_validate(totals(tasks)),
                           video=VideoSummary.model_validate(video_summary(tasks, budget)))

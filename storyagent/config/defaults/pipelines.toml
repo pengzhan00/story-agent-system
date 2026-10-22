@@ -1,0 +1,141 @@
+# Pipeline plans: one chosen, complete set of models and settings per project (a project picks ONE when it is created,
+# together with its picture frame). Nothing inside a project mixes models from different plans; to change a model,
+# copy a plan under a new name in $STORY_AGENT_HOME/config/pipelines.toml and change it there - the whole plan changes.
+#
+#   delivery_profile : picture frame, direction and the length range (a profile in delivery.toml)
+#   tier             : quality tier of a first production pass (draft | preview | final)
+#   requires         : services/tools this plan needs (names from services.toml, or tool.<name>); the healthcheck
+#                      for a project lists exactly these
+#   models           : the model of every task kind the plan uses. image.generate, video.generate, audio.tts,
+#                      audio.music and compose.assemble are required; any other kind not listed falls back to
+#                      [defaults] in models.toml
+#   model_params     : parameter overrides per model within this plan (a `tiers.<tier>` table inside overrides tiers)
+#   workflow / edit / mix : merged over [workflow] / [edit] / [mix] for projects of this plan
+# A plan that fails these checks is refused at load time with the reason.
+
+[default]
+pipeline = "vertical_drama"
+
+# -- vertical (9:16) short drama / series: the stack validated end to end on the pilot ----------------------------------
+[pipelines.vertical_drama]
+label_key = "pipeline.vertical_drama"
+note_key = "pipeline.vertical_drama.note"
+delivery_profile = "series_vertical_720"
+tier = "preview"
+requires = ["ollama", "acestep", "phosphene", "tool.ffmpeg", "tool.mflux", "tool.cosyvoice"]
+[pipelines.vertical_drama.models]
+"image.generate" = "flux2-klein-base-4b"
+"image.edit" = "flux2-klein-base-4b-edit"
+"video.generate" = "ltx-2.5-video"
+"video.av" = "ltx-2.5-av"
+"audio.tts" = "cosyvoice3-0.5b"
+"audio.music" = "acestep-1.5-turbo"
+"audio.sfx" = "stable-audio-3-medium"
+"compose.assemble" = "ffmpeg-assemble"
+[pipelines.vertical_drama.workflow]
+video_share = 0.2
+keyframe_from_references = true
+[pipelines.vertical_drama.edit]
+title_card = false
+next_card = true
+
+# -- landscape (16:9) short drama / web series ---------------------------------------------------------------------------
+[pipelines.landscape_drama]
+label_key = "pipeline.landscape_drama"
+note_key = "pipeline.landscape_drama.note"
+delivery_profile = "landscape_drama_720"
+tier = "preview"
+requires = ["ollama", "acestep", "phosphene", "tool.ffmpeg", "tool.mflux", "tool.cosyvoice"]
+[pipelines.landscape_drama.models]
+"image.generate" = "flux2-klein-base-4b"
+"image.edit" = "flux2-klein-base-4b-edit"
+"video.generate" = "ltx-2.5-video"
+"video.av" = "ltx-2.5-av"
+"audio.tts" = "cosyvoice3-0.5b"
+"audio.music" = "acestep-1.5-turbo"
+"audio.sfx" = "stable-audio-3-medium"
+"compose.assemble" = "ffmpeg-assemble"
+[pipelines.landscape_drama.workflow]
+video_share = 0.3
+keyframe_from_references = true
+[pipelines.landscape_drama.edit]
+title_card = true
+next_card = true
+
+# -- TV series: long episodes, so few clips per episode and cards that tie episodes together ---------------------------
+[pipelines.tv_series]
+label_key = "pipeline.tv_series"
+note_key = "pipeline.tv_series.note"
+delivery_profile = "tv_landscape_1080"
+tier = "preview"
+requires = ["ollama", "acestep", "phosphene", "tool.ffmpeg", "tool.mflux", "tool.cosyvoice"]
+[pipelines.tv_series.models]
+"image.generate" = "flux2-klein-base-4b"
+"image.edit" = "flux2-klein-base-4b-edit"
+"video.generate" = "ltx-2.5-video"
+"video.av" = "ltx-2.5-av"
+"audio.tts" = "cosyvoice3-0.5b"
+"audio.music" = "acestep-1.5-turbo"
+"audio.sfx" = "stable-audio-3-medium"
+"compose.assemble" = "ffmpeg-assemble"
+[pipelines.tv_series.workflow]
+video_share = 0.08
+video_min_per_episode = 6
+keyframe_from_references = true
+[pipelines.tv_series.edit]
+title_card = true
+recap_card = true
+next_card = true
+scene_fade_sec = 0.5
+[pipelines.tv_series.mix]
+loudnorm_i = -23.0      # broadcast loudness (EBU R128)
+
+# -- advert: short, every shot a real clip, quality first, no title cards --------------------------------------------------
+[pipelines.advert]
+label_key = "pipeline.advert"
+note_key = "pipeline.advert.note"
+delivery_profile = "advert_landscape_1080"
+tier = "final"
+requires = ["ollama", "acestep", "phosphene", "tool.ffmpeg", "tool.mflux", "tool.cosyvoice"]
+[pipelines.advert.models]
+"image.generate" = "flux2-klein-base-4b"
+"image.edit" = "flux2-klein-base-4b-edit"
+"video.generate" = "ltx-2.5-video"
+"video.av" = "ltx-2.5-av"
+"audio.tts" = "cosyvoice3-0.5b"
+"audio.music" = "acestep-1.5-turbo"
+"audio.sfx" = "stable-audio-3-medium"
+"compose.assemble" = "ffmpeg-assemble"
+[pipelines.advert.workflow]
+video_share = 1.0
+keyframe_from_references = true
+[pipelines.advert.edit]
+title_card = false
+recap_card = false
+next_card = false
+
+# -- feature film: very long, produced in parts, clips only where they count ------------------------------------------------
+[pipelines.feature_film]
+label_key = "pipeline.feature_film"
+note_key = "pipeline.feature_film.note"
+delivery_profile = "film_scope_1080"
+tier = "final"
+requires = ["ollama", "acestep", "phosphene", "tool.ffmpeg", "tool.mflux", "tool.cosyvoice"]
+[pipelines.feature_film.models]
+"image.generate" = "flux2-klein-base-4b"
+"image.edit" = "flux2-klein-base-4b-edit"
+"video.generate" = "ltx-2.5-video"
+"video.av" = "ltx-2.5-av"
+"audio.tts" = "cosyvoice3-0.5b"
+"audio.music" = "acestep-1.5-turbo"
+"audio.sfx" = "stable-audio-3-medium"
+"compose.assemble" = "ffmpeg-assemble"
+[pipelines.feature_film.workflow]
+video_share = 0.12
+video_min_per_episode = 20
+keyframe_from_references = true
+[pipelines.feature_film.edit]
+title_card = true
+scene_fade_sec = 0.6
+[pipelines.feature_film.mix]
+loudnorm_i = -23.0

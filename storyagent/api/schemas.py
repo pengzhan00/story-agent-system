@@ -42,6 +42,9 @@ class ProjectOut(Out):
     aspect_ratio: str
     status: str
     settings: dict[str, Any]
+    kind: str
+    pipeline: str
+    brief: dict[str, Any]
     created_at: str
     updated_at: str
 
@@ -63,12 +66,54 @@ class ProjectCard(Strict):
     updated_at: str
 
 
+class BriefAnswers(BaseModel):
+    """The plan made up front. Anything left out takes the default of the kind of work."""
+
+    seasons: int | None = Field(default=None, ge=1)
+    episodes_per_season: int | None = Field(default=None, ge=1)
+    episode_sec: float | None = Field(default=None, gt=0, description="target length of one episode in seconds")
+    audience: str = ""
+    platform: str = ""
+    logline: str = ""
+
+
 class ProjectCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     genre: str = ""
     description: str = ""
     content_language: str = ""
     delivery_profile: str = Field(default="", description="the picture frame (vertical / landscape ...), decided now")
+    kind: str = Field(default="", description="kind of work (drama_series, advert ...): recommends the pipeline plan")
+    pipeline: str = Field(default="", description="the pipeline plan: one complete set of models; default = the kind's")
+    brief: BriefAnswers | None = None
+
+
+class EstimateRequest(BaseModel):
+    kind: str = ""
+    pipeline: str = ""
+    brief: BriefAnswers | None = None
+
+
+class EstimateTaskOut(Strict):
+    kind: str
+    model_ref: str
+    count: int
+    each_sec: int
+    known: bool
+    total_sec: int
+
+
+class EstimateOut(Strict):
+    brief: dict[str, Any]
+    pipeline: str
+    tier: str
+    episodes: int
+    shots: int
+    tasks: list[EstimateTaskOut]
+    total_sec: int
+    hours: float
+    video_budget_hours: float | None
+    over_budget: bool
 
 
 class ProjectPatch(BaseModel):
@@ -78,6 +123,8 @@ class ProjectPatch(BaseModel):
     content_language: str | None = None
     delivery_profile: str | None = None
     aspect_ratio: str | None = None
+    kind: str | None = None
+    pipeline: str | None = Field(default=None, description="change the plan: the whole set of models changes with it")
 
 
 class ProjectSettingsPatch(BaseModel):
@@ -358,6 +405,35 @@ class RecipeOut(BaseModel):
     steps: list[RecipeStepOut]
 
 
+class RangeOut(Strict):
+    min: float
+    default: float
+    max: float
+
+
+class WorkKindOut(Strict):
+    name: str
+    label: str
+    note: str
+    pipeline: str
+    seasons: bool
+    episodes: RangeOut
+    episode_sec: RangeOut
+    ask: list[str]
+
+
+class PlanOut(Strict):
+    name: str
+    label: str
+    note: str
+    delivery_profile: str
+    width: int
+    height: int
+    tier: str
+    models: dict[str, str]
+    requires: list[str]
+
+
 class QueueState(BaseModel):
     queued: int
     running: int
@@ -388,6 +464,10 @@ class Meta(BaseModel):
     models: list[ModelOut]
     defaults: dict[str, str]
     recipes: list[RecipeOut]
+    work_kinds: list[WorkKindOut]
+    default_work_kind: str
+    pipelines: list[PlanOut]
+    default_pipeline: str
     delivery_profiles: list[DeliveryProfileOut]
     delivery_default: str
     compliance_enabled: bool
@@ -704,6 +784,7 @@ class WorkshopModel(Strict):
     commercial_ok: bool
     available: bool
     note: str
+    in_plan: bool = Field(description="false = outside the chosen pipeline plan: a trial only, not for a project")
 
 
 class WorkshopKind(Strict):

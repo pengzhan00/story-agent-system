@@ -2,9 +2,14 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Request
 
+from storyagent.brief import estimate, resolve_brief
+
 from .context import ctx_of
 from .errors import ApiError
 from .schemas import (
+    BriefAnswers,
+    EstimateOut,
+    EstimateRequest,
     ProjectCard,
     ProjectCreate,
     ProjectFromText,
@@ -48,11 +53,23 @@ def overview(request: Request, trashed: bool = False) -> list[ProjectCard]:
 
 @router.post("", response_model=ProjectOut, status_code=201)
 def create_project(body: ProjectCreate, request: Request) -> ProjectOut:
+    """A project with its plan: the kind of work, the pipeline plan (one complete set of models, picture frame) and the
+    brief (seasons, episodes, episode length) are decided here, once."""
     p = ctx_of(request).projects.create(
         body.name, genre=body.genre, description=body.description, content_language=body.content_language,
-        delivery_profile=body.delivery_profile,
+        delivery_profile=body.delivery_profile, kind=body.kind, pipeline=body.pipeline,
+        brief=body.brief.model_dump(exclude_none=True) if body.brief else None,
     )
     return ProjectOut.model_validate(p)
+
+
+@router.post("/estimate", response_model=EstimateOut)
+def estimate_project(body: EstimateRequest, request: Request) -> EstimateOut:
+    """How big the planned work is (tasks, machine time) before anything is created - for the creation wizard."""
+    ctx = ctx_of(request)
+    brief = resolve_brief(ctx.settings, body.kind, body.brief.model_dump(exclude_none=True) if body.brief else None)
+    plan = ctx.projects.plan_of(body.pipeline, body.kind)
+    return EstimateOut(brief=brief, **estimate(ctx.settings, ctx.ledger, brief, plan))
 
 
 TEXT_KINDS = ("text.story", "text.script", "text.asr", "upload.text")
@@ -103,6 +120,13 @@ def patch_project_settings(project_id: int, body: ProjectSettingsPatch, request:
     """Per-project overrides: ``compliance`` (on/off, labels) and ``models.<ref>`` parameter overrides."""
     patch = body.model_dump(exclude_unset=True)
     return ProjectOut.model_validate(ctx_of(request).projects.set_settings(project_id, patch))
+
+
+@router.patch("/{project_id}/brief", response_model=ProjectOut)
+def patch_project_brief(project_id: int, body: BriefAnswers, request: Request) -> ProjectOut:
+    """Change the plan made up front: more seasons/episodes, another episode length (seasons are only added to)."""
+    return ProjectOut.model_validate(
+        ctx_of(request).projects.set_brief(project_id, body.model_dump(exclude_unset=True, exclude_none=True)))
 
 
 @router.delete("/{project_id}", response_model=ProjectOut)

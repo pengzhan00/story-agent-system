@@ -90,7 +90,7 @@ def produce_plan(
             if spec.subject_type not in types:
                 continue
             asset = current_asset(ledger, spec)
-            state = "new" if asset is None else "done" if up_to_date(ledger, spec) and not force else "stale"
+            state = "new" if asset is None else "done" if up_to_date(ledger, spec, settings) and not force else "stale"
             reason, model_ref = "", spec.model_ref
             kind = spec.kind.value
             edit_ref = keyframe_edit_model(settings, spec, modes)       # composed from portraits: another, slower model

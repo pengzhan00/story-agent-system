@@ -14,6 +14,7 @@ from storyagent.db import Database
 from storyagent.llm import LLMError, LLMRouter
 from storyagent.media.ledger import Ledger
 from storyagent.media.specs import SpecStore
+from storyagent.pipelines import settings_for
 from storyagent.projects import ProjectStore
 from storyagent.story import StoryStore
 
@@ -78,8 +79,10 @@ class WorkflowEngine:
         cancelled: Callable[[], bool] | None = None,
     ) -> dict[str, Any]:
         episode = int((params or {}).get("episode") or 1)
+        project = self.projects.get(project_id)
         ctx = Ctx(
-            self.settings, self.db, self.store, self.state, self.agents, self.projects, self.projects.get(project_id),
+            settings_for(self.settings, project.pipeline), self.db, self.store, self.state, self.agents, self.projects,
+            project,
             dict(params or {}), progress or (lambda *_: None), cancelled or (lambda: False), self.spec_store, stage,
         )
         self.state.set_stage(project_id, stage, "running", episode=episode)

@@ -29,7 +29,7 @@ from storyagent.domain import JobStatus, MediaKind, QualityTier
 from storyagent.i18n import get_catalog
 from storyagent.media.compliance import visible_marks
 from storyagent.media.contracts import AssetRecord, JobRecord, MediaJob
-from storyagent.media.ledger import Ledger
+from storyagent.media.ledger import Ledger, LedgerError
 from storyagent.media.specs import SpecRecord, SpecStore
 from storyagent.story import StoryStore
 
@@ -77,9 +77,24 @@ def slot_asset(
     return ledger.get_asset(older["id"]) if older else None
 
 
-def up_to_date(ledger: Ledger, spec: SpecRecord) -> bool:
+def allowed_models(settings: Settings, spec: SpecRecord) -> set[str]:
+    """The models the project's pipeline plan allows for this spec: its own choice, else the plan's model for the kind
+    (a shot keyframe may also come from the plan's image-edit model, which composes it from reference images)."""
+    allowed: set[str] = set()
+    try:
+        allowed.add(spec.model_ref or settings.default_model(spec.kind.value).ref)
+        if spec.subject_type == "shot.keyframe" and not spec.model_ref:
+            allowed.add(settings.default_model(MediaKind.IMAGE_EDIT.value).ref)
+    except ConfigError:
+        pass
+    return allowed
+
+
+def up_to_date(ledger: Ledger, spec: SpecRecord, settings: Settings | None = None) -> bool:
     """Made from this version of the spec, and not older than what it was built on: a clip whose keyframe has been
-    made again since is outdated even though its own spec did not change."""
+    made again since is outdated even though its own spec did not change. With ``settings`` (the project's own, i.e.
+    its pipeline plan) an asset made by a model the plan does not use - after the plan was changed - is outdated too;
+    an imported file (no job) is never judged by its model."""
     asset = current_asset(ledger, spec)
     if asset is None or (asset.spec_version or 0) < spec.version:
         return False
@@ -87,6 +102,14 @@ def up_to_date(ledger: Ledger, spec: SpecRecord) -> bool:
         base = slot_asset(ledger, spec.project_id, str(dep.get("subject_type", "")), str(dep.get("subject_id", "")),
                           str(dep.get("slot", "main")))
         if base is not None and base.created_at > asset.created_at:
+            return False
+    if settings is not None and asset.job_id:
+        try:
+            made_by = ledger.get_job(asset.job_id).model_ref
+        except LedgerError:
+            return True
+        allowed = allowed_models(settings, spec)
+        if allowed and made_by and made_by not in allowed:
             return False
     return True
 
@@ -136,7 +159,7 @@ def _plan_phase(
     for spec in specs:
         if spec.subject_type not in types or spec.subject_type in skip or (only and spec.id not in only):
             continue
-        if up_to_date(ledger, spec) and not ctx.force():
+        if up_to_date(ledger, spec, ctx.settings) and not ctx.force():
             counts["reused"] += 1
             continue
         if spec.subject_type == "shot.video" and spec.subject_id not in picks and spec.id not in only:
@@ -267,7 +290,7 @@ def _expected_seconds(ctx: Ctx, ledger: Ledger, specs: list[SpecRecord], tier: Q
             continue
         if spec.subject_type == "shot.video" and spec.subject_id not in picks and spec.id not in only:
             continue
-        if up_to_date(ledger, spec) and not ctx.force():
+        if up_to_date(ledger, spec, ctx.settings) and not ctx.force():
             continue
         kind = spec.kind.value
         edit_ref = keyframe_edit_model(ctx.settings, spec, modes)

@@ -15,7 +15,7 @@ from __future__ import annotations
 import os
 import tomllib
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from importlib import resources
 from pathlib import Path
 from typing import Any
@@ -33,7 +33,9 @@ DEFAULT_LOCALE = "zh-CN"
 UNLOAD_POLICIES = ("never", "ask", "auto")
 EXPLICIT_LABEL_MODES = ("off", "overlay", "both")
 LLM_BACKEND_KINDS = ("ollama", "llamacpp", "openai_compat")
-_CONFIG_FILES = ("services", "models", "delivery", "compliance", "recipes", "llm")
+_CONFIG_FILES = ("services", "models", "delivery", "compliance", "recipes", "llm", "pipelines", "kinds")
+CORE_KINDS = ("image.generate", "video.generate", "audio.tts", "audio.music", "compose.assemble")
+BRIEF_QUESTIONS = ("seasons", "episodes", "episode_sec", "audience", "platform")
 _VALID_KINDS = frozenset(k.value for k in MediaKind)
 _VALID_TIERS = frozenset(t.value for t in QualityTier)
 _TRUE = {"1", "true", "yes", "on"}
@@ -110,6 +112,48 @@ class Recipe:
 
 
 @dataclass(frozen=True)
+class Pipeline:
+    """One complete, chosen set of models and settings (see ``pipelines.toml``); a project uses exactly one."""
+
+    name: str
+    label_key: str
+    note_key: str
+    delivery_profile: str
+    tier: str
+    models: Mapping[str, str]
+    requires: tuple[str, ...] = ()
+    model_params: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
+    workflow: Mapping[str, Any] = field(default_factory=dict)
+    edit: Mapping[str, Any] = field(default_factory=dict)
+    mix: Mapping[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class Range:
+    min: float
+    default: float
+    max: float
+
+    def clamp_check(self, value: float) -> bool:
+        return self.min <= value <= self.max
+
+
+@dataclass(frozen=True)
+class WorkKind:
+    """A kind of work (drama series, advert, film ...): recommended plan, structure and the usual size."""
+
+    name: str
+    label_key: str
+    note_key: str
+    pipeline: str
+    seasons: bool
+    episodes: Range
+    episode_sec: Range
+    ask: tuple[str, ...]
+    guidance: str = ""
+
+
+@dataclass(frozen=True)
 class LLMBackend:
     name: str
     kind: str
@@ -147,6 +191,10 @@ class Settings:
     api: Mapping[str, Any] = field(default_factory=dict)  # [api] host/port/cors_origins/sse_*
     workflow: Mapping[str, Any] = field(default_factory=dict)  # [workflow] produce/compose defaults
     launch: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)  # [launch.<service>] how to start it
+    pipelines: Mapping[str, Pipeline] = field(default_factory=dict)
+    default_pipeline: str = ""
+    kinds: Mapping[str, WorkKind] = field(default_factory=dict)
+    default_kind: str = ""
 
     # -- derived paths ----------------------------------------------------
     @property
@@ -195,6 +243,40 @@ class Settings:
             return self.recipes[name]
         except KeyError:
             raise ConfigError(f"unknown recipe: {name!r}") from None
+
+    def pipeline(self, name: str = "") -> Pipeline:
+        name = name or self.default_pipeline
+        try:
+            return self.pipelines[name]
+        except KeyError:
+            raise ConfigError(f"unknown pipeline: {name!r}") from None
+
+    def kind(self, name: str = "") -> WorkKind:
+        name = name or self.default_kind
+        try:
+            return self.kinds[name]
+        except KeyError:
+            raise ConfigError(f"unknown kind of work: {name!r}") from None
+
+    def for_pipeline(self, name: str = "") -> Settings:
+        """The settings a project of this plan runs with: the plan's models replace the defaults of their kinds, its
+        parameters/tiers are merged into those models, its workflow/edit/mix are merged over the global ones and its
+        delivery profile is the default frame. Everything else is the global configuration."""
+        plan = self.pipeline(name)
+        models = dict(self.models)
+        for ref, over in plan.model_params.items():
+            base = models[ref]
+            over = dict(over)
+            tiers = {t: dict(v) for t, v in base.tiers.items()}
+            for tier, values in dict(over.pop("tiers", {})).items():
+                tiers[tier] = {**tiers.get(tier, {}), **values}
+            models[ref] = replace(base, params={**base.params, **over}, tiers=tiers)
+        delivery = deep_merge(dict(self.delivery), {
+            "default": {"profile": plan.delivery_profile}, "edit": dict(plan.edit), "mix": dict(plan.mix)})
+        return replace(
+            self, models=models, default_models={**self.default_models, **plan.models}, delivery=delivery,
+            workflow=deep_merge(dict(self.workflow), {**plan.workflow, "tier": plan.tier}),
+            default_pipeline=plan.name)
 
     def llm_role(self, role: str) -> LLMRole:
         """Role routing with fallback to the ``default`` role."""
@@ -364,6 +446,82 @@ def _build_recipes(
     return out
 
 
+def _num(where: str, value: Any) -> float:
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise ConfigError(f"{where} must be a number")
+    return float(value)
+
+
+def _build_range(where: str, raw: Mapping[str, Any]) -> Range:
+    lo, default, hi = (_num(f"{where}.{k}", raw.get(k)) for k in ("min", "default", "max"))
+    if not 0 < lo <= default <= hi:
+        raise ConfigError(f"{where}: needs 0 < min <= default <= max")
+    return Range(lo, default, hi)
+
+
+def _build_pipelines(
+    raw: Mapping[str, Any], models: Mapping[str, ModelSpec], delivery: Mapping[str, Any], known: set[str],
+) -> dict[str, Pipeline]:
+    out: dict[str, Pipeline] = {}
+    for name, spec in raw.get("pipelines", {}).items():
+        where = f"pipeline {name!r}"
+        profile = str(spec.get("delivery_profile", ""))
+        if profile not in delivery["profiles"]:
+            raise ConfigError(f"{where}: unknown delivery profile {profile!r}")
+        tier = str(spec.get("tier", "preview"))
+        if tier not in _VALID_TIERS:
+            raise ConfigError(f"{where}: unknown tier {tier!r}")
+        plan_models = dict(spec.get("models", {}))
+        for kind, ref in plan_models.items():
+            if kind not in _VALID_KINDS:
+                raise ConfigError(f"{where}: unknown media kind {kind!r}")
+            if ref not in models:
+                raise ConfigError(f"{where}: {kind} -> unknown model {ref!r}")
+            if models[ref].kind != kind:
+                raise ConfigError(f"{where}: {kind} -> {ref!r} is a {models[ref].kind!r} model")
+        missing = [k for k in CORE_KINDS if k not in plan_models]
+        if missing:
+            raise ConfigError(f"{where}: models missing for {missing}")
+        params = {ref: dict(v) for ref, v in dict(spec.get("model_params", {})).items()}
+        for ref, over in params.items():
+            if ref not in models:
+                raise ConfigError(f"{where}: model_params for unknown model {ref!r}")
+            if set(over.get("tiers", {})) - _VALID_TIERS:
+                raise ConfigError(f"{where}: model_params.{ref} has unknown tiers")
+        requires = tuple(spec.get("requires", ()))
+        unknown = [r for r in requires if r not in known]
+        if unknown:
+            raise ConfigError(f"{where}: requires lists unknown entries {unknown}")
+        out[name] = Pipeline(
+            name=name, label_key=str(spec.get("label_key", f"pipeline.{name}")),
+            note_key=str(spec.get("note_key", "")), delivery_profile=profile, tier=tier, models=plan_models,
+            requires=requires, model_params=params, workflow=dict(spec.get("workflow", {})),
+            edit=dict(spec.get("edit", {})), mix=dict(spec.get("mix", {})),
+        )
+    return out
+
+
+def _build_kinds(raw: Mapping[str, Any], pipelines: Mapping[str, Pipeline]) -> dict[str, WorkKind]:
+    out: dict[str, WorkKind] = {}
+    for name, spec in raw.get("kinds", {}).items():
+        where = f"kind {name!r}"
+        if spec.get("pipeline") not in pipelines:
+            raise ConfigError(f"{where}: unknown pipeline {spec.get('pipeline')!r}")
+        ask = tuple(spec.get("ask", ()))
+        bad = [a for a in ask if a not in BRIEF_QUESTIONS]
+        if bad:
+            raise ConfigError(f"{where}: ask lists unknown questions {bad}; allowed: {list(BRIEF_QUESTIONS)}")
+        episodes = _build_range(f"{where}.episodes", spec.get("episodes", {}))
+        out[name] = WorkKind(
+            name=name, label_key=str(spec.get("label_key", f"brief.kind.{name}")),
+            note_key=str(spec.get("note_key", "")),
+            pipeline=str(spec["pipeline"]), seasons=bool(spec.get("seasons", False)), episodes=episodes,
+            episode_sec=_build_range(f"{where}.episode_sec", spec.get("episode_sec", {})), ask=ask,
+            guidance=str(spec.get("guidance", "")),
+        )
+    return out
+
+
 def _build_llm(
     raw: Mapping[str, Any], services: Mapping[str, ServiceConfig]
 ) -> tuple[dict[str, LLMBackend], dict[str, LLMRole]]:
@@ -486,6 +644,14 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     if unknown_required:
         raise ConfigError(f"[healthcheck] required lists unknown entries: {unknown_required}")
 
+    pipelines = _build_pipelines(merged["pipelines"], models, delivery, known_entries)
+    default_pipeline = str(merged["pipelines"].get("default", {}).get("pipeline", ""))
+    if default_pipeline not in pipelines:
+        raise ConfigError(f"[default] pipeline {default_pipeline!r} is not defined in pipelines.toml")
+    kinds = _build_kinds(merged["kinds"], pipelines)
+    default_kind = str(merged["kinds"].get("default", {}).get("kind", ""))
+    if default_kind not in kinds:
+        raise ConfigError(f"[default] kind {default_kind!r} is not defined in kinds.toml")
     backends, roles = _build_llm(merged["llm"], services)
     launch = _build_launch(merged["services"].get("launch", {}), services)
     legacy = env.get(ENV_LEGACY_DB)
@@ -509,6 +675,10 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         api=_build_api(merged["services"].get("api", {})),
         workflow=dict(merged["services"].get("workflow", {})),
         launch=launch,
+        pipelines=pipelines,
+        default_pipeline=default_pipeline,
+        kinds=kinds,
+        default_kind=default_kind,
     )
 
 

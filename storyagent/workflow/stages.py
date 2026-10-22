@@ -141,8 +141,12 @@ def analyze(ctx: Ctx) -> dict[str, Any]:
     acts = int(ctx.params.get("acts") or 4)
     ctx.step(0, 2, "plan")
     shape = "vertical" if ctx.frame_vertical() else "landscape"
+    kind = ctx.settings.kind(ctx.project.kind) if ctx.project.kind else None
+    work = kind.name.replace("_", " ") if kind else "short drama"
     plan = ctx.run_agent("director.analyze", {
-        "premise": _premise(ctx), "format": f"{ctx.project.aspect_ratio} {shape} short drama", "acts": acts})
+        "premise": _premise(ctx), "format": f"{ctx.project.aspect_ratio} {shape} {work}", "acts": acts,
+        "kind": kind.name if kind else "", "guidance": kind.guidance if kind else "",
+        "brief": {k: v for k, v in ctx.project.brief.items() if v not in ("", None)}})
     plan["act_count"] = acts
     ctx.state.put_data(ctx.pid, "plan", plan)
     ctx.step(1, 2, "style")

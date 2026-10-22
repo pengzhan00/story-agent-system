@@ -284,8 +284,9 @@ class SpecStore:
         shot_id: int | None = None, priority: int = 5, extra_inputs: Mapping[str, Any] | None = None,
     ) -> MediaJob:
         """Freeze the spec into a job request: dialect-rendered prompt, params, refs and provenance link."""
-        model_ref = spec.model_ref or self.settings.default_model(spec.kind.value).ref
-        model = self.settings.model(model_ref)
+        cfg = self.ledger.settings_for(spec.project_id)
+        model_ref = spec.model_ref or cfg.default_model(spec.kind.value).ref
+        model = cfg.model(model_ref)
         params = dict(spec.params)
         structured = params.pop("structured", None)
         voice_ref = params.pop("voice_ref", None)   # TTS / voice conversion: who to sound like (job input, not a knob)

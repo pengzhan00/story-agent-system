@@ -14,8 +14,10 @@ from storyagent.config import ConfigError, Settings
 from storyagent.db import Database
 from storyagent.domain import MediaKind, QualityTier
 from storyagent.media.params import resolve_params
+from storyagent.media.specs import SpecStore
+from storyagent.pipelines import project_settings_for
 
-from .media import slot_asset
+from .media import current_asset, up_to_date
 from .state import STAGES, WorkflowState
 
 # (stage, how it works, agents (always), agents (only on some runs), reads, writes)
@@ -80,25 +82,24 @@ def _agents(settings: Settings, names: list[str], *, optional: bool) -> list[dic
     return out
 
 
-def _counts(db: Database, ledger: Any, project_id: int, subject: str) -> dict[str, Any]:
-    rows = db.conn.execute(
-        "SELECT id, version, model_ref, subject_id, slot FROM gen_specs_current WHERE project_id=? AND subject_type=?",
-        (project_id, subject)).fetchall()
+def _counts(db: Database, settings: Settings, ledger: Any, project_id: int, subject: str) -> dict[str, Any]:
+    current = [x for x in SpecStore(db, settings, ledger).list_current(project_id) if x.subject_type == subject]
     made = stale = 0
     models: dict[str, int] = {}
-    for r in rows:
-        models[r["model_ref"]] = models.get(r["model_ref"], 0) + 1
-        asset = slot_asset(ledger, project_id, subject, r["subject_id"], r["slot"], r["id"])
-        if asset:
+    for spec in current:
+        models[spec.model_ref] = models.get(spec.model_ref, 0) + 1
+        if current_asset(ledger, spec) is not None:
             made += 1
-            if (asset.spec_version or 0) < r["version"]:
+            if not up_to_date(ledger, spec, settings):        # judged as the production plan judges it
                 stale += 1
+    rows = current
     return {"specs": len(rows), "made": made, "stale": stale, "models": models}
 
 
 def describe_flow(
     settings: Settings, db: Database, state: WorkflowState, ledger: Any, project_id: int | None = None,
 ) -> dict[str, Any]:
+    settings = project_settings_for(settings, db, project_id)       # the models of the project's pipeline plan
     status = {s["stage"]: s for s in state.stages(project_id)} if project_id is not None else {}
     steps: list[dict[str, Any]] = []
     for node in CHAIN:
@@ -111,7 +112,7 @@ def describe_flow(
         }
         if stage == "produce":
             for subject, kind, phase in MEDIA:
-                counts = _counts(db, ledger, project_id, subject) if project_id is not None else None
+                counts = _counts(db, settings, ledger, project_id, subject) if project_id is not None else None
                 try:
                     default_ref = settings.default_model(kind.value).ref
                 except ConfigError:

@@ -7,12 +7,14 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
+from storyagent.brief import resolve_brief
 from storyagent.compose.pacing import PacingError, parse_target
 from storyagent.config import ConfigError, Settings
 from storyagent.db import Database
 from storyagent.domain import slugify
 
-_PATCHABLE = ("name", "description", "genre", "content_language", "delivery_profile", "aspect_ratio")
+_PATCHABLE = ("name", "description", "genre", "content_language", "delivery_profile", "aspect_ratio", "kind",
+              "pipeline")
 _SETTINGS_KEYS = ("compliance", "models", "allow_restricted_licenses", "target_sec", "allow_remote", "default_voice",
                   "video_share", "video_budget_hours", "edit")
 
@@ -37,6 +39,9 @@ class Project:
     aspect_ratio: str
     status: str
     settings: dict[str, Any] = field(default_factory=dict)
+    kind: str = ""
+    pipeline: str = ""
+    brief: dict[str, Any] = field(default_factory=dict)
     created_at: str = ""
     updated_at: str = ""
 
@@ -46,6 +51,7 @@ class Project:
             id=r["id"], slug=r["slug"], name=r["name"], description=r["description"], genre=r["genre"],
             content_language=r["content_language"], delivery_profile=r["delivery_profile"],
             aspect_ratio=r["aspect_ratio"], status=r["status"], settings=json.loads(r["settings"] or "{}"),
+            kind=r["kind"], pipeline=r["pipeline"], brief=json.loads(r["brief"] or "{}"),
             created_at=r["created_at"], updated_at=r["updated_at"],
         )
 
@@ -88,25 +94,75 @@ class ProjectStore:
         g = math.gcd(*frame)
         return f"{frame[0] // g}:{frame[1] // g}"
 
+    def plan_of(self, pipeline: str, kind: str = "", profile: str = "") -> str:
+        """The plan a new project runs on: the one asked for, else the one its kind recommends, else the default - or,
+        when only a picture frame was named and the default points the other way, the first plan with that direction."""
+        name = pipeline or (self.settings.kind(kind).pipeline if kind else "") or self.settings.default_pipeline
+        plan = self.settings.pipeline(name)
+        if profile and not pipeline and not kind:
+            want = self._orientation(self._frame(profile))
+            if self._orientation(self._frame(plan.delivery_profile)) != want:
+                name = next((p.name for p in self.settings.pipelines.values()
+                             if self._orientation(self._frame(p.delivery_profile)) == want), name)
+        return name
+
     def create(
         self, name: str, *, genre: str = "", description: str = "", content_language: str = "",
-        delivery_profile: str = "",
+        delivery_profile: str = "", kind: str = "", pipeline: str = "", brief: Mapping[str, Any] | None = None,
     ) -> Project:
-        """``delivery_profile`` is the picture frame (vertical, landscape, ...): chosen here, it is the one direction of
-        every picture, video and the film. The aspect ratio follows from it."""
-        ratio = self._ratio(self._frame(delivery_profile))       # also rejects an unknown profile
+        """A project is made with its plan: ``kind`` (drama series, advert ...) recommends a pipeline plan - one
+        complete set of models and the picture frame - and ``brief`` gives the structure (seasons, episodes, episode
+        length). The plan and the frame are decided here: every picture, video and the film follow them. An explicit
+        ``delivery_profile`` may refine the frame but must keep the plan's direction."""
+        if kind:
+            self.settings.kind(kind)
+        plan_name = self.plan_of(pipeline, kind, delivery_profile)
+        plan = self.settings.pipeline(plan_name)
+        profile = delivery_profile or plan.delivery_profile
+        frame = self._frame(profile)                                 # also rejects an unknown profile
+        if self._orientation(frame) != self._orientation(self._frame(plan.delivery_profile)):
+            raise ConfigError(f"pipeline {plan_name!r} is {self._orientation(self._frame(plan.delivery_profile))}; "
+                              f"profile {profile!r} is {self._orientation(frame)}")
+        resolved = resolve_brief(self.settings, kind, brief) if (kind or brief) else {}
+        settings: dict[str, Any] = {"target_sec": resolved["episode_sec"]} if resolved else {}
         base = slugify(name)
         with self.db.transaction() as conn:
             slug, n = base, 2
             while conn.execute("SELECT 1 FROM projects WHERE slug=?", (slug,)).fetchone():
                 slug, n = f"{base}-{n}", n + 1
             cur = conn.execute(
-                "INSERT INTO projects(slug, name, genre, description, content_language, delivery_profile, aspect_ratio)"
-                " VALUES (?,?,?,?,?,?,?)",
-                (slug, name, genre, description, content_language or self.settings.locale, delivery_profile, ratio),
+                "INSERT INTO projects(slug, name, genre, description, content_language, delivery_profile, aspect_ratio,"
+                " kind, pipeline, brief, settings) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                (slug, name, genre, description, content_language or self.settings.locale, profile,
+                 self._ratio(frame), kind, plan_name, json.dumps(resolved, ensure_ascii=False),
+                 json.dumps(settings)),
             )
             assert cur.lastrowid is not None
-            return self.get(cur.lastrowid)
+            project_id = cur.lastrowid
+        if resolved:
+            self._plan_seasons(project_id, resolved)
+        return self.get(project_id)
+
+    def _plan_seasons(self, project_id: int, brief: Mapping[str, Any]) -> None:
+        """One ``seasons`` row per planned season with its planned episode count (never removes or shrinks anything)."""
+        from storyagent.story import StoryStore
+
+        store = StoryStore(self.db)
+        for number in range(1, int(brief["seasons"]) + 1):
+            row = store.ensure_season(project_id, number)
+            if int(row.get("planned_episodes") or 0) < int(brief["episodes_per_season"]):
+                store.update_season(project_id, number, {"planned_episodes": int(brief["episodes_per_season"])})
+
+    def set_brief(self, project_id: int, answers: Mapping[str, Any]) -> Project:
+        """Change the plan made up front (more seasons/episodes, another length); seasons are only ever added to."""
+        project = self.get(project_id)
+        resolved = resolve_brief(self.settings, project.kind, {**project.brief, **answers})
+        with self.db.transaction() as conn:
+            conn.execute("UPDATE projects SET brief=?, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?",
+                         (json.dumps(resolved, ensure_ascii=False), project_id))
+        self._plan_seasons(project_id, resolved)
+        self.set_settings(project_id, {"target_sec": resolved["episode_sec"]})
+        return self.get(project_id)
 
     def get(self, project_id: int) -> Project:
         row = self.db.conn.execute("SELECT * FROM projects WHERE id=?", (project_id,)).fetchone()
@@ -145,6 +201,18 @@ class ProjectStore:
         unknown = set(changes) - set(_PATCHABLE)
         if unknown:
             raise ConfigError(f"cannot update {sorted(unknown)}")
+        if "kind" in changes and changes["kind"]:
+            self.settings.kind(str(changes["kind"]))
+        if "pipeline" in changes:
+            # Changing the plan changes the whole set of models and the frame: the direction may not change once there
+            # are pictures, and the frame becomes the new plan's unless one of the same direction is named too.
+            plan = self.settings.pipeline(str(changes["pipeline"]))
+            changes["pipeline"] = plan.name
+            wanted = str(changes.get("delivery_profile") or plan.delivery_profile)
+            if self._orientation(self._frame(wanted)) != self._orientation(self._frame(plan.delivery_profile)):
+                raise ConfigError(
+                    f"pipeline {plan.name!r} fixes the direction of the frame; profile {wanted!r} differs")
+            changes["delivery_profile"] = wanted
         if "delivery_profile" in changes:
             before = self.get(project_id)
             old, new = self._frame(before.delivery_profile), self._frame(str(changes["delivery_profile"]))

@@ -7,36 +7,39 @@ from __future__ import annotations
 
 from typing import Any
 
+from storyagent.config import Settings
 from storyagent.media.ledger import Ledger
 from storyagent.media.specs import SpecStore
 from storyagent.story import StoryStore
 
+from .media import current_asset, up_to_date
 from .state import WorkflowState
 
 KEYFRAME, VIDEO = "shot.keyframe", "shot.video"
 
 
-def _made(specs: SpecStore, project_id: int, subject_type: str) -> dict[str, bool]:
-    """subject_id -> True when its current asset was made from the spec's current version (False = outdated).
-    Every spec version is its own row, so an asset is matched to its spec's subject, not to the row id."""
-    rows = specs.db.conn.execute(
-        """SELECT c.subject_id, a.spec_version, c.version FROM media_assets a
-           JOIN gen_specs s ON s.id = a.spec_id
-           JOIN gen_specs_current c ON c.project_id=s.project_id AND c.subject_type=s.subject_type
-                AND c.subject_id=s.subject_id AND c.slot=s.slot
-           WHERE a.project_id=? AND a.is_current=1 AND a.trashed_at IS NULL AND c.subject_type=?""",
-        (project_id, subject_type)).fetchall()
-    return {r["subject_id"]: (r["spec_version"] or 0) >= r["version"] for r in rows}
+def _made(
+    specs: SpecStore, ledger: Ledger, settings: Settings | None, project_id: int, subject_type: str,
+) -> dict[str, bool]:
+    """subject_id -> True when its current asset is up to date (False = outdated). Judged exactly as the production
+    plan judges it (``up_to_date``), so the board's counts and the plan's list agree."""
+    out: dict[str, bool] = {}
+    for spec in specs.list_current(project_id):
+        if spec.subject_type == subject_type and current_asset(ledger, spec) is not None:
+            out[spec.subject_id] = up_to_date(ledger, spec, settings)
+    return out
 
 
 def series_board(
     story: StoryStore, state: WorkflowState, specs: SpecStore, ledger: Ledger, project_id: int,
+    settings: Settings | None = None,
 ) -> dict[str, Any]:
     episodes = {e["number"]: e for e in story.list_episodes(project_id)}
     shots: dict[int, list[dict[str, Any]]] = {}
     for sh in story.list_shots(project_id):
         shots.setdefault(sh["episode_id"], []).append(sh)
-    keyframes, videos = _made(specs, project_id, KEYFRAME), _made(specs, project_id, VIDEO)
+    keyframes = _made(specs, ledger, settings, project_id, KEYFRAME)
+    videos = _made(specs, ledger, settings, project_id, VIDEO)
     films = {a.slot: a for a in ledger.list_assets(
         project_id=project_id, kind="compose.assemble", current_only=True, limit=1000)}
     out_seasons: list[dict[str, Any]] = []

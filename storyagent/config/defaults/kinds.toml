@@ -1,0 +1,109 @@
+# Kinds of work: what a person is making. Chosen when a project is created; it brings the recommended pipeline plan,
+# whether there are seasons/episodes, the usual episode count and length, and a note for the story analysis. Add your own
+# (or change these) in $STORY_AGENT_HOME/config/kinds.toml - nothing here is fixed in code.
+#
+#   pipeline   : recommended plan (a name from pipelines.toml); the creator can pick another
+#   seasons    : whether the work has seasons (false = one season, one or a few episodes, no season UI)
+#   episodes   : min / default / max number of episodes (per season when seasons = true)
+#   episode_sec: min / default / max length of one episode in seconds (the default becomes the project's target)
+#   ask        : questions the creation wizard shows; subset of seasons, episodes, episode_sec, audience, platform
+#   guidance   : English paragraph handed to the story analysis (what this kind of work needs)
+
+[default]
+kind = "drama_series"
+
+[kinds.drama_series]
+label_key = "brief.kind.drama_series"
+note_key = "brief.kind.drama_series.note"
+pipeline = "vertical_drama"
+seasons = true
+ask = ["seasons", "episodes", "episode_sec", "audience", "platform"]
+guidance = "A continuing vertical short-drama series. Every episode opens with a hook in the first seconds, turns at least once, and ends on a cliffhanger that makes the viewer want the next episode. Characters and the look stay the same across episodes."
+[kinds.drama_series.episodes]
+min = 2
+default = 12
+max = 200
+[kinds.drama_series.episode_sec]
+min = 30
+default = 120
+max = 600
+
+[kinds.drama_single]
+label_key = "brief.kind.drama_single"
+note_key = "brief.kind.drama_single.note"
+pipeline = "vertical_drama"
+seasons = false
+ask = ["episode_sec", "audience", "platform"]
+guidance = "A self-contained short drama told in one piece: a hook at the start, a clear conflict, a reversal, and a resolution at the end."
+[kinds.drama_single.episodes]
+min = 1
+default = 1
+max = 1
+[kinds.drama_single.episode_sec]
+min = 30
+default = 180
+max = 900
+
+[kinds.tv_series]
+label_key = "brief.kind.tv_series"
+note_key = "brief.kind.tv_series.note"
+pipeline = "tv_series"
+seasons = true
+ask = ["seasons", "episodes", "episode_sec", "audience", "platform"]
+guidance = "A television series with long episodes: an A story and a B story per episode, an arc that runs through the season, a recap of the story so far and a closing beat that points to the next episode."
+[kinds.tv_series.episodes]
+min = 2
+default = 8
+max = 60
+[kinds.tv_series.episode_sec]
+min = 600
+default = 1500
+max = 3600
+
+[kinds.advert]
+label_key = "brief.kind.advert"
+note_key = "brief.kind.advert.note"
+pipeline = "advert"
+seasons = false
+ask = ["episode_sec", "audience", "platform"]
+guidance = "An advert: one product or message, one clear promise, a memorable image in the first seconds, a short story or demonstration, and a closing call to action with the name of the brand. No subplots; every shot earns its place."
+[kinds.advert.episodes]
+min = 1
+default = 1
+max = 1
+[kinds.advert.episode_sec]
+min = 5
+default = 30
+max = 120
+
+[kinds.feature_film]
+label_key = "brief.kind.feature_film"
+note_key = "brief.kind.feature_film.note"
+pipeline = "feature_film"
+seasons = false
+ask = ["episode_sec", "audience", "platform"]
+guidance = "A feature film in three acts: setup, confrontation, resolution, with an inciting incident, a midpoint turn, a low point and a climax. Themes and characters develop over the whole length; scenes are long enough to breathe."
+[kinds.feature_film.episodes]
+min = 1
+default = 1
+max = 1
+[kinds.feature_film.episode_sec]
+min = 1800
+default = 5400
+max = 10800
+
+[kinds.custom]
+label_key = "brief.kind.custom"
+note_key = "brief.kind.custom.note"
+pipeline = "vertical_drama"
+seasons = true
+ask = ["seasons", "episodes", "episode_sec", "audience", "platform"]
+guidance = ""
+[kinds.custom.episodes]
+min = 1
+default = 1
+max = 500
+[kinds.custom.episode_sec]
+min = 5
+default = 120
+max = 10800

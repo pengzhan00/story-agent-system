@@ -61,6 +61,66 @@ audio_rate = 48000
 min_episode_sec = 0
 max_episode_sec = 0
 
+[profiles.landscape_drama_720]
+label_key = "delivery.profile.landscape_drama_720"
+width = 1280
+height = 720
+fps = 24
+video_codec = "libx264"
+crf = 18
+pix_fmt = "yuv420p"
+audio_codec = "aac"
+audio_bitrate = "192k"
+audio_rate = 48000
+target_sec = 300
+min_episode_sec = 180
+max_episode_sec = 600
+
+[profiles.tv_landscape_1080]
+label_key = "delivery.profile.tv_landscape_1080"
+width = 1920
+height = 1080
+fps = 24
+video_codec = "libx264"
+crf = 18
+pix_fmt = "yuv420p"
+audio_codec = "aac"
+audio_bitrate = "256k"
+audio_rate = 48000
+target_sec = 1500
+min_episode_sec = 1200
+max_episode_sec = 2700
+
+[profiles.advert_landscape_1080]
+label_key = "delivery.profile.advert_landscape_1080"
+width = 1920
+height = 1080
+fps = 24
+video_codec = "libx264"
+crf = 16
+pix_fmt = "yuv420p"
+audio_codec = "aac"
+audio_bitrate = "256k"
+audio_rate = 48000
+target_sec = 30
+min_episode_sec = 5
+max_episode_sec = 120
+
+[profiles.film_scope_1080]
+label_key = "delivery.profile.film_scope_1080"
+width = 1920
+height = 816
+fps = 24
+video_codec = "libx264"
+crf = 18
+pix_fmt = "yuv420p"
+audio_codec = "aac"
+audio_bitrate = "256k"
+audio_rate = 48000
+target_sec = 5400
+min_episode_sec = 5400
+max_episode_sec = 10800
+
 [pacing]
 # Average planned shot length: with the target length it decides how many acts, scenes and shots to write.
 avg_shot_sec = 4.0
@@ -111,3 +171,10 @@ freeze_sec = 1.5
 require_audio = true
 min_mean_volume_db = -45.0
 aspect_tolerance = 0.08
+
+[estimate]
+# Assumptions for the size estimate in the creation wizard (a rough count before any story exists).
+lines_per_shot = 1.5          # spoken lines per shot
+sfx_per_shot = 1.0            # sound effects per shot
+characters_per_work = 4       # portraits made once for the whole work
+locations_per_season = 3      # location images made per season

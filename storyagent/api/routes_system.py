@@ -29,10 +29,13 @@ from .schemas import (
     LabeledValue,
     Meta,
     ModelOut,
+    PlanOut,
+    RangeOut,
     Ready,
     RecipeOut,
     RecipeStepOut,
     WorkflowRunOut,
+    WorkKindOut,
 )
 
 router = APIRouter(prefix="/api", tags=["system"])
@@ -45,11 +48,14 @@ def ready(request: Request) -> Ready:
 
 
 @router.get("/health", response_model=HealthOut)
-def pipeline_health(request: Request) -> HealthOut:
-    """Same report as `storyagent media healthcheck` (probes services, tools, models, disk)."""
+def pipeline_health(request: Request, pipeline: str = "", project: int | None = None) -> HealthOut:
+    """Same report as `storyagent media healthcheck` (probes services, tools, models, disk). With ``pipeline`` (or
+    the ``project`` whose plan it is) what that plan needs is the required part: the exit code says if *it* can run."""
     ctx = ctx_of(request)
     t = translator_of(request)
-    report = health.run_checks(ctx.settings, registry=default_registry(ctx.settings))
+    plan = pipeline or (ctx.projects.get(project).pipeline if project else "")
+    needs = ctx.settings.pipeline(plan).requires if plan else ()
+    report = health.run_checks(ctx.settings, registry=default_registry(ctx.settings), require=needs)
     entries = [
         HealthEntry(
             name=e.name, category=e.category, state=e.state.value, label=t(f"health.{e.state.value}"),
@@ -111,6 +117,23 @@ def meta(request: Request) -> Meta:
             )
             for r in s.recipes.values()
         ],
+        work_kinds=[
+            WorkKindOut(
+                name=k.name, label=t(k.label_key), note=t(k.note_key) if k.note_key else "", pipeline=k.pipeline,
+                seasons=k.seasons, episodes=RangeOut(**k.episodes.__dict__),
+                episode_sec=RangeOut(**k.episode_sec.__dict__), ask=list(k.ask))
+            for k in s.kinds.values()
+        ],
+        default_work_kind=s.default_kind,
+        pipelines=[
+            PlanOut(
+                name=p.name, label=t(p.label_key), note=t(p.note_key) if p.note_key else "",
+                delivery_profile=p.delivery_profile, width=int(s.delivery["profiles"][p.delivery_profile]["width"]),
+                height=int(s.delivery["profiles"][p.delivery_profile]["height"]), tier=p.tier, models=dict(p.models),
+                requires=list(p.requires))
+            for p in s.pipelines.values()
+        ],
+        default_pipeline=s.default_pipeline,
         compliance_enabled=s.compliance.enabled,
         llm_unload_policy=s.llm_unload_policy,
         queue=queue_state(request),

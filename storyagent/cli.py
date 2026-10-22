@@ -9,6 +9,7 @@
     storyagent serve [--host H] [--port P]
     storyagent worker [--once]
     storyagent workflow run | status | watch | review      (story pipeline with live progress bars)
+    storyagent project create | estimate | update | list | trash   (kind of work, pipeline plan, seasons, episodes)
     storyagent export episode --project N [--episode 1] --out DIR   (film + subtitles + stems + provenance)
     storyagent llm check
     storyagent api openapi [--out FILE]
@@ -96,6 +97,9 @@ def _cmd_config_show(s: Settings, _a: argparse.Namespace) -> int:
         "default_models": dict(s.default_models), "llm_unload_policy": s.llm_unload_policy,
         "compliance": asdict(s.compliance), "strict_params": s.strict_params,
         "delivery_profile": s.delivery["default"]["profile"], "recipes": sorted(s.recipes),
+        "pipelines": {n: {"default": n == s.default_pipeline, "frame": p.delivery_profile, "tier": p.tier,
+                          "models": dict(p.models)} for n, p in s.pipelines.items()},
+        "kinds": {n: {"default": n == s.default_kind, "pipeline": k.pipeline} for n, k in s.kinds.items()},
         "llm_roles": {n: f"{r.backend}:{r.model}" for n, r in s.llm_roles.items()},
     })
     return 0
@@ -136,15 +140,61 @@ def _cmd_i18n_check(_s: Settings, _a: argparse.Namespace) -> int:
 
 
 # -- project ----------------------------------------------------------------------------------------
+def _answers(a: argparse.Namespace) -> dict[str, Any]:
+    """The creator's answers from the command line (anything not given takes the kind's default)."""
+    given = {"seasons": a.seasons, "episodes_per_season": a.episodes, "episode_sec": a.episode_sec,
+             "audience": a.audience, "platform": a.platform}
+    return {k: v for k, v in given.items() if v not in (None, "")}
+
+
+def _print_plan(p: Any) -> None:
+    b = p.brief
+    print(t("cli.project.plan", kind=p.kind or "-", pipeline=p.pipeline or "-", ratio=p.aspect_ratio,
+            episodes=b.get("episodes_total", "-"), minutes=round(b.get("total_sec", 0) / 60, 1)))
+
+
 def _cmd_project_create(s: Settings, a: argparse.Namespace) -> int:
-    p = ProjectStore(_ctx(s).db, s).create(a.name, genre=a.genre or "", delivery_profile=a.profile or "")
+    p = ProjectStore(_ctx(s).db, s).create(
+        a.name, genre=a.genre or "", delivery_profile=a.profile or "", kind=a.kind or "", pipeline=a.pipeline or "",
+        brief=_answers(a) or None)
     print(t("cli.project.created", id=p.id, slug=p.slug))
+    _print_plan(p)
+    return 0
+
+
+def _cmd_project_estimate(s: Settings, a: argparse.Namespace) -> int:
+    from storyagent.brief import estimate, resolve_brief
+
+    c = _ctx(s)
+    brief = resolve_brief(s, a.kind or "", _answers(a))
+    plan = ProjectStore(c.db, s).plan_of(a.pipeline or "", a.kind or "")
+    e = estimate(s, c.ledger, brief, plan)
+    print(t("cli.estimate.head", pipeline=e["pipeline"], tier=e["tier"], episodes=e["episodes"], shots=e["shots"]))
+    for task in e["tasks"]:
+        print(t("cli.estimate.row", kind=task["kind"], model=task["model_ref"], count=task["count"],
+                each=task["each_sec"], total=round(task["total_sec"] / 60), rough="" if task["known"] else "~"))
+    print(t("cli.estimate.total", hours=e["hours"]))
+    if e["over_budget"]:
+        print(t("cli.estimate.over_budget", hours=e["video_budget_hours"]), file=sys.stderr)
+    return 0
+
+
+def _cmd_project_update(s: Settings, a: argparse.Namespace) -> int:
+    store = ProjectStore(_ctx(s).db, s)
+    try:
+        if a.kind or a.pipeline:
+            store.update(a.project, **{k: v for k, v in (("kind", a.kind), ("pipeline", a.pipeline)) if v})
+        if _answers(a):
+            store.set_brief(a.project, _answers(a))
+    except ProjectStateError as exc:
+        raise CliError("cli.project.state", 1, detail=str(exc)) from exc
+    _print_plan(store.get(a.project))
     return 0
 
 
 def _cmd_project_list(s: Settings, a: argparse.Namespace) -> int:
     for p in ProjectStore(_ctx(s).db, s).list(trashed=a.trashed):
-        print(t("cli.project.row", id=p.id, slug=p.slug, name=p.name))
+        print(t("cli.project.row", id=p.id, slug=p.slug, name=p.name, kind=p.kind or "-", pipeline=p.pipeline or "-"))
     return 0
 
 
@@ -169,9 +219,11 @@ def _cmd_serve(s: Settings, a: argparse.Namespace) -> int:
 
 # -- media ------------------------------------------------------------------------------------------
 def _cmd_media_health(s: Settings, a: argparse.Namespace) -> int:
-    report = health.run_checks(
-        s, registry=default_registry(s), require=[r for r in (a.require or "").split(",") if r]
-    )
+    needs = [r for r in (a.require or "").split(",") if r]
+    plan = a.pipeline or (ProjectStore(_ctx(s).db, s).get(a.project).pipeline if a.project else "")
+    if plan:                                            # what the plan needs counts as required
+        needs += s.pipeline(plan).requires
+    report = health.run_checks(s, registry=default_registry(s), require=needs)
     print(json.dumps(report.to_dict(), ensure_ascii=False, indent=2) if a.json else health.format_report(report))
     return report.exit_code
 
@@ -644,6 +696,22 @@ def build_parser() -> argparse.ArgumentParser:
     pc.add_argument("name")
     pc.add_argument("--genre")
     pc.add_argument("--profile", help="delivery profile = the picture frame (vertical / landscape), fixed at the start")
+
+    def brief_args(sp: argparse.ArgumentParser) -> None:
+        sp.add_argument("--kind", help="kind of work (drama_series, advert ...): recommends the pipeline plan")
+        sp.add_argument("--pipeline", help="pipeline plan: one complete set of models (default: the kind's)")
+        sp.add_argument("--seasons", type=int)
+        sp.add_argument("--episodes", type=int, help="episodes per season")
+        sp.add_argument("--episode-sec", type=float, help="target length of one episode in seconds")
+        sp.add_argument("--audience")
+        sp.add_argument("--platform")
+
+    brief_args(pc)
+    pe = add(pr, "estimate", _cmd_project_estimate)
+    brief_args(pe)
+    pu = add(pr, "update", _cmd_project_update)
+    pu.add_argument("project", type=int)
+    brief_args(pu)
     pl = add(pr, "list", _cmd_project_list)
     pl.add_argument("--trashed", action="store_true", help="list the recycle bin")
     pt = add(pr, "trash", _cmd_project_trash)
@@ -654,6 +722,8 @@ def build_parser() -> argparse.ArgumentParser:
     hc = add(me, "healthcheck", _cmd_media_health)
     hc.add_argument("--json", action="store_true")
     hc.add_argument("--require", default="")
+    hc.add_argument("--pipeline", help="what this pipeline plan needs counts as required")
+    hc.add_argument("--project", type=int, help="the same, for the plan of this project")
     ms = add(me, "submit", _cmd_media_submit)
     ms.add_argument("--kind", required=True, choices=[k.value for k in MediaKind])
     ms.add_argument("--model")

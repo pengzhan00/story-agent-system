@@ -26,6 +26,7 @@ from storyagent.media.ledger import Ledger, LedgerError
 from storyagent.media.library import Library
 from storyagent.media.params import resolve_params
 from storyagent.media.registry import AdapterRegistry
+from storyagent.pipelines import settings_for
 from storyagent.util import new_id, now_iso
 
 
@@ -245,7 +246,12 @@ class Workshop:
                 cache[provider] = (h.state is HealthState.OK, h.detail or h.state.value)
         return cache[provider]
 
-    def describe(self) -> list[dict[str, Any]]:
+    def describe(self, pipeline: str = "") -> list[dict[str, Any]]:
+        """The modules with their models. With a ``pipeline`` the defaults are that plan's models and every model says
+        whether it belongs to the plan: the others can be tried here, but are not for a project (a project runs on
+        one complete plan)."""
+        cfg = settings_for(self.settings, pipeline)
+        in_plan = set(cfg.pipeline(pipeline).models.values()) if pipeline else set()
         cache: dict[str, tuple[bool, str]] = {}
         out: list[dict[str, Any]] = []
         for m in MODULES:
@@ -253,7 +259,7 @@ class Workshop:
             for ks in m.kinds:
                 kind = ks.kind.value
                 preset = self.preset(kind)
-                default = self.settings.default_models.get(kind, "")
+                default = cfg.default_models.get(kind, "")
                 models = []
                 for ref, spec in self.settings.models.items():
                     if spec.kind != kind:
@@ -263,13 +269,14 @@ class Workshop:
                         "ref": ref, "provider": spec.provider, "version": spec.version, "heavy": spec.heavy,
                         "est_memory_gib": spec.est_memory_gib, "license_tag": spec.license_tag,
                         "commercial_ok": spec.commercial_ok, "available": ok, "note": "" if ok else note,
+                        "in_plan": (not pipeline) or ref in in_plan,
                     })
                 chosen = preset["model_ref"] if preset["model_ref"] in {x["ref"] for x in models} else default
                 tier = preset["tier"] or QualityTier.FINAL.value
                 provider = self.settings.model(chosen).provider if chosen else ""
                 adapter = self.registry.get(provider) if provider else None
                 schema = dict(adapter.capabilities().param_schema) if adapter else {}
-                base = resolve_params(self.settings, chosen, tier) if chosen else {}
+                base = resolve_params(cfg, chosen, tier) if chosen else {}
                 kinds.append({
                     "kind": kind, "model_ref": chosen, "default_model": default, "tier": tier, "models": models,
                     "base_params": base,
