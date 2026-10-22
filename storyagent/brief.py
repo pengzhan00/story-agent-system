@@ -58,7 +58,7 @@ def resolve_brief(settings: Settings, kind_name: str = "", answers: Mapping[str,
 
 def estimate(settings: Settings, ledger: Any, brief: Mapping[str, Any], pipeline: str = "") -> dict[str, Any]:
     """Tasks and machine time the brief needs under the plan. ``known`` says whether the time per task is measured."""
-    from storyagent.workflow.media import FALLBACK_SECONDS
+    from storyagent.workflow.media import fallback_seconds
 
     eff = settings.for_pipeline(pipeline or settings.kind(str(brief.get("kind", ""))).pipeline)
     cfg = eff.delivery.get("estimate", {})
@@ -85,7 +85,7 @@ def estimate(settings: Settings, ledger: Any, brief: Mapping[str, Any], pipeline
             continue
         ref = eff.default_model(kind).ref
         known = int(ledger.estimate_seconds(ref, tier)) if ledger is not None else 0
-        each = known or int(FALLBACK_SECONDS.get(kind) or FALLBACK_SECONDS.get(kind.split(".")[0], 30.0))
+        each = known or int(fallback_seconds(eff, ref, kind))
         tasks.append({"kind": kind, "model_ref": ref, "count": count, "each_sec": each, "known": bool(known),
                       "total_sec": each * count})
     total = sum(t["total_sec"] for t in tasks)

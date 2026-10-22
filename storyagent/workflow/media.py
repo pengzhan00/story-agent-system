@@ -225,6 +225,16 @@ FALLBACK_SECONDS = {"image": 45.0, "image.edit": 600.0, "video": 240.0, "audio.t
                     "audio.sfx": 20.0}
 
 
+def fallback_seconds(settings: Settings, model_ref: str, kind: str) -> float:
+    """Seconds per job to assume without history: the model's own ``est_seconds`` (models.toml) if it states one, else
+    the kind's figure above."""
+    try:
+        own = float(settings.model(model_ref).extra.get("est_seconds", 0) or 0)
+    except (ConfigError, TypeError, ValueError):
+        own = 0.0
+    return own or float(FALLBACK_SECONDS.get(kind) or FALLBACK_SECONDS.get(kind.split(".")[0], 30.0))
+
+
 def scene_modes(store: StoryStore, project_id: int) -> dict[str, str]:
     """``keyframe_mode`` of every location, by the id its scene-keyframe spec carries as subject."""
     return {str(loc["id"]): str(loc.get("keyframe_mode") or "auto") for loc in store.list_locations(project_id)}
@@ -301,8 +311,7 @@ def _expected_seconds(ctx: Ctx, ledger: Ledger, specs: list[SpecRecord], tier: Q
         if edit_ref:
             kind = MediaKind.IMAGE_EDIT.value
         known = ledger.estimate_seconds(model_ref, tier.value)
-        guess = FALLBACK_SECONDS.get(kind) or FALLBACK_SECONDS.get(kind.split(".")[0], 60.0)
-        total += float(known or guess)
+        total += float(known or fallback_seconds(ctx.settings, model_ref, kind))
     return total
 
 

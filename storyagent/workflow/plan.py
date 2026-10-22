@@ -25,6 +25,7 @@ from .media import (
     PHASES,
     current_asset,
     default_voice_of,
+    fallback_seconds,
     keyframe_edit_model,
     scene_modes,
     up_to_date,
@@ -105,7 +106,7 @@ def produce_plan(
                 state, reason = "blocked", "no_voice"
             if spec.subject_type == "shot.video" and state == "new" and spec.subject_id not in picks:
                 state, reason = "skip", "still"
-            guess = FALLBACK_SECONDS.get(kind) or FALLBACK_SECONDS.get(kind.split(".")[0], 60.0)
+            guess = fallback_seconds(settings, model_ref, kind) if model_ref else FALLBACK_SECONDS.get(kind, 60.0)
             known = ledger.estimate_seconds(model_ref, tier.value) if model_ref else 0
             needs = [by_key[(d["subject_type"], d["subject_id"], d.get("slot", "main"))].id
                      for d in spec.depends_on

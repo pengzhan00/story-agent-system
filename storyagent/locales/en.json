@@ -1148,6 +1148,8 @@
   "web.edit.hint": "Cards and fades are added when the episode is assembled. Off by default: a series episode usually jumps straight into its hook.",
   "pipeline.vertical_drama": "Vertical short drama / series",
   "pipeline.vertical_drama.note": "9:16 vertical. The stack validated end to end on this machine: FLUX composed keyframes, LTX video, CosyVoice voices, ACE-Step music, Stable Audio effects, ffmpeg assembly.",
+  "pipeline.vertical_drama_fast": "Vertical short drama / series (fast keyframes)",
+  "pipeline.vertical_drama_fast.note": "9:16 vertical, like the one above but keyframes are composed by FLUX.2 klein distilled through ComfyUI: about a minute each (the Base model takes about ten). Faces and poses are a little less faithful; good for drafts or when time matters. One project never mixes the two keyframe models.",
   "pipeline.landscape_drama": "Landscape short drama / web series",
   "pipeline.landscape_drama.note": "16:9 landscape 720p, the same models; episodes of a few minutes to ten or so.",
   "pipeline.tv_series": "TV series",

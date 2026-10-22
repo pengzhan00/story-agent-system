@@ -82,6 +82,7 @@ license_tag = "flux2-klein-4b-apache-2.0"
 commercial_ok = true
 prompt_profile = "natural_en"
 timeout_sec = 1800
+est_seconds = 600   # measured 575 s at 720x1280 / 30 steps
 command = "mflux-generate-flux2-edit"
 weights = "~/models/flux2-klein-base-4B"
 base_model = "flux2-klein-base-4b"
@@ -118,6 +119,7 @@ commercial_ok = true
 prompt_profile = "natural_en"
 timeout_sec = 900
 workflow = "flux2_klein_edit"
+est_seconds = 60   # measured 56 s at 720x1280 / 4 steps; shapes the estimate until the ledger has history
 
 [models."flux2-klein-4b-edit-comfy".params]
 width = 720

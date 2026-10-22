@@ -228,3 +228,22 @@ def test_the_estimate_counts_tasks_and_time_and_flags_a_budget(settings: Setting
     assert estimate(tight, ledger, brief, "")["over_budget"] is True
     ad = estimate(settings, ledger, resolve_brief(settings, "advert"))
     assert {t["kind"]: t["count"] for t in ad["tasks"]}["video.generate"] == ad["shots"]    # advert: a clip per shot
+
+
+def test_the_fast_keyframe_plan_differs_from_the_base_plan_only_in_the_edit_model(tmp_path: Path) -> None:
+    s = load_settings(home_with(tmp_path))
+    base, fast = s.pipelines["vertical_drama"], s.pipelines["vertical_drama_fast"]
+    assert base.models["image.edit"] == "flux2-klein-base-4b-edit"
+    assert fast.models["image.edit"] == "flux2-klein-4b-edit-comfy"
+    assert {k: v for k, v in fast.models.items() if k != "image.edit"} == {
+        k: v for k, v in base.models.items() if k != "image.edit"}
+    assert "comfy" in fast.requires and fast.delivery_profile == base.delivery_profile
+
+
+def test_a_model_states_its_own_time_per_job_until_the_ledger_has_history(tmp_path: Path) -> None:
+    from storyagent.workflow.media import fallback_seconds
+
+    s = load_settings(home_with(tmp_path))
+    assert fallback_seconds(s, "flux2-klein-4b-edit-comfy", "image.edit") == 60.0
+    assert fallback_seconds(s, "flux2-klein-base-4b-edit", "image.edit") == 600.0
+    assert fallback_seconds(s, "no-such-model", "image.edit") == 600.0        # unknown model: the kind's figure

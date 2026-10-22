@@ -39,6 +39,32 @@ keyframe_from_references = true
 title_card = false
 next_card = true
 
+# -- the same vertical drama with fast keyframes: shot keyframes are composed by FLUX.2 klein 4B *distilled* through
+# ComfyUI (about 56 s instead of about 575 s on this machine, measured on one shot - see docs/PIPELINES.md). Faces and
+# poses are a little less faithful than the Base model; use it for drafts, or for a whole series when time matters. A
+# project that wants the Base keyframes picks vertical_drama instead (models are never mixed inside one project).
+[pipelines.vertical_drama_fast]
+label_key = "pipeline.vertical_drama_fast"
+note_key = "pipeline.vertical_drama_fast.note"
+delivery_profile = "series_vertical_720"
+tier = "preview"
+requires = ["ollama", "acestep", "phosphene", "comfy", "tool.ffmpeg", "tool.mflux", "tool.cosyvoice"]
+[pipelines.vertical_drama_fast.models]
+"image.generate" = "flux2-klein-base-4b"
+"image.edit" = "flux2-klein-4b-edit-comfy"
+"video.generate" = "ltx-2.5-video"
+"video.av" = "ltx-2.5-av"
+"audio.tts" = "cosyvoice3-0.5b"
+"audio.music" = "acestep-1.5-turbo"
+"audio.sfx" = "stable-audio-3-medium"
+"compose.assemble" = "ffmpeg-assemble"
+[pipelines.vertical_drama_fast.workflow]
+video_share = 0.2
+keyframe_from_references = true
+[pipelines.vertical_drama_fast.edit]
+title_card = false
+next_card = true
+
 # -- landscape (16:9) short drama / web series ---------------------------------------------------------------------------
 [pipelines.landscape_drama]
 label_key = "pipeline.landscape_drama"
