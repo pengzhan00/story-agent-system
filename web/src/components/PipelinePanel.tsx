@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { usePipeline, usePipelineChoices, type PipelineRow } from "../api/pipeline";
 import { useT } from "../i18n";
 import { ErrorNote } from "./ErrorNote";
@@ -45,6 +46,14 @@ export function PipelinePanel({ projectId }: { projectId: number }) {
                       ))}
                     </select>
                   )}
+                  {row.chosen !== "" ? (
+                    <>
+                      {" "}
+                      <Link className="link small" to={`/wiki?q=${encodeURIComponent(row.chosen)}`} title={t("web.wiki.about_hint")}>
+                        {t("web.wiki.about")}
+                      </Link>
+                    </>
+                  ) : null}
                 </td>
                 <td>
                   {row.overridden ? <span className="chip chip-stale">{t("web.pipeline.changed")}</span> : null}

@@ -1,0 +1,23 @@
+# The in-system wiki (web "Wiki" page, `storyagent wiki ...`). Pages are copied into the database by
+# `storyagent wiki sync` (or the Sync button); the files they come from are only read, never changed.
+#
+#   docs      true = the repository's own docs/*.md are pages of the source "docs"
+#   sources   notes folders to read, e.g. an Obsidian vault. Put yours in $STORY_AGENT_HOME/config/wiki.toml:
+#
+#     [[wiki.sources]]
+#     name = "obsidian"                      # shown as the source; no "/" in it
+#     path = "~/Documents/Obsidian Vault"
+#     include = ["Skills/Model matrix.md", "Projects/Media-*.md"]   # allow-list: a note's path or a glob (* ? [abc])
+#                                            # relative to path;
+#                                            # nothing outside it is ever read (an empty list reads nothing)
+#     exclude = []
+#     restricted = ["Skills/Adult-*.md"]     # these notes get `rating` (default "restricted"): they are hidden and
+#                                            # audited like restricted pictures - age gate and unlock session apply
+#     rating = "restricted"
+#
+# The notes may use Obsidian's syntax ([[links]], ![[embeds]], callouts, %%comments%%, ==highlights==, frontmatter);
+# it is turned into plain Markdown when the page is stored.
+
+[wiki]
+docs = true
+sources = []

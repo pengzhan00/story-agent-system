@@ -15,6 +15,7 @@ import { PromptsPage } from "./pages/PromptsPage";
 import { WorkshopPage } from "./pages/WorkshopPage";
 import { QueuePage } from "./pages/QueuePage";
 import { SystemPage } from "./pages/SystemPage";
+import { WikiPage } from "./pages/WikiPage";
 
 /** The first visit of a browser session lands on the launch screen; later visits go straight to the projects. */
 function Home() {
@@ -60,6 +61,9 @@ export function App() {
           <NavLink to="/tools" className={link}>
             {t("web.nav.tools")}
           </NavLink>
+          <NavLink to="/wiki" className={link}>
+            {t("web.nav.wiki")}
+          </NavLink>
           <NavLink to="/system" className={link}>
             {t("web.nav.system")}
           </NavLink>
@@ -90,6 +94,7 @@ export function App() {
           <Route path="/prompts" element={<PromptsPage />} />
           <Route path="/llm" element={<LlmPage />} />
           <Route path="/tools" element={<ToolsPage />} />
+          <Route path="/wiki/*" element={<WikiPage />} />
           <Route path="/system" element={<SystemPage />} />
           <Route path="/users" element={<UsersPage />} />
           <Route path="/audit" element={<AuditPage />} />

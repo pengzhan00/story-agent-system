@@ -2334,6 +2334,77 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/wiki/assets/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Asset */
+        get: operations["asset_api_wiki_assets__name__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/wiki/pages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Pages */
+        get: operations["list_pages_api_wiki_pages_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/wiki/pages/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Page */
+        get: operations["get_page_api_wiki_pages__slug__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/wiki/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sync
+         * @description Read the sources again (only the notes the include lists allow) and bring the pages up to date.
+         */
+        post: operations["sync_api_wiki_sync_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/workflow/runs/{run_id}": {
         parameters: {
             query?: never;
@@ -5113,6 +5184,96 @@ export interface components {
              * @description shots that have a clip task
              */
             shots: number;
+        };
+        /** WikiBrief */
+        WikiBrief: {
+            /** Path */
+            path: string;
+            /** Rating */
+            rating: string;
+            /** Slug */
+            slug: string;
+            /**
+             * Snippet
+             * @description the text around the first search hit; empty when no query was given
+             */
+            snippet: string;
+            /** Source */
+            source: string;
+            /** Summary */
+            summary: string;
+            /** Tags */
+            tags: string[];
+            /** Title */
+            title: string;
+            /** Updated */
+            updated: string | null;
+        };
+        /** WikiCount */
+        WikiCount: {
+            /** Count */
+            count: number;
+            /** Name */
+            name: string;
+        };
+        /** WikiList */
+        WikiList: {
+            /**
+             * Configured
+             * @description false until a source other than the built-in docs is listed in wiki.toml
+             */
+            configured: boolean;
+            /**
+             * Hidden
+             * @description restricted pages this caller may not see right now (locked or too young)
+             */
+            hidden: number;
+            /** Pages */
+            pages: components["schemas"]["WikiBrief"][];
+            /** Sources */
+            sources: components["schemas"]["WikiCount"][];
+            /** Synced At */
+            synced_at: string | null;
+            /** Tags */
+            tags: components["schemas"]["WikiCount"][];
+            /**
+             * Total
+             * @description pages this caller may see, before the query and the filters
+             */
+            total: number;
+        };
+        /** WikiPageOut */
+        WikiPageOut: {
+            /** Backlinks */
+            backlinks: components["schemas"]["WikiBrief"][];
+            /** Body */
+            body: string;
+            /** Links */
+            links: components["schemas"]["WikiBrief"][];
+            /** Meta */
+            meta: {
+                [key: string]: unknown;
+            };
+            page: components["schemas"]["WikiBrief"];
+        };
+        /** WikiSyncOut */
+        WikiSyncOut: {
+            /** Added */
+            added: number;
+            /** Removed */
+            removed: number;
+            /** Sources */
+            sources: {
+                [key: string]: number;
+            };
+            /** Unchanged */
+            unchanged: number;
+            /** Updated */
+            updated: number;
+            /** Warnings */
+            warnings: {
+                [key: string]: string;
+            }[];
         };
         /** WorkKindOut */
         WorkKindOut: {
@@ -10533,6 +10694,121 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    asset_api_wiki_assets__name__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_pages_api_wiki_pages_get: {
+        parameters: {
+            query?: {
+                q?: string;
+                source?: string;
+                tag?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WikiList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_page_api_wiki_pages__slug__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WikiPageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sync_api_wiki_sync_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WikiSyncOut"];
                 };
             };
         };

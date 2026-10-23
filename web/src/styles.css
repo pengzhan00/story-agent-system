@@ -194,3 +194,22 @@ button.link { background: none; border: none; color: inherit; cursor: pointer; t
 dialog.lightbox { width: auto; max-width: 96vw; max-height: 96vh; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--text); }
 dialog.lightbox::backdrop { background: rgba(0, 0, 0, 0.75); }
 dialog.lightbox img, dialog.lightbox video { display: block; max-width: 92vw; max-height: 82vh; margin: 0 auto; object-fit: contain; background: #000; }
+
+/* wiki */
+.wiki-split { grid-template-columns: 340px 1fr; }
+@media (max-width: 800px) { .wiki-split { grid-template-columns: 1fr; } }
+.wiki-list, .wiki-links { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.wiki-row a { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius); color: inherit; text-decoration: none; background: var(--panel); }
+.wiki-row.active a, .wiki-row a:hover { border-color: var(--accent); }
+.wiki-toc ul { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.wiki-toc .toc-3 { padding-left: 14px; }
+.markdown { line-height: 1.65; max-width: 80ch; overflow-wrap: anywhere; }
+.markdown h2, .markdown h3, .markdown h4 { margin: 1.4em 0 0.4em; }
+.markdown pre { background: var(--track); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; overflow-x: auto; }
+.markdown code { background: var(--track); padding: 1px 5px; border-radius: 4px; }
+.markdown pre code { background: none; padding: 0; }
+.markdown blockquote { margin: 0.8em 0; padding: 2px 14px; border-left: 3px solid var(--accent); color: var(--muted); }
+.markdown img { max-width: 100%; border-radius: var(--radius); }
+.markdown table { border-collapse: collapse; font-size: 0.92rem; }
+.markdown th, .markdown td { border: 1px solid var(--line); padding: 4px 10px; text-align: left; vertical-align: top; }
+.markdown a { color: var(--accent); }

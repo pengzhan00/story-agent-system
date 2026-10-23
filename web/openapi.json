@@ -6592,6 +6592,236 @@
         "title": "VideoSummary",
         "type": "object"
       },
+      "WikiBrief": {
+        "properties": {
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "rating": {
+            "title": "Rating",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "snippet": {
+            "description": "the text around the first search hit; empty when no query was given",
+            "title": "Snippet",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated"
+          }
+        },
+        "required": [
+          "slug",
+          "title",
+          "source",
+          "path",
+          "rating",
+          "tags",
+          "summary",
+          "snippet",
+          "updated"
+        ],
+        "title": "WikiBrief",
+        "type": "object"
+      },
+      "WikiCount": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "count"
+        ],
+        "title": "WikiCount",
+        "type": "object"
+      },
+      "WikiList": {
+        "properties": {
+          "configured": {
+            "description": "false until a source other than the built-in docs is listed in wiki.toml",
+            "title": "Configured",
+            "type": "boolean"
+          },
+          "hidden": {
+            "description": "restricted pages this caller may not see right now (locked or too young)",
+            "title": "Hidden",
+            "type": "integer"
+          },
+          "pages": {
+            "items": {
+              "$ref": "#/components/schemas/WikiBrief"
+            },
+            "title": "Pages",
+            "type": "array"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/WikiCount"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "synced_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Synced At"
+          },
+          "tags": {
+            "items": {
+              "$ref": "#/components/schemas/WikiCount"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
+          "total": {
+            "description": "pages this caller may see, before the query and the filters",
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "pages",
+          "total",
+          "hidden",
+          "sources",
+          "tags",
+          "synced_at",
+          "configured"
+        ],
+        "title": "WikiList",
+        "type": "object"
+      },
+      "WikiPageOut": {
+        "properties": {
+          "backlinks": {
+            "items": {
+              "$ref": "#/components/schemas/WikiBrief"
+            },
+            "title": "Backlinks",
+            "type": "array"
+          },
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "links": {
+            "items": {
+              "$ref": "#/components/schemas/WikiBrief"
+            },
+            "title": "Links",
+            "type": "array"
+          },
+          "meta": {
+            "additionalProperties": true,
+            "title": "Meta",
+            "type": "object"
+          },
+          "page": {
+            "$ref": "#/components/schemas/WikiBrief"
+          }
+        },
+        "required": [
+          "page",
+          "body",
+          "meta",
+          "backlinks",
+          "links"
+        ],
+        "title": "WikiPageOut",
+        "type": "object"
+      },
+      "WikiSyncOut": {
+        "properties": {
+          "added": {
+            "title": "Added",
+            "type": "integer"
+          },
+          "removed": {
+            "title": "Removed",
+            "type": "integer"
+          },
+          "sources": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Sources",
+            "type": "object"
+          },
+          "unchanged": {
+            "title": "Unchanged",
+            "type": "integer"
+          },
+          "updated": {
+            "title": "Updated",
+            "type": "integer"
+          },
+          "warnings": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "added",
+          "updated",
+          "unchanged",
+          "removed",
+          "sources",
+          "warnings"
+        ],
+        "title": "WikiSyncOut",
+        "type": "object"
+      },
       "WorkKindOut": {
         "properties": {
           "ask": {
@@ -15568,6 +15798,174 @@
         "summary": "Review Age",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/api/wiki/assets/{name}": {
+      "get": {
+        "operationId": "asset_api_wiki_assets__name__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Asset",
+        "tags": [
+          "wiki"
+        ]
+      }
+    },
+    "/api/wiki/pages": {
+      "get": {
+        "operationId": "list_pages_api_wiki_pages_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "default": "",
+              "maxLength": 200,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "source",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Source",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tag",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Tag",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WikiList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Pages",
+        "tags": [
+          "wiki"
+        ]
+      }
+    },
+    "/api/wiki/pages/{slug}": {
+      "get": {
+        "operationId": "get_page_api_wiki_pages__slug__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WikiPageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Page",
+        "tags": [
+          "wiki"
+        ]
+      }
+    },
+    "/api/wiki/sync": {
+      "post": {
+        "description": "Read the sources again (only the notes the include lists allow) and bring the pages up to date.",
+        "operationId": "sync_api_wiki_sync_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WikiSyncOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Sync",
+        "tags": [
+          "wiki"
         ]
       }
     },

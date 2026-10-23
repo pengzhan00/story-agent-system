@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../src/i18n";
 import { PipelinePanel } from "../src/components/PipelinePanel";
@@ -42,13 +43,16 @@ describe("PipelinePanel", () => {
     render(
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
         <I18nProvider>
-          <PipelinePanel projectId={3} />
+          <MemoryRouter>
+            <PipelinePanel projectId={3} />
+          </MemoryRouter>
         </I18nProvider>
       </QueryClientProvider>,
     );
     const select = (await screen.findByLabelText(en["media.kind.image.generate"]!)) as HTMLSelectElement;
     expect(select.value).toBe("flux");
     expect((screen.getByRole("button", { name: en["web.pipeline.reset_all"]! }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getAllByRole("link", { name: en["web.wiki.about"]! })[0]?.getAttribute("href")).toBe("/wiki?q=flux");
     fireEvent.change(select, { target: { value: "alt" } });
     await waitFor(() => expect(calls.some((c) => c.url === "PUT /api/projects/3/pipeline")).toBe(true));
     expect(JSON.parse(calls.find((c) => c.url.startsWith("PUT"))?.body ?? "{}")).toEqual({ models: { "image.generate": "alt" } });
