@@ -774,6 +774,40 @@ def _cmd_stop(s: Settings, a: argparse.Namespace) -> int:
     return 0
 
 
+# -- tools: connect outside software ----------------------------------------------------------------
+def _cmd_tool_import_comfy(s: Settings, a: argparse.Namespace) -> int:
+    """Read a ComfyUI workflow saved in API format, show what was bound, and (unless --dry-run) save it."""
+    from storyagent.connect.comfy_import import ImportFailed, import_workflow
+    from storyagent.connect.store import ConnectError, save_comfy
+
+    try:
+        data = json.loads(Path(a.file).expanduser().read_text("utf-8"))
+    except (OSError, ValueError) as exc:
+        raise CliError("cli.error.unreadable", 1, what=a.file, detail=str(exc)) from exc
+    try:
+        result = import_workflow(data, a.kind)
+    except ImportFailed as exc:
+        raise CliError(f"connect.error.{exc.code}", 1, **exc.params) from exc
+    for d in result.detected:
+        where = ", ".join(f"{n}.{i}" for n, i in d.targets)
+        print(t("cli.tool.bound", name=d.name, where=where, value="" if d.value is None else d.value))
+    for w in result.warnings:
+        print(t(f"connect.warn.{w.code}", **w.params), file=sys.stderr)
+    out = {"output": result.template["output"], "type": json.dumps(result.template["output_type"])}
+    print(t("cli.tool.output", **out))
+    if a.dry_run:
+        print(t("cli.tool.dry_run"))
+        return 0
+    name = a.name or Path(a.file).stem.lower().replace(" ", "-")
+    try:
+        saved = save_comfy(s, name=name, ref=a.ref or name, kind=a.kind, result=result, family=a.family,
+                           heavy=a.heavy, timeout_sec=a.timeout, force=a.force)
+    except ConnectError as exc:
+        raise CliError(f"connect.error.{exc.code}", 1, **exc.params) from exc
+    print(t("cli.tool.saved", workflow=str(saved.workflow_path), models=str(saved.models_path), ref=a.ref or name))
+    return 0
+
+
 # -- story workflow ---------------------------------------------------------------------------------
 def _show_run(state: WorkflowState, run_id: str, interval: float) -> dict[str, Any]:
     """Draw the run's progress bar until it ends (a worker - or ``--inline`` - is doing the work)."""
@@ -1306,6 +1340,20 @@ def build_parser() -> argparse.ArgumentParser:
     wp = add(llm, "unset", _cmd_llm_unset)
     wp.add_argument("role")
     wp.add_argument("--project", type=int)
+
+    tool = sub.add_parser("tool").add_subparsers(dest="cmd", required=True)
+    timp = tool.add_parser("import").add_subparsers(dest="source", required=True)
+    tc = add(timp, "comfy", _cmd_tool_import_comfy)
+    tc.add_argument("file", help="a workflow saved with ComfyUI's Save (API Format)")
+    tc.add_argument("--kind", required=True, choices=[k.value for k in MediaKind if not k.value.startswith(
+        ("text.", "compose.", "train."))])
+    tc.add_argument("--name", help="template file name (default: the file's name)")
+    tc.add_argument("--ref", help="model ref in models.toml (default: --name)")
+    tc.add_argument("--family", default="", help="model family (pairs image.generate with image.edit, ...)")
+    tc.add_argument("--heavy", action="store_true", help="one at a time with the other heavy jobs")
+    tc.add_argument("--timeout", type=int, default=1800, help="seconds one job may take")
+    tc.add_argument("--dry-run", action="store_true", help="only show what would be bound")
+    tc.add_argument("--force", action="store_true", help="replace a template / model entry of the same name")
 
     api = sub.add_parser("api").add_subparsers(dest="cmd", required=True)
     wp = add(api, "openapi", _cmd_api_openapi)

@@ -1,0 +1,4 @@
+[services.openai_speech]
+url = "http://localhost:8000"
+health_path = "/health"
+probe_only = true

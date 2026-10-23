@@ -1,0 +1,4 @@
+[services.a1111]
+url = "http://localhost:7861"        # AUTOMATIC1111 / Forge started with --api
+health_path = "/sdapi/v1/options"
+probe_only = true

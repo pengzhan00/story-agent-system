@@ -1,0 +1,27 @@
+# The shape of a service that takes a job, is asked how far it is, and hands over a file when it is done.
+[models."music-api"]
+kind = "audio.music"
+provider = "http"
+family = "music-api"
+license_tag = ""
+commercial_ok = false
+prompt_profile = "music_tags"
+timeout_sec = 1800
+[models."music-api".connector]
+service = "musicapi"
+ext = "mp3"
+required = ["prompt"]
+[models."music-api".connector.submit]
+path = "/jobs"
+json = { caption = "{prompt}", lyrics = "{text}", duration = "{duration|30}", seed = "{seed}" }
+id_path = "id"
+[models."music-api".connector.poll]
+path = "/jobs/{id}"
+status_path = "status"
+done = ["done"]
+failed = ["failed"]
+progress_path = "percent"
+progress_scale = 100
+error_path = "message"
+[models."music-api".connector.result]
+url_path = "result.url"

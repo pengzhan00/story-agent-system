@@ -25,6 +25,7 @@ class RecordedRequest:
     query: dict[str, list[str]]
     body: bytes
     json: Any = None
+    headers: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -57,7 +58,8 @@ class FakeServer:
                 except ValueError:
                     parsed_json = None
                 req = RecordedRequest(
-                    self.command, parsed.path, parse_qs(parsed.query), body, parsed_json
+                    self.command, parsed.path, parse_qs(parsed.query), body, parsed_json,
+                    {k.lower(): v for k, v in self.headers.items()},
                 )
                 outer.requests.append(req)
                 resp = outer._routes.get((self.command, parsed.path))

@@ -2220,6 +2220,64 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/tools": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Tools
+         * @description Models that run through a connector (ComfyUI workflow, command line, HTTP service), and whether a ComfyUI
+         *     template is the operator's own.
+         */
+        get: operations["list_tools_api_tools_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tools/comfy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Save Comfy Tool */
+        post: operations["save_comfy_tool_api_tools_comfy_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tools/import/comfy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Comfy
+         * @description What would be bound, and what could not be - nothing is written.
+         */
+        post: operations["preview_comfy_api_tools_import_comfy_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/users": {
         parameters: {
             query?: never;
@@ -4837,6 +4895,110 @@ export interface components {
         TextEdit: {
             /** Text */
             text: string;
+        };
+        /** ToolBinding */
+        ToolBinding: {
+            /** Classes */
+            classes: string[];
+            /** Name */
+            name: string;
+            /** Targets */
+            targets: string[];
+            /** Value */
+            value: unknown;
+        };
+        /** ToolImportPreview */
+        ToolImportPreview: {
+            /** Bindings */
+            bindings: components["schemas"]["ToolBinding"][];
+            /** Defaults */
+            defaults: {
+                [key: string]: unknown;
+            };
+            /** Output Node */
+            output_node: string;
+            /** Output Type */
+            output_type: string[];
+            /** Warnings */
+            warnings: components["schemas"]["ToolWarning"][];
+        };
+        /** ToolImportRequest */
+        ToolImportRequest: {
+            /** Kind */
+            kind: string;
+            /** Workflow */
+            workflow: {
+                [key: string]: unknown;
+            };
+        };
+        /** ToolModel */
+        ToolModel: {
+            /** Family */
+            family: string;
+            /** Kind */
+            kind: string;
+            /** Mine */
+            mine: boolean;
+            /** Provider */
+            provider: string;
+            /** Ref */
+            ref: string;
+            /** Workflow */
+            workflow: string;
+        };
+        /** ToolSaveRequest */
+        ToolSaveRequest: {
+            /**
+             * Family
+             * @default
+             */
+            family: string;
+            /**
+             * Force
+             * @default false
+             */
+            force: boolean;
+            /**
+             * Heavy
+             * @default false
+             */
+            heavy: boolean;
+            /** Kind */
+            kind: string;
+            /** Name */
+            name: string;
+            /**
+             * Ref
+             * @default
+             */
+            ref: string;
+            /**
+             * Timeout Sec
+             * @default 1800
+             */
+            timeout_sec: number;
+            /** Workflow */
+            workflow: {
+                [key: string]: unknown;
+            };
+        };
+        /** ToolSaved */
+        ToolSaved: {
+            /** Models File */
+            models_file: string;
+            /** Ref */
+            ref: string;
+            /** Restart Needed */
+            restart_needed: boolean;
+            /** Workflow */
+            workflow: string;
+        };
+        /** ToolWarning */
+        ToolWarning: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
         };
         /** UnlockBody */
         UnlockBody: {
@@ -10162,6 +10324,92 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Ready"];
+                };
+            };
+        };
+    };
+    list_tools_api_tools_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolModel"][];
+                };
+            };
+        };
+    };
+    save_comfy_tool_api_tools_comfy_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ToolSaveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolSaved"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_comfy_api_tools_import_comfy_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ToolImportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolImportPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

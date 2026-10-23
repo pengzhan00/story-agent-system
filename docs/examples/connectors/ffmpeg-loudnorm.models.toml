@@ -1,0 +1,11 @@
+# Evens out the loudness of the audio file given as the reference ({ref}).
+[models."ffmpeg-loudnorm"]
+kind = "audio.enhance"
+provider = "cli"
+family = "ffmpeg"
+license_tag = "ffmpeg"
+commercial_ok = true
+timeout_sec = 600
+[models."ffmpeg-loudnorm".connector]
+argv = ["ffmpeg", "-y", "-i", "{ref}", "-af", "loudnorm=I=-16:TP=-1.5:LRA=11", "{out}"]
+ext = "wav"

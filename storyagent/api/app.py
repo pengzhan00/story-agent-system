@@ -49,6 +49,7 @@ from . import (
     routes_specs,
     routes_story,
     routes_system,
+    routes_tools,
     routes_workflow,
     routes_workshop,
 )
@@ -117,7 +118,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     for module in (routes_auth, routes_review, routes_projects, routes_jobs, routes_assets, routes_library,
                    routes_pack, routes_pipeline, routes_delivery, routes_content, routes_grammar, routes_interchange,
                    routes_specs, routes_story, routes_workflow, routes_system, routes_ai, routes_launch,
-                   routes_workshop, routes_llm):
+                   routes_workshop, routes_llm, routes_tools):
         app.include_router(module.router)
     web = web_root(settings)
     if web is not None:

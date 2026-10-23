@@ -1,0 +1,19 @@
+[models."openai-images"]
+kind = "image.generate"
+provider = "http"
+family = "openai-images"
+license_tag = ""
+commercial_ok = false
+prompt_profile = "natural_en"
+timeout_sec = 600
+[models."openai-images".connector]
+service = "openai_images"
+mode = "sync"
+ext = "png"
+required = ["prompt"]
+headers = { Authorization = "Bearer {env.OPENAI_IMAGES_KEY|none}" }
+[models."openai-images".connector.submit]
+path = "/v1/images/generations"
+json = { prompt = "{prompt}", n = 1, size = "{size|1024x1024}", response_format = "b64_json" }
+[models."openai-images".connector.result]
+b64_path = "data.0.b64_json"

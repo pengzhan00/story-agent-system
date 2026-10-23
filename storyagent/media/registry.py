@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable
+from typing import Any
 
 from storyagent.config import Settings
 
@@ -13,6 +14,7 @@ class AdapterRegistry:
 
     def __init__(self) -> None:
         self._adapters: dict[str, Adapter] = {}
+        self.plugin_reports: list[Any] = []       # what the operator's plugins did (connect/plugins.py)
 
     def register(self, adapter: Adapter) -> None:
         self._adapters[adapter.provider] = adapter
@@ -53,7 +55,7 @@ def _comfy(settings: Settings) -> Adapter:
     from .adapters.comfy import ComfyAdapter
 
     workflows = {ref: str(m.extra.get("workflow", "")) for ref, m in settings.models.items() if m.provider == "comfy"}
-    return ComfyAdapter(ServiceClient(settings.service("comfy")), workflows)
+    return ComfyAdapter(ServiceClient(settings.service("comfy")), workflows, user_dir=settings.config_dir / "workflows")
 
 
 def _phosphene(settings: Settings) -> Adapter:
@@ -129,9 +131,21 @@ def _longcat(settings: Settings) -> Adapter:
     return LongCatAdapter()
 
 
+def _cli(settings: Settings) -> Adapter:
+    from .adapters.generic_cli import CliAdapter
+
+    return CliAdapter(settings)
+
+
+def _http(settings: Settings) -> Adapter:
+    from .adapters.generic_http import HttpAdapter
+
+    return HttpAdapter(settings)
+
+
 _BUILTIN: list[Callable[[Settings], Adapter]] = [
     _acestep, _comfy, _drawthings, _phosphene, _cosyvoice, _whisper, _llm, _remote_video, _mflux, _lora_train,
-    _seedvc, _ffmpeg, _delivery, _h3, _longcat,
+    _seedvc, _ffmpeg, _delivery, _h3, _longcat, _cli, _http,
 ]
 
 
@@ -139,6 +153,9 @@ def default_registry(settings: Settings) -> AdapterRegistry:
     reg = AdapterRegistry()
     for build in _BUILTIN:
         reg.register(build(settings))
+    from storyagent.connect.plugins import load_plugins
+
+    reg.plugin_reports = load_plugins(reg, settings)
     if os.environ.get("STORY_AGENT_ENABLE_FAKE") == "1":  # dev/demo only
         from .adapters.fake import FakeAdapter
 

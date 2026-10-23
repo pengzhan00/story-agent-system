@@ -212,6 +212,9 @@ def run_checks(
             assert adapter is not None
             h = adapter.health()
             report.entries.append(Entry(f"adapter.{prov}", "adapter", h.state, h.detail, h.missing))
+        for plugin in getattr(registry, "plugin_reports", []):
+            if plugin.error:
+                report.entries.append(Entry(f"plugin.{plugin.name}", "adapter", HealthState.DEGRADED, plugin.error))
 
     unknown = sorted(required - {e.name for e in report.entries})
     if unknown:

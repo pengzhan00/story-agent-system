@@ -1,0 +1,4 @@
+[services.openai_images]
+url = "http://localhost:8080"        # 你的兼容服务的地址
+health_path = "/v1/models"
+probe_only = true                    # 只探测,不当作必需服务

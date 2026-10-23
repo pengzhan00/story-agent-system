@@ -1,0 +1,12 @@
+# Piper reads the text from its standard input and writes a wav file.
+[models."piper-voice"]
+kind = "audio.tts"
+provider = "cli"
+family = "piper"
+license_tag = ""               # the licence is that of the voice model you use
+commercial_ok = false
+timeout_sec = 300
+[models."piper-voice".connector]
+argv = ["piper", "--model", "~/piper/voice.onnx", "--output_file", "{out}"]
+stdin = "{text}"
+ext = "wav"

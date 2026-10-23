@@ -29,6 +29,7 @@ class Command:
     argv: list[str]
     cwd: Path | None = None
     env: dict[str, str] = field(default_factory=dict)  # added to the worker's environment
+    stdin: str | None = None                            # text written to the tool's standard input, then closed
 
 
 def clean_env(extra: dict[str, str]) -> dict[str, str]:
@@ -67,8 +68,14 @@ class SubprocessAdapter(AdapterBase):
         try:
             proc = subprocess.Popen(  # noqa: S603 - argv list, no shell
                 cmd.argv, cwd=cmd.cwd, env=clean_env(cmd.env), stdout=log, stderr=subprocess.STDOUT,
-                stdin=subprocess.DEVNULL, start_new_session=True,
+                stdin=subprocess.DEVNULL if cmd.stdin is None else subprocess.PIPE, start_new_session=True,
             )
+            if cmd.stdin is not None and proc.stdin is not None:
+                try:
+                    proc.stdin.write(cmd.stdin.encode("utf-8"))
+                    proc.stdin.close()
+                except BrokenPipeError:
+                    pass          # the tool exited before reading: its exit code and log say why
         except FileNotFoundError as exc:
             raise AdapterError(ErrorCode.MISSING_TOOL, f"cannot start {cmd.argv[0]}", tool=str(cmd.argv[0])) from exc
         except OSError as exc:

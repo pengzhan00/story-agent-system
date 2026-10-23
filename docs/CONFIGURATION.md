@@ -67,3 +67,5 @@ A project can switch compliance off or on regardless of the global value; unspec
 ## 云端模型相关开关
 
 `[runtime] allow_remote`(默认 false;项目设置 `allow_remote` 覆盖)、`max_remote_jobs`(默认 4)。云端模型条目与适配器配置见 `docs/CLOUD.md`。
+
+接入你自己的工具(ComfyUI 工作流、命令行、HTTP 服务、插件):见 [CONNECTORS.md](CONNECTORS.md)。

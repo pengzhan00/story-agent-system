@@ -1,0 +1,18 @@
+[models."a1111-txt2img"]
+kind = "image.generate"
+provider = "http"
+family = "a1111"
+license_tag = ""
+commercial_ok = false
+prompt_profile = "tag_list"
+timeout_sec = 900
+[models."a1111-txt2img".connector]
+service = "a1111"
+mode = "sync"
+ext = "png"
+required = ["prompt"]
+[models."a1111-txt2img".connector.submit]
+path = "/sdapi/v1/txt2img"
+json = { prompt = "{prompt}", negative_prompt = "{negative_prompt}", seed = "{seed}", steps = "{steps|25}", cfg_scale = "{cfg|7}", width = "{width|512}", height = "{height|768}", sampler_name = "{sampler_name|Euler a}" }
+[models."a1111-txt2img".connector.result]
+b64_path = "images.0"

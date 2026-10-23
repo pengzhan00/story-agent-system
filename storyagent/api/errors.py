@@ -18,6 +18,8 @@ from storyagent.auth import AuthError
 from storyagent.compose.delivery import DeliveryError
 from storyagent.compose.interchange import InterchangeError
 from storyagent.config import ConfigError
+from storyagent.connect.comfy_import import ImportFailed
+from storyagent.connect.store import ConnectError
 from storyagent.content import ContentError
 from storyagent.launcher import LaunchError
 from storyagent.media.ledger import LedgerError
@@ -77,6 +79,12 @@ def install(app: FastAPI) -> None:
                   "launch_not_stoppable": 409, "launch_not_running": 409, "launch_foreign": 403,
                   "launch_stop_timeout": 409}.get(exc.code, 500)
         return respond(request, status, exc.code, exc.detail)
+
+    @app.exception_handler(ImportFailed)
+    @app.exception_handler(ConnectError)
+    async def _connect(request: Request, exc: ImportFailed | ConnectError) -> JSONResponse:
+        detail = translator_of(request)(f"connect.error.{exc.code}", **exc.params)
+        return respond(request, 409 if exc.code in ("exists", "ref_packaged") else 422, "connect_failed", detail)
 
     @app.exception_handler(WorkshopError)
     async def _workshop(request: Request, exc: WorkshopError) -> JSONResponse:

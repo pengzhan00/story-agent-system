@@ -1,0 +1,17 @@
+[models."openai-speech"]
+kind = "audio.tts"
+provider = "http"
+family = "openai-speech"
+license_tag = ""
+commercial_ok = false
+timeout_sec = 300
+[models."openai-speech".connector]
+service = "openai_speech"
+mode = "sync"
+ext = "wav"
+required = ["text"]
+[models."openai-speech".connector.submit]
+path = "/v1/audio/speech"
+json = { model = "{model|tts-1}", input = "{text}", voice = "{voice|alloy}", response_format = "wav" }
+[models."openai-speech".connector.result]
+content = "body"

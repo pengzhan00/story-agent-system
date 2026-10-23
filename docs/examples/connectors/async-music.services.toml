@@ -1,0 +1,4 @@
+[services.musicapi]
+url = "http://localhost:9100"
+health_path = "/health"
+probe_only = true

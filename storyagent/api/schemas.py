@@ -1341,3 +1341,55 @@ class PipelineView(Strict):
 class PipelineChoices(Strict):
     models: dict[str, str] = Field(
         description="kind -> model ref; replaces all hand-picked choices (empty = the plan's defaults)")
+
+
+# -- tools: connect outside software ----------------------------------------------------------------
+class ToolImportRequest(BaseModel):
+    workflow: dict[str, Any]          # the parsed JSON file (ComfyUI "Save (API Format)")
+    kind: str
+
+
+class ToolBinding(Strict):
+    name: str
+    targets: list[str]                # "<node id>.<input>"
+    classes: list[str]
+    value: Any = None
+
+
+class ToolWarning(Strict):
+    code: str
+    message: str
+
+
+class ToolImportPreview(Strict):
+    bindings: list[ToolBinding]
+    warnings: list[ToolWarning]
+    output_node: str
+    output_type: list[str]
+    defaults: dict[str, Any]
+
+
+class ToolSaveRequest(ToolImportRequest):
+    name: str
+    ref: str = ""
+    family: str = ""
+    heavy: bool = False
+    timeout_sec: int = Field(default=1800, ge=10, le=86400)
+    force: bool = False
+
+
+class ToolSaved(Strict):
+    ref: str
+    workflow: str
+    models_file: str
+    restart_needed: bool
+
+
+class ToolModel(Strict):
+    ref: str
+    kind: str
+    provider: str
+    family: str
+    workflow: str                     # template name ("" = none)
+    mine: bool                        # the template is in the operator's own folder
+

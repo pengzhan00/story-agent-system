@@ -6049,6 +6049,236 @@
         "title": "TextEdit",
         "type": "object"
       },
+      "ToolBinding": {
+        "properties": {
+          "classes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Classes",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "targets": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Targets",
+            "type": "array"
+          },
+          "value": {
+            "title": "Value"
+          }
+        },
+        "required": [
+          "name",
+          "targets",
+          "classes",
+          "value"
+        ],
+        "title": "ToolBinding",
+        "type": "object"
+      },
+      "ToolImportPreview": {
+        "properties": {
+          "bindings": {
+            "items": {
+              "$ref": "#/components/schemas/ToolBinding"
+            },
+            "title": "Bindings",
+            "type": "array"
+          },
+          "defaults": {
+            "additionalProperties": true,
+            "title": "Defaults",
+            "type": "object"
+          },
+          "output_node": {
+            "title": "Output Node",
+            "type": "string"
+          },
+          "output_type": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Output Type",
+            "type": "array"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/ToolWarning"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "bindings",
+          "warnings",
+          "output_node",
+          "output_type",
+          "defaults"
+        ],
+        "title": "ToolImportPreview",
+        "type": "object"
+      },
+      "ToolImportRequest": {
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "workflow": {
+            "additionalProperties": true,
+            "title": "Workflow",
+            "type": "object"
+          }
+        },
+        "required": [
+          "workflow",
+          "kind"
+        ],
+        "title": "ToolImportRequest",
+        "type": "object"
+      },
+      "ToolModel": {
+        "properties": {
+          "family": {
+            "title": "Family",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "mine": {
+            "title": "Mine",
+            "type": "boolean"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "ref": {
+            "title": "Ref",
+            "type": "string"
+          },
+          "workflow": {
+            "title": "Workflow",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ref",
+          "kind",
+          "provider",
+          "family",
+          "workflow",
+          "mine"
+        ],
+        "title": "ToolModel",
+        "type": "object"
+      },
+      "ToolSaveRequest": {
+        "properties": {
+          "family": {
+            "default": "",
+            "title": "Family",
+            "type": "string"
+          },
+          "force": {
+            "default": false,
+            "title": "Force",
+            "type": "boolean"
+          },
+          "heavy": {
+            "default": false,
+            "title": "Heavy",
+            "type": "boolean"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "ref": {
+            "default": "",
+            "title": "Ref",
+            "type": "string"
+          },
+          "timeout_sec": {
+            "default": 1800,
+            "maximum": 86400.0,
+            "minimum": 10.0,
+            "title": "Timeout Sec",
+            "type": "integer"
+          },
+          "workflow": {
+            "additionalProperties": true,
+            "title": "Workflow",
+            "type": "object"
+          }
+        },
+        "required": [
+          "workflow",
+          "kind",
+          "name"
+        ],
+        "title": "ToolSaveRequest",
+        "type": "object"
+      },
+      "ToolSaved": {
+        "properties": {
+          "models_file": {
+            "title": "Models File",
+            "type": "string"
+          },
+          "ref": {
+            "title": "Ref",
+            "type": "string"
+          },
+          "restart_needed": {
+            "title": "Restart Needed",
+            "type": "boolean"
+          },
+          "workflow": {
+            "title": "Workflow",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ref",
+          "workflow",
+          "models_file",
+          "restart_needed"
+        ],
+        "title": "ToolSaved",
+        "type": "object"
+      },
+      "ToolWarning": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ToolWarning",
+        "type": "object"
+      },
       "UnlockBody": {
         "properties": {
           "confirm_adult": {
@@ -15060,6 +15290,115 @@
         "summary": "Ready",
         "tags": [
           "system"
+        ]
+      }
+    },
+    "/api/tools": {
+      "get": {
+        "description": "Models that run through a connector (ComfyUI workflow, command line, HTTP service), and whether a ComfyUI\ntemplate is the operator's own.",
+        "operationId": "list_tools_api_tools_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ToolModel"
+                  },
+                  "title": "Response List Tools Api Tools Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Tools",
+        "tags": [
+          "tools"
+        ]
+      }
+    },
+    "/api/tools/comfy": {
+      "post": {
+        "operationId": "save_comfy_tool_api_tools_comfy_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolSaveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolSaved"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Comfy Tool",
+        "tags": [
+          "tools"
+        ]
+      }
+    },
+    "/api/tools/import/comfy": {
+      "post": {
+        "description": "What would be bound, and what could not be - nothing is written.",
+        "operationId": "preview_comfy_api_tools_import_comfy_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolImportPreview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Comfy",
+        "tags": [
+          "tools"
         ]
       }
     },
