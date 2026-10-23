@@ -288,6 +288,51 @@ class StaleAsset(BaseModel):
     latest_spec_version: int
 
 
+# -- wiki -------------------------------------------------------------------------------------------
+class WikiBrief(Strict):
+    slug: str
+    title: str
+    source: str
+    path: str
+    rating: str
+    tags: list[str]
+    summary: str
+    snippet: str = Field(description="the text around the first search hit; empty when no query was given")
+    updated: str | None
+
+
+class WikiCount(Strict):
+    name: str
+    count: int
+
+
+class WikiList(Strict):
+    pages: list[WikiBrief]
+    total: int = Field(description="pages this caller may see, before the query and the filters")
+    hidden: int = Field(description="restricted pages this caller may not see right now (locked or too young)")
+    sources: list[WikiCount]
+    tags: list[WikiCount]
+    synced_at: str | None
+    configured: bool = Field(description="false until a source other than the built-in docs is listed in wiki.toml")
+
+
+class WikiPageOut(Strict):
+    page: WikiBrief
+    body: str
+    meta: dict[str, Any]
+    backlinks: list[WikiBrief]
+    links: list[WikiBrief]
+
+
+class WikiSyncOut(Strict):
+    added: int
+    updated: int
+    unchanged: int
+    removed: int
+    sources: dict[str, int]
+    warnings: list[dict[str, str]]
+
+
 # -- library ----------------------------------------------------------------------------------------
 class LibraryItemOut(BaseModel):
     id: str

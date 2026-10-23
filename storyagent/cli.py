@@ -586,6 +586,49 @@ def _cmd_library_list(s: Settings, a: argparse.Namespace) -> int:
     return 0
 
 
+def _wiki(s: Settings) -> Any:
+    from storyagent.wiki import WikiStore
+
+    db = Database(s.db_path)
+    migrate(db)
+    return WikiStore(db, s)
+
+
+def _cmd_wiki_sync(s: Settings, a: argparse.Namespace) -> int:
+    report = _wiki(s).sync()
+    print(t("cli.wiki.synced", added=report.added, updated=report.updated, unchanged=report.unchanged,
+            removed=report.removed))
+    for source, n in sorted(report.sources.items()):
+        print(t("cli.wiki.source", source=source, n=n))
+    for w in report.warnings:
+        print(t(f"cli.wiki.warn.{w['code']}", source=w["source"], detail=w["detail"]))
+    return 0
+
+
+def _cmd_wiki_list(s: Settings, a: argparse.Namespace) -> int:
+    store = _wiki(s)
+    pages = store.all()
+    if a.source:
+        pages = [p for p in pages if p.source == a.source]
+    if a.tag:
+        pages = [p for p in pages if a.tag in p.tags]
+    if a.q:
+        found = {p.slug: snip for p, snip, _ in store.search(a.q, pages)}
+        pages = [p for p in pages if p.slug in found]
+    for p in pages:
+        print("\t".join([p.slug, p.rating, p.title, ",".join(p.tags)]))
+    return 0
+
+
+def _cmd_wiki_show(s: Settings, a: argparse.Namespace) -> int:
+    page = _wiki(s).get(a.slug)
+    if page is None:
+        raise CliError("cli.error.not_found", 1, what=a.slug)
+    print(f"# {page.title}  [{page.slug}]\n")
+    print(page.body)
+    return 0
+
+
 def _cmd_library_show(s: Settings, a: argparse.Namespace) -> int:
     from storyagent.media.library import LibraryError
 
@@ -1195,6 +1238,14 @@ def build_parser() -> argparse.ArgumentParser:
     qa.add_argument("--flicker-amp", dest="flicker_amp", type=float)
     qa.add_argument("--stripe-amp", dest="stripe_amp", type=float)
     qa.add_argument("--stripe-ratio", dest="stripe_ratio", type=float)
+
+    wiki_cmds = sub.add_parser("wiki").add_subparsers(dest="cmd", required=True)
+    add(wiki_cmds, "sync", _cmd_wiki_sync)
+    wiki_ls = add(wiki_cmds, "list", _cmd_wiki_list)
+    wiki_ls.add_argument("--source")
+    wiki_ls.add_argument("--tag")
+    wiki_ls.add_argument("-q")
+    add(wiki_cmds, "show", _cmd_wiki_show).add_argument("slug")
 
     li = sub.add_parser("library").add_subparsers(dest="cmd", required=True)
     la = add(li, "add", _cmd_library_add)
