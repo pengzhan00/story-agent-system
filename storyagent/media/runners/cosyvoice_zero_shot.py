@@ -51,6 +51,9 @@ def main(cfg: dict[str, Any]) -> int:
     emit(event="loaded", sample_rate=rate)
     mode, speed = cfg.get("mode", "zero_shot"), float(cfg.get("speed", 1.0))
     items = cfg["items"]
+    instruct = cfg.get("instruct", "")
+    if engine == "cv3" and mode == "instruct" and "<|endofprompt|>" not in instruct:  # its LLM asserts on the marker
+        instruct = f"You are a helpful assistant. {instruct}<|endofprompt|>"
     os.makedirs(cfg["out_dir"], exist_ok=True)
     failed = 0
     for index, item in enumerate(items):
@@ -65,7 +68,7 @@ def main(cfg: dict[str, Any]) -> int:
             elif mode == "cross_lingual":
                 gen = model.inference_cross_lingual(text, cfg["ref_wav"], stream=False, speed=speed)
             elif mode == "instruct":
-                gen = model.inference_instruct2(text, cfg["instruct"], cfg["ref_wav"], stream=False, speed=speed)
+                gen = model.inference_instruct2(text, instruct, cfg["ref_wav"], stream=False, speed=speed)
             else:
                 raise ValueError(f"unknown mode {mode}")
             chunks = [np.squeeze(o["tts_speech"].detach().cpu().numpy()) for o in gen]

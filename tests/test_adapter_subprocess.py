@@ -121,6 +121,20 @@ def test_single_line(tmp_path: Path) -> None:
     assert Path(cfg["ref_wav"]) == ref and cfg["root"].endswith("cv")
 
 
+def test_a_line_with_an_emotion_is_spoken_in_that_tone(tmp_path: Path) -> None:
+    rig, ref = build(tmp_path)
+    rec, _ = rig.run(tts(ref, seed=1, inputs={"prompt": "furious"}))
+    assert rec.status is JobStatus.COMPLETED, (rec.error_code, rec.error_message)
+    [cfg] = calls(tmp_path)
+    assert cfg["mode"] == "instruct" and "furious" in cfg["instruct"]
+    # off per job, an explicit instruct text or another mode: no emotion override
+    rig.run(tts(ref, seed=2, inputs={"prompt": "furious"}, params={"emotion": False}))
+    rig.run(tts(ref, seed=3, inputs={"prompt": "furious", "instruct": "whisper"}))
+    rig.run(tts(ref, seed=4, inputs={"prompt": "furious"}, params={"mode": "cross_lingual"}))
+    modes = [(c["mode"], c["instruct"]) for c in calls(tmp_path)[1:]]
+    assert modes == [("zero_shot", ""), ("zero_shot", "whisper"), ("cross_lingual", "")]
+
+
 def test_batch_lines_become_one_asset_each(tmp_path: Path) -> None:
     rig, ref = build(tmp_path)
     lines = [{"id": "l01", "text": "first"}, {"id": "l02", "text": "a considerably longer second line"}]

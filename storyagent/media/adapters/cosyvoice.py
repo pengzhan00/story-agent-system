@@ -7,7 +7,10 @@ Inputs:
     voice_ref                  {"audio": <3-20 s wav>, "text": <transcript>, "consent": true}
                                (a missing transcript is produced with whisper unless auto_transcribe=false)
     instruct                   style instruction for mode=instruct (e.g. "speak softly, with a sad tone")
+    prompt                     the line's emotion ("furious", "犹豫"): with mode=zero_shot it is spoken in that tone
+                               (the job runs as ``instruct`` with ``emotion_prompt``); ``emotion=false`` turns it off
 Params: mode (zero_shot | cross_lingual | instruct), speed (0.5-2.0), output_format (wav | mp3),
+        emotion (bool, default true), emotion_prompt (template with {emotion}),
         ref_min_sec / ref_max_sec (reference length window), auto_transcribe, language (for that transcript).
 Output: mono wav at the model's sample rate (24 kHz); the real duration is measured by ffprobe when stored,
 so the timeline is built from what was actually spoken, not from a character-count guess.
@@ -30,6 +33,8 @@ from ._subprocess import Command, SubprocessAdapter
 
 SCHEMA: dict[str, dict[str, Any]] = {
     "mode": {"type": "str", "choices": ["zero_shot", "cross_lingual", "instruct"]},
+    "emotion": {"type": "bool"},
+    "emotion_prompt": {"type": "str"},
     "speed": {"type": "float", "min": 0.5, "max": 2.0},
     "output_format": {"type": "str", "choices": ["wav", "mp3"]},
     "ref_min_sec": {"type": "float", "min": 0},
@@ -40,6 +45,18 @@ SCHEMA: dict[str, dict[str, Any]] = {
 }
 _ID = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 DEFAULT_RUNNER = Path(__file__).resolve().parents[1] / "runners" / "cosyvoice_zero_shot.py"
+
+
+def mode_of(job: JobRecord) -> tuple[str, str]:
+    """``(mode, instruct)`` the job really runs with. A line that carries an emotion is spoken in that tone: a plain
+    zero-shot job becomes ``instruct`` (the reference voice is kept, the style comes from the emotion text)."""
+    mode = str(job.params.get("mode", "zero_shot"))
+    instruct = str(job.inputs.get("instruct", "")).strip()
+    emotion = str(job.inputs.get("prompt") or "").strip()
+    if mode == "zero_shot" and emotion and not instruct and bool(job.params.get("emotion", True)):
+        template = str(job.params.get("emotion_prompt") or "请用{emotion}的语气说")
+        return "instruct", template.replace("{emotion}", emotion)
+    return mode, instruct
 
 
 def lines_of(job: JobRecord) -> list[dict[str, str]]:
@@ -107,7 +124,7 @@ class CosyVoiceAdapter(SubprocessAdapter):
             bad("every line needs text")
         if not all(_ID.match(i) for i in ids) or len(set(ids)) != len(ids):
             bad("line ids must be unique and file-safe (letters, digits, _ . -)")
-        mode = str(job.params.get("mode", "zero_shot"))
+        mode, instruct = mode_of(job)
         ref = self._ref_audio(job, ctx)
         if ref is None or not ref.is_file():
             bad(f"reference voice audio not found: {ref}")
@@ -116,7 +133,7 @@ class CosyVoiceAdapter(SubprocessAdapter):
         lo, hi = float(job.params.get("ref_min_sec", 3)), float(job.params.get("ref_max_sec", 20))
         if info and info.duration_sec is not None and not lo <= info.duration_sec <= hi:
             bad(f"reference voice must be {lo:g}-{hi:g} s long (it is {info.duration_sec:.1f} s)")
-        if mode == "instruct" and not job.inputs.get("instruct"):
+        if mode == "instruct" and not instruct:
             bad("mode instruct needs an instruct text")
         has_text = bool((job.inputs.get("voice_ref") or {}).get("text"))
         if mode == "zero_shot" and not has_text:
@@ -133,7 +150,7 @@ class CosyVoiceAdapter(SubprocessAdapter):
         ref = self._ref_audio(job, ctx)
         assert ref is not None
         ref_text = str((job.inputs.get("voice_ref") or {}).get("text") or "").strip()
-        mode = str(job.params.get("mode", "zero_shot"))
+        mode, instruct = mode_of(job)
         if mode == "zero_shot" and not ref_text:
             try:
                 ref_text = transcribe(ctx.settings, ref, ctx.work_dir, str(job.params.get("language", "zh")))
@@ -143,7 +160,7 @@ class CosyVoiceAdapter(SubprocessAdapter):
             ctx.log("ref_transcribed", text=ref_text[:120])
         cfg = {
             "root": str(workdir), "model_dir": str(model_dir), "engine": self._engine(job, ctx), "mode": mode,
-            "ref_wav": str(ref), "ref_text": ref_text, "instruct": str(job.inputs.get("instruct", "")),
+            "ref_wav": str(ref), "ref_text": ref_text, "instruct": instruct,
             "speed": float(job.params.get("speed", 1.0)), "seed": job.seed, "out_dir": str(ctx.work_dir / "out"),
             "items": lines_of(job),
         }
