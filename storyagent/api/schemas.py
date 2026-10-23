@@ -1423,11 +1423,51 @@ class ToolSaveRequest(ToolImportRequest):
     force: bool = False
 
 
+class ReloadResult(Strict):
+    reloaded: bool
+    error: str
+    models: int
+
+
 class ToolSaved(Strict):
     ref: str
     workflow: str
     models_file: str
-    restart_needed: bool
+    reloaded: bool                    # the server uses it now; the worker swaps it in when it is between jobs
+    error: str
+
+
+class ToolTemplate(Strict):
+    name: str
+    models: str
+    services: str
+
+
+class ToolSnippet(BaseModel):
+    models: str
+    services: str = ""
+    force: bool = False
+
+
+class ToolIssue(Strict):
+    level: str                        # "error" | "warning"
+    code: str
+    message: str
+
+
+class ToolChecked(Strict):
+    ref: str
+    kind: str
+    provider: str
+    ok: bool
+    issues: list[ToolIssue]
+
+
+class ToolConnectorSaved(Strict):
+    ref: str
+    reloaded: bool
+    error: str
+    issues: list[ToolIssue]           # warnings that remain after saving
 
 
 class ToolModel(Strict):

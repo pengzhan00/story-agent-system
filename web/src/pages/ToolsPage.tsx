@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ApiError } from "../api/client";
-import { usePreviewComfy, useSaveComfy, useToolModels } from "../api/tools";
+import { useCheckConnector, usePreviewComfy, useSaveComfy, useSaveConnector, useToolModels, useToolTemplates } from "../api/tools";
 import { useMeta } from "../api/hooks";
 import { ErrorNote } from "../components/ErrorNote";
 import { useT } from "../i18n";
@@ -9,6 +9,97 @@ const NOT_IMPORTABLE = ["text.", "compose.", "train."];
 
 function detailOf(error: unknown): string {
   return error instanceof ApiError && typeof error.detail === "string" ? error.detail : "";
+}
+
+type Issue = { level: string; code: string; message: string };
+
+function Issues({ issues }: { issues: Issue[] }) {
+  return (
+    <ul className="small">
+      {issues.map((i) => (
+        <li key={`${i.code}-${i.message}`} className={i.level === "error" ? "error-text" : "muted"}>
+          {i.message}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** Write a command-line tool or an HTTP service as configuration: pick a starting point, edit, check, save. */
+function ConnectorEditor() {
+  const t = useT();
+  const templates = useToolTemplates();
+  const check = useCheckConnector();
+  const save = useSaveConnector();
+  const [models, setModels] = useState("");
+  const [services, setServices] = useState("");
+  const [force, setForce] = useState(false);
+  const clear = () => {
+    check.reset();
+    save.reset();
+  };
+  const start = (name: string) => {
+    const row = templates.data?.find((x) => x.name === name);
+    if (!row) return;
+    setModels(row.models);
+    setServices(row.services);
+    clear();
+  };
+  const body = { models, services, force };
+  const onSave = async () => {
+    save.reset();
+    const checked = await check.mutateAsync(body);
+    if (checked.ok) save.mutate(body);
+  };
+  const failure = check.error ?? save.error;
+  return (
+    <section className="stack">
+      <h2>{t("web.tools.connector")}</h2>
+      <p className="muted small">{t("web.tools.connector_hint")}</p>
+      <label className="field">
+        <span>{t("web.tools.start_from")}</span>
+        <select value="" onChange={(e) => start(e.target.value)}>
+          <option value="" />
+          {(templates.data ?? []).map((x) => (
+            <option key={x.name} value={x.name}>{t(`web.tools.tpl.${x.name}`)}</option>
+          ))}
+        </select>
+      </label>
+      <label className="field">
+        <span>{t("web.tools.models_toml")}</span>
+        <textarea className="mono" rows={14} spellCheck={false} value={models} onChange={(e) => { setModels(e.target.value); clear(); }} />
+      </label>
+      <label className="field">
+        <span>{t("web.tools.services_toml")}</span>
+        <textarea className="mono" rows={5} spellCheck={false} value={services} onChange={(e) => { setServices(e.target.value); clear(); }} />
+      </label>
+      <label className="field check">
+        <input type="checkbox" checked={force} onChange={(e) => { setForce(e.target.checked); clear(); }} />
+        <span>{t("web.tools.replace")}</span>
+      </label>
+      <div className="row">
+        <button disabled={!models.trim() || check.isPending} onClick={() => check.mutate(body)}>
+          {t("web.tools.check")}
+        </button>
+        <button disabled={!models.trim() || check.isPending || save.isPending} onClick={() => void onSave()}>
+          {t("web.tools.save_connector")}
+        </button>
+      </div>
+      <ErrorNote error={failure} />
+      {check.data ? (
+        <div className={check.data.ok ? "banner banner-ok" : "banner banner-warn"} role="status">
+          <strong>{check.data.ok ? t("web.tools.checked_ok", { ref: check.data.ref }) : t("web.tools.checked_bad")}</strong>
+          <Issues issues={check.data.issues} />
+        </div>
+      ) : null}
+      {save.data ? (
+        <div className="banner banner-ok" role="status">
+          <strong>{t("web.tools.saved", { ref: save.data.ref })}</strong>
+          <p className="muted small">{save.data.reloaded ? t("web.tools.restart") : t("web.tools.reload_failed", { error: save.data.error })}</p>
+        </div>
+      ) : null}
+    </section>
+  );
 }
 
 /** Connect outside software: import a ComfyUI workflow (saved in API format) as a model the pipelines can use. */
@@ -146,12 +237,14 @@ export function ToolsPage() {
           {save.data ? (
             <div className="banner banner-ok" role="status">
               <strong>{t("web.tools.saved", { ref: save.data.ref })}</strong>
-              <p className="muted small">{t("web.tools.restart")}</p>
+              <p className="muted small">{save.data.reloaded ? t("web.tools.restart") : t("web.tools.reload_failed", { error: save.data.error })}</p>
               <p className="muted small mono">{save.data.workflow}</p>
             </div>
           ) : null}
         </section>
       ) : null}
+
+      <ConnectorEditor />
 
       <section className="stack">
         <h2>{t("web.tools.models")}</h2>

@@ -1,23 +1,31 @@
 """Connect outside software: import a ComfyUI workflow (API format) as a model of the ``comfy`` provider.
 
 Operator only (``/api/tools`` is an admin prefix): saving writes the template and a model entry into the operator's own
-config folder. The running server and worker read the configuration once, so a saved model is usable after they restart.
+config folder, and the running server loads it at once; the worker does so when it is between jobs.
 """
 from __future__ import annotations
 
+import anyio
 from fastapi import APIRouter, Request
 
 from storyagent.connect.comfy_import import ImportResult, import_workflow
+from storyagent.connect.snippets import TEMPLATES, Checked, check_snippet, save_snippet, template
 from storyagent.connect.store import describe, save_comfy, workflows_dir
 
 from .context import ctx_of, translator_of
+from .reloading import reload_now
 from .schemas import (
     ToolBinding,
+    ToolChecked,
+    ToolConnectorSaved,
     ToolImportPreview,
     ToolImportRequest,
+    ToolIssue,
     ToolModel,
     ToolSaved,
     ToolSaveRequest,
+    ToolSnippet,
+    ToolTemplate,
     ToolWarning,
 )
 
@@ -59,10 +67,44 @@ def preview_comfy(body: ToolImportRequest, request: Request) -> ToolImportPrevie
 
 
 @router.post("/comfy", response_model=ToolSaved, status_code=201)
-def save_comfy_tool(body: ToolSaveRequest, request: Request) -> ToolSaved:
+async def save_comfy_tool(body: ToolSaveRequest, request: Request) -> ToolSaved:
     settings = ctx_of(request).settings
     result = import_workflow(body.workflow, body.kind)
     saved = save_comfy(settings, name=body.name, ref=body.ref or body.name, kind=body.kind, result=result,
                        family=body.family, heavy=body.heavy, timeout_sec=body.timeout_sec, force=body.force)
+    error = await anyio.to_thread.run_sync(reload_now, request.app, request.app.state.reload_loader)
     return ToolSaved(ref=body.ref or body.name, workflow=str(saved.workflow_path), models_file=str(saved.models_path),
-                     restart_needed=True)
+                     reloaded=not error, error=error)
+
+
+def _checked(request: Request, checked: Checked) -> ToolChecked:
+    t = translator_of(request)
+    return ToolChecked(
+        ref=checked.ref, kind=checked.kind, provider=checked.provider, ok=checked.ok,
+        issues=[ToolIssue(level=i.level, code=i.code, message=t(f"connect.issue.{i.code}", **i.params))
+                for i in checked.issues])
+
+
+@router.get("/templates", response_model=list[ToolTemplate])
+def templates() -> list[ToolTemplate]:
+    """Starting points for a command-line tool and for an HTTP service (text for models.toml / services.toml)."""
+    out = []
+    for name in TEMPLATES:
+        models, services = template(name)
+        out.append(ToolTemplate(name=name, models=models, services=services))
+    return out
+
+
+@router.post("/connector/check", response_model=ToolChecked)
+def check_connector(body: ToolSnippet, request: Request) -> ToolChecked:
+    """Dry run of a ``[models.X]`` (and ``[services.Y]``) snippet: what is wrong with it, and what to look at."""
+    return _checked(request, check_snippet(ctx_of(request).settings, body.models, body.services, force=body.force))
+
+
+@router.post("/connector", response_model=ToolConnectorSaved, status_code=201)
+async def save_connector(body: ToolSnippet, request: Request) -> ToolConnectorSaved:
+    """Check, add the snippet to the operator's models.toml (and services.toml), and load it."""
+    checked = save_snippet(ctx_of(request).settings, body.models, body.services, force=body.force)
+    error = await anyio.to_thread.run_sync(reload_now, request.app, request.app.state.reload_loader)
+    shown = _checked(request, checked)
+    return ToolConnectorSaved(ref=checked.ref, reloaded=not error, error=error, issues=shown.issues)

@@ -1,0 +1,11 @@
+# A command-line tool. {placeholders} are filled from the job; a nested list is an optional group of arguments.
+[models."my-cli-tool"]
+kind = "audio.tts"
+provider = "cli"
+family = "my-cli-tool"
+license_tag = ""
+commercial_ok = false
+timeout_sec = 600
+[models."my-cli-tool".connector]
+argv = ["~/tools/mytool/bin/mytool", "--text", "{text}", ["--voice", "{ref}"], ["--seed", "{seed}"], "--out", "{out}"]
+ext = "wav"

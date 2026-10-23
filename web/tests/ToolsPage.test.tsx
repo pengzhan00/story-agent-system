@@ -14,10 +14,15 @@ const PREVIEW = {
   output_type: ["images"],
   defaults: {},
 };
+const TEMPLATES = [{ name: "cli", models: '[models."my-cli"]\nkind = "audio.tts"\n', services: "" }];
+const OK = { ref: "my-cli", kind: "audio.tts", provider: "cli", ok: true, issues: [{ level: "warning", code: "license_empty", message: "Licence is empty" }] };
+const BAD = { ref: "my-cli", kind: "audio.tts", provider: "cli", ok: false, issues: [{ level: "error", code: "cli_argv", message: "argv must be a list" }] };
+let checkAnswer: unknown = OK;
 let calls: { method: string; url: string; body: unknown }[] = [];
 
 beforeEach(() => {
   calls = [];
+  checkAnswer = OK;
   localStorage.setItem("storyagent.locale", "en");
   vi.stubGlobal("fetch", async (url: string, init?: { method?: string; body?: string }) => {
     calls.push({ method: init?.method ?? "GET", url, body: init?.body ? JSON.parse(init.body) : undefined });
@@ -26,9 +31,14 @@ beforeEach(() => {
     if (url.includes("/api/i18n")) json = en;
     else if (url.includes("/api/meta")) json = { kinds: [{ value: "image.generate", label: "Image" }, { value: "text.story", label: "Story" }] };
     else if (url.endsWith("/api/tools")) json = [{ ref: "klein", kind: "image.edit", provider: "comfy", family: "flux2", workflow: "flux2_klein_edit", mine: false }];
-    else if (url.includes("/api/tools/import/comfy")) json = PREVIEW;
+    else if (url.endsWith("/api/tools/templates")) json = TEMPLATES;
+    else if (url.endsWith("/api/tools/connector/check")) json = checkAnswer;
+    else if (url.endsWith("/api/tools/connector")) {
+      json = { ref: "my-cli", reloaded: true, error: "", issues: [] };
+      status = 201;
+    } else if (url.includes("/api/tools/import/comfy")) json = PREVIEW;
     else if (url.endsWith("/api/tools/comfy")) {
-      json = { ref: "my-sd", workflow: "/cfg/workflows/my-sd.json", models_file: "/cfg/models.toml", restart_needed: true };
+      json = { ref: "my-sd", workflow: "/cfg/workflows/my-sd.json", models_file: "/cfg/models.toml", reloaded: true, error: "" };
       status = 201;
     }
     return { ok: true, status, statusText: "", json: async () => json, text: async () => JSON.stringify(json) };
@@ -76,5 +86,33 @@ describe("tools page", () => {
     await screen.findByText("klein");
     pick("not json at all");
     expect(await screen.findByText(en["web.tools.invalid_json"]!)).toBeTruthy();
+  });
+
+  it("fills the editor from a starting point, checks it and saves it", async () => {
+    mount();
+    await screen.findByText("klein");
+    const picker = screen.getByLabelText(en["web.tools.start_from"]!) as HTMLSelectElement;
+    fireEvent.change(picker, { target: { value: "cli" } });
+    const models = screen.getByLabelText(en["web.tools.models_toml"]!) as HTMLTextAreaElement;
+    await waitFor(() => expect(models.value).toContain('[models."my-cli"]'));
+    fireEvent.click(screen.getByRole("button", { name: en["web.tools.check"]! }));
+    expect(await screen.findByText("Check passed: my-cli")).toBeTruthy();
+    expect(screen.getByText("Licence is empty")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: en["web.tools.save_connector"]! }));
+    await waitFor(() => expect(calls.some((c) => c.method === "POST" && c.url.endsWith("/api/tools/connector"))).toBe(true));
+    const saved = calls.find((c) => c.method === "POST" && c.url.endsWith("/api/tools/connector"));
+    expect(saved?.body).toMatchObject({ models: models.value, services: "", force: false });
+  });
+
+  it("shows what is wrong and does not save", async () => {
+    checkAnswer = BAD;
+    mount();
+    await screen.findByText("klein");
+    fireEvent.change(screen.getByLabelText(en["web.tools.start_from"]!), { target: { value: "cli" } });
+    await waitFor(() => expect((screen.getByLabelText(en["web.tools.models_toml"]!) as HTMLTextAreaElement).value).not.toBe(""));
+    fireEvent.click(screen.getByRole("button", { name: en["web.tools.save_connector"]! }));
+    expect(await screen.findByText("argv must be a list")).toBeTruthy();
+    expect(screen.getByText(en["web.tools.checked_bad"]!)).toBeTruthy();
+    expect(calls.some((c) => c.method === "POST" && c.url.endsWith("/api/tools/connector"))).toBe(false);
   });
 });

@@ -8,7 +8,8 @@ restarted without the other. The API never runs generation work itself.
 """
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+import asyncio
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -20,6 +21,7 @@ from fastapi.staticfiles import StaticFiles
 import storyagent
 from storyagent.auth import AuthStore
 from storyagent.config import Settings, get_settings
+from storyagent.config.reload import fingerprint
 from storyagent.db import Database, migrate
 from storyagent.media.ledger import Ledger
 from storyagent.media.library import Library
@@ -31,9 +33,11 @@ from storyagent.workflow import WorkflowState
 
 from . import (
     errors,
+    reloading,
     routes_ai,
     routes_assets,
     routes_auth,
+    routes_config,
     routes_content,
     routes_delivery,
     routes_grammar,
@@ -92,13 +96,31 @@ def mount_web(app: FastAPI, root: Path) -> None:
         return FileResponse(root / "index.html")        # client-side routes
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, *, loader: Callable[[], Settings] | None = None) -> FastAPI:
+    """``loader`` reads the configuration afresh (default: the process settings, re-read); without it and with explicit
+    ``settings`` (tests) the server does not watch the config folder."""
+    watching = settings is None or loader is not None
+    given = settings is not None
     settings = settings or get_settings()
+
+    def no_loader() -> Settings:
+        raise RuntimeError("this app was given settings and no way to read them again")
+
+    reread = loader or (no_loader if given else (lambda: get_settings(reload=True)))
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.ctx = build_context(settings)
-        yield
+        app.state.reload_error = ""
+        app.state.reload_loader = reread
+        app.state.seen = fingerprint(settings.config_dir)
+        task = asyncio.create_task(reloading.watch(app, reread, float(settings.api.get("reload_seconds", 3)))) \
+            if watching else None
+        try:
+            yield
+        finally:
+            if task is not None:
+                task.cancel()
 
     app = FastAPI(
         title="Story Agent API",
@@ -116,8 +138,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             expose_headers=["Content-Disposition"],
         )
     errors.install(app)
-    for module in (routes_auth, routes_review, routes_projects, routes_jobs, routes_assets, routes_library,
-                   routes_pack, routes_pipeline, routes_delivery, routes_content, routes_grammar, routes_interchange,
+    for module in (routes_auth, routes_config, routes_review, routes_projects, routes_jobs, routes_assets,
+                   routes_library, routes_pack, routes_pipeline, routes_delivery, routes_content, routes_grammar,
+                   routes_interchange,
                    routes_specs, routes_story, routes_workflow, routes_system, routes_ai, routes_launch,
                    routes_workshop, routes_llm, routes_wiki, routes_tools):
         app.include_router(module.router)
@@ -131,7 +154,7 @@ def serve(settings: Settings, host: str | None = None, port: int | None = None) 
     import uvicorn
 
     uvicorn.run(
-        create_app(settings),
+        create_app(settings, loader=lambda: get_settings(reload=True)),    # a changed config folder is read again
         host=host or str(settings.api["host"]),
         port=port or int(settings.api["port"]),
         log_level="info",

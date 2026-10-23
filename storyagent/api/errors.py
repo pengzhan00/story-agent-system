@@ -84,7 +84,10 @@ def install(app: FastAPI) -> None:
     @app.exception_handler(ConnectError)
     async def _connect(request: Request, exc: ImportFailed | ConnectError) -> JSONResponse:
         detail = translator_of(request)(f"connect.error.{exc.code}", **exc.params)
-        return respond(request, 409 if exc.code in ("exists", "ref_packaged") else 422, "connect_failed", detail)
+        names = {"exists", "ref_packaged"}
+        listed = exc.params.get("issues")
+        taken = exc.code in names or (isinstance(listed, list) and bool(names & {str(i) for i in listed}))
+        return respond(request, 409 if taken else 422, "connect_failed", detail)
 
     @app.exception_handler(WorkshopError)
     async def _workshop(request: Request, exc: WorkshopError) -> JSONResponse:

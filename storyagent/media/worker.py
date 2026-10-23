@@ -26,6 +26,7 @@ from typing import TYPE_CHECKING, Any
 
 from storyagent import content
 from storyagent.config import Settings
+from storyagent.config.reload import fingerprint
 from storyagent.db import Database
 from storyagent.domain.errors import ErrorCode
 from storyagent.util import new_id
@@ -74,6 +75,7 @@ class Worker:
         self.db = db
         self.registry = registry
         self.ledger = ledger or Ledger(db, settings)
+        self._auto_probes = probes is None
         self.probes = list(probes) if probes is not None else build_probes(settings)
         self.resolver = Resolver(settings, self.ledger)
         self.owner = owner or f"{socket.gethostname()}:{os.getpid()}:{new_id()[:6]}"
@@ -140,13 +142,40 @@ class Worker:
             started += 1
         return started
 
-    def run_forever(self, stop: threading.Event | None = None) -> None:
+    def reload_config(self, settings: Settings, registry: AdapterRegistry) -> None:
+        """Swap in new configuration. Call it only while nothing runs: the jobs in flight use the old objects."""
+        self.settings, self.registry = settings, registry
+        self.ledger.settings = settings
+        self.resolver = Resolver(settings, self.ledger)
+        self._workflow = None                                  # rebuilt with the new settings on its next run
+        if self._auto_probes:
+            self.probes = build_probes(settings)
+
+    def _idle(self) -> bool:
+        return all(f.done() for f in self._futures.values()) and all(f.done() for f in self._wf_futures.values())
+
+    def run_forever(
+        self, stop: threading.Event | None = None,
+        reload: Callable[[], tuple[Settings, AdapterRegistry]] | None = None,
+    ) -> None:
+        """Schedule until ``stop``. With ``reload`` (a function that reads the configuration afresh), a change in the
+        config folder is picked up between jobs: the worker waits until nothing runs, then swaps it in."""
         stop = stop or self._stop
         interval = float(self.settings.runtime.get("poll_interval_seconds", 2))
+        seen = fingerprint(self.settings.config_dir)
         with CaffeinateGuard(bool(self.settings.runtime.get("caffeinate", True))):
             while not stop.is_set():
                 try:
                     self.tick()
+                    if reload is not None and self._idle():
+                        now = fingerprint(self.settings.config_dir)
+                        if now != seen:
+                            seen = now
+                            try:
+                                self.reload_config(*reload())
+                                log.info("configuration reloaded")
+                            except Exception:
+                                log.exception("configuration not reloaded: the old one stays until the next change")
                 except Exception:
                     log.exception("scheduler pass failed")
                 stop.wait(interval)

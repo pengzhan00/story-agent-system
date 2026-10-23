@@ -1,0 +1,18 @@
+# An HTTP service that answers the first request with the result.
+[models."my-http-tool"]
+kind = "image.generate"
+provider = "http"
+family = "my-http-tool"
+license_tag = ""
+commercial_ok = false
+timeout_sec = 600
+[models."my-http-tool".connector]
+service = "my_tool"
+mode = "sync"
+ext = "png"
+required = ["prompt"]
+[models."my-http-tool".connector.submit]
+path = "/generate"
+json = { prompt = "{prompt}", seed = "{seed}", steps = "{steps|20}" }
+[models."my-http-tool".connector.result]
+b64_path = "images.0"

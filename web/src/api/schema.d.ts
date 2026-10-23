@@ -380,6 +380,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/config/reload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reload Config
+         * @description Read ``<config>/*.toml``, workflows and plugins afresh and use them from the next request on. The worker
+         *     notices the same change on its own and swaps it in when it is between jobs.
+         */
+        post: operations["reload_config_api_config_reload_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/content/status": {
         parameters: {
             query?: never;
@@ -2258,6 +2279,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/tools/connector": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Save Connector
+         * @description Check, add the snippet to the operator's models.toml (and services.toml), and load it.
+         */
+        post: operations["save_connector_api_tools_connector_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tools/connector/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check Connector
+         * @description Dry run of a ``[models.X]`` (and ``[services.Y]``) snippet: what is wrong with it, and what to look at.
+         */
+        post: operations["check_connector_api_tools_connector_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/tools/import/comfy": {
         parameters: {
             query?: never;
@@ -2272,6 +2333,26 @@ export interface paths {
          * @description What would be bound, and what could not be - nothing is written.
          */
         post: operations["preview_comfy_api_tools_import_comfy_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tools/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Templates
+         * @description Starting points for a command-line tool and for an HTTP service (text for models.toml / services.toml).
+         */
+        get: operations["templates_api_tools_templates_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4509,6 +4590,15 @@ export interface components {
             /** Username */
             username: string;
         };
+        /** ReloadResult */
+        ReloadResult: {
+            /** Error */
+            error: string;
+            /** Models */
+            models: number;
+            /** Reloaded */
+            reloaded: boolean;
+        };
         /** RetryRequest */
         RetryRequest: {
             /**
@@ -4978,6 +5068,30 @@ export interface components {
             /** Value */
             value: unknown;
         };
+        /** ToolChecked */
+        ToolChecked: {
+            /** Issues */
+            issues: components["schemas"]["ToolIssue"][];
+            /** Kind */
+            kind: string;
+            /** Ok */
+            ok: boolean;
+            /** Provider */
+            provider: string;
+            /** Ref */
+            ref: string;
+        };
+        /** ToolConnectorSaved */
+        ToolConnectorSaved: {
+            /** Error */
+            error: string;
+            /** Issues */
+            issues: components["schemas"]["ToolIssue"][];
+            /** Ref */
+            ref: string;
+            /** Reloaded */
+            reloaded: boolean;
+        };
         /** ToolImportPreview */
         ToolImportPreview: {
             /** Bindings */
@@ -5001,6 +5115,15 @@ export interface components {
             workflow: {
                 [key: string]: unknown;
             };
+        };
+        /** ToolIssue */
+        ToolIssue: {
+            /** Code */
+            code: string;
+            /** Level */
+            level: string;
+            /** Message */
+            message: string;
         };
         /** ToolModel */
         ToolModel: {
@@ -5055,14 +5178,40 @@ export interface components {
         };
         /** ToolSaved */
         ToolSaved: {
+            /** Error */
+            error: string;
             /** Models File */
             models_file: string;
             /** Ref */
             ref: string;
-            /** Restart Needed */
-            restart_needed: boolean;
+            /** Reloaded */
+            reloaded: boolean;
             /** Workflow */
             workflow: string;
+        };
+        /** ToolSnippet */
+        ToolSnippet: {
+            /**
+             * Force
+             * @default false
+             */
+            force: boolean;
+            /** Models */
+            models: string;
+            /**
+             * Services
+             * @default
+             */
+            services: string;
+        };
+        /** ToolTemplate */
+        ToolTemplate: {
+            /** Models */
+            models: string;
+            /** Name */
+            name: string;
+            /** Services */
+            services: string;
         };
         /** ToolWarning */
         ToolWarning: {
@@ -6100,6 +6249,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reload_config_api_config_reload_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReloadResult"];
                 };
             };
         };
@@ -10542,6 +10711,72 @@ export interface operations {
             };
         };
     };
+    save_connector_api_tools_connector_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ToolSnippet"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolConnectorSaved"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_connector_api_tools_connector_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ToolSnippet"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolChecked"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     preview_comfy_api_tools_import_comfy_post: {
         parameters: {
             query?: never;
@@ -10571,6 +10806,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    templates_api_tools_templates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolTemplate"][];
                 };
             };
         };

@@ -5017,6 +5017,29 @@
         "title": "RegisterBody",
         "type": "object"
       },
+      "ReloadResult": {
+        "properties": {
+          "error": {
+            "title": "Error",
+            "type": "string"
+          },
+          "models": {
+            "title": "Models",
+            "type": "integer"
+          },
+          "reloaded": {
+            "title": "Reloaded",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "reloaded",
+          "error",
+          "models"
+        ],
+        "title": "ReloadResult",
+        "type": "object"
+      },
       "RetryRequest": {
         "properties": {
           "new_seed": {
@@ -6082,6 +6105,73 @@
         "title": "ToolBinding",
         "type": "object"
       },
+      "ToolChecked": {
+        "properties": {
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/ToolIssue"
+            },
+            "title": "Issues",
+            "type": "array"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "ref": {
+            "title": "Ref",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ref",
+          "kind",
+          "provider",
+          "ok",
+          "issues"
+        ],
+        "title": "ToolChecked",
+        "type": "object"
+      },
+      "ToolConnectorSaved": {
+        "properties": {
+          "error": {
+            "title": "Error",
+            "type": "string"
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/ToolIssue"
+            },
+            "title": "Issues",
+            "type": "array"
+          },
+          "ref": {
+            "title": "Ref",
+            "type": "string"
+          },
+          "reloaded": {
+            "title": "Reloaded",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ref",
+          "reloaded",
+          "error",
+          "issues"
+        ],
+        "title": "ToolConnectorSaved",
+        "type": "object"
+      },
       "ToolImportPreview": {
         "properties": {
           "bindings": {
@@ -6142,6 +6232,29 @@
           "kind"
         ],
         "title": "ToolImportRequest",
+        "type": "object"
+      },
+      "ToolIssue": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "level": {
+            "title": "Level",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "level",
+          "code",
+          "message"
+        ],
+        "title": "ToolIssue",
         "type": "object"
       },
       "ToolModel": {
@@ -6235,6 +6348,10 @@
       },
       "ToolSaved": {
         "properties": {
+          "error": {
+            "title": "Error",
+            "type": "string"
+          },
           "models_file": {
             "title": "Models File",
             "type": "string"
@@ -6243,8 +6360,8 @@
             "title": "Ref",
             "type": "string"
           },
-          "restart_needed": {
-            "title": "Restart Needed",
+          "reloaded": {
+            "title": "Reloaded",
             "type": "boolean"
           },
           "workflow": {
@@ -6256,9 +6373,56 @@
           "ref",
           "workflow",
           "models_file",
-          "restart_needed"
+          "reloaded",
+          "error"
         ],
         "title": "ToolSaved",
+        "type": "object"
+      },
+      "ToolSnippet": {
+        "properties": {
+          "force": {
+            "default": false,
+            "title": "Force",
+            "type": "boolean"
+          },
+          "models": {
+            "title": "Models",
+            "type": "string"
+          },
+          "services": {
+            "default": "",
+            "title": "Services",
+            "type": "string"
+          }
+        },
+        "required": [
+          "models"
+        ],
+        "title": "ToolSnippet",
+        "type": "object"
+      },
+      "ToolTemplate": {
+        "properties": {
+          "models": {
+            "title": "Models",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "services": {
+            "title": "Services",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "models",
+          "services"
+        ],
+        "title": "ToolTemplate",
         "type": "object"
       },
       "ToolWarning": {
@@ -8345,6 +8509,28 @@
         "summary": "Setup",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/api/config/reload": {
+      "post": {
+        "description": "Read ``<config>/*.toml``, workflows and plugins afresh and use them from the next request on. The worker\nnotices the same change on its own and swaps it in when it is between jobs.",
+        "operationId": "reload_config_api_config_reload_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReloadResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Reload Config",
+        "tags": [
+          "config"
         ]
       }
     },
@@ -15590,6 +15776,90 @@
         ]
       }
     },
+    "/api/tools/connector": {
+      "post": {
+        "description": "Check, add the snippet to the operator's models.toml (and services.toml), and load it.",
+        "operationId": "save_connector_api_tools_connector_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolSnippet"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolConnectorSaved"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Connector",
+        "tags": [
+          "tools"
+        ]
+      }
+    },
+    "/api/tools/connector/check": {
+      "post": {
+        "description": "Dry run of a ``[models.X]`` (and ``[services.Y]``) snippet: what is wrong with it, and what to look at.",
+        "operationId": "check_connector_api_tools_connector_check_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolSnippet"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolChecked"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Check Connector",
+        "tags": [
+          "tools"
+        ]
+      }
+    },
     "/api/tools/import/comfy": {
       "post": {
         "description": "What would be bound, and what could not be - nothing is written.",
@@ -15627,6 +15897,32 @@
           }
         },
         "summary": "Preview Comfy",
+        "tags": [
+          "tools"
+        ]
+      }
+    },
+    "/api/tools/templates": {
+      "get": {
+        "description": "Starting points for a command-line tool and for an HTTP service (text for models.toml / services.toml).",
+        "operationId": "templates_api_tools_templates_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ToolTemplate"
+                  },
+                  "title": "Response Templates Api Tools Templates Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Templates",
         "tags": [
           "tools"
         ]

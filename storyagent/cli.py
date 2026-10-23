@@ -56,7 +56,7 @@ from storyagent.media.contracts import MediaJob
 from storyagent.media.ledger import Ledger, LedgerError
 from storyagent.media.llm_resident import build_probes
 from storyagent.media.pack import PackError
-from storyagent.media.registry import default_registry
+from storyagent.media.registry import AdapterRegistry, default_registry
 from storyagent.media.specs import SpecError, SpecLocked, SpecStore
 from storyagent.media.worker import Worker, run_once
 from storyagent.progressbar import render_run, render_stages
@@ -753,7 +753,12 @@ def _cmd_worker(s: Settings, a: argparse.Namespace) -> int:
     for sig in (signal.SIGINT, signal.SIGTERM):
         signal.signal(sig, lambda *_: stop.set())
     print(t("cli.worker.started", owner=worker.owner))
-    worker.run_forever(stop)
+
+    def reread() -> tuple[Settings, AdapterRegistry]:
+        fresh = get_settings(reload=True)
+        return fresh, default_registry(fresh)
+
+    worker.run_forever(stop, reload=reread)
     return 0
 
 

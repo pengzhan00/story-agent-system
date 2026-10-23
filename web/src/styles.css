@@ -28,6 +28,7 @@ a { color: var(--accent); text-decoration: none; } a:hover { text-decoration: un
 .muted { color: var(--muted); } .small { font-size: 0.85rem; } .strong { font-weight: 600; }
 .clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .empty { color: var(--muted); padding: 24px; text-align: center; border: 1px dashed var(--line); border-radius: var(--radius); }
+.error-text { color: var(--bad); }
 .hint { color: var(--warn); margin: 0; font-size: 0.9rem; }
 .field { display: flex; flex-direction: column; gap: 4px; } .field > span { font-size: 0.85rem; color: var(--muted); }
 input, textarea, select, button { font: inherit; color: inherit; }

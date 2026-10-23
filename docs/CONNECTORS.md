@@ -10,7 +10,10 @@
 | 一个 HTTP 服务(同步或异步任务) | `provider = "http"`,写请求/轮询/取结果的模板 | ✅ |
 | 以上都不合适 | 在 `<config>/plugins/` 放一个 Python 文件,注册自己的适配器 | ✅ |
 
-配置目录是 `$STORY_AGENT_HOME/config/`(下文 `<config>`)。服务和 worker **启动时读一次配置**,保存后重启才生效。
+配置目录是 `$STORY_AGENT_HOME/config/`(下文 `<config>`)。**改了配置不用重启**:服务每几秒看一眼配置目录(`[api] reload_seconds`,默认 3),
+变了就重新读;worker 在手上的任务都做完之后(空闲时几秒内)换上新配置,从不在一个任务中途换。读不进去(比如 TOML 写坏了)时
+沿用旧配置,在日志里说明原因,下次文件再变会重试。也可以马上读:`POST /api/config/reload`(管理员,返回是否成功和原因)。
+插件是 Python 代码,和别的配置一样会被重新载入。
 
 ## ComfyUI 工作流
 
@@ -56,7 +59,7 @@
 
 ### 4. 用起来
 
-重启服务和 worker 后,新模型就是同类里的一个候选:项目页的**管线面板**里能选到它,工坊也能直接试。
+保存后(服务马上、worker 空闲时)新模型就是同类里的一个候选:项目页的**管线面板**里能选到它,工坊也能直接试。
 同 `family` 的图像生成与图像编辑自动搭配;视频同理。
 
 ### 限制
@@ -125,6 +128,21 @@ url_path = "result.url"             # 或 b64_path = "images.0",或 path = "/job
 - 路径用点分(`data.0.url`,数字是列表下标)。`content = "body"`:答案的原始字节就是文件。
 - 重启后 async 任务靠任务号接回;sync 的答案在内存里,重启后重新提交。
 - 取消不会通知服务。健康检查对用到的每个服务请求它的 `health_path`。
+
+## 在网页上写(不用手改文件)
+
+网页「工具接入」页下半部分是连接器编辑器:选一个**起点**(命令行工具 / HTTP 同步 / HTTP 异步任务),模板会填进两个文本框 ——
+上面是 `models.toml` 里的这一段(一个 `[models."名字"]` 表加它的 `.connector` 子表),下面是 `services.toml` 里的这一段
+(HTTP 服务要有 `[services.<名>]`,命令行工具留空)。改成你的工具后:
+
+- **检查**只是试运行,什么都不写。它会逐条指出问题(TOML 写法、名字、provider、kind、`argv`/`submit`/`poll`/`result` 缺什么、
+  services 里有没有这个服务),最后还把这一段放进配置目录的**临时副本**,用真正的加载器读一遍,所以整份配置读不进去也会在这里报出来。
+  许可 `license_tag` 为空只是提醒,读过许可再填,`commercial_ok` 保持 `false`。
+- **保存并载入**先检查,没有错误才写:同名的表被替换,别的内容原样保留;写完服务端马上载入,worker 在手头任务做完后换上。
+  重名要勾「替换同名的模型」;系统自带的模型名不能占用。
+
+对应的接口(管理员):`GET /api/tools/templates`、`POST /api/tools/connector/check`、`POST /api/tools/connector`
+(请求体 `{models, services, force}`)。写的就是 `<config>/models.toml` 和 `services.toml`,以后想手改也行。
 
 ## 占位符
 

@@ -1,0 +1,26 @@
+# An HTTP service that takes a job, reports its state, and hands over the file when it is done.
+[models."my-job-tool"]
+kind = "audio.music"
+provider = "http"
+family = "my-job-tool"
+license_tag = ""
+commercial_ok = false
+timeout_sec = 1800
+[models."my-job-tool".connector]
+service = "my_job_tool"
+ext = "mp3"
+required = ["prompt"]
+[models."my-job-tool".connector.submit]
+path = "/jobs"
+json = { caption = "{prompt}", lyrics = "{text}", duration = "{duration|30}", seed = "{seed}" }
+id_path = "id"
+[models."my-job-tool".connector.poll]
+path = "/jobs/{id}"
+status_path = "status"
+done = ["done"]
+failed = ["failed"]
+progress_path = "percent"
+progress_scale = 100
+error_path = "message"
+[models."my-job-tool".connector.result]
+url_path = "result.url"
