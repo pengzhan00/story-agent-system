@@ -1774,6 +1774,7 @@
   "web.keyframe_mode.text": "From the prompt only (fast)",
   "web.plan.state.skip": "still",
   "web.plan.pick_every_clip": "Everything incl. every clip",
+  "web.plan.pick_only_video": "Only the clips (the shot needs its keyframe first)",
   "web.plan.clips": "Clips: {chosen} of {shots} shots get one (~{eta} still to make); the rest are a keyframe with a slow move.",
   "web.plan.budget": "budget {time}",
   "web.workflow.video_share": "Shots with a video clip (%)",

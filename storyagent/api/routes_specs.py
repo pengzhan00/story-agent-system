@@ -5,6 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Query, Request
 
 from storyagent.media.specs import SpecRecord, SpecStore
+from storyagent.workflow.media import job_preparer
 
 from .context import ApiContext, ctx_of
 from .errors import ApiError
@@ -159,9 +160,10 @@ def regenerate(
 ) -> list[JobOut]:
     """Queue ``n_candidates`` jobs from the current spec version; adopt the winner via /assets/{id}/adopt."""
     ctx = ctx_of(request)
+    pset = project_settings(request, project_id)
     jobs = ctx.specs.regenerate(
         project_id, subject_type, subject_id, slot, n_candidates=body.n_candidates, vary_seed=body.vary_seed,
-        tier=body.tier, shot_id=body.shot_id, priority=body.priority,
-        project_settings=project_settings(request, project_id),
+        tier=body.tier, shot_id=body.shot_id, priority=body.priority, project_settings=pset,
+        prepare=job_preparer(ctx.settings, ctx.story, ctx.specs, ctx.ledger, dict(pset or {})),
     )
     return [JobOut.model_validate(j) for j in jobs]

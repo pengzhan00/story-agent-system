@@ -731,9 +731,14 @@ def _cmd_spec_unlock(s: Settings, a: argparse.Namespace) -> int:
 
 def _cmd_spec_regen(s: Settings, a: argparse.Namespace) -> int:
     c = _ctx(s)
+    from storyagent.story import StoryStore
+    from storyagent.workflow.media import job_preparer
+
+    pset = _project_settings(c, a.project)
     jobs = c.specs.regenerate(
         a.project, a.subject_type, a.subject_id, a.slot, n_candidates=a.n, vary_seed=not a.same_seed,
-        tier=QualityTier(a.tier), shot_id=a.shot, project_settings=_project_settings(c, a.project),
+        tier=QualityTier(a.tier), shot_id=a.shot, project_settings=pset,
+        prepare=job_preparer(s, StoryStore(c.db), c.specs, c.ledger, dict(pset or {})),
     )
     print(t("cli.spec.regenerated", count=len(jobs)))
     for j in jobs:

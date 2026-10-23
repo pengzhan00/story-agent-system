@@ -250,7 +250,7 @@ export function WorkflowPanel({ id }: { id: number }) {
             </button>
           </div>
           <p className="muted small">{t("web.workflow.make_media_hint")} {t("web.workflow.needs_worker")}</p>
-          {planning ? <ProducePlan id={id} onClose={() => setPlanning(false)} /> : null}
+          {planning ? <ProducePlan id={id} defaultTier={planTier} onClose={() => setPlanning(false)} /> : null}
           <div className="row">
             <button disabled={review.isPending} onClick={() => review.mutate()}>
               {review.isPending ? t("web.review.running") : t("web.review.run")}

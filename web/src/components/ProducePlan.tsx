@@ -14,9 +14,9 @@ const optional = (t: PlannedTask) => t.state === "skip";       // a shot the pol
  * The production plan: every image, voice, song and video that producing would make, with its model and an estimate.
  * Nothing runs until it is confirmed; the expensive videos start unticked.
  */
-export function ProducePlan({ id, onClose }: { id: number; onClose: () => void }) {
+export function ProducePlan({ id, onClose, defaultTier = "draft" }: { id: number; onClose: () => void; defaultTier?: string }) {
   const t = useT();
-  const [tier, setTier] = useState("draft");
+  const [tier, setTier] = useState(defaultTier);
   const plan = useProducePlan(id, tier, true);
   const start = useStartRun(id);
   const [picked, setPicked] = useState<Set<string>>(new Set());
@@ -64,6 +64,9 @@ export function ProducePlan({ id, onClose }: { id: number; onClose: () => void }
         </button>
         <button type="button" className="chip chip-button" onClick={() => setPicked(new Set(tasks.filter((x) => runnable(x) || optional(x)).map((x) => x.spec_id)))}>
           {t("web.plan.pick_every_clip")}
+        </button>
+        <button type="button" className="chip chip-button" onClick={() => setPicked(new Set(tasks.filter((x) => x.subject_type === VIDEO && (runnable(x) || optional(x))).map((x) => x.spec_id)))}>
+          {t("web.plan.pick_only_video")}
         </button>
         <button type="button" className="chip chip-button" onClick={() => setPicked(new Set())}>
           {t("web.plan.pick_none")}

@@ -1774,6 +1774,7 @@
   "web.keyframe_mode.text": "仅按提示词生成(快)",
   "web.plan.state.skip": "静图",
   "web.plan.pick_every_clip": "全部(含所有视频)",
+  "web.plan.pick_only_video": "只选视频(镜头先要有关键帧)",
   "web.plan.clips": "视频:{chosen} / {shots} 个镜头会做视频(还需约 {eta});其余用关键帧加缓慢推拉。",
   "web.plan.budget": "预算 {time}",
   "web.workflow.video_share": "做视频的镜头比例(%)",

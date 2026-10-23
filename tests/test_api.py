@@ -325,6 +325,26 @@ def test_regenerate_candidates_stale_and_review(client: TestClient, fsettings: S
     assert client.get(f"{base}/review").json() == []
 
 
+def test_a_clip_made_by_hand_belongs_to_its_shot_and_starts_from_its_keyframe(
+    client: TestClient, fsettings: Settings, run_worker,  # noqa: ANN001
+) -> None:
+    pid = project(client)["id"]
+    [shot] = make_shots(fsettings, pid, 1)
+    base = f"/api/projects/{pid}/specs"
+    key = spec_body(subject_type="shot.keyframe", subject_id=str(shot), prompt="the opening frame")
+    client.post(base, json=key)
+    client.post(base, json=spec_body(subject_type="shot.video", subject_id=str(shot), prompt="it moves"))
+    [early] = client.post(f"{base}/shot.video/{shot}/regenerate", json={"tier": "draft"}).json()
+    assert early["shot_id"] == shot and not early["inputs"].get("refs")           # no keyframe yet: a plain clip
+    [frame_job] = client.post(f"{base}/shot.keyframe/{shot}/regenerate", json={"tier": "draft"}).json()
+    assert frame_job["shot_id"] == shot                                          # filed under the shot, not loose
+    run_worker()
+    frame = client.get("/api/assets", params={"project_id": pid, "spec_id": frame_job["spec_id"]}).json()[0]
+    assert frame["shot_id"] == shot
+    [job] = client.post(f"{base}/shot.video/{shot}/regenerate", json={"tier": "draft"}).json()
+    assert job["inputs"]["refs"] == [f"asset:{frame['id']}"]                      # the clip starts from the keyframe
+
+
 def test_in_flight_job_is_a_snapshot_of_the_spec(client: TestClient) -> None:
     pid = project(client)["id"]
     base = f"/api/projects/{pid}/specs"
@@ -441,16 +461,17 @@ def test_library_upload_and_limits(client: TestClient) -> None:
     assert client.get("/api/library/nope").status_code == 404
 
 
-def test_jobs_and_assets_can_be_filtered_by_spec(client: TestClient, run_worker) -> None:  # noqa: ANN001
+def test_jobs_and_assets_can_be_filtered_by_spec(client: TestClient, fsettings: Settings, run_worker) -> None:  # noqa: ANN001
     pid = project(client)["id"]
+    [shot] = make_shots(fsettings, pid, 1)
     a = client.post(f"/api/projects/{pid}/specs", json={
-        "subject_type": "shot.video", "subject_id": "1", "kind": "video.generate", "model_ref": "fake-video",
+        "subject_type": "shot.video", "subject_id": str(shot), "kind": "video.generate", "model_ref": "fake-video",
         "prompt": "a", "seed": 1}).json()
     b = client.post(f"/api/projects/{pid}/specs", json={
-        "subject_type": "shot.video", "subject_id": "2", "kind": "video.generate", "model_ref": "fake-video",
+        "subject_type": "shot.sfx", "subject_id": f"{shot}#0", "kind": "video.generate", "model_ref": "fake-video",
         "prompt": "b", "seed": 2}).json()
     for spec in (a, b):
-        url = f"/api/projects/{pid}/specs/shot.video/{spec['subject_id']}/regenerate"
+        url = f"/api/projects/{pid}/specs/{spec['subject_type']}/{spec['subject_id'].replace('#', '%23')}/regenerate"
         r = client.post(url, json={"n_candidates": 2, "tier": "draft"})
         assert r.status_code == 201
     assert len(client.get("/api/jobs", params={"spec_id": a["id"]}).json()) == 2

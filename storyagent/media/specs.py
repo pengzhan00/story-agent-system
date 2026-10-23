@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import random
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -28,6 +28,12 @@ _EDITABLE = ("model_ref", "prompt", "negative_prompt", "text_payload", "params",
 
 class SpecError(ValueError):
     pass
+
+
+def shot_id_of(spec: SpecRecord) -> int | None:
+    """The shot a spec belongs to (shot and dialogue specs carry it as ``<shot id>`` or ``<shot id>#<n>``)."""
+    head = spec.subject_id.split("#")[0]
+    return int(head) if spec.subject_type.startswith(("shot.", "dialogue.")) and head.isdigit() else None
 
 
 class SpecLocked(SpecError):
@@ -309,8 +315,11 @@ class SpecStore:
         self, project_id: int, subject_type: str, subject_id: str, slot: str = "main", *,
         n_candidates: int = 1, vary_seed: bool = True, tier: QualityTier = QualityTier.FINAL,
         shot_id: int | None = None, priority: int = 5, project_settings: Mapping[str, Any] | None = None,
+        prepare: Callable[[SpecRecord, MediaJob], MediaJob] | None = None,
     ) -> list[JobRecord]:
-        """Queue ``n_candidates`` jobs from the *current* spec version. Pick the winner with ``Ledger.adopt``."""
+        """Queue ``n_candidates`` jobs from the *current* spec version. Pick the winner with ``Ledger.adopt``.
+        The result is filed under the spec's own shot (``shot_id`` overrides); ``prepare`` may add what the workflow
+        adds to a job of that kind (the first frame of a clip, the references of a composed keyframe)."""
         spec = self.current(project_id, subject_type, subject_id, slot)
         if spec is None:
             raise SpecError(f"no spec {subject_type}/{subject_id}/{slot}")
@@ -329,8 +338,7 @@ class SpecStore:
             seeds = [spec.seed]
         jobs = []
         for seed in seeds:
-            rec, _ = self.ledger.enqueue(
-                self.build_job(spec, tier=tier, seed=seed, shot_id=shot_id, priority=priority), project_settings
-            )
+            job = self.build_job(spec, tier=tier, seed=seed, shot_id=shot_id or shot_id_of(spec), priority=priority)
+            rec, _ = self.ledger.enqueue(prepare(spec, job) if prepare else job, project_settings)
             jobs.append(rec)
         return jobs

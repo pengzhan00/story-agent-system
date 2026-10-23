@@ -31,7 +31,7 @@ from storyagent.i18n import get_catalog
 from storyagent.media.compliance import visible_marks
 from storyagent.media.contracts import AssetRecord, JobRecord, MediaJob
 from storyagent.media.ledger import Ledger, LedgerError
-from storyagent.media.specs import SpecRecord, SpecStore
+from storyagent.media.specs import SpecRecord, SpecStore, shot_id_of
 from storyagent.story import StoryStore
 
 from .stages import Ctx, StageError, WorkflowCancelled
@@ -51,9 +51,7 @@ def _ledger(ctx: Ctx) -> Ledger:
     return ledger
 
 
-def _shot_id(spec: SpecRecord) -> int | None:
-    head = spec.subject_id.split("#")[0]
-    return int(head) if spec.subject_type.startswith(("shot.", "dialogue.")) and head.isdigit() else None
+_shot_id = shot_id_of
 
 
 def current_asset(ledger: Ledger, spec: SpecRecord) -> AssetRecord | None:
@@ -192,17 +190,19 @@ def _plan_phase(
     return out
 
 
-def keyframe_from_references(ctx: Ctx, ledger: Ledger, spec: SpecRecord, job: MediaJob) -> MediaJob:
+def compose_keyframe(
+    settings: Settings, story: StoryStore, spec_store: SpecStore, ledger: Ledger, spec: SpecRecord, job: MediaJob,
+) -> MediaJob:
     """Compose the shot from the approved portraits and the scene image: an image-edit job whose reference images are
     the current assets of the specs this keyframe depends on. Without any (or switched off), the job stays as it was."""
-    modes = scene_modes(ctx.store, ctx.pid)
-    if not compose_wanted(ctx.settings, modes, spec) or spec.kind is not MediaKind.IMAGE_GENERATE:
+    modes = scene_modes(story, spec.project_id)
+    if not compose_wanted(settings, modes, spec) or spec.kind is not MediaKind.IMAGE_GENERATE:
         return job
     refs: list[str] = []
     for dep in spec.depends_on:
         if dep.get("subject_type") not in ("character.portrait", "scene.keyframe"):
             continue
-        found = ctx.spec_store.current(spec.project_id, str(dep["subject_type"]), str(dep["subject_id"]),
+        found = spec_store.current(spec.project_id, str(dep["subject_type"]), str(dep["subject_id"]),
                                        str(dep.get("slot", "main")))
         asset = current_asset(ledger, found) if found else None
         if asset is not None:
@@ -210,8 +210,8 @@ def keyframe_from_references(ctx: Ctx, ledger: Ledger, spec: SpecRecord, job: Me
     if not refs:
         return job
     try:
-        model = ctx.settings.model(spec.model_ref) if spec.model_ref and ctx.settings.model(
-            spec.model_ref).kind == MediaKind.IMAGE_EDIT.value else ctx.settings.default_model(
+        model = settings.model(spec.model_ref) if spec.model_ref and settings.model(
+            spec.model_ref).kind == MediaKind.IMAGE_EDIT.value else settings.default_model(
                 MediaKind.IMAGE_EDIT.value)
     except ConfigError:
         return job
@@ -224,6 +224,35 @@ def keyframe_from_references(ctx: Ctx, ledger: Ledger, spec: SpecRecord, job: Me
 # image.edit (a keyframe composed from reference images) was measured at about 11 minutes, plain generation at 1.5.
 FALLBACK_SECONDS = {"image": 45.0, "image.edit": 600.0, "video": 240.0, "audio.tts": 12.0, "audio.music": 90.0,
                     "audio.sfx": 20.0}
+
+def keyframe_from_references(ctx: Ctx, ledger: Ledger, spec: SpecRecord, job: MediaJob) -> MediaJob:
+    return compose_keyframe(ctx.settings, ctx.store, ctx.spec_store, ledger, spec, job)
+
+
+def job_preparer(
+    settings: Settings, story: StoryStore, spec_store: SpecStore, ledger: Ledger,
+    project_settings: dict[str, Any] | None = None,
+) -> Callable[[SpecRecord, MediaJob], MediaJob]:
+    """What ``produce`` adds to a job beyond its spec, for a job queued by hand (the Create tab, ``spec regenerate``):
+    a keyframe is composed from the portraits and the scene image, a clip starts from its keyframe, a line without a
+    voice gets the default voice. A clip whose keyframe is not made yet stays a text-only clip."""
+
+    def prepare(spec: SpecRecord, job: MediaJob) -> MediaJob:
+        if spec.subject_type == "shot.keyframe":
+            return compose_keyframe(settings, story, spec_store, ledger, spec, job)
+        if spec.subject_type == "shot.video":
+            key = spec_store.current(spec.project_id, "shot.keyframe", spec.subject_id)
+            frame = current_asset(ledger, key) if key else None
+            if frame is None:
+                return job
+            return MediaJob(**{**job.__dict__, "inputs": {**job.inputs, "refs": [f"asset:{frame.id}"]}})
+        if spec.subject_type == "dialogue.line" and not spec.params.get("voice_ref"):
+            voice = default_voice_of(settings, project_settings)
+            if voice:
+                return MediaJob(**{**job.__dict__, "inputs": {**job.inputs, "voice_ref": voice}})
+        return job
+
+    return prepare
 
 
 def fallback_seconds(settings: Settings, model_ref: str, kind: str) -> float:
