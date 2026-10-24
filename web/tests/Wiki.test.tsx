@@ -17,12 +17,18 @@ const listing = (pages: unknown[], over: Record<string, unknown> = {}) => ({
   pages, total: pages.length, hidden: 0, sources: [{ name: "vault", count: pages.length }], tags: [{ name: "AI", count: pages.length }], synced_at: "2026-10-23T08:00:00+00:00", configured: true, ...over,
 });
 
+const graphOf = (nodes: unknown[], edges: unknown[] = [], over: Record<string, unknown> = {}) => ({
+  nodes, edges, total: nodes.length, hidden: 0, matched: nodes.length, truncated: false, limit: 300, focus: "", depth: 1,
+  sources: [{ name: "vault", count: nodes.length }], tags: [{ name: "AI", count: nodes.length }], ...over,
+});
+
 let calls: string[] = [];
 function stubApi(extra: Record<string, unknown> = {}) {
   vi.stubGlobal("fetch", async (url: string, init?: { method?: string }) => {
     calls.push(`${init?.method ?? "GET"} ${url}`);
     let json: unknown = {};
     if (url.includes("/api/i18n")) json = en;
+    else if (url.includes("/api/wiki/graph")) json = extra.graph ?? graphOf([]);
     else if (url.includes("/api/wiki/sync")) json = { added: 2, updated: 0, unchanged: 0, removed: 0, sources: { vault: 2 }, warnings: [{ code: "no_include", source: "vault", detail: "" }] };
     else if (url.includes("/api/wiki/pages/")) {
       json = {

@@ -215,3 +215,30 @@ dialog.lightbox img, dialog.lightbox video { display: block; max-width: 92vw; ma
 .markdown table { border-collapse: collapse; font-size: 0.92rem; }
 .markdown th, .markdown td { border: 1px solid var(--line); padding: 4px 10px; text-align: left; vertical-align: top; }
 .markdown a { color: var(--accent); }
+
+/* wiki graph */
+.wiki-graph { position: relative; }
+.wiki-graph-svg { display: block; width: 100%; height: auto; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); touch-action: none; cursor: grab; user-select: none; }
+.wiki-graph.compact .wiki-graph-svg { cursor: default; }
+.wiki-graph-svg:active { cursor: grabbing; }
+.g-node { cursor: pointer; stroke: var(--panel); stroke-width: 1.5; transition: opacity 0.15s; }
+.g-node.g-tag { fill: var(--muted); } .g-node.g-model { fill: var(--accent); }
+.g-node.dim { opacity: 0.18; }
+.g-node.current > :first-of-type { stroke: var(--text); stroke-width: 3; }
+.g-node:focus-visible > :first-of-type { stroke: var(--accent); stroke-width: 3; }
+.g-label { display: none; fill: var(--text); stroke: var(--panel); stroke-width: 3px; paint-order: stroke; font-size: 11px; pointer-events: none; }
+.g-node.lbl .g-label, .labels-all .g-label { display: block; }
+.g-edge { stroke: var(--muted); stroke-opacity: 0.45; fill: none; }
+.g-edge-tag { stroke-dasharray: 1 3; stroke-opacity: 0.5; } .g-edge-shared_tag { stroke-dasharray: 5 4; stroke-opacity: 0.3; }
+.g-edge-mention { stroke: var(--accent); stroke-opacity: 0.6; }
+.g-edge.hl { stroke: var(--text); stroke-opacity: 0.9; stroke-width: 2; } .g-edge.dim { stroke-opacity: 0.08; }
+.wiki-graph-tools { position: absolute; top: 8px; right: 8px; gap: 4px; }
+.wiki-graph-tools button { padding: 2px 10px; }
+.wiki-graph-card { position: absolute; left: 8px; bottom: 8px; max-width: min(320px, 70%); gap: 4px; pointer-events: none; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18); }
+.wiki-graph-split { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: var(--gap); align-items: start; }
+@media (max-width: 800px) { .wiki-graph-split { grid-template-columns: 1fr; } }
+.wiki-graph-reader { max-height: 80vh; overflow: auto; position: sticky; top: 8px; }
+.wiki-layers { border: none; padding: 0; margin: 0; }
+.wiki-legend, .wiki-isolated { list-style: none; margin: 0; padding: 0; }
+.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
+.swatch.square { border-radius: 2px; background: var(--muted); } .swatch.diamond { border-radius: 1px; background: var(--accent); transform: rotate(45deg) scale(0.85); }

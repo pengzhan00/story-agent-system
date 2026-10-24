@@ -324,6 +324,45 @@ class WikiPageOut(Strict):
     links: list[WikiBrief]
 
 
+class WikiGraphNode(Strict):
+    id: str = Field(description="the page slug; `tag:<name>` for a tag node, `model:<family>` for a model node")
+    kind: str = Field(description="page | tag | model")
+    label: str
+    slug: str = Field(description="page nodes: the slug to open; empty for the others")
+    source: str
+    rating: str
+    tags: list[str]
+    summary: str
+    links_in: int = Field(description="links from other visible pages, over the whole wiki (not only this view)")
+    links_out: int
+    pages: int = Field(description="tag and model nodes: pages in this view that carry the tag or mention the model")
+    refs: list[str] = Field(description="model nodes: the models of the family (keys of models.toml)")
+    model_kind: str
+    isolated: bool = Field(description="a page without any edge in this view")
+    match: bool = Field(description="false for the pages around the hits of a search, shown only for context")
+
+
+class WikiGraphEdge(Strict):
+    source: str
+    target: str
+    kind: str = Field(description="link | tag | shared_tag | mention")
+    weight: int = Field(description="shared tags (shared_tag) or mentions (mention); 1 otherwise")
+
+
+class WikiGraphOut(Strict):
+    nodes: list[WikiGraphNode]
+    edges: list[WikiGraphEdge]
+    total: int = Field(description="pages this caller may see, before the filters")
+    hidden: int = Field(description="restricted pages this caller may not see right now (locked or too young)")
+    matched: int = Field(description="pages that passed the filters, before the cap")
+    truncated: bool = Field(description="more pages matched than `limit`: the best connected ones are shown")
+    limit: int
+    focus: str
+    depth: int
+    sources: list[WikiCount]
+    tags: list[WikiCount]
+
+
 class WikiSyncOut(Strict):
     added: int
     updated: int

@@ -53,6 +53,7 @@ describe("PipelinePanel", () => {
     expect(select.value).toBe("flux");
     expect((screen.getByRole("button", { name: en["web.pipeline.reset_all"]! }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getAllByRole("link", { name: en["web.wiki.about"]! })[0]?.getAttribute("href")).toBe("/wiki?q=flux");
+    expect(screen.getAllByRole("link", { name: en["web.wiki.about_graph"]! })[0]?.getAttribute("href")).toBe("/wiki?view=graph&model=flux");
     fireEvent.change(select, { target: { value: "alt" } });
     await waitFor(() => expect(calls.some((c) => c.url === "PUT /api/projects/3/pipeline")).toBe(true));
     expect(JSON.parse(calls.find((c) => c.url.startsWith("PUT"))?.body ?? "{}")).toEqual({ models: { "image.generate": "alt" } });
