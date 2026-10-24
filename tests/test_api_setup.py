@@ -99,3 +99,31 @@ def test_verify_runs_the_healthcheck_with_the_profiles_requirements(
     r = client.post("/api/setup/verify", params={"profile": "story"})
     assert r.status_code == 200 and r.json()["ok"] is False and asked == [["tool.ffmpeg", "ollama"]]
     assert {e["name"]: e["ok"] for e in r.json()["entries"]} == {"ollama": False, "tool.ffmpeg": True}
+
+
+# -- who may use it -----------------------------------------------------------------------------------------------------
+def test_only_an_administrator_may_read_or_write_the_setup(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    m = FakeMachine(tmp_path, monkeypatch)
+    settings = load_settings({"STORY_AGENT_HOME": str(m.data), "STORY_AGENT_AUTH": "token"})
+    app = create_app(settings)
+    app.state.setup_probe = m.probe()
+    with TestClient(app, raise_server_exceptions=False) as c:
+        store = c.app.state.ctx.auth                                                     # type: ignore[attr-defined]
+        store.create_user("root", "correct horse", "admin")
+        store.create_user("ed", "correct horse", "editor")
+
+        def token(name: str) -> dict[str, str]:
+            r = c.post("/api/auth/login", json={"username": name, "password": "correct horse"})
+            return {"Authorization": f"Bearer {r.json()['token']}"}
+
+        write = {"profile": "story", "llm_model": "qwen3:8b", "write": True}
+        assert c.get("/api/setup").status_code == 401
+        assert c.get("/api/setup", headers=token("ed")).status_code == 403
+        assert c.post("/api/setup/config", json=write, headers=token("ed")).status_code == 403
+        assert c.post("/api/setup/verify", headers=token("ed")).status_code == 403
+        assert not (m.data / "config" / "llm.toml").exists()
+        admin = token("root")
+        assert c.get("/api/setup", headers=admin).status_code == 200
+        assert c.post("/api/setup/config", json=write, headers=admin).status_code == 200
+        rows = store.list_audit(action="setup.config")
+        assert len(rows) == 1 and "llm.toml" in str(rows[0])

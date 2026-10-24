@@ -82,7 +82,7 @@ uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python -e '.[de
 | voice | CosyVoice 代码 + Python 3.10 环境 | `git clone --recursive https://github.com/FunAudioLLM/CosyVoice.git ~/cosyvoice/CosyVoice`;`uv venv --python 3.10 ~/cosyvoice/venv`;`uv pip install --python ~/cosyvoice/venv/bin/python -r storyagent/setup/recipes/cosyvoice-venv.txt`;✋ pynini(见 §6) | 2 GiB | Apache-2.0 |
 | voice | CosyVoice 3 权重 | `hf download FunAudioLLM/Fun-CosyVoice3-0.5B-2512 --local-dir ~/models/cosyvoice3/Fun-CosyVoice3-0.5B` | **9.1 GiB** | Apache-2.0 |
 | voice | 资产库里至少一个声线 ✋ | `storyagent library add REF.wav --role voice --name 名字 --text "录音里说的话" --consent`(3–20 秒清晰人声,说话人同意) | - | 自备素材 |
-| asr | whisper.cpp | `brew install whisper-cpp` | 小 | MIT |
+| asr | whisper.cpp | `brew install whisper.cpp` | 小 | MIT |
 | asr | whisper 模型 | `hf download ggerganov/whisper.cpp ggml-large-v3-turbo.bin --local-dir ~/myworkspace/models/whisper` | 1.5 GiB | MIT |
 | music | ACE-Step 1.5 | `git clone https://github.com/ACE-Step/ACE-Step-1.5.git ~/ACE-Step-1.5`;`uv sync`(在该目录);权重 `uv run acestep-download` | ~2 + **9.4 GiB** | MIT |
 | comfy | ComfyUI(Comfy Desktop)✋ | 从 comfy.org 下载安装,打开一次(端口 8188) | ~5 GiB | GPL-3.0 |
@@ -150,7 +150,7 @@ scripts/start.sh                                       # worker + 网页服务(�
 - **Seed-VC 环境**:`recipes/seedvc-venv.txt` 同理(Python 3.11);另需 `python -m ensurepip` 与 `pip install sphn julius lameenc openunmix einops`(Demucs 的依赖,见 RUNBOOK)。
 - **ACE-Step**:`uv sync` 与 `uv run acestep-download` 取自它自己的 README(参考机上的目录是同样方式装的),下载哪些模型以它的下载器为准;启动台用 `--lm-model-path acestep-5Hz-lm-1.7B`,所以 1.7B 语言模型必须在 `checkpoints/` 里,引导检测 turbo、1.7B、vae、Qwen3-Embedding 四项。
 - **Hugging Face 仓库名**:FLUX.2 klein base 4B、CosyVoice 3、whisper.cpp 的仓库名取自本机目录名与模型登记(`models.toml` 的 `version`),是否需要登录/接受条款以页面为准;`hf download` 失败时先打开仓库页面。
-- **`brew install` 的公式名**(`ffmpeg-full`、`whisper-cpp`、`ollama`、`node`、`pnpm`、`uv`)在参考机上核对过 `ffmpeg-full`/`whisper.cpp`/`uv`/`node`;Homebrew 公式可能改名。
+- **`brew install` 的公式名**(`ffmpeg-full`、`whisper.cpp`、`ollama`、`node`、`pnpm`、`uv`)已用参考机的 `brew info` 核对存在于 homebrew-core(`whisper-cpp` 只是旧名);Homebrew 公式以后可能改名。
 - 引导**不检查**:各服务的真实可用性(那是 `setup verify` / 启动台的事)、模型权重是否完整无损(只看关键文件在不在)、你的网络。
 
 ## 7. 引导没覆盖的参考机状态

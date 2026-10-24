@@ -381,7 +381,7 @@ kind = "command"
 name = "whisper-cli"
 [[components.whisper_cli.steps]]
 kind = "command"
-argv = ["brew", "install", "whisper-cpp"]
+argv = ["brew", "install", "whisper.cpp"]
 
 [components.whisper_model]
 capability = "asr"
