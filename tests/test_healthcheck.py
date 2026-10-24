@@ -92,7 +92,7 @@ def test_tool_states_distinguish_missing_tool_from_missing_model(tmp_path: Path)
         tmp_path,
         h3=f'binary = "{exe(root / "h3")}"\nmodel_dir = "{h3_dir}"',
         longcat=f'root = "{root / "lc"}"\npython = "{root / "nope"}"\nweights_dir = "{root}"\nvariant_dir = "v"',
-        cosyvoice=(f'python = "{exe(root / "cpy")}"\nscript = "{exe(root / "clone.py")}"\n'
+        cosyvoice=(f'python = "{exe(root / "cpy")}"\nworkdir = "{root}"\n'
                    f'model_dir = "{root / "missing_model"}"'),
         lora_train=f'command = "{exe(root / "mflux-train")}"\nbase_model_dir = "{root}"',
         models=f'[models."cosyvoice3-0.5b"]\nmodel_dir = "{root / "missing_model"}"\n',

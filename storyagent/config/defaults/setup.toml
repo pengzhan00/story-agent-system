@@ -1,0 +1,741 @@
+# New-machine install guide: what the pipeline depends on, how to tell it is there, and what to do when it is not.
+# Read by `storyagent setup ...` and the web page "Setup guide". Nothing in here runs by itself: the guide only
+# detects, lists and prints; a step runs only when the operator names it (`storyagent setup run STEP`) and confirms it.
+# Override or extend in $STORY_AGENT_HOME/config/setup.toml (tables are deep-merged: add your own [components.X]).
+#
+# Layout of the catalog
+#   [machine]                 what the computer must be; defaults for the guide itself
+#   [capabilities.X]          a unit you can install or leave out (images, voice, video ...); `needs` pulls in others
+#   [profiles.X]              a named choice of capabilities: required / recommended (everything else is optional)
+#   [components.X]            one dependency: how to detect it ([[detect]]) and how to install it ([[steps]])
+#
+# Paths come from the normal configuration (services.toml / models.toml), so a step names them by reference:
+#   {tool:cosyvoice.root}  [tools.cosyvoice] root      {model:flux2-klein-base-4b.weights}  [models.X] weights
+#   {launch:acestep.cwd}   [launch.acestep] cwd        {...|dir}  the parent folder of that path
+#   {raw:~/path}           a literal path              {python} {repo} {recipes} {item}
+# `layout` of a component maps such a reference to a folder below the install root chosen with `--root`; without a
+# root every tool is installed where the configuration already says it lives.
+#
+# Detection checks (`kind`):
+#   command  name [, min_version, version_argv, version_re]   a program on PATH
+#   run      argv [, contains, label]                          a command whose exit code (0) / output says it is there
+#   path     ref [, sub, is = file|dir|exec|any, label]        a file or folder
+#   app      names                                             a macOS app bundle in /Applications or ~/Applications
+#   ffmpeg_filter  names                                       filters the ffmpeg in use must have (libass: subtitles)
+#   ollama_models                                              the models the LLM roles name, on the Ollama backend
+#   comfy_files  files = [{class, input, name}]                files ComfyUI can see (asks the running ComfyUI)
+#   hf_cache repos                                             repositories in the local Hugging Face cache
+#   web_dist                                                   the web client is built
+#   database                                                   the database exists
+#   voices   min                                               voices in the asset library
+# Steps (`kind`): command (an argv list, never a shell) | download (a command that fetches model weights: source,
+# file and size are shown and it needs an explicit yes) | manual (text only: needs a person, a login or a licence).
+
+[machine]
+arch = "arm64"
+system = "Darwin"
+min_macos = "14.0"              # MLX needs a recent macOS; only a warning
+disk_margin_gib = 20            # free space that should remain after all downloads
+memory_budget_share = 0.75      # [runtime] memory_budget_gib the guide writes = this share of the installed memory
+default_root = "~/storyagent-tools"   # a suggestion for --root; nobody is forced to use it
+app_dirs = ["/Applications", "~/Applications"]
+
+# -- capabilities -----------------------------------------------------------------------------------------------------
+# rec_ram_gib: memory that runs it comfortably (the models of that stage are heavy; the queue runs one at a time)
+[capabilities.base]
+rec_ram_gib = 0
+[capabilities.hub]
+needs = ["base"]
+[capabilities.story]
+needs = ["base"]
+rec_ram_gib = 32
+min_ram_gib = 24
+[capabilities.image]
+needs = ["base", "hub"]
+rec_ram_gib = 24
+min_ram_gib = 16
+[capabilities.voice]
+needs = ["base", "hub"]
+rec_ram_gib = 8
+[capabilities.asr]
+needs = ["base", "hub"]
+rec_ram_gib = 4
+[capabilities.music]
+needs = ["base", "hub"]
+rec_ram_gib = 20
+min_ram_gib = 16
+[capabilities.comfy]
+needs = ["base"]
+[capabilities.sfx]
+needs = ["base", "comfy"]
+rec_ram_gib = 12
+[capabilities.keyframe_fast]
+needs = ["base", "comfy"]
+rec_ram_gib = 16
+[capabilities.video]
+needs = ["base"]
+rec_ram_gib = 64
+min_ram_gib = 36
+[capabilities.voice_convert]
+needs = ["base", "hub"]
+rec_ram_gib = 10
+[capabilities.avatar]
+needs = ["base", "hub"]
+rec_ram_gib = 32
+[capabilities.h3]
+needs = ["base", "hub"]
+rec_ram_gib = 48
+[capabilities.drawthings]
+needs = ["base"]
+
+# -- profiles ---------------------------------------------------------------------------------------------------------
+[profiles.story]
+required = ["story"]
+
+[profiles.stills]
+required = ["story", "image", "voice"]
+recommended = ["asr", "music", "sfx"]
+
+[profiles.full]
+required = ["story", "image", "voice", "music", "video"]
+recommended = ["asr", "sfx"]
+
+[profiles.everything]
+required = ["story", "image", "voice", "music", "video", "asr", "sfx"]
+recommended = ["keyframe_fast", "voice_convert"]
+
+# -- components, in the order they should be installed ----------------------------------------------------------------
+
+[components.homebrew]
+capability = "base"
+size_gib = 0.5
+license = "BSD-2-Clause"
+url = "https://brew.sh"
+[[components.homebrew.detect]]
+kind = "command"
+name = "brew"
+[[components.homebrew.steps]]
+kind = "manual"
+note_key = "setup.step.homebrew"
+show = '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
+
+[components.xcode_clt]
+capability = "base"
+size_gib = 1.5
+license = "Apple"
+after = ["homebrew"]
+[[components.xcode_clt.detect]]
+kind = "run"
+argv = ["xcode-select", "-p"]
+label = "Command Line Tools"
+[[components.xcode_clt.steps]]
+kind = "manual"
+note_key = "setup.step.xcode_clt"
+show = "xcode-select --install"
+
+[components.uv]
+capability = "base"
+size_gib = 0.05
+license = "MIT / Apache-2.0"
+url = "https://docs.astral.sh/uv/"
+after = ["homebrew"]
+[[components.uv.detect]]
+kind = "command"
+name = "uv"
+[[components.uv.steps]]
+kind = "command"
+argv = ["brew", "install", "uv"]
+
+[components.ffmpeg_full]
+capability = "base"
+size_gib = 2.0
+license = "GPL-3.0-or-later (build with libass, whisper)"
+url = "https://formulae.brew.sh/formula/ffmpeg-full"
+health = ["tool.ffmpeg"]
+after = ["homebrew"]
+[[components.ffmpeg_full.detect]]
+kind = "ffmpeg_filter"
+names = ["subtitles"]
+[[components.ffmpeg_full.steps]]
+kind = "command"
+argv = ["brew", "install", "ffmpeg-full"]
+
+[components.web_client]
+capability = "base"
+size_gib = 0.3
+measured = true
+license = "MIT (React, Vite)"
+after = ["homebrew"]
+[[components.web_client.detect]]
+kind = "web_dist"
+[[components.web_client.steps]]
+kind = "command"
+argv = ["brew", "install", "node", "pnpm"]
+[[components.web_client.steps]]
+kind = "command"
+argv = ["pnpm", "install", "--frozen-lockfile"]
+cwd = "{repo}/web"
+[[components.web_client.steps]]
+kind = "command"
+argv = ["pnpm", "build"]
+cwd = "{repo}/web"
+
+[components.database]
+capability = "base"
+size_gib = 0.0
+license = "-"
+[[components.database.detect]]
+kind = "database"
+[[components.database.steps]]
+kind = "command"
+argv = ["{python}", "-m", "storyagent", "db", "migrate"]
+
+[components.hf_cli]
+capability = "hub"
+size_gib = 0.05
+license = "Apache-2.0"
+url = "https://huggingface.co/docs/huggingface_hub/guides/cli"
+after = ["uv"]
+[[components.hf_cli.detect]]
+kind = "command"
+name = "hf"
+[[components.hf_cli.steps]]
+kind = "command"
+argv = ["uv", "tool", "install", "huggingface_hub[cli]"]
+
+# -- story: Ollama and the language model ------------------------------------------------------------------------------
+[components.ollama]
+capability = "story"
+size_gib = 0.2
+license = "MIT"
+url = "https://ollama.com"
+health = ["ollama"]
+after = ["homebrew"]
+[[components.ollama.detect]]
+kind = "command"
+name = "ollama"
+[[components.ollama.steps]]
+kind = "command"
+argv = ["brew", "install", "ollama"]
+
+[components.llm_model]
+capability = "story"
+size_gib = 20.0
+measured = true
+license = "Apache-2.0 (Gemma 4)"
+url = "https://ollama.com/library/gemma4"
+after = ["ollama"]
+[components.llm_model.known_sizes]
+"gemma4:31b" = 20.0
+[[components.llm_model.detect]]
+kind = "ollama_models"
+[[components.llm_model.steps]]
+kind = "download"
+foreach = "llm_models"
+argv = ["ollama", "pull", "{item}"]
+source = "ollama.com/library/{item}"
+file = "{item}"
+needs_service = "ollama"
+
+# -- images: mflux (FLUX.2 klein 4B) ------------------------------------------------------------------------------------
+[components.mflux]
+capability = "image"
+size_gib = 1.0
+license = "MIT"
+url = "https://github.com/filipstrand/mflux"
+health = ["tool.mflux"]
+after = ["uv"]
+[[components.mflux.detect]]
+kind = "path"
+ref = "tool:mflux.bin_dir"
+sub = "mflux-generate-flux2"
+is = "exec"
+[[components.mflux.detect]]
+kind = "path"
+ref = "tool:mflux.bin_dir"
+sub = "mflux-generate-flux2-edit"
+is = "exec"
+[[components.mflux.detect]]
+kind = "path"
+ref = "tool:lora_train.command"
+is = "exec"
+[[components.mflux.steps]]
+kind = "command"
+argv = ["uv", "tool", "install", "mflux==0.22.0"]
+
+[components.flux_klein_base_4b]
+capability = "image"
+size_gib = 22.0
+measured = true
+license = "Apache-2.0"
+url = "https://huggingface.co/black-forest-labs/FLUX.2-klein-base-4B"
+after = ["hf_cli"]
+[components.flux_klein_base_4b.layout]
+"model:flux2-klein-base-4b.weights" = "models/flux2-klein-base-4B"
+"model:flux2-klein-base-4b-edit.weights" = "models/flux2-klein-base-4B"
+"tool:lora_train.base_model_dir" = "models/flux2-klein-base-4B"
+[[components.flux_klein_base_4b.detect]]
+kind = "path"
+ref = "model:flux2-klein-base-4b.weights"
+sub = "model_index.json"
+is = "file"
+[[components.flux_klein_base_4b.detect]]
+kind = "path"
+ref = "model:flux2-klein-base-4b.weights"
+sub = "transformer"
+is = "dir"
+[[components.flux_klein_base_4b.steps]]
+kind = "manual"
+note_key = "setup.step.hf_login"
+show = "hf auth login"
+[[components.flux_klein_base_4b.steps]]
+kind = "download"
+argv = ["hf", "download", "black-forest-labs/FLUX.2-klein-base-4B", "--local-dir", "{model:flux2-klein-base-4b.weights}"]
+source = "huggingface.co/black-forest-labs/FLUX.2-klein-base-4B"
+file = "FLUX.2-klein-base-4B (diffusers folder + single file)"
+
+# -- voice: CosyVoice 3 -------------------------------------------------------------------------------------------------
+[components.cosyvoice_runtime]
+capability = "voice"
+size_gib = 2.0
+measured = true
+license = "Apache-2.0"
+url = "https://github.com/FunAudioLLM/CosyVoice"
+health = ["tool.cosyvoice"]
+after = ["uv", "xcode_clt"]
+[components.cosyvoice_runtime.layout]
+"tool:cosyvoice.root" = "cosyvoice"
+"tool:cosyvoice.python" = "cosyvoice/venv/bin/python"
+"tool:cosyvoice.workdir" = "cosyvoice/CosyVoice"
+[[components.cosyvoice_runtime.detect]]
+kind = "path"
+ref = "tool:cosyvoice.python"
+is = "exec"
+[[components.cosyvoice_runtime.detect]]
+kind = "path"
+ref = "tool:cosyvoice.workdir"
+sub = "cosyvoice/cli/cosyvoice.py"
+is = "file"
+[[components.cosyvoice_runtime.steps]]
+kind = "command"
+argv = ["git", "clone", "--recursive", "https://github.com/FunAudioLLM/CosyVoice.git", "{tool:cosyvoice.workdir}"]
+[[components.cosyvoice_runtime.steps]]
+kind = "command"
+argv = ["uv", "venv", "--python", "3.10", "{tool:cosyvoice.root}/venv"]
+[[components.cosyvoice_runtime.steps]]
+kind = "command"
+argv = ["uv", "pip", "install", "--python", "{tool:cosyvoice.python}", "-r", "{recipes}/cosyvoice-venv.txt"]
+[[components.cosyvoice_runtime.steps]]
+kind = "manual"
+note_key = "setup.step.cosyvoice_pynini"
+show = "uv pip install --python {tool:cosyvoice.python} pynini==2.1.5   # or: conda install -c conda-forge pynini==2.1.5"
+
+[components.cosyvoice3_weights]
+capability = "voice"
+size_gib = 9.1
+measured = true
+license = "Apache-2.0"
+url = "https://huggingface.co/FunAudioLLM/Fun-CosyVoice3-0.5B-2512"
+after = ["hf_cli", "cosyvoice_runtime"]
+[components.cosyvoice3_weights.layout]
+"model:cosyvoice3-0.5b.model_dir" = "models/cosyvoice3/Fun-CosyVoice3-0.5B"
+[[components.cosyvoice3_weights.detect]]
+kind = "path"
+ref = "model:cosyvoice3-0.5b.model_dir"
+sub = "cosyvoice3.yaml"
+is = "file"
+[[components.cosyvoice3_weights.detect]]
+kind = "path"
+ref = "model:cosyvoice3-0.5b.model_dir"
+sub = "llm.pt"
+is = "file"
+[[components.cosyvoice3_weights.steps]]
+kind = "download"
+argv = ["hf", "download", "FunAudioLLM/Fun-CosyVoice3-0.5B-2512", "--local-dir", "{model:cosyvoice3-0.5b.model_dir}"]
+source = "huggingface.co/FunAudioLLM/Fun-CosyVoice3-0.5B-2512"
+file = "Fun-CosyVoice3-0.5B-2512"
+
+[components.voice_library]
+capability = "voice"
+size_gib = 0.0
+license = "-"
+after = ["database"]
+[[components.voice_library.detect]]
+kind = "voices"
+min = 1
+[[components.voice_library.steps]]
+kind = "manual"
+note_key = "setup.step.voice_library"
+show = 'storyagent library add REF.wav --role voice --name NAME --text "what the clip says" --consent'
+
+# -- speech recognition: whisper.cpp ------------------------------------------------------------------------------------
+[components.whisper_cli]
+capability = "asr"
+size_gib = 0.1
+license = "MIT"
+url = "https://github.com/ggml-org/whisper.cpp"
+health = ["tool.whisper"]
+after = ["homebrew"]
+[[components.whisper_cli.detect]]
+kind = "command"
+name = "whisper-cli"
+[[components.whisper_cli.steps]]
+kind = "command"
+argv = ["brew", "install", "whisper-cpp"]
+
+[components.whisper_model]
+capability = "asr"
+size_gib = 1.5
+measured = true
+license = "MIT"
+url = "https://huggingface.co/ggerganov/whisper.cpp"
+after = ["hf_cli"]
+[components.whisper_model.layout]
+"tool:whisper.model" = "models/whisper/ggml-large-v3-turbo.bin"
+[[components.whisper_model.detect]]
+kind = "path"
+ref = "tool:whisper.model"
+is = "file"
+[[components.whisper_model.steps]]
+kind = "download"
+argv = ["hf", "download", "ggerganov/whisper.cpp", "ggml-large-v3-turbo.bin", "--local-dir", "{tool:whisper.model|dir}"]
+source = "huggingface.co/ggerganov/whisper.cpp"
+file = "ggml-large-v3-turbo.bin"
+
+# -- music: ACE-Step 1.5 ------------------------------------------------------------------------------------------------
+[components.acestep_runtime]
+capability = "music"
+size_gib = 2.0
+license = "MIT"
+url = "https://github.com/ACE-Step/ACE-Step-1.5"
+health = ["acestep"]
+after = ["uv", "xcode_clt"]
+[components.acestep_runtime.layout]
+"launch:acestep.cwd" = "ACE-Step-1.5"
+[[components.acestep_runtime.detect]]
+kind = "path"
+ref = "launch:acestep.cwd"
+sub = ".venv/bin/python3"
+is = "exec"
+[[components.acestep_runtime.detect]]
+kind = "path"
+ref = "launch:acestep.cwd"
+sub = "acestep"
+is = "dir"
+[[components.acestep_runtime.steps]]
+kind = "command"
+argv = ["git", "clone", "https://github.com/ACE-Step/ACE-Step-1.5.git", "{launch:acestep.cwd}"]
+[[components.acestep_runtime.steps]]
+kind = "command"
+argv = ["uv", "sync"]
+cwd = "{launch:acestep.cwd}"
+
+[components.acestep_weights]
+capability = "music"
+size_gib = 9.4
+measured = true
+license = "MIT"
+url = "https://huggingface.co/ACE-Step/Ace-Step1.5"
+after = ["acestep_runtime"]
+[[components.acestep_weights.detect]]
+kind = "path"
+ref = "launch:acestep.cwd"
+sub = "checkpoints/acestep-v15-turbo"
+is = "dir"
+[[components.acestep_weights.detect]]
+kind = "path"
+ref = "launch:acestep.cwd"
+sub = "checkpoints/acestep-5Hz-lm-1.7B"
+is = "dir"
+[[components.acestep_weights.detect]]
+kind = "path"
+ref = "launch:acestep.cwd"
+sub = "checkpoints/vae"
+is = "dir"
+[[components.acestep_weights.detect]]
+kind = "path"
+ref = "launch:acestep.cwd"
+sub = "checkpoints/Qwen3-Embedding-0.6B"
+is = "dir"
+[[components.acestep_weights.steps]]
+kind = "download"
+argv = ["uv", "run", "acestep-download"]
+cwd = "{launch:acestep.cwd}"
+source = "huggingface.co/ACE-Step/Ace-Step1.5"
+file = "acestep-v15-turbo, acestep-5Hz-lm-1.7B, vae, Qwen3-Embedding-0.6B"
+
+# -- ComfyUI: sound effects (Stable Audio 3) and fast keyframes (FLUX.2 klein distilled) -------------------------------
+[components.comfyui]
+capability = "comfy"
+size_gib = 5.0
+license = "GPL-3.0"
+url = "https://www.comfy.org/download"
+health = ["comfy"]
+[[components.comfyui.detect]]
+kind = "app"
+names = ["Comfy Desktop.app", "ComfyUI.app"]
+[[components.comfyui.steps]]
+kind = "manual"
+note_key = "setup.step.comfyui"
+show = "https://www.comfy.org/download"
+
+[components.sfx_models]
+capability = "sfx"
+size_gib = 9.7
+measured = true
+license = "Stability AI Community License"
+url = "https://stability.ai/license"
+after = ["comfyui"]
+[[components.sfx_models.detect]]
+kind = "comfy_files"
+files = [
+  { class = "CheckpointLoaderSimple", input = "ckpt_name", name = "stable_audio_3_medium.safetensors" },
+  { class = "CLIPLoader", input = "clip_name", name = "t5gemma_b_b_ul2.safetensors" },
+]
+[[components.sfx_models.steps]]
+kind = "manual"
+note_key = "setup.step.sfx_models"
+show = "checkpoints/stable_audio_3_medium.safetensors + text_encoders/t5gemma_b_b_ul2.safetensors"
+
+[components.klein_distilled_models]
+capability = "keyframe_fast"
+size_gib = 15.0
+measured = true
+license = "Apache-2.0"
+url = "https://huggingface.co/black-forest-labs/FLUX.2-klein-4B"
+after = ["comfyui"]
+[[components.klein_distilled_models.detect]]
+kind = "comfy_files"
+files = [
+  { class = "CheckpointLoaderSimple", input = "ckpt_name", name = "flux-2-klein-4b.safetensors" },
+  { class = "CLIPLoader", input = "clip_name", name = "qwen_3_4b.safetensors" },
+  { class = "VAELoader", input = "vae_name", name = "flux2-vae.safetensors" },
+]
+[[components.klein_distilled_models.steps]]
+kind = "manual"
+note_key = "setup.step.klein_distilled_models"
+show = "checkpoints/flux-2-klein-4b.safetensors + text_encoders/qwen_3_4b.safetensors + vae/flux2-vae.safetensors"
+
+# -- video: Pinokio + Phosphene (LTX-2.5) --------------------------------------------------------------------------------
+[components.pinokio]
+capability = "video"
+size_gib = 0.4
+measured = true
+license = "MIT"
+url = "https://pinokio.computer"
+[[components.pinokio.detect]]
+kind = "app"
+names = ["Pinokio.app"]
+[[components.pinokio.steps]]
+kind = "manual"
+note_key = "setup.step.pinokio"
+show = "https://pinokio.computer"
+
+[components.phosphene]
+capability = "video"
+size_gib = 27.5
+license = "MIT (panel); LTX-2.x Community License (model)"
+url = "https://github.com/mrbizarro/Phosphene"
+health = ["phosphene"]
+after = ["pinokio"]
+[[components.phosphene.detect]]
+kind = "path"
+ref = "raw:~/pinokio/api/phosphene"
+sub = "mlx_ltx_panel.py"
+is = "file"
+label = "Phosphene (Pinokio)"
+[[components.phosphene.detect]]
+kind = "path"
+ref = "raw:~/pinokio/api/phosphene"
+sub = "mlx_models/ltx-2.5-mlx-q4"
+is = "dir"
+label = "LTX-2.5 q4 weights"
+[[components.phosphene.steps]]
+kind = "manual"
+note_key = "setup.step.phosphene"
+show = "Pinokio > Discover > Download from URL > https://github.com/mrbizarro/phosphene > Install"
+
+# -- optional: Seed-VC voice conversion ----------------------------------------------------------------------------------
+[components.seedvc_runtime]
+capability = "voice_convert"
+size_gib = 1.7
+measured = true
+license = "GPL-3.0 (code, run as a separate process)"
+url = "https://github.com/Plachtaa/seed-vc"
+health = ["tool.seedvc"]
+after = ["uv", "xcode_clt"]
+[components.seedvc_runtime.layout]
+"tool:seedvc.root" = "seed-vc"
+"tool:seedvc.python" = "venvs/seedvc/bin/python"
+[[components.seedvc_runtime.detect]]
+kind = "path"
+ref = "tool:seedvc.python"
+is = "exec"
+[[components.seedvc_runtime.detect]]
+kind = "path"
+ref = "tool:seedvc.root"
+sub = "inference_v2.py"
+is = "file"
+[[components.seedvc_runtime.steps]]
+kind = "command"
+argv = ["git", "clone", "https://github.com/Plachtaa/seed-vc.git", "{tool:seedvc.root}"]
+[[components.seedvc_runtime.steps]]
+kind = "command"
+argv = ["uv", "venv", "--python", "3.11", "{tool:seedvc.python|dir|dir}"]
+[[components.seedvc_runtime.steps]]
+kind = "command"
+argv = ["uv", "pip", "install", "--python", "{tool:seedvc.python}", "-r", "{recipes}/seedvc-venv.txt"]
+
+[components.seedvc_weights]
+capability = "voice_convert"
+size_gib = 3.7
+measured = true
+license = "see the model cards (weights terms not verified)"
+url = "https://huggingface.co/Plachta/Seed-VC"
+after = ["hf_cli", "seedvc_runtime"]
+[[components.seedvc_weights.detect]]
+kind = "path"
+ref = "tool:seedvc.root"
+sub = "checkpoints/ar_base.pth"
+is = "file"
+[[components.seedvc_weights.detect]]
+kind = "path"
+ref = "tool:seedvc.root"
+sub = "checkpoints/cfm_small.pth"
+is = "file"
+[[components.seedvc_weights.detect]]
+kind = "hf_cache"
+repos = ["facebook/hubert-large-ll60k", "nvidia/bigvgan_v2_22khz_80band_256x"]
+[[components.seedvc_weights.steps]]
+kind = "manual"
+note_key = "setup.step.seedvc_checkpoints"
+show = "hf download Plachta/Seed-VC --include 'v2/*' --local-dir <tmp>   # then copy ar_base.pth and cfm_small.pth"
+[[components.seedvc_weights.steps]]
+kind = "download"
+argv = ["hf", "download", "facebook/hubert-large-ll60k"]
+source = "huggingface.co/facebook/hubert-large-ll60k"
+file = "hubert-large-ll60k"
+size_gib = 1.2
+[[components.seedvc_weights.steps]]
+kind = "download"
+argv = ["hf", "download", "nvidia/bigvgan_v2_22khz_80band_256x"]
+source = "huggingface.co/nvidia/bigvgan_v2_22khz_80band_256x"
+file = "bigvgan_v2_22khz_80band_256x"
+size_gib = 1.8
+
+# -- optional: LongCat avatar video -----------------------------------------------------------------------------------------
+[components.longcat_runtime]
+capability = "avatar"
+size_gib = 1.0
+license = "MIT"
+url = "https://github.com/xocialize/longcat-avatar-mlx"
+health = ["tool.longcat"]
+after = ["uv", "xcode_clt"]
+[components.longcat_runtime.layout]
+"tool:longcat.root" = "longcat-avatar-mlx"
+"tool:longcat.python" = "longcat-avatar-mlx/.venv/bin/python"
+"tool:longcat.weights_dir" = "longcat-avatar-mlx/weights"
+[[components.longcat_runtime.detect]]
+kind = "path"
+ref = "tool:longcat.python"
+is = "exec"
+[[components.longcat_runtime.detect]]
+kind = "path"
+ref = "tool:longcat.root"
+sub = "longcat_video_avatar_mlx.egg-info"
+is = "dir"
+[[components.longcat_runtime.steps]]
+kind = "command"
+argv = ["git", "clone", "https://github.com/xocialize/longcat-avatar-mlx.git", "{tool:longcat.root}"]
+[[components.longcat_runtime.steps]]
+kind = "command"
+argv = ["uv", "venv", "--python", "3.11", "{tool:longcat.root}/.venv"]
+[[components.longcat_runtime.steps]]
+kind = "command"
+argv = ["uv", "pip", "install", "--python", "{tool:longcat.python}", "-e", "{tool:longcat.root}"]
+
+[components.longcat_weights]
+capability = "avatar"
+size_gib = 23.0
+measured = true
+license = "MIT"
+url = "https://huggingface.co/mlx-community/LongCat-Video-Avatar-1.5-q4-dmd-merged"
+after = ["hf_cli", "longcat_runtime"]
+[[components.longcat_weights.detect]]
+kind = "path"
+ref = "tool:longcat.weights_dir"
+sub = "{tool:longcat.variant_dir}"
+is = "dir"
+[[components.longcat_weights.detect]]
+kind = "hf_cache"
+repos = ["openai/whisper-large-v3"]
+[[components.longcat_weights.steps]]
+kind = "download"
+argv = ["hf", "download", "mlx-community/LongCat-Video-Avatar-1.5-q4-dmd-merged", "--local-dir",
+        "{tool:longcat.weights_dir}/{tool:longcat.variant_dir}"]
+source = "huggingface.co/mlx-community/LongCat-Video-Avatar-1.5-q4-dmd-merged"
+file = "LongCat-Video-Avatar-1.5-q4-dmd-merged"
+size_gib = 23.0
+[[components.longcat_weights.steps]]
+kind = "download"
+argv = ["hf", "download", "openai/whisper-large-v3", "--include", "*.json"]
+source = "huggingface.co/openai/whisper-large-v3"
+file = "configuration/preprocessor json files only"
+size_gib = 0.01
+
+# -- optional: MiniMax H3 (h3.c) -------------------------------------------------------------------------------------------
+[components.h3_runtime]
+capability = "h3"
+size_gib = 0.01
+license = "MIT"
+url = "https://github.com/antirez/h3.c"
+health = ["tool.h3"]
+after = ["xcode_clt"]
+[components.h3_runtime.layout]
+"tool:h3.binary" = "h3.c/h3"
+[[components.h3_runtime.detect]]
+kind = "path"
+ref = "tool:h3.binary"
+is = "exec"
+[[components.h3_runtime.steps]]
+kind = "command"
+argv = ["git", "clone", "https://github.com/antirez/h3.c.git", "{tool:h3.binary|dir}"]
+[[components.h3_runtime.steps]]
+kind = "command"
+argv = ["make"]
+cwd = "{tool:h3.binary|dir}"
+
+[components.h3_weights]
+capability = "h3"
+size_gib = 196.0
+measured = true
+license = "MiniMax H3 Community License (territory limits; not for commercial use in EU/UK/South Korea/USA)"
+url = "https://huggingface.co/MiniMaxAI/MiniMax-H3"
+after = ["hf_cli", "h3_runtime"]
+[components.h3_weights.layout]
+"tool:h3.model_dir" = "MiniMax-H3"
+[[components.h3_weights.detect]]
+kind = "path"
+ref = "tool:h3.model_dir"
+sub = "model_index.json"
+is = "file"
+[[components.h3_weights.steps]]
+kind = "download"
+argv = ["hf", "download", "MiniMaxAI/MiniMax-H3", "--local-dir", "{tool:h3.model_dir}"]
+source = "huggingface.co/MiniMaxAI/MiniMax-H3"
+file = "MiniMax-H3 (all files)"
+
+# -- optional: Draw Things (a restricted-content plan only) ---------------------------------------------------------------
+[components.drawthings_app]
+capability = "drawthings"
+size_gib = 0.3
+license = "Draw Things terms"
+url = "https://drawthings.ai"
+health = ["drawthings"]
+[[components.drawthings_app.detect]]
+kind = "app"
+names = ["Draw Things.app"]
+[[components.drawthings_app.steps]]
+kind = "manual"
+note_key = "setup.step.drawthings"
+show = "App Store > Draw Things; then Settings > Advanced > API Server"

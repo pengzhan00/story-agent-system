@@ -172,3 +172,12 @@ Roles are flags in `[auth.roles.<name>]`: `write` (any POST/PATCH/PUT/DELETE), `
 |---|---|
 | `GET /api/launch` | adds `memory` (`total_gib`, `free_gib`, `swap_total_gib`, `swap_used_gib`, `swap_percent`; 80+ = free memory before a heavy job) and `stoppable` per service |
 | `POST /api/launch/{name}/stop` | `{force?}`: only for a service whose `[launch.<name>]` has `stop = "port"`. Ends the process of the same user that listens on the service's port (SIGTERM, SIGKILL with `force`); `409 service_busy` while a job of that service is queued/running (unless `force`), `409 launch_not_stoppable|launch_not_running|launch_stop_timeout`, `403 launch_foreign`. Audited as `service.stop`. CLI: `storyagent ops stop NAME [--force]` |
+
+## Setup guide (new machine)
+
+Admin only (`/api/setup` is an admin prefix). Reading changes nothing; nothing is downloaded, installed or started from the API - steps are shown, to be run with `storyagent setup run`.
+
+- `GET /api/setup?profile=full&root=&extra=` - the machine checks (arch, system, macOS, memory, disk), every capability and component with its state (`ok | partial | missing | unverified`), need (`required | recommended | optional`), size, licence, the checks behind the state, the install steps (`command | download | manual`, with the resolved one-line command, and for a download its source, file and size), the downloads still to confirm, and `ready`.
+- `GET /api/setup/config?profile=&root=&llm_model=` - the configuration changes this machine needs, per file (`changes`, the whole file as `text`). Writes nothing.
+- `POST /api/setup/config {profile, root, extra, llm_model, write}` - with `write: true` the changed files are written to the config folder (the file replaced is kept as `<name>.bak-setup-<time>`), after the result has been loaded in a scratch copy; a configuration the loader refuses is `409 setup_config_invalid` and nothing is written. Audited as `setup.config`.
+- `POST /api/setup/verify?profile=&root=` - the healthcheck with everything the profile needs counted as required.

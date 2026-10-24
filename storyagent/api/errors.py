@@ -28,6 +28,7 @@ from storyagent.media.pack import PackError
 from storyagent.media.specs import SpecError, SpecLocked
 from storyagent.projects import ProjectNotFound, ProjectStateError
 from storyagent.review import ReviewError
+from storyagent.setup.layout import SetupError
 from storyagent.story import ShotLocked, StoryError, StoryNotFound
 from storyagent.workflow import WorkflowStateError
 from storyagent.workshop import WorkshopError
@@ -79,6 +80,11 @@ def install(app: FastAPI) -> None:
                   "launch_not_stoppable": 409, "launch_not_running": 409, "launch_foreign": 403,
                   "launch_stop_timeout": 409}.get(exc.code, 500)
         return respond(request, status, exc.code, exc.detail)
+
+    @app.exception_handler(SetupError)
+    async def _setup(request: Request, exc: SetupError) -> JSONResponse:
+        status = {"unknown_profile": 404, "unknown_capability": 400, "unknown_step": 404}.get(exc.code, 409)
+        return respond(request, status, f"setup_{exc.code}", exc.detail)
 
     @app.exception_handler(ImportFailed)
     @app.exception_handler(ConnectError)

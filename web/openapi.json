@@ -5855,6 +5855,596 @@
         "title": "SetupBody",
         "type": "object"
       },
+      "SetupCapabilityOut": {
+        "properties": {
+          "components": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Components",
+            "type": "array"
+          },
+          "label_key": {
+            "title": "Label Key",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "need": {
+            "title": "Need",
+            "type": "string"
+          },
+          "note_key": {
+            "title": "Note Key",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "need",
+          "state",
+          "label_key",
+          "note_key",
+          "components"
+        ],
+        "title": "SetupCapabilityOut",
+        "type": "object"
+      },
+      "SetupCheckOut": {
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "state",
+          "detail"
+        ],
+        "title": "SetupCheckOut",
+        "type": "object"
+      },
+      "SetupComponentOut": {
+        "properties": {
+          "after": {
+            "items": {
+              "type": "string"
+            },
+            "title": "After",
+            "type": "array"
+          },
+          "blocked_by": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Blocked By",
+            "type": "array"
+          },
+          "capability": {
+            "title": "Capability",
+            "type": "string"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/SetupCheckOut"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "label_key": {
+            "title": "Label Key",
+            "type": "string"
+          },
+          "license": {
+            "title": "License",
+            "type": "string"
+          },
+          "measured": {
+            "title": "Measured",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "need": {
+            "title": "Need",
+            "type": "string"
+          },
+          "note_key": {
+            "title": "Note Key",
+            "type": "string"
+          },
+          "size_gib": {
+            "title": "Size Gib",
+            "type": "number"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/SetupStepOut"
+            },
+            "title": "Steps",
+            "type": "array"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "capability",
+          "need",
+          "state",
+          "label_key",
+          "note_key",
+          "size_gib",
+          "measured",
+          "license",
+          "url",
+          "checks",
+          "after",
+          "blocked_by",
+          "steps"
+        ],
+        "title": "SetupComponentOut",
+        "type": "object"
+      },
+      "SetupConfigBody": {
+        "properties": {
+          "extra": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Extra",
+            "type": "array"
+          },
+          "llm_model": {
+            "default": "",
+            "title": "Llm Model",
+            "type": "string"
+          },
+          "profile": {
+            "default": "full",
+            "title": "Profile",
+            "type": "string"
+          },
+          "root": {
+            "default": "",
+            "title": "Root",
+            "type": "string"
+          },
+          "write": {
+            "default": false,
+            "title": "Write",
+            "type": "boolean"
+          }
+        },
+        "title": "SetupConfigBody",
+        "type": "object"
+      },
+      "SetupConfigFileOut": {
+        "properties": {
+          "changed": {
+            "title": "Changed",
+            "type": "boolean"
+          },
+          "changes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Changes",
+            "type": "array"
+          },
+          "exists": {
+            "title": "Exists",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "path",
+          "exists",
+          "changed",
+          "changes",
+          "text"
+        ],
+        "title": "SetupConfigFileOut",
+        "type": "object"
+      },
+      "SetupConfigOut": {
+        "properties": {
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/SetupConfigFileOut"
+            },
+            "title": "Files",
+            "type": "array"
+          }
+        },
+        "required": [
+          "files"
+        ],
+        "title": "SetupConfigOut",
+        "type": "object"
+      },
+      "SetupConfigWritten": {
+        "properties": {
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/SetupConfigFileOut"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "written": {
+            "items": {
+              "$ref": "#/components/schemas/SetupWritten"
+            },
+            "title": "Written",
+            "type": "array"
+          }
+        },
+        "required": [
+          "files",
+          "written"
+        ],
+        "title": "SetupConfigWritten",
+        "type": "object"
+      },
+      "SetupMachineOut": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Params",
+            "type": "object"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "state",
+          "params"
+        ],
+        "title": "SetupMachineOut",
+        "type": "object"
+      },
+      "SetupOut": {
+        "properties": {
+          "capabilities": {
+            "items": {
+              "$ref": "#/components/schemas/SetupCapabilityOut"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "capabilities_all": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Capabilities All",
+            "type": "array"
+          },
+          "components": {
+            "items": {
+              "$ref": "#/components/schemas/SetupComponentOut"
+            },
+            "title": "Components",
+            "type": "array"
+          },
+          "default_root": {
+            "title": "Default Root",
+            "type": "string"
+          },
+          "download_gib": {
+            "title": "Download Gib",
+            "type": "number"
+          },
+          "downloads": {
+            "items": {
+              "$ref": "#/components/schemas/SetupStepOut"
+            },
+            "title": "Downloads",
+            "type": "array"
+          },
+          "health_required": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Health Required",
+            "type": "array"
+          },
+          "machine": {
+            "items": {
+              "$ref": "#/components/schemas/SetupMachineOut"
+            },
+            "title": "Machine",
+            "type": "array"
+          },
+          "missing_gib": {
+            "title": "Missing Gib",
+            "type": "number"
+          },
+          "next_step": {
+            "title": "Next Step",
+            "type": "string"
+          },
+          "profile": {
+            "title": "Profile",
+            "type": "string"
+          },
+          "profiles": {
+            "items": {
+              "$ref": "#/components/schemas/SetupProfileOut"
+            },
+            "title": "Profiles",
+            "type": "array"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "boolean"
+          },
+          "root": {
+            "title": "Root",
+            "type": "string"
+          }
+        },
+        "required": [
+          "profile",
+          "root",
+          "default_root",
+          "profiles",
+          "capabilities_all",
+          "machine",
+          "capabilities",
+          "components",
+          "downloads",
+          "missing_gib",
+          "download_gib",
+          "ready",
+          "health_required",
+          "next_step"
+        ],
+        "title": "SetupOut",
+        "type": "object"
+      },
+      "SetupProfileOut": {
+        "properties": {
+          "label_key": {
+            "title": "Label Key",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "note_key": {
+            "title": "Note Key",
+            "type": "string"
+          },
+          "recommended": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Recommended",
+            "type": "array"
+          },
+          "required": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Required",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "label_key",
+          "note_key",
+          "required",
+          "recommended"
+        ],
+        "title": "SetupProfileOut",
+        "type": "object"
+      },
+      "SetupStepOut": {
+        "properties": {
+          "component": {
+            "title": "Component",
+            "type": "string"
+          },
+          "done": {
+            "title": "Done",
+            "type": "boolean"
+          },
+          "error": {
+            "title": "Error",
+            "type": "string"
+          },
+          "file": {
+            "title": "File",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "needs_service": {
+            "title": "Needs Service",
+            "type": "string"
+          },
+          "note_key": {
+            "title": "Note Key",
+            "type": "string"
+          },
+          "runnable": {
+            "title": "Runnable",
+            "type": "boolean"
+          },
+          "shell": {
+            "title": "Shell",
+            "type": "string"
+          },
+          "size_gib": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size Gib"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "component",
+          "kind",
+          "shell",
+          "note_key",
+          "source",
+          "file",
+          "size_gib",
+          "needs_service",
+          "runnable",
+          "done",
+          "error"
+        ],
+        "title": "SetupStepOut",
+        "type": "object"
+      },
+      "SetupVerifyEntry": {
+        "properties": {
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "required": {
+            "title": "Required",
+            "type": "boolean"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "category",
+          "state",
+          "label",
+          "detail",
+          "ok",
+          "required"
+        ],
+        "title": "SetupVerifyEntry",
+        "type": "object"
+      },
+      "SetupVerifyOut": {
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/SetupVerifyEntry"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "entries",
+          "ok"
+        ],
+        "title": "SetupVerifyOut",
+        "type": "object"
+      },
+      "SetupWritten": {
+        "properties": {
+          "backup": {
+            "title": "Backup",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "backup"
+        ],
+        "title": "SetupWritten",
+        "type": "object"
+      },
       "SpeakerBody": {
         "properties": {
           "character": {
@@ -16191,6 +16781,247 @@
         "summary": "Ready",
         "tags": [
           "system"
+        ]
+      }
+    },
+    "/api/setup": {
+      "get": {
+        "description": "The checks of a profile, component by component, with the steps for what is missing.",
+        "operationId": "setup_state_api_setup_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "profile",
+            "required": false,
+            "schema": {
+              "default": "full",
+              "title": "Profile",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "root",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Root",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "extra",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Extra",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Setup State",
+        "tags": [
+          "setup"
+        ]
+      }
+    },
+    "/api/setup/config": {
+      "get": {
+        "operationId": "setup_config_preview_api_setup_config_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "profile",
+            "required": false,
+            "schema": {
+              "default": "full",
+              "title": "Profile",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "root",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Root",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "extra",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Extra",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "llm_model",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Llm Model",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupConfigOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Setup Config Preview",
+        "tags": [
+          "setup"
+        ]
+      },
+      "post": {
+        "description": "The configuration this machine needs. ``write`` false = a preview; true writes the changed files (the file a\nwrite replaces is kept as ``<name>.bak-setup-<time>``) and loads them.",
+        "operationId": "setup_config_api_setup_config_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetupConfigBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupConfigWritten"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Setup Config",
+        "tags": [
+          "setup"
+        ]
+      }
+    },
+    "/api/setup/verify": {
+      "post": {
+        "description": "The healthcheck, with everything the profile needs counted as required.",
+        "operationId": "setup_verify_api_setup_verify_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "profile",
+            "required": false,
+            "schema": {
+              "default": "full",
+              "title": "Profile",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "root",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Root",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "extra",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Extra",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupVerifyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Setup Verify",
+        "tags": [
+          "setup"
         ]
       }
     },

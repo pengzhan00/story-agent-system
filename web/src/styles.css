@@ -25,6 +25,7 @@ a { color: var(--accent); text-decoration: none; } a:hover { text-decoration: un
 .spacer { flex: 1; }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
 .grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--gap); }
+.nowrap { white-space: nowrap; }
 .muted { color: var(--muted); } .small { font-size: 0.85rem; } .strong { font-weight: 600; }
 .clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .empty { color: var(--muted); padding: 24px; text-align: center; border: 1px dashed var(--line); border-radius: var(--radius); }
