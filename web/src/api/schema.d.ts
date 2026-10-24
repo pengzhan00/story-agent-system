@@ -2519,6 +2519,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/wiki/ask": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask Wiki
+         * @description A question answered from the wiki's own pages by the ``knowledge`` language model, with numbered sources.
+         *     Only pages the caller may see are read; a restricted page that was read is audited like opening it, and the
+         *     answer is then made under that rating (a model that never leaves this computer, no text in the call log).
+         */
+        post: operations["ask_wiki_api_wiki_ask_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/wiki/assets/{name}": {
         parameters: {
             query?: never;
@@ -5845,6 +5867,88 @@ export interface components {
              * @description shots that have a clip task
              */
             shots: number;
+        };
+        /** WikiAskIn */
+        WikiAskIn: {
+            /**
+             * Language
+             * @description language code the answer is written in
+             * @default zh-CN
+             */
+            language: string;
+            /**
+             * Limit
+             * @description how many pages to read
+             * @default 5
+             */
+            limit: number;
+            /** Question */
+            question: string;
+            /**
+             * Source
+             * @description only look in this source (docs, obsidian, ...); empty = everywhere
+             * @default
+             */
+            source: string;
+        };
+        /** WikiAskOut */
+        WikiAskOut: {
+            /**
+             * Answer
+             * @description empty when no page bears on the question (reason says so)
+             */
+            answer: string;
+            /** Backend */
+            backend: string;
+            /**
+             * Found
+             * @description the knowledge base has an answer
+             */
+            found: boolean;
+            /**
+             * Grounded
+             * @description found and the answer points at at least one excerpt
+             */
+            grounded: boolean;
+            /** Model */
+            model: string;
+            /**
+             * Reason
+             * @description no_match: nothing in the wiki mentions the question; empty otherwise
+             */
+            reason: string;
+            /** Seconds */
+            seconds: number;
+            /** Sources */
+            sources: components["schemas"]["WikiAskSource"][];
+        };
+        /** WikiAskSource */
+        WikiAskSource: {
+            /**
+             * Cited
+             * @description the answer rests on this excerpt
+             */
+            cited: boolean;
+            /**
+             * Heading
+             * @description the section of the page; empty for the part before the first heading
+             */
+            heading: string;
+            /**
+             * N
+             * @description the number the answer uses to point at this excerpt, like [2]
+             */
+            n: number;
+            /** Rating */
+            rating: string;
+            /** Slug */
+            slug: string;
+            /** Snippet */
+            snippet: string;
+            /** Source */
+            source: string;
+            /** Title */
+            title: string;
         };
         /** WikiBrief */
         WikiBrief: {
@@ -11762,6 +11866,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ask_wiki_api_wiki_ask_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WikiAskIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WikiAskOut"];
                 };
             };
             /** @description Validation Error */

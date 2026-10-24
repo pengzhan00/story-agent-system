@@ -29,12 +29,14 @@ interface Props {
   compact?: boolean;
   /** a search is on: pages that only give context are faded */
   fadeContext?: boolean;
+  /** pages an answer rests on: drawn with a highlight */
+  marked?: ReadonlySet<string>;
   onActivate: (node: WikiGraphNode) => void;
 }
 
 const WIDTH = 800; // the drawing box; the svg scales to the width it is given
 
-export function WikiGraph({ nodes, edges, palette, height, current, compact = false, fadeContext = false, onActivate }: Props) {
+export function WikiGraph({ nodes, edges, palette, height, current, compact = false, fadeContext = false, marked, onActivate }: Props) {
   const t = useT();
   const shown = useMemo(() => nodes.filter((n) => !n.isolated), [nodes]);
   const radius = useMemo(() => new Map(shown.map((n) => [n.id, radiusOf(n)])), [shown]);
@@ -273,7 +275,7 @@ export function WikiGraph({ nodes, edges, palette, height, current, compact = fa
                     if (el) nodeEls.current.set(n.id, el);
                     else nodeEls.current.delete(n.id);
                   }}
-                  className={`g-node g-${n.kind}${faded ? " dim" : ""}${n.id === current ? " current" : ""}${label ? " lbl" : ""}`}
+                  className={`g-node g-${n.kind}${faded ? " dim" : ""}${n.id === current ? " current" : ""}${marked?.has(n.id) ? " marked" : ""}${label ? " lbl" : ""}`}
                   fill={n.kind === "page" ? colorOf(palette, n.id) : undefined}
                   tabIndex={0}
                   role="link"

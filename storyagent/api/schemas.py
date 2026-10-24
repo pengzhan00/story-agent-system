@@ -363,6 +363,35 @@ class WikiGraphOut(Strict):
     tags: list[WikiCount]
 
 
+class WikiAskIn(BaseModel):
+    question: str = Field(min_length=2, max_length=500)
+    language: str = Field(default="zh-CN", description="language code the answer is written in")
+    source: str = Field(default="", description="only look in this source (docs, obsidian, ...); empty = everywhere")
+    limit: int = Field(default=5, ge=1, le=8, description="how many pages to read")
+
+
+class WikiAskSource(Strict):
+    n: int = Field(description="the number the answer uses to point at this excerpt, like [2]")
+    slug: str
+    title: str
+    source: str
+    rating: str
+    heading: str = Field(description="the section of the page; empty for the part before the first heading")
+    snippet: str
+    cited: bool = Field(description="the answer rests on this excerpt")
+
+
+class WikiAskOut(Strict):
+    found: bool = Field(description="the knowledge base has an answer")
+    grounded: bool = Field(description="found and the answer points at at least one excerpt")
+    answer: str = Field(description="empty when no page bears on the question (reason says so)")
+    reason: str = Field(description="no_match: nothing in the wiki mentions the question; empty otherwise")
+    sources: list[WikiAskSource]
+    backend: str
+    model: str
+    seconds: float
+
+
 class WikiSyncOut(Strict):
     added: int
     updated: int

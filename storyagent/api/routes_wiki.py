@@ -1,18 +1,26 @@
 from __future__ import annotations
 
 import mimetypes
+import re
+import time
 from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import FileResponse
 
-from storyagent.wiki import FocusNotFound, Page, WikiStore, build_graph
+from storyagent.agents.runner import AgentRunner, language_name
+from storyagent.llm import LLMError, LLMRouter
+from storyagent.wiki import FocusNotFound, Page, WikiStore, ask, build_graph
 from storyagent.wiki.graph import DEFAULT_LIMIT, MAX_LIMIT
 
 from .context import ctx_of
 from .errors import ApiError
+from .routes_llm import _llm_error
 from .schemas import (
+    WikiAskIn,
+    WikiAskOut,
+    WikiAskSource,
     WikiBrief,
     WikiCount,
     WikiGraphEdge,
@@ -128,6 +136,48 @@ def get_page(slug: str, request: Request) -> WikiPageOut:
         page=_brief(page), body=page.body, meta=page.meta,
         backlinks=[_brief(p) for p in store.backlinks(slug) if _visible(p)],
         links=[_brief(p) for p in store.outgoing(slug) if _visible(p)])
+
+
+@router.post("/ask", response_model=WikiAskOut)
+def ask_wiki(body: WikiAskIn, request: Request) -> WikiAskOut:
+    """A question answered from the wiki's own pages by the ``knowledge`` language model, with numbered sources.
+    Only pages the caller may see are read; a restricted page that was read is audited like opening it, and the
+    answer is then made under that rating (a model that never leaves this computer, no text in the call log)."""
+    ctx = ctx_of(request)
+    pool = [p for p in _store(request).all() if _visible(p) and (not body.source or p.source == body.source)]
+    found = ask.passages(pool, ask.terms_of(body.question), limit=body.limit)
+    if not found:
+        return WikiAskOut(found=False, grounded=False, answer="", reason="no_match", sources=[], backend="", model="",
+                          seconds=0.0)
+    rating = ""
+    for p in found:
+        if p.page.rating != "general":
+            require_viewable(request, p.page.rating, None, what=f"wiki:{p.page.slug}")
+            rating = ctx.settings.content.higher(rating, p.page.rating)
+    router_ = LLMRouter(ctx.settings, ctx.db)
+    started = time.monotonic()
+    try:
+        result = AgentRunner(ctx.settings, router_).run(
+            "wiki.ask", {"language": language_name(body.language), "question": body.question.strip(),
+                         "excerpts": ask.excerpts_text(found)}, rating=rating)
+    except LLMError as exc:
+        raise _llm_error(exc) from exc
+    backend, model, _ = router_.resolve("knowledge", rating=rating)
+    cited = {int(n) for n in result.data.get("cited", []) if isinstance(n, int) and 1 <= n <= len(found)}
+    # an answer may carry [n] marks the model forgot to list
+    marks = re.findall(r"\[(\d{1,2})\]", str(result.data.get("answer", "")))
+    cited |= {int(n) for n in marks if 1 <= int(n) <= len(found)}
+    is_found = bool(result.data.get("found"))
+    return WikiAskOut(
+        found=is_found, grounded=is_found and bool(cited), answer=str(result.data.get("answer", "")).strip(), reason="",
+        sources=[WikiAskSource(n=p.n, slug=p.page.slug, title=p.page.title, source=p.page.source, rating=p.page.rating,
+                               heading=p.heading, snippet=_clip(p.text), cited=p.n in cited) for p in found],
+        backend=backend, model=model, seconds=round(time.monotonic() - started, 1))
+
+
+def _clip(text: str, limit: int = 220) -> str:
+    flat = re.sub(r"\s+", " ", re.sub(r"[#>*`|]", "", text)).strip()
+    return flat if len(flat) <= limit else flat[:limit].rstrip() + "..."
 
 
 @router.post("/sync", response_model=WikiSyncOut)

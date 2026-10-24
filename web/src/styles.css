@@ -225,6 +225,7 @@ dialog.lightbox img, dialog.lightbox video { display: block; max-width: 92vw; ma
 .g-node.g-tag { fill: var(--muted); } .g-node.g-model { fill: var(--accent); }
 .g-node.dim { opacity: 0.18; }
 .g-node.current > :first-of-type { stroke: var(--text); stroke-width: 3; }
+.g-node.marked > :first-of-type { stroke: var(--ok); stroke-width: 4; } .g-node.marked .g-label { display: block; font-weight: 600; }
 .g-node:focus-visible > :first-of-type { stroke: var(--accent); stroke-width: 3; }
 .g-label { display: none; fill: var(--text); stroke: var(--panel); stroke-width: 3px; paint-order: stroke; font-size: 11px; pointer-events: none; }
 .g-node.lbl .g-label, .labels-all .g-label { display: block; }
@@ -242,3 +243,8 @@ dialog.lightbox img, dialog.lightbox video { display: block; max-width: 92vw; ma
 .wiki-legend, .wiki-isolated { list-style: none; margin: 0; padding: 0; }
 .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
 .swatch.square { border-radius: 2px; background: var(--muted); } .swatch.diamond { border-radius: 1px; background: var(--accent); transform: rotate(45deg) scale(0.85); }
+.wiki-answer { margin: 0; white-space: pre-wrap; line-height: 1.6; }
+.wiki-cite { display: inline-block; min-width: 1.4em; padding: 0 4px; margin: 0 1px; text-align: center; font-size: 0.8em; border-radius: 4px; background: var(--accent); color: var(--bg); text-decoration: none; vertical-align: super; }
+.wiki-sources { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 8px; }
+.wiki-snippet { display: block; }
+.wiki-ask input.grow { flex: 1; min-width: 0; }

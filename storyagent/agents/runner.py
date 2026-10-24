@@ -62,12 +62,14 @@ class AgentRunner:
         return (string.Template(spec.system).safe_substitute(values),
                 string.Template(spec.prompt).safe_substitute(values))
 
-    def run(self, name: str, variables: Mapping[str, Any], *, project_id: int | None = None) -> AgentResult:
+    def run(self, name: str, variables: Mapping[str, Any], *, project_id: int | None = None,
+            rating: str = "") -> AgentResult:
         spec = self.spec(name)
         system, prompt = self.render(name, variables)
         try:
             data = self.router.json(
-                spec.role, prompt, system=system, schema=spec.schema, project_id=project_id, attempts=spec.attempts,
+                spec.role, prompt, system=system, schema=spec.schema, project_id=project_id, rating=rating,
+                attempts=spec.attempts,
                 temperature=spec.temperature, max_tokens=spec.max_tokens, label=name,
                 **({"model": spec.model} if spec.model else {}),
             )

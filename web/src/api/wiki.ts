@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, post } from "./client";
-import type { WikiGraphData, WikiList, WikiPageData, WikiSync } from "./types";
+import type { WikiAnswer, WikiGraphData, WikiList, WikiPageData, WikiSync } from "./types";
 
 export interface WikiFilter {
   q: string;
@@ -56,3 +56,8 @@ export function useWikiSync() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["wiki"] }),
   });
 }
+
+export const useAskWiki = () =>
+  useMutation({
+    mutationFn: (body: { question: string; language: string; source?: string }) => post<WikiAnswer>("/api/wiki/ask", body),
+  });

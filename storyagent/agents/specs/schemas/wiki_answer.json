@@ -1,0 +1,9 @@
+{
+ "type": "object",
+ "properties": {
+  "found": {"type": "boolean"},
+  "answer": {"type": "string"},
+  "cited": {"type": "array", "items": {"type": "integer"}}
+ },
+ "required": ["found", "answer", "cited"]
+}

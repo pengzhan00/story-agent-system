@@ -71,8 +71,14 @@ class LLMRouter:
             self._clients[backend] = build_client(spec)
         return self._clients[backend]
 
+    def rating_of(self, project_id: int | None, rating: str = "") -> str:
+        """The rating a call is made under: the project's, or ``rating`` when that is higher (a wiki answer built from a
+        restricted note carries no project but the note's rating)."""
+        base = project_rating(self.db, project_id) if self.db is not None and project_id is not None else ""
+        return self.settings.content.higher(base, rating) if rating else base
+
     def resolve(
-        self, role: str, override_model: str = "", project_id: int | None = None
+        self, role: str, override_model: str = "", project_id: int | None = None, rating: str = ""
     ) -> tuple[str, str, dict[str, Any]]:
         """(backend, model, params): a model named by the call wins, then the project's choice, then the model the
         project's rating routes the role to (``[llm.ratings.X]``), then the global choice made on the screen, then
@@ -81,7 +87,7 @@ class LLMRouter:
         backend, model, params = r.backend, r.model, dict(r.params)
         routed = None
         if self.db is not None:
-            routed = self.settings.llm_route(project_rating(self.db, project_id), role)
+            routed = self.settings.llm_route(self.rating_of(project_id, rating), role)
             chosen = overrides.get(self.db, role, project_id)
             if routed is not None and (chosen is None or chosen.scope == overrides.GLOBAL):
                 chosen = None
@@ -91,11 +97,11 @@ class LLMRouter:
             backend, model, params = routed.backend, routed.model, {**params, **routed.params}
         return backend, override_model or model, params
 
-    def check_local(self, backend: str, project_id: int | None) -> None:
+    def check_local(self, backend: str, project_id: int | None, rating: str = "") -> None:
         """A rating that never leaves this computer (``allow_remote = false``) is refused a backend that is not."""
-        if self.db is None or project_id is None:
+        if self.db is None or (project_id is None and not rating):
             return
-        policy = self.settings.content.policy(project_rating(self.db, project_id))
+        policy = self.settings.content.policy(self.rating_of(project_id, rating))
         if not policy.allow_remote and not backend_is_local(self.settings.llm_backends[backend]):
             raise LLMError("remote_forbidden", f"backend {backend!r} is not on this computer and rating "
                            f"{policy.name!r} is never sent away", backend=backend, rating=policy.name)
@@ -117,7 +123,7 @@ class LLMRouter:
 
     def _log(
         self, role: str, backend: str, project_id: int | None, prompt: str, res: ChatResult | None, *,
-        system: str = "", label: str = "",
+        system: str = "", label: str = "", rating: str = "",
     ) -> None:
         rec = {
             "project_id": project_id, "agent": role, "model": res.model if res else "",
@@ -126,7 +132,7 @@ class LLMRouter:
             "tokens_out": res.tokens_out if res else 0, "duration_ms": res.duration_ms if res else 0,
             "system": system[:TRANSCRIPT_CAP], "label": label,
         }
-        if self._keeps_no_text(project_id):          # a restricted rating: a digest and the length, not the words
+        if self._keeps_no_text(project_id, rating):     # a restricted rating: a digest and the length, not the words
             for key in ("prompt", "response", "system"):
                 rec[key] = digest_text(str(rec[key]))
         if self.on_call:
@@ -142,11 +148,11 @@ class LLMRouter:
             except Exception:  # the audit log must never break generation  # noqa: BLE001
                 log.warning("could not write generation_logs", exc_info=True)
 
-    def _keeps_no_text(self, project_id: int | None) -> bool:
-        if self.db is None or project_id is None:
+    def _keeps_no_text(self, project_id: int | None, rating: str = "") -> bool:
+        if self.db is None or (project_id is None and not rating):
             return False
         try:
-            return not self.settings.content.policy(project_rating(self.db, project_id)).log_prompts
+            return not self.settings.content.policy(self.rating_of(project_id, rating)).log_prompts
         except Exception:  # the audit log must never break generation  # noqa: BLE001
             return False
 
@@ -170,18 +176,18 @@ class LLMRouter:
     # -- calls --------------------------------------------------------------------------------
     def chat(
         self, role: str, prompt: str, *, system: str = "", project_id: int | None = None, model: str = "",
-        schema: dict[str, Any] | None = None, label: str = "", **opts: Any,
+        schema: dict[str, Any] | None = None, label: str = "", rating: str = "", **opts: Any,
     ) -> ChatResult:
         self._wait_for_heavy()
-        backend, model_name, params = self.resolve(role, model, project_id)
-        self.check_local(backend, project_id)
+        backend, model_name, params = self.resolve(role, model, project_id, rating)
+        self.check_local(backend, project_id, rating)
         merged = {"temperature": 0.7, "max_tokens": 4096, **params, **opts}
         res = self.client(backend).chat(
             model_name, system, prompt, temperature=float(merged["temperature"]),
             max_tokens=int(merged["max_tokens"]), num_ctx=merged.get("num_ctx"), schema=schema,
             timeout=merged.get("timeout"),
         )
-        self._log(role, backend, project_id, prompt, res, system=system, label=label)
+        self._log(role, backend, project_id, prompt, res, system=system, label=label, rating=rating)
         return res
 
     def json(

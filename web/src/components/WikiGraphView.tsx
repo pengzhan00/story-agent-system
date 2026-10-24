@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useWikiGraph } from "../api/wiki";
 import type { WikiGraphNode } from "../api/types";
@@ -36,13 +36,15 @@ interface ViewProps {
   model: string;
   color: "source" | "tag";
   layers: { tags: boolean; shared: boolean; models: boolean };
+  /** pages an answer rests on */
+  marked?: ReadonlySet<string>;
   /** the search / source / tag controls, drawn by the page so both views share them */
   filters: (sources: { name: string; count: number }[], tags: { name: string; count: number }[]) => ReactNode;
   set: (patch: Record<string, string>) => void;
   reader: ReactNode;
 }
 
-export function WikiGraphView({ slug, q, source, tag, scope, model, color, layers, filters, set, reader }: ViewProps) {
+export function WikiGraphView({ slug, q, source, tag, scope, model, color, layers, marked, filters, set, reader }: ViewProps) {
   const t = useT();
   const [limit, setLimit] = useState(GRAPH_LIMIT);
   const depth = scope === "2" ? 2 : 1;
@@ -60,6 +62,14 @@ export function WikiGraphView({ slug, q, source, tag, scope, model, color, layer
   const kinds = new Set(edges.map((e) => e.kind));
   const modelNode = model ? nodes.find((n) => n.id === `${MODEL_PREFIX}${model}`) : undefined;
   const canvasNodes = nodes.filter((n) => !n.isolated);
+  // the pages behind a model or tag node: what the node is for, since it has no text of its own
+  const mentioning = new Set(edges.filter((e) => e.kind === "mention" && e.target === `${MODEL_PREFIX}${model}`).map((e) => e.source));
+  const behind = model ? nodes.filter((n) => n.kind === "page" && mentioning.has(n.id)) : tag ? nodes.filter((n) => n.kind === "page" && n.tags.includes(tag)) : [];
+  const readerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    // beside the picture on a wide screen, below it on a narrow one: bring it into view when a page is picked
+    if (slug && window.matchMedia?.("(max-width: 800px)").matches) readerRef.current?.scrollIntoView?.({ block: "start" });
+  }, [slug]);
 
   return (
     <div className="stack">
@@ -111,16 +121,29 @@ export function WikiGraphView({ slug, q, source, tag, scope, model, color, layer
             </button>
           </div>
           {modelNode ? <p className="small muted">{t("web.wiki.graph.model_refs", { refs: modelNode.refs.join(", ") })}</p> : null}
+          <NodePages pages={behind} search={search} title={t("web.wiki.graph.pages_behind", { n: behind.length })} />
           <p className="small muted">
             {t("web.wiki.graph.model_hint")} <Link to="/projects">{t("web.wiki.graph.model_projects")}</Link>
           </p>
+        </div>
+      ) : null}
+      {tag && !model ? (
+        <div className="card stack">
+          <div className="row">
+            <h3>{t("web.wiki.graph.tag_title", { tag })}</h3>
+            <span className="spacer" />
+            <button type="button" onClick={() => set({ tag: "" })}>
+              {t("web.wiki.graph.model_clear")}
+            </button>
+          </div>
+          <NodePages pages={behind} search={search} title={t("web.wiki.graph.pages_behind", { n: behind.length })} />
         </div>
       ) : null}
       <div className={slug ? "wiki-graph-split" : "stack"}>
         <div className="stack">
           {data && canvasNodes.length === 0 ? <p className="empty">{t("web.wiki.graph.empty")}</p> : null}
           {canvasNodes.length > 0 ? (
-            <WikiGraph nodes={nodes} edges={edges} palette={palette} height={slug ? HEIGHT_BESIDE_READER : HEIGHT} current={slug || undefined} fadeContext={q.trim() !== ""} onActivate={activate} />
+            <WikiGraph nodes={nodes} edges={edges} palette={palette} height={slug ? HEIGHT_BESIDE_READER : HEIGHT} current={slug || undefined} fadeContext={q.trim() !== ""} marked={marked} onActivate={activate} />
           ) : null}
           {data ? (
             <div className="row small muted">
@@ -157,9 +180,31 @@ export function WikiGraphView({ slug, q, source, tag, scope, model, color, layer
             </section>
           ) : null}
         </div>
-        {slug ? <div className="wiki-graph-reader">{reader}</div> : null}
+        {slug ? (
+          <div className="wiki-graph-reader" ref={readerRef}>
+            {reader}
+          </div>
+        ) : null}
       </div>
     </div>
+  );
+}
+
+/** The pages a model or tag node stands for, each with its first lines: click one to read it. */
+function NodePages({ pages, search, title }: { pages: WikiGraphNode[]; search: string; title: string }) {
+  if (pages.length === 0) return null;
+  return (
+    <section className="stack">
+      <h4>{title}</h4>
+      <ul className="wiki-sources">
+        {pages.map((n) => (
+          <li key={n.id}>
+            <Link to={pageHref(n.slug, search)}>{n.label}</Link> <span className="chip">{n.source}</span>
+            <span className="muted small wiki-snippet">{n.summary}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

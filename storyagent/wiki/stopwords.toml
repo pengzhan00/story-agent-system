@@ -1,0 +1,7 @@
+# Words that say "how / what / why" and name nothing: they are left out of the search terms of a question.
+# `words`: Latin words. `chars`: single Chinese characters. `pairs`: the overlapping pairs of Chinese characters.
+words = ["the", "a", "an", "of", "to", "is", "are", "in", "on", "and", "or", "for", "how", "what", "do", "does", "i",
+         "me", "my", "it", "this", "that", "with", "can", "use", "used"]
+chars = "的了吗呢是在有和与或"
+pairs = ["什么", "怎么", "为什", "怎样", "如何", "是什", "哪个", "哪些", "有什", "多少", "可以", "么意", "么样", "是否", "能不",
+         "不能", "么办"]

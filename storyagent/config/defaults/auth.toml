@@ -18,7 +18,7 @@ max_pending_registrations = 50
 # reachable without signing in (login itself, who am I, the translation catalog the login page needs, the API docs)
 public_prefixes = ["/api/auth/login", "/api/auth/register", "/api/auth/setup", "/api/auth/mode", "/api/auth/me", "/api/i18n/", "/api/docs", "/api/openapi.json"]
 # any signed-in user (their own session and password), whatever the role
-signed_in_prefixes = ["/api/auth/", "/api/content/unlock"]
+signed_in_prefixes = ["/api/auth/", "/api/content/unlock", "/api/wiki/ask"]
 # need the admin flag
 admin_prefixes = ["/api/users", "/api/audit", "/api/launch", "/api/config", "/api/tools", "/api/setup"]
 # POST/DELETE on these need the create_project flag

@@ -1,8 +1,9 @@
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useWikiList, useWikiPage, useWikiSync } from "../api/wiki";
 import type { WikiBrief } from "../api/types";
 import { ErrorNote } from "../components/ErrorNote";
+import { WikiAsk } from "../components/WikiAsk";
 import { MiniGraph, WikiGraphView } from "../components/WikiGraphView";
 import { useT } from "../i18n";
 import { Markdown, headingsOf, readBlocks } from "../lib/markdown";
@@ -155,6 +156,7 @@ export function WikiPage() {
   const list = useWikiList({ q, source, tag }, !graphView);
   const sync = useWikiSync();
   const data = list.data;
+  const [marked, setMarked] = useState<ReadonlySet<string>>(new Set());
   const set = (patch: Record<string, string>) => {
     const next = new URLSearchParams(params);
     for (const [key, value] of Object.entries(patch)) {
@@ -192,6 +194,7 @@ export function WikiPage() {
           ))}
         </div>
       ) : null}
+      <WikiAsk source={source} onAnswer={(slugs) => setMarked(new Set(slugs))} />
       {graphView ? (
         <WikiGraphView
           slug={slug}
@@ -202,6 +205,7 @@ export function WikiPage() {
           model={params.get("model") ?? ""}
           color={params.get("color") === "tag" ? "tag" : "source"}
           layers={layers}
+          marked={marked}
           filters={filters}
           set={set}
           reader={slug ? <Reader slug={slug} search={`?${params.toString()}`} mini={false} /> : null}
