@@ -101,7 +101,7 @@ def test_verify_runs_the_healthcheck_with_the_profiles_requirements(
     assert {e["name"]: e["ok"] for e in r.json()["entries"]} == {"ollama": False, "tool.ffmpeg": True}
 
 
-# -- who may use it -----------------------------------------------------------------------------------------------------
+# -- who may use it ------------------------------------------------------------
 def test_only_an_administrator_may_read_or_write_the_setup(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     m = FakeMachine(tmp_path, monkeypatch)
     settings = load_settings({"STORY_AGENT_HOME": str(m.data), "STORY_AGENT_AUTH": "token"})
