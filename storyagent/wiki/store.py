@@ -158,6 +158,7 @@ class WikiStore:
         raws: dict[str, tuple[_Entry, dict[str, Any], str]] = {}
         by_name: dict[str, str] = {}          # normalised file name / title / relative path -> slug
         by_path: dict[tuple[str, str], str] = {}
+        anywhere: dict[str, str] = {}         # same keys across sources: a [[note]] from another source
         for e in entries:
             text = e.file.read_text("utf-8", errors="replace")
             meta, body = obsidian.split_frontmatter(text)
@@ -168,6 +169,8 @@ class WikiStore:
             for key in (stem.rsplit("/", 1)[-1], str(meta.get("title", "")), obsidian.first_heading(body)):
                 if key.strip():
                     by_name.setdefault(f"{e.source}\0{obsidian.norm(key)}", slug)
+                    if e.rating == GENERAL:       # a general page never points at (or reveals) a restricted one
+                        anywhere.setdefault(obsidian.norm(key), slug)
         images: dict[str, dict[str, Path]] = {}
         for src in self.settings.wiki.sources:
             if src.path.is_dir():
@@ -178,7 +181,8 @@ class WikiStore:
         for slug, (e, meta, body) in raws.items():
             def resolve(target: str, _e: _Entry = e) -> str | None:
                 t = target.strip()
-                return by_path.get((_e.source, obsidian.norm(t))) or by_name.get(f"{_e.source}\0{obsidian.norm(t)}")
+                return (by_path.get((_e.source, obsidian.norm(t))) or by_name.get(f"{_e.source}\0{obsidian.norm(t)}")
+                        or anywhere.get(obsidian.norm(t)))
 
             def resolve_md(path: str, _e: _Entry = e) -> str | None:
                 if "://" in path:
@@ -265,6 +269,10 @@ class WikiStore:
             "SELECT p.* FROM wiki_links l JOIN wiki_pages p ON p.slug = l.dst WHERE l.src=? ORDER BY p.title",
             (slug,)).fetchall()
         return [_row_page(r) for r in rows]
+
+    def links(self) -> list[tuple[str, str]]:
+        rows = self.db.conn.execute("SELECT src, dst FROM wiki_links ORDER BY src, dst").fetchall()
+        return [(r["src"], r["dst"]) for r in rows]
 
     def search(self, query: str, pages: list[Page] | None = None) -> list[tuple[Page, str, int]]:
         """Pages that contain every word of ``query`` (case ignored) in the title, the tags or the text, best first,

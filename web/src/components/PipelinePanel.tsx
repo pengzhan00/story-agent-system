@@ -52,6 +52,10 @@ export function PipelinePanel({ projectId }: { projectId: number }) {
                       <Link className="link small" to={`/wiki?q=${encodeURIComponent(row.chosen)}`} title={t("web.wiki.about_hint")}>
                         {t("web.wiki.about")}
                       </Link>
+                      {" "}
+                      <Link className="link small" to={`/wiki?view=graph&model=${encodeURIComponent(row.chosen)}`} title={t("web.wiki.about_graph_hint")}>
+                        {t("web.wiki.about_graph")}
+                      </Link>
                     </>
                   ) : null}
                 </td>

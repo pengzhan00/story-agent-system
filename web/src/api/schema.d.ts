@@ -2536,6 +2536,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/wiki/graph": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Graph
+         * @description The pages and the links between them. A restricted page the caller may not see is not a node, not the end of an
+         *     edge and not in any count (``hidden`` says how many there are, as the page list does).
+         */
+        get: operations["graph_api_wiki_graph_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/wiki/pages": {
         parameters: {
             query?: never;
@@ -5855,6 +5876,117 @@ export interface components {
             count: number;
             /** Name */
             name: string;
+        };
+        /** WikiGraphEdge */
+        WikiGraphEdge: {
+            /**
+             * Kind
+             * @description link | tag | shared_tag | mention
+             */
+            kind: string;
+            /** Source */
+            source: string;
+            /** Target */
+            target: string;
+            /**
+             * Weight
+             * @description shared tags (shared_tag) or mentions (mention); 1 otherwise
+             */
+            weight: number;
+        };
+        /** WikiGraphNode */
+        WikiGraphNode: {
+            /**
+             * Id
+             * @description the page slug; `tag:<name>` for a tag node, `model:<family>` for a model node
+             */
+            id: string;
+            /**
+             * Isolated
+             * @description a page without any edge in this view
+             */
+            isolated: boolean;
+            /**
+             * Kind
+             * @description page | tag | model
+             */
+            kind: string;
+            /** Label */
+            label: string;
+            /**
+             * Links In
+             * @description links from other visible pages, over the whole wiki (not only this view)
+             */
+            links_in: number;
+            /** Links Out */
+            links_out: number;
+            /**
+             * Match
+             * @description false for the pages around the hits of a search, shown only for context
+             */
+            match: boolean;
+            /** Model Kind */
+            model_kind: string;
+            /**
+             * Pages
+             * @description tag and model nodes: pages in this view that carry the tag or mention the model
+             */
+            pages: number;
+            /** Rating */
+            rating: string;
+            /**
+             * Refs
+             * @description model nodes: the models of the family (keys of models.toml)
+             */
+            refs: string[];
+            /**
+             * Slug
+             * @description page nodes: the slug to open; empty for the others
+             */
+            slug: string;
+            /** Source */
+            source: string;
+            /** Summary */
+            summary: string;
+            /** Tags */
+            tags: string[];
+        };
+        /** WikiGraphOut */
+        WikiGraphOut: {
+            /** Depth */
+            depth: number;
+            /** Edges */
+            edges: components["schemas"]["WikiGraphEdge"][];
+            /** Focus */
+            focus: string;
+            /**
+             * Hidden
+             * @description restricted pages this caller may not see right now (locked or too young)
+             */
+            hidden: number;
+            /** Limit */
+            limit: number;
+            /**
+             * Matched
+             * @description pages that passed the filters, before the cap
+             */
+            matched: number;
+            /** Nodes */
+            nodes: components["schemas"]["WikiGraphNode"][];
+            /** Sources */
+            sources: components["schemas"]["WikiCount"][];
+            /** Tags */
+            tags: components["schemas"]["WikiCount"][];
+            /**
+             * Total
+             * @description pages this caller may see, before the filters
+             */
+            total: number;
+            /**
+             * Truncated
+             * @description more pages matched than `limit`: the best connected ones are shown
+             */
+            truncated: boolean;
         };
         /** WikiList */
         WikiList: {
@@ -11661,6 +11793,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    graph_api_wiki_graph_get: {
+        parameters: {
+            query?: {
+                q?: string;
+                source?: string;
+                tag?: string;
+                /** @description a page slug, or model:<family> */
+                focus?: string;
+                depth?: number;
+                include_tags?: boolean;
+                shared_tags?: boolean;
+                include_models?: boolean;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WikiGraphOut"];
                 };
             };
             /** @description Validation Error */
