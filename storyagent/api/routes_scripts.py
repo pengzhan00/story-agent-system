@@ -10,7 +10,8 @@ from storyagent import script_text
 
 from .context import ctx_of, translator_of
 from .errors import ApiError
-from .schemas import ScriptBrief, ScriptDoc
+from .routes_library import _out
+from .schemas import LibraryItemOut, ScriptBrief, ScriptDoc, ScriptPublish
 from .visibility import hidden, require_viewable, too_young
 
 router = APIRouter(prefix="/api/scripts", tags=["scripts"])
@@ -61,3 +62,22 @@ def get_script(project_id: int, episode_no: int, request: Request) -> ScriptDoc:
         raise ApiError(404, "not_found", f"script:{project_id}/{episode_no}")
     text = script_text.render(row["title"], row["synopsis"], row["acts"], translator_of(request), heading=project.name)
     return ScriptDoc(**_brief(project, row, False), text=text)
+
+
+@router.post("/{project_id}/{episode_no}/publish", response_model=LibraryItemOut, status_code=201)
+def publish_script(project_id: int, episode_no: int, body: ScriptPublish, request: Request) -> LibraryItemOut:
+    """File the script as a named item (``library:script/<name>``): a snapshot of its text, usable from any project or
+    the workshop, unaffected by later edits of the script. A restricted project's script stays in the vault."""
+    ctx = ctx_of(request)
+    project = ctx.projects.get(project_id)
+    require_viewable(request, project.rating, project_id, what=f"script:{project_id}/{episode_no}")
+    row = ctx.story.get_script(project_id, episode_no)
+    if row is None:
+        raise ApiError(404, "not_found", f"script:{project_id}/{episode_no}")
+    text = script_text.render(row["title"], row["synopsis"], row["acts"], translator_of(request), heading=project.name)
+    name = body.name.strip() or f"{project.name}-{episode_no}".replace("/", "-").replace("\\", "-")[:80]
+    item = ctx.library.add_text(
+        text, "script", name, project_id=project_id, slot=f"script_e{episode_no}", description=body.description,
+        tags=body.tags, replace=body.replace, meta={"project_id": project_id, "episode_no": episode_no},
+        origin={"project_id": project_id, "episode_no": episode_no, "script_id": row["id"]})
+    return _out(item)

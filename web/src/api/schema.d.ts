@@ -2280,6 +2280,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/scripts/{project_id}/{episode_no}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish Script
+         * @description File the script as a named item (``library:script/<name>``): a snapshot of its text, usable from any project or
+         *     the workshop, unaffected by later edits of the script. A restricted project's script stays in the vault.
+         */
+        post: operations["publish_script_api_scripts__project_id___episode_no__publish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/setup": {
         parameters: {
             query?: never;
@@ -5168,6 +5189,27 @@ export interface components {
             updated_at: string;
             /** Words */
             words: number;
+        };
+        /** ScriptPublish */
+        ScriptPublish: {
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Name
+             * @description the name under script/; empty = project name and episode
+             * @default
+             */
+            name: string;
+            /**
+             * Replace
+             * @default false
+             */
+            replace: boolean;
+            /** Tags */
+            tags?: string[];
         };
         /** ScriptReviewOut */
         ScriptReviewOut: {
@@ -11554,6 +11596,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ScriptDoc"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    publish_script_api_scripts__project_id___episode_no__publish_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+                episode_no: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScriptPublish"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LibraryItemOut"];
                 };
             };
             /** @description Validation Error */

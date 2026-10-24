@@ -197,6 +197,35 @@ class Library:
             )
         return self.get(item_id)
 
+    def add_text(
+        self, text: str, role: str, name: str, *, project_id: int, slot: str, kind: str = "text.script",
+        description: str = "", tags: Sequence[str] = (), meta: Mapping[str, Any] | None = None, replace: bool = False,
+        origin: Mapping[str, Any] | None = None,
+    ) -> LibraryItem:
+        """File a text (a script, a story) of a project under ``role/name``: the text becomes an asset of the project
+        (``slot``, kept in the vault when the project's rating says so) and its copy is the named item."""
+        if not _SAFE.match(name):
+            raise LibraryError("name must be 1-80 characters and contain no slash")
+        if self.find(role, name) and not replace:
+            raise LibraryError(f"{role}/{name} already exists (use replace to overwrite)")
+        row = self.db.conn.execute("SELECT slug, rating FROM projects WHERE id=?", (project_id,)).fetchone()
+        if row is None:
+            raise LibraryError(f"unknown project {project_id}")
+        dest_dir = self.settings.project_media_dir(row["slug"], kind, None, row["rating"])
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest = dest_dir / f"{new_id()}.md"
+        dest.write_text(text, "utf-8")
+        asset = self.ledger.register_asset(
+            NewAsset(
+                kind=kind, slot=slot, path=str(dest.relative_to(self.settings.home)), sha256=_sha(dest),
+                bytes=dest.stat().st_size, metadata={"original_name": f"{slot}.md", **dict(origin or {})},
+                provenance={"schema": "storyagent.provenance.v1", "origin": "project_text", **dict(origin or {})},
+                rating=row["rating"],
+            ),
+            project_id=project_id, adopt=True,
+        )
+        return self.publish(asset.id, role, name, description=description, tags=tags, meta=meta, replace=replace)
+
     def add_file(
         self, src: Path, role: str, name: str, *, description: str = "", tags: Sequence[str] = (),
         meta: Mapping[str, Any] | None = None, replace: bool = False,

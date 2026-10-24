@@ -384,6 +384,13 @@ class ScriptDoc(ScriptBrief):
     text: str = Field(description="the whole script as Markdown, in the caller's language")
 
 
+class ScriptPublish(BaseModel):
+    name: str = Field(default="", max_length=80, description="the name under script/; empty = project name and episode")
+    description: str = ""
+    tags: list[str] = Field(default_factory=list)
+    replace: bool = False
+
+
 class WikiAskIn(BaseModel):
     question: str = Field(min_length=2, max_length=500)
     language: str = Field(default="zh-CN", description="language code the answer is written in")

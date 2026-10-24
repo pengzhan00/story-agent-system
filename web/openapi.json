@@ -5755,6 +5755,36 @@
         "title": "ScriptDoc",
         "type": "object"
       },
+      "ScriptPublish": {
+        "properties": {
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "name": {
+            "default": "",
+            "description": "the name under script/; empty = project name and episode",
+            "maxLength": 80,
+            "title": "Name",
+            "type": "string"
+          },
+          "replace": {
+            "default": false,
+            "title": "Replace",
+            "type": "boolean"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          }
+        },
+        "title": "ScriptPublish",
+        "type": "object"
+      },
       "ScriptReviewOut": {
         "properties": {
           "issues": {
@@ -17202,6 +17232,68 @@
           }
         },
         "summary": "Get Script",
+        "tags": [
+          "scripts"
+        ]
+      }
+    },
+    "/api/scripts/{project_id}/{episode_no}/publish": {
+      "post": {
+        "description": "File the script as a named item (``library:script/<name>``): a snapshot of its text, usable from any project or\nthe workshop, unaffected by later edits of the script. A restricted project's script stays in the vault.",
+        "operationId": "publish_script_api_scripts__project_id___episode_no__publish_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "episode_no",
+            "required": true,
+            "schema": {
+              "title": "Episode No",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScriptPublish"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryItemOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Publish Script",
         "tags": [
           "scripts"
         ]

@@ -74,3 +74,55 @@ def test_a_locked_restricted_project_is_listed_but_masked_until_unlocked(client:
     row = client.get("/api/scripts").json()[0]
     assert row["locked"] is False and row["title"] == "Private pilot"
     assert "kettle screams" in client.get(f"/api/scripts/{pid}/1").json()["text"]
+
+
+# -- filing a script under a name -------------------------------------------------------------------------------------
+def test_a_script_is_filed_as_a_named_snapshot_other_projects_can_call(client: TestClient) -> None:
+    pid = project_with_script(client, "Drama")
+    r = client.post(f"/api/scripts/{pid}/1/publish", json={"description": "pilot text", "tags": ["pilot"]})
+    assert r.status_code == 201, r.text
+    item = r.json()
+    assert item["ref"] == "library:script/Drama-1" and item["asset"]["kind"] == "text.script"
+    assert item["description"] == "pilot text" and item["source_project_id"] == pid
+    body = client.get(f"/api/library/{item['id']}/file").text
+    assert body.startswith("# Drama\n") and "- **Mia** (angry): You never listen." in body
+    listed = client.get("/api/library", params={"role": "script"}).json()
+    assert [i["ref"] for i in listed] == ["library:script/Drama-1"]
+    ctx = client.app.state.ctx  # type: ignore[attr-defined]
+    found = ctx.library.find("script", "Drama-1")
+    assert found is not None and found.asset is not None and (ctx.settings.home / found.asset.path).is_file()
+
+
+def test_filing_twice_needs_replace_and_a_name_may_be_chosen(client: TestClient) -> None:
+    pid = project_with_script(client, "Drama")
+    assert client.post(f"/api/scripts/{pid}/1/publish", json={"name": "pilot"}).status_code == 201
+    again = client.post(f"/api/scripts/{pid}/1/publish", json={"name": "pilot"})
+    assert again.status_code >= 400 and "already exists" in again.text
+    ctx = client.app.state.ctx  # type: ignore[attr-defined]
+    ctx.story.save_script(pid, 1, title="Second cut", synopsis="Changed.", acts=ACTS)
+    assert client.post(f"/api/scripts/{pid}/1/publish", json={"name": "pilot", "replace": True}).status_code == 201
+    [only] = client.get("/api/library", params={"role": "script"}).json()
+    assert "Second cut" in client.get(f"/api/library/{only['id']}/file").text
+    assert client.post(f"/api/scripts/{pid}/1/publish", json={"name": "a/b"}).status_code >= 400
+
+
+def test_a_restricted_script_is_filed_into_the_vault_and_only_when_unlocked(client: TestClient) -> None:
+    pid = project_with_script(client, "Private", rating="restricted")
+    assert client.post(f"/api/scripts/{pid}/1/publish", json={}).status_code == 403
+    assert client.post("/api/content/unlock", json={"confirm_adult": True}).status_code == 200
+    item = client.post(f"/api/scripts/{pid}/1/publish", json={}).json()
+    assert item["asset"]["rating"] == "restricted"
+    ctx = client.app.state.ctx  # type: ignore[attr-defined]
+    found = ctx.library.find("script", "Private-1")
+    assert found is not None and found.asset is not None and "vault" in found.asset.path
+
+
+def test_a_filed_script_is_a_reference_a_job_input_can_name(client: TestClient) -> None:
+    from storyagent.media.assetrefs import Resolver
+
+    pid = project_with_script(client, "Drama")
+    client.post(f"/api/scripts/{pid}/1/publish", json={"name": "pilot"})
+    ctx = client.app.state.ctx  # type: ignore[attr-defined]
+    inputs, _params, _res = Resolver(ctx.settings, ctx.ledger).resolve({"story": "library:script/pilot"}, {})
+    text = open(inputs["story"], encoding="utf-8").read()
+    assert text.startswith("# Drama\n") and "You never listen." in text
