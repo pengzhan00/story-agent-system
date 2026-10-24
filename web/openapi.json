@@ -5589,6 +5589,172 @@
         "title": "RunProgressOut",
         "type": "object"
       },
+      "ScriptBrief": {
+        "properties": {
+          "episode_no": {
+            "title": "Episode No",
+            "type": "integer"
+          },
+          "lines": {
+            "description": "dialogue lines",
+            "title": "Lines",
+            "type": "integer"
+          },
+          "locked": {
+            "description": "a restricted project that is locked: title and synopsis are blank",
+            "title": "Locked",
+            "type": "boolean"
+          },
+          "project_id": {
+            "title": "Project Id",
+            "type": "integer"
+          },
+          "project_kind": {
+            "title": "Project Kind",
+            "type": "string"
+          },
+          "project_name": {
+            "title": "Project Name",
+            "type": "string"
+          },
+          "rating": {
+            "title": "Rating",
+            "type": "string"
+          },
+          "scenes": {
+            "title": "Scenes",
+            "type": "integer"
+          },
+          "shots": {
+            "title": "Shots",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "synopsis": {
+            "title": "Synopsis",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          },
+          "words": {
+            "title": "Words",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "project_id",
+          "project_name",
+          "project_kind",
+          "rating",
+          "locked",
+          "episode_no",
+          "title",
+          "synopsis",
+          "scenes",
+          "shots",
+          "lines",
+          "words",
+          "status",
+          "updated_at"
+        ],
+        "title": "ScriptBrief",
+        "type": "object"
+      },
+      "ScriptDoc": {
+        "properties": {
+          "episode_no": {
+            "title": "Episode No",
+            "type": "integer"
+          },
+          "lines": {
+            "description": "dialogue lines",
+            "title": "Lines",
+            "type": "integer"
+          },
+          "locked": {
+            "description": "a restricted project that is locked: title and synopsis are blank",
+            "title": "Locked",
+            "type": "boolean"
+          },
+          "project_id": {
+            "title": "Project Id",
+            "type": "integer"
+          },
+          "project_kind": {
+            "title": "Project Kind",
+            "type": "string"
+          },
+          "project_name": {
+            "title": "Project Name",
+            "type": "string"
+          },
+          "rating": {
+            "title": "Rating",
+            "type": "string"
+          },
+          "scenes": {
+            "title": "Scenes",
+            "type": "integer"
+          },
+          "shots": {
+            "title": "Shots",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "synopsis": {
+            "title": "Synopsis",
+            "type": "string"
+          },
+          "text": {
+            "description": "the whole script as Markdown, in the caller's language",
+            "title": "Text",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          },
+          "words": {
+            "title": "Words",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "project_id",
+          "project_name",
+          "project_kind",
+          "rating",
+          "locked",
+          "episode_no",
+          "title",
+          "synopsis",
+          "scenes",
+          "shots",
+          "lines",
+          "words",
+          "status",
+          "updated_at",
+          "text"
+        ],
+        "title": "ScriptDoc",
+        "type": "object"
+      },
       "ScriptReviewOut": {
         "properties": {
           "issues": {
@@ -16922,6 +17088,122 @@
         "summary": "Ready",
         "tags": [
           "system"
+        ]
+      }
+    },
+    "/api/scripts": {
+      "get": {
+        "description": "Scripts of the live projects the caller may see. A restricted project that is locked is listed (so it is known\nto exist) without its title and synopsis, and its text is never searched. ``q``: every word must occur in the\ntitle, synopsis or text.",
+        "operationId": "list_scripts_api_scripts_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "default": "",
+              "maxLength": 200,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "project_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ScriptBrief"
+                  },
+                  "title": "Response List Scripts Api Scripts Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Scripts",
+        "tags": [
+          "scripts"
+        ]
+      }
+    },
+    "/api/scripts/{project_id}/{episode_no}": {
+      "get": {
+        "operationId": "get_script_api_scripts__project_id___episode_no__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "episode_no",
+            "required": true,
+            "schema": {
+              "title": "Episode No",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScriptDoc"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Script",
+        "tags": [
+          "scripts"
         ]
       }
     },

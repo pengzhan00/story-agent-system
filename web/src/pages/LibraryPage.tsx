@@ -1,18 +1,21 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useProjects } from "../api/hooks";
+import { useScripts } from "../api/scripts";
 import { useAllAssets, useLibraryActions, useLibraryItems, useLibraryRoles } from "../api/library";
 import type { Asset, LibraryItem } from "../api/types";
 import { useWorkshop } from "../api/workshop";
 import { AssetPreview } from "../components/Candidates";
 import { ErrorNote } from "../components/ErrorNote";
 import { MakeProject } from "../components/MakeProject";
+import { ProjectScripts } from "../components/ProjectScripts";
 import { useT } from "../i18n";
 import { duration } from "../lib/format";
 import { CATEGORIES, type Category, categoryOf, mediaOfAsset, targetsFor } from "../lib/assets";
 
 const NAMED = "named";
 const WORKSHOP = "workshop";
+const SCRIPTS = "project_scripts";
 
 function CopyButton({ text, label }: { text: string; label: string }) {
   const t = useT();
@@ -269,6 +272,7 @@ export function LibraryPage() {
     for (const a of scoped) c[categoryOf(a)] = (c[categoryOf(a)] ?? 0) + 1;
     return c;
   }, [scoped]);
+  const scriptList = useScripts("", null);
   const needle = q.trim().toLowerCase();
   const shown = scoped.filter((a) => (tab === "all" || categoryOf(a) === (tab as Category)) && (!needle || a.id.includes(needle) || a.kind.includes(needle) || a.slot.toLowerCase().includes(needle)));
   const namedBy = (assetId: string) => (items.data ?? []).filter((i) => i.source_asset_id === assetId).map((i) => i.ref);
@@ -285,12 +289,15 @@ export function LibraryPage() {
             {`${t(c === "all" ? "web.library.all" : `library.cat.${c}`)} (${counts[c] ?? 0})`}
           </button>
         ))}
+        <button className={tab === SCRIPTS ? "tab active" : "tab"} onClick={() => setTab(SCRIPTS)}>
+          {`${t("web.library.scripts.tab")} (${scriptList.data?.length ?? 0})`}
+        </button>
         <button className={tab === NAMED ? "tab active" : "tab"} onClick={() => setTab(NAMED)}>
           {`${t("web.library.named")} (${items.data?.length ?? 0})`}
         </button>
       </nav>
       <div className="row">
-        {tab !== NAMED ? (
+        {tab !== NAMED && tab !== SCRIPTS ? (
           <label className="row small">
             <span>{t("web.library.scope")}</span>
             <select value={scope} onChange={(e) => setScope(e.target.value)}>
@@ -306,7 +313,9 @@ export function LibraryPage() {
         ) : null}
         <input type="search" value={q} placeholder={t("web.library.search")} aria-label={t("web.library.search")} onChange={(e) => setQ(e.target.value)} />
       </div>
-      {tab === NAMED ? (
+      {tab === SCRIPTS ? (
+        <ProjectScripts q={q} projectId={null} />
+      ) : tab === NAMED ? (
         namedItems.length === 0 ? (
           <p className="empty">{t("web.library.empty_named")}</p>
         ) : (

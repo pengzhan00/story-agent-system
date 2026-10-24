@@ -18,8 +18,8 @@
 `llama4:scout` 官方不支持中文,已淘汰。
 
 候选(没有拉取):`qwen3.6:35b-coding`(约 23–24 GB,SWE-bench Verified 73.4%、Terminal-Bench 51.5%)补编码/agent 位;
-替换 uncensored 的 `abliterant/qwen3.8-rana`(14–30 GB 多档量化)、`mgraffam/gemma4-agentic-fable-abliterated`(14 GB,MoE 最快)、`FableForge-AI/mythos-v2-9b`(5.8 GB,最轻);
-**不要选** 112 GB 的 `qwen3.8-flash-next-abliterated`(128 GB 机器上余量只有约 6 GB)。去拒答模型没有统一评测,指令遵循和事实性通常会下降,许可要回各自 README 核。
+替换 uncensored 的 `mgraffam/gemma4-agentic-fable-abliterated`(14 GB,MoE 最快)、`FableForge-AI/mythos-v2-9b`(5.8 GB,最轻);
+**已试过、不好用,不要再选** `abliterant/qwen3.8-rana`(你的实测)。**不要选** 112 GB 的 `qwen3.8-flash-next-abliterated`(128 GB 机器上余量只有约 6 GB)。去拒答模型没有统一评测,指令遵循和事实性通常会下降,许可要回各自 README 核。
 
 ## 按内容分级选模型
 

@@ -363,6 +363,27 @@ class WikiGraphOut(Strict):
     tags: list[WikiCount]
 
 
+class ScriptBrief(Strict):
+    project_id: int
+    project_name: str
+    project_kind: str
+    rating: str
+    locked: bool = Field(description="a restricted project that is locked: title and synopsis are blank")
+    episode_no: int
+    title: str
+    synopsis: str
+    scenes: int
+    shots: int
+    lines: int = Field(description="dialogue lines")
+    words: int
+    status: str
+    updated_at: str
+
+
+class ScriptDoc(ScriptBrief):
+    text: str = Field(description="the whole script as Markdown, in the caller's language")
+
+
 class WikiAskIn(BaseModel):
     question: str = Field(min_length=2, max_length=500)
     language: str = Field(default="zh-CN", description="language code the answer is written in")

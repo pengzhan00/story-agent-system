@@ -2241,6 +2241,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/scripts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Scripts
+         * @description Scripts of the live projects the caller may see. A restricted project that is locked is listed (so it is known
+         *     to exist) without its title and synopsis, and its text is never searched. ``q``: every word must occur in the
+         *     title, synopsis or text.
+         */
+        get: operations["list_scripts_api_scripts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scripts/{project_id}/{episode_no}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Script */
+        get: operations["get_script_api_scripts__project_id___episode_no__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/setup": {
         parameters: {
             query?: never;
@@ -5050,6 +5089,85 @@ export interface components {
              * @default 0
              */
             total: number;
+        };
+        /** ScriptBrief */
+        ScriptBrief: {
+            /** Episode No */
+            episode_no: number;
+            /**
+             * Lines
+             * @description dialogue lines
+             */
+            lines: number;
+            /**
+             * Locked
+             * @description a restricted project that is locked: title and synopsis are blank
+             */
+            locked: boolean;
+            /** Project Id */
+            project_id: number;
+            /** Project Kind */
+            project_kind: string;
+            /** Project Name */
+            project_name: string;
+            /** Rating */
+            rating: string;
+            /** Scenes */
+            scenes: number;
+            /** Shots */
+            shots: number;
+            /** Status */
+            status: string;
+            /** Synopsis */
+            synopsis: string;
+            /** Title */
+            title: string;
+            /** Updated At */
+            updated_at: string;
+            /** Words */
+            words: number;
+        };
+        /** ScriptDoc */
+        ScriptDoc: {
+            /** Episode No */
+            episode_no: number;
+            /**
+             * Lines
+             * @description dialogue lines
+             */
+            lines: number;
+            /**
+             * Locked
+             * @description a restricted project that is locked: title and synopsis are blank
+             */
+            locked: boolean;
+            /** Project Id */
+            project_id: number;
+            /** Project Kind */
+            project_kind: string;
+            /** Project Name */
+            project_name: string;
+            /** Rating */
+            rating: string;
+            /** Scenes */
+            scenes: number;
+            /** Shots */
+            shots: number;
+            /** Status */
+            status: string;
+            /** Synopsis */
+            synopsis: string;
+            /**
+             * Text
+             * @description the whole script as Markdown, in the caller's language
+             */
+            text: string;
+            /** Title */
+            title: string;
+            /** Updated At */
+            updated_at: string;
+            /** Words */
+            words: number;
         };
         /** ScriptReviewOut */
         ScriptReviewOut: {
@@ -11381,6 +11499,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Ready"];
+                };
+            };
+        };
+    };
+    list_scripts_api_scripts_get: {
+        parameters: {
+            query?: {
+                q?: string;
+                project_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScriptBrief"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_script_api_scripts__project_id___episode_no__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+                episode_no: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScriptDoc"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
