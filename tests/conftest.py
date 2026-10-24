@@ -78,6 +78,7 @@ heartbeat_seconds = 0.05
 lease_seconds = 5
 caffeinate = false
 memory_budget_gib = 64
+check_system_memory = false
 max_concurrent_jobs = 0
 """
 
