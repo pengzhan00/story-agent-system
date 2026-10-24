@@ -74,3 +74,10 @@ HF_HUB_DISABLE_XET=1 ~/venvs/seedvc/bin/python inference_v2.py \
 - 歌曲:`separate_vocals = true` 一步完成拆轨、转换、混回。
 - 许可:代码 GPL-3.0,权重自己的条款没核过,商用前确认。合规闸门要求 `voice_ref` 带授权勾选(换成真人的声音必须有本人同意)。
 - 想要更高相似度再考虑 RVC,但那要 10–30 分钟干净干声和训练,目前没装。
+
+## 你的实测笔记(Obsidian)
+
+- [[本地 AI 出歌实战（ACE-Step 1.5 + 换声纹）]]
+- [[音视频资产全景_MEDIA]]
+
+(这些链接在知识库里指向同步进来的笔记;没同步笔记时只显示名字。)

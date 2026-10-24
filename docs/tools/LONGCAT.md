@@ -67,3 +67,11 @@ HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 …
 
 - 提交前检查变体目录存在;输出 mp4 登记为素材;模型是重任务,由 broker 串行。
 - 想要对口型:先用 [CosyVoice](COSYVOICE.md) 生成语音,再把人像和语音交给 LongCat;口型对话也可以用 `ltx-2.5-lipsync`。
+
+## 你的实测笔记(Obsidian)
+
+- [[LongCat-Avatar 卡加载与 HuggingFace 锁坑]]
+- [[音视频资产全景_MEDIA]]
+- [[本机模型能力矩阵]]
+
+(这些链接在知识库里指向同步进来的笔记;没同步笔记时只显示名字。)

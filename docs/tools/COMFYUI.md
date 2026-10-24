@@ -101,3 +101,11 @@ cd ~/Documents/Comfy/ComfyUI/ComfyUI
 | 提交后立刻报错 | 导出的不是 API 格式 |
 | 出片后内存一直占着 | ComfyUI 缓存了模型;系统会调 `POST /free`,手动也可以 |
 | 音频全静音 | 先 `ffmpeg … -af volumedetect` 判定,别在参数上反复试(见 [ACE-Step](ACESTEP.md)) |
+
+## 你的实测笔记(Obsidian)
+
+- [[本机模型能力矩阵]]
+- [[本地 AI 工具链清单]]
+- [[ACE-Step 1.5 XL SFT ComfyUI 工作流]]
+
+(这些链接在知识库里指向同步进来的笔记;没同步笔记时只显示名字。)

@@ -117,3 +117,11 @@ curl -s -X POST http://127.0.0.1:8198/oneshot -H 'Content-Type: application/json
 ## 长任务的纪律
 
 整批任务用 `caffeinate -i` 包住(睡眠会冻死批次);成品不要放 scratch 目录(24 小时清);出片后必核实际分辨率。
+
+## 你的实测笔记(Obsidian)
+
+- [[LTX-2.5 长场景分段出片（Phosphene One Shot）]]
+- [[音视频资产全景_MEDIA]]
+- [[音视频工具矩阵]]
+
+(这些链接在知识库里指向同步进来的笔记;没同步笔记时只显示名字。)

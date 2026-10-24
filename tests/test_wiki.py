@@ -202,3 +202,26 @@ def test_api_lists_searches_and_gates_restricted_notes(wclient: TestClient) -> N
     assert unlocked["hidden"] == 0 and unlocked["total"] == 4
     assert wclient.get("/api/wiki/pages/vault/Skills/Adult-setup").json()["page"]["rating"] == "restricted"
     assert wclient.get("/api/wiki/assets/..%2F..%2Fetc%2Fpasswd").status_code == 404
+
+
+def test_a_link_from_another_source_resolves_but_never_to_a_restricted_page(tmp_path: Path) -> None:
+    vault = make_vault(tmp_path)
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    cfg = tmp_path / "home" / "config"
+    cfg.mkdir(parents=True)
+    (cfg / "wiki.toml").write_text(
+        f'[wiki]\ndocs = false\n[[wiki.sources]]\nname = "vault"\npath = "{vault}"\n'
+        'include = ["Skills/Model matrix.md", "Skills/Adult*.md"]\nrestricted = ["Skills/Adult*"]\n'
+        f'[[wiki.sources]]\nname = "notes"\npath = "{docs}"\ninclude = ["*.md"]\n')
+    (docs / "tool.md").write_text("# Tool\n\nSee [[Model matrix]] and [[Adult setup]].\n", "utf-8")
+    s = load_settings({"STORY_AGENT_HOME": str(tmp_path / "home")})
+    db = Database(s.db_path)
+    migrate(db)
+    store = WikiStore(db, s)
+    store.sync()
+    tool = store.get("notes/tool")
+    assert tool is not None
+    assert "(wiki:vault/Skills/Model-matrix)" in tool.body            # another source's page
+    assert "wiki:vault/Skills/Adult" not in tool.body                  # a restricted page is not linked from outside
+    assert [p.slug for p in store.backlinks("vault/Skills/Model-matrix")][:1] == ["notes/tool"]

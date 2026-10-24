@@ -114,3 +114,12 @@ ffmpeg -hide_banner -i out.mp3 -af volumedetect -f null - 2>&1 | grep -E "mean_v
 | 多批次互相灌队列 | 旧批次没杀干净;改参数前先 `pgrep -fl render.py` 清场 |
 | 吐字糊 | 时长太短,上整首长度 |
 | 想换成自己的声音 | ACE-Step 做不到,走 [Seed-VC](SEEDVC.md) |
+
+## 你的实测笔记(Obsidian)
+
+- [[本地 AI 出歌实战（ACE-Step 1.5 + 换声纹）]]
+- [[ACE-Step XL SFT 人声经验总结]]
+- [[ACE-Step 1.5 XL SFT ComfyUI 工作流]]
+- [[音视频工具矩阵]]
+
+(这些链接在知识库里指向同步进来的笔记;没同步笔记时只显示名字。)

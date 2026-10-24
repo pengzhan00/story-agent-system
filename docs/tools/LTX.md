@@ -129,3 +129,12 @@ ffmpeg -hide_banner -ss <中点秒> -i x.mp4 -frames:v 1 -vf signalstats,metadat
 - LTX 没有原生的多角色对话控制;LoRA 只支持单人。
 - 竖屏视频可能出现横向条纹(banding),可以在负面词里加 `horizontal stripes, banding, flicker`(系统默认已带)并调参数。
 - 速度:high 档每条 8–10 分钟,不适合大量试错;先用 `balanced` 草稿看动作,再出最终档。
+
+## 你的实测笔记(Obsidian)
+
+- [[LTX-2.5 长场景分段出片（Phosphene One Shot）]]
+- [[音视频工具矩阵]]
+- [[音视频资产全景_MEDIA]]
+- [[本机模型能力矩阵]]
+
+(这些链接在知识库里指向同步进来的笔记;没同步笔记时只显示名字。)

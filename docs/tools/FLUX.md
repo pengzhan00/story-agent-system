@@ -89,3 +89,10 @@ LoRA 层目标是 `transformer_blocks.{block}.attn.to_q/to_k/to_v/…`,块 0–5
 | 脸或手变形 | 步数太低,用 30 步以上,guidance 3.5–5 |
 | 想要“不要某某” | FLUX.2 没有负面词,正向描述想要的画面;系统会丢掉负面词并记 `negative_prompt_ignored` 事件 |
 | 内存紧 | `--low-ram`、`--vae-tiling` 或 `--quantize 8/6/4` |
+
+## 你的实测笔记(Obsidian)
+
+- [[本机模型能力矩阵]]
+- [[音视频资产全景_MEDIA]]
+
+(这些链接在知识库里指向同步进来的笔记;没同步笔记时只显示名字。)
