@@ -38,6 +38,8 @@ scripts/start.sh                       # worker + 网页服务;浏览器打开 h
 | 接口 | `storyagent/api/` | FastAPI + SSE(`/api/docs`) |
 | 界面 | `web/` | React + TypeScript,中英文,生成自 OpenAPI |
 
+换新机器:[docs/INSTALL.md](docs/INSTALL.md)(`storyagent setup` 检测、列清单、写配置、体检)。
+
 文档:[docs/WORKFLOW.md](docs/WORKFLOW.md)(流水线)· [docs/MEDIA_CONTRACT.md](docs/MEDIA_CONTRACT.md)(媒体契约)· [docs/CONFIGURATION.md](docs/CONFIGURATION.md)(所有旋钮)· [docs/API.md](docs/API.md) · [docs/RUNBOOK.md](docs/RUNBOOK.md)(排障)· [docs/USER_GUIDE.md](docs/USER_GUIDE.md)(使用)· [docs/PARITY_MATRIX.md](docs/PARITY_MATRIX.md)(v1 功能去向与已知缺口)。
 
 ## 开发

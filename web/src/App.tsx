@@ -6,6 +6,7 @@ import { UserMenu } from "./components/UserMenu";
 import { AuditPage } from "./pages/AuditPage";
 import { UsersPage } from "./pages/UsersPage";
 import { LAUNCH_SEEN, LaunchPage } from "./pages/LaunchPage";
+import { SetupPage } from "./pages/SetupPage";
 import { ToolsPage } from "./pages/ToolsPage";
 import { LibraryPage } from "./pages/LibraryPage";
 import { ProjectPage } from "./pages/ProjectPage";
@@ -61,6 +62,9 @@ export function App() {
           <NavLink to="/tools" className={link}>
             {t("web.nav.tools")}
           </NavLink>
+          <NavLink to="/setup" className={link}>
+            {t("web.nav.setup")}
+          </NavLink>
           <NavLink to="/wiki" className={link}>
             {t("web.nav.wiki")}
           </NavLink>
@@ -94,6 +98,7 @@ export function App() {
           <Route path="/prompts" element={<PromptsPage />} />
           <Route path="/llm" element={<LlmPage />} />
           <Route path="/tools" element={<ToolsPage />} />
+          <Route path="/setup" element={<SetupPage />} />
           <Route path="/wiki/*" element={<WikiPage />} />
           <Route path="/system" element={<SystemPage />} />
           <Route path="/users" element={<UsersPage />} />

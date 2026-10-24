@@ -16,6 +16,8 @@ storyagent project list [--trashed] | trash ID [--restore]
 storyagent ops llm-unload             # unload resident LLMs (when a heavy job waits on `llm_resident`)
 ```
 
+New machine: `storyagent setup` (detect, list what is missing, write this machine's config, verify) - see [INSTALL.md](INSTALL.md).
+
 ## Symptoms
 
 | Symptom | Cause / action |

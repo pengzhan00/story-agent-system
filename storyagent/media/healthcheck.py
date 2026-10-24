@@ -117,7 +117,7 @@ def _check_tools(settings: Settings, run: Runner) -> list[Entry]:
     )
     entry(
         "cosyvoice",
-        [] if _exists(tp("cosyvoice", "python"), executable=True) and _exists(tp("cosyvoice", "script"))
+        [] if _exists(tp("cosyvoice", "python"), executable=True) and _exists(tp("cosyvoice", "workdir"))
         else ["cosyvoice runtime"],
         [] if _exists(cosy_model_dir) else [cosy_model_dir.name if cosy_model_dir else "CosyVoice model"],
     )
