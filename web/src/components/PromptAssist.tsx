@@ -4,6 +4,7 @@ import { useT } from "../i18n";
 import { ErrorNote } from "./ErrorNote";
 
 const TARGETS = ["en", "zh-CN", "ja", "ko", "fr", "de", "es"];
+const CJK = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\u3040-\u30ff\uac00-\ud7af]/;
 
 /** The two AI buttons beside a prompt: a suggestion (optionally steered by a sentence) and a translation. The answer is
  * shown first; the author takes it (replacing the text) or drops it. Nothing is saved here. */
@@ -12,11 +13,14 @@ export function PromptAssist({
   onApply,
   purpose,
   projectId,
+  englishOnly = false,
 }: {
   text: string;
   onApply: (next: string) => void;
   purpose: string;
   projectId?: number | null;
+  /** The model reads English prompts only: Chinese text gets a one-click "translate and preview". */
+  englishOnly?: boolean;
 }) {
   const t = useT();
   const assist = usePromptAssist();
@@ -34,8 +38,23 @@ export function PromptAssist({
     assist.reset();
   };
   const result = assist.data;
+  const needsEnglish = englishOnly && CJK.test(text);
+  const translateToEnglish = () => {
+    assist.reset();
+    setMode("translate");
+    setTarget("en");
+    assist.mutate({ action: "translate", text, purpose, instruction: "", target: "en", project_id: projectId ?? null });
+  };
   return (
     <div className="stack small">
+      {needsEnglish && mode === null ? (
+        <div className="notice row">
+          <span className="grow">{t("web.ai.needs_english")}</span>
+          <button type="button" className="primary" disabled={assist.isPending} onClick={translateToEnglish}>
+            {t("web.ai.translate_en")}
+          </button>
+        </div>
+      ) : null}
       <div className="row">
         <button type="button" className="link" disabled={!text.trim()} onClick={() => { assist.reset(); setMode("suggest"); }}>
           {t("web.ai.suggest")}

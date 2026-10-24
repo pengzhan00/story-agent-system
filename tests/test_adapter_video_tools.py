@@ -125,6 +125,16 @@ def test_h3_generates_with_a_first_frame_and_carries_the_attribution(tmp_path: P
     assert a.metadata["attribution"] == "MiniMax H3" and a.metadata["engine"] == "h3.c"
 
 
+def test_h3_passes_the_m5_and_reference_size_switches(tmp_path: Path) -> None:
+    rig = build_h3(tmp_path)
+    rec, _ = rig.run(job(MediaKind.VIDEO_AV, "h3-test", {"prompt": "x"}, seed=1,
+                         params={"int8_row_fc2": True, "ref_image_size": "max", "token_reduction": False}))
+    assert rec.status is JobStatus.COMPLETED, (rec.error_code, rec.error_message)
+    [call] = h3_calls(tmp_path)
+    assert "--use-int8-row-fc2" in call["argv"] and flag(call["argv"], "--ref-image-size") == "max"
+    assert "--token-reduction" not in call["argv"]
+
+
 def test_h3_roles_of_reference_files(tmp_path: Path) -> None:
     rig = build_h3(tmp_path)
     img1, img2, wav = tmp_path / "a.png", tmp_path / "b.png", tmp_path / "v.wav"

@@ -36,6 +36,8 @@ export function SpecEditor({ pid, spec, review, onAcknowledge }: { pid: number; 
   }, [spec.id, spec.version, spec.slot]);
 
   const models = (meta.data?.models ?? []).filter((m) => m.kind === spec.kind);
+  const chosen = models.find((m) => m.ref === (model || meta.data?.defaults[spec.kind]));
+  const englishOnly = chosen?.prompt_language === "en";
   const f = fieldsOfKind(spec.kind);
   const seedValue = seed.trim() === "" ? null : Number(seed);
   const seedOk = seedValue === null || Number.isInteger(seedValue);
@@ -73,7 +75,7 @@ export function SpecEditor({ pid, spec, review, onAcknowledge }: { pid: number; 
           <label className="field">
             <span>{t("web.creative.prompt")}</span>
             <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={4} />
-            <PromptAssist text={prompt} onApply={setPrompt} purpose={purposeOf(spec.kind)} projectId={pid} />
+            <PromptAssist text={prompt} onApply={setPrompt} purpose={purposeOf(spec.kind)} projectId={pid} englishOnly={englishOnly} />
           </label>
         ) : null}
         {f.negative ? (

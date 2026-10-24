@@ -172,3 +172,14 @@ def test_api_validation(tmp_path: Path, toml: str) -> None:
     with pytest.raises(ConfigError, match=r"\[api\]"):
         load_settings(home_with(tmp_path, services=toml))
 
+
+
+def test_prompt_language_defaults_from_the_dialect_and_can_be_overridden(tmp_path: Path) -> None:
+    s = load_settings(home_with(tmp_path, models=(
+        '[models.mine]\nkind = "image.generate"\nprovider = "comfy"\nprompt_profile = "natural_en"\n'
+        '[models.mine2]\nkind = "image.generate"\nprovider = "comfy"\nprompt_profile = "natural_en"\n'
+        'prompt_language = ""\n'
+        '[models.mine3]\nkind = "image.generate"\nprovider = "comfy"\n')))
+    assert s.model("mine").prompt_language == "en"
+    assert s.model("mine2").prompt_language == ""          # said so explicitly
+    assert s.model("mine3").prompt_language == ""          # no English-only dialect

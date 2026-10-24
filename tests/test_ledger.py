@@ -293,3 +293,16 @@ def test_reprioritize_moves_queued_jobs_ahead_without_touching_running_ones(led:
     with pytest.raises(LedgerError):
         led.reprioritize([b.id], move="first", priority=1)
 
+
+
+def test_chinese_in_the_prompt_of_an_english_only_model_warns_but_still_queues(
+        fdb: Database, fsettings: Settings, clock: Clock) -> None:
+    from dataclasses import replace
+    fsettings.models["fake-video"] = replace(fsettings.models["fake-video"], prompt_language="en")
+    led = Ledger(fdb, fsettings, clock=clock, rng=random.Random(1))
+    ok, _ = led.enqueue(job(inputs={"prompt": "a cat on a roof"}))
+    assert [e["event"] for e in led.events(ok.id)] == ["enqueued"]
+    rec, created = led.enqueue(job(inputs={"prompt": "屋顶上的一只猫"}, seed=9))
+    assert created and rec.status is JobStatus.QUEUED
+    warn = [e for e in led.events(rec.id) if e["event"] == "prompt_language"]
+    assert len(warn) == 1 and warn[0]["level"] == "warning"

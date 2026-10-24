@@ -741,6 +741,280 @@
         "title": "CancelResult",
         "type": "object"
       },
+      "CliBuildRequest": {
+        "properties": {
+          "cwd": {
+            "default": "",
+            "title": "Cwd",
+            "type": "string"
+          },
+          "ext": {
+            "default": "",
+            "title": "Ext",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "license_tag": {
+            "default": "",
+            "title": "License Tag",
+            "type": "string"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/CliOption-Input"
+            },
+            "title": "Options",
+            "type": "array"
+          },
+          "program": {
+            "title": "Program",
+            "type": "string"
+          },
+          "ref": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+            "title": "Ref",
+            "type": "string"
+          },
+          "sample": {
+            "additionalProperties": true,
+            "title": "Sample",
+            "type": "object"
+          },
+          "timeout_sec": {
+            "default": 3600,
+            "minimum": 1.0,
+            "title": "Timeout Sec",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ref",
+          "kind",
+          "program",
+          "options"
+        ],
+        "title": "CliBuildRequest",
+        "type": "object"
+      },
+      "CliBuilt": {
+        "properties": {
+          "argv": {
+            "items": {},
+            "title": "Argv",
+            "type": "array"
+          },
+          "command": {
+            "title": "Command",
+            "type": "string"
+          },
+          "models": {
+            "title": "Models",
+            "type": "string"
+          }
+        },
+        "required": [
+          "models",
+          "command",
+          "argv"
+        ],
+        "title": "CliBuilt",
+        "type": "object"
+      },
+      "CliOption-Input": {
+        "description": "One option of a command-line tool, as the wizard shows and edits it.",
+        "properties": {
+          "default": {
+            "title": "Default"
+          },
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "flag": {
+            "title": "Flag",
+            "type": "string"
+          },
+          "flags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Flags",
+            "type": "array"
+          },
+          "include": {
+            "default": true,
+            "title": "Include",
+            "type": "boolean"
+          },
+          "kind": {
+            "default": "string",
+            "title": "Kind",
+            "type": "string"
+          },
+          "metavars": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Metavars",
+            "type": "array"
+          },
+          "param": {
+            "default": "",
+            "title": "Param",
+            "type": "string"
+          },
+          "repeat": {
+            "default": false,
+            "title": "Repeat",
+            "type": "boolean"
+          },
+          "role": {
+            "default": "param",
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "flag"
+        ],
+        "title": "CliOption",
+        "type": "object"
+      },
+      "CliOption-Output": {
+        "description": "One option of a command-line tool, as the wizard shows and edits it.",
+        "properties": {
+          "default": {
+            "title": "Default"
+          },
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "flag": {
+            "title": "Flag",
+            "type": "string"
+          },
+          "flags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Flags",
+            "type": "array"
+          },
+          "include": {
+            "default": true,
+            "title": "Include",
+            "type": "boolean"
+          },
+          "kind": {
+            "default": "string",
+            "title": "Kind",
+            "type": "string"
+          },
+          "metavars": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Metavars",
+            "type": "array"
+          },
+          "param": {
+            "default": "",
+            "title": "Param",
+            "type": "string"
+          },
+          "repeat": {
+            "default": false,
+            "title": "Repeat",
+            "type": "boolean"
+          },
+          "role": {
+            "default": "param",
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "flag",
+          "flags",
+          "metavars",
+          "description",
+          "kind",
+          "default",
+          "role",
+          "param",
+          "repeat",
+          "include"
+        ],
+        "title": "CliOption",
+        "type": "object"
+      },
+      "CliParseRequest": {
+        "properties": {
+          "help_arg": {
+            "default": "--help",
+            "title": "Help Arg",
+            "type": "string"
+          },
+          "help_text": {
+            "default": "",
+            "description": "the usage text pasted in (nothing is run)",
+            "title": "Help Text",
+            "type": "string"
+          },
+          "program": {
+            "description": "path or name of the tool; its --help is read unless help_text is given",
+            "title": "Program",
+            "type": "string"
+          }
+        },
+        "required": [
+          "program"
+        ],
+        "title": "CliParseRequest",
+        "type": "object"
+      },
+      "CliParsed": {
+        "properties": {
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/CliOption-Output"
+            },
+            "title": "Options",
+            "type": "array"
+          },
+          "program": {
+            "title": "Program",
+            "type": "string"
+          },
+          "ran": {
+            "title": "Ran",
+            "type": "boolean"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Roles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "program",
+          "options",
+          "roles",
+          "ran"
+        ],
+        "title": "CliParsed",
+        "type": "object"
+      },
       "ContentStatusOut": {
         "properties": {
           "age_status": {
@@ -2893,6 +3167,10 @@
             "title": "Params",
             "type": "object"
           },
+          "prompt_language": {
+            "title": "Prompt Language",
+            "type": "string"
+          },
           "prompt_profile": {
             "title": "Prompt Profile",
             "type": "string"
@@ -2934,6 +3212,7 @@
           "commercial_ok",
           "attribution",
           "prompt_profile",
+          "prompt_language",
           "timeout_sec",
           "params",
           "tiers"
@@ -16561,6 +16840,90 @@
           }
         },
         "summary": "List Tools",
+        "tags": [
+          "tools"
+        ]
+      }
+    },
+    "/api/tools/cli/build": {
+      "post": {
+        "description": "The connector text for the chosen options, and the command it makes with sample values (nothing is written:\npaste it into the connector editor, check and save).",
+        "operationId": "build_cli_api_tools_cli_build_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CliBuildRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CliBuilt"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Build Cli",
+        "tags": [
+          "tools"
+        ]
+      }
+    },
+    "/api/tools/cli/parse": {
+      "post": {
+        "description": "The options of a command-line tool, read from its ``--help`` (run without a shell, time-limited, no input) or\nfrom help text the operator pasted. Nothing is written.",
+        "operationId": "parse_cli_api_tools_cli_parse_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CliParseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CliParsed"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Parse Cli",
         "tags": [
           "tools"
         ]

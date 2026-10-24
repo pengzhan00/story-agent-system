@@ -91,7 +91,8 @@ def meta(request: Request) -> Meta:
             ModelOut(
                 ref=m.ref, kind=m.kind, provider=m.provider, version=m.version, family=m.family, heavy=m.heavy,
                 est_memory_gib=m.est_memory_gib, license_tag=m.license_tag, commercial_ok=m.commercial_ok,
-                attribution=m.attribution, prompt_profile=m.prompt_profile, timeout_sec=m.timeout_sec,
+                attribution=m.attribution, prompt_profile=m.prompt_profile, prompt_language=m.prompt_language,
+                timeout_sec=m.timeout_sec,
                 params=dict(m.params), tiers={k: dict(v) for k, v in m.tiers.items()},
             )
             for m in s.models.values()

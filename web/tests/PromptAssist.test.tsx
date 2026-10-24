@@ -9,12 +9,12 @@ import { I18nProvider } from "../src/i18n";
 const en = JSON.parse(readFileSync(join(__dirname, "..", "..", "storyagent", "locales", "en.json"), "utf-8")) as Record<string, string>;
 const sent: Record<string, unknown>[] = [];
 
-function mount(onApply: (s: string) => void) {
+function mount(onApply: (s: string) => void, englishOnly = false, text = "雨夜的街道") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   render(
     <QueryClientProvider client={qc}>
       <I18nProvider>
-        <PromptAssist text="雨夜的街道" onApply={onApply} purpose="image" projectId={3} />
+        <PromptAssist text={text} onApply={onApply} purpose="image" projectId={3} englishOnly={englishOnly} />
       </I18nProvider>
     </QueryClientProvider>,
   );
@@ -52,5 +52,22 @@ describe("PromptAssist", () => {
     fireEvent.change(screen.getByPlaceholderText(en["web.ai.instruction"] ?? ""), { target: { value: "more rain" } });
     fireEvent.click(screen.getByText(en["web.ai.go"] ?? ""));
     await waitFor(() => expect(sent[0]).toMatchObject({ action: "suggest", instruction: "more rain" }));
+  });
+
+  it("offers a one-click translation to English for an English-only model, and only when the text has Chinese", async () => {
+    const onApply = vi.fn();
+    mount(onApply, true);
+    fireEvent.click(await screen.findByText(en["web.ai.translate_en"] ?? ""));
+    expect(await screen.findByText("a rainy street at night")).toBeTruthy();
+    expect(sent[0]).toMatchObject({ action: "translate", target: "en", text: "雨夜的街道" });
+    expect(onApply).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText(en["web.ai.apply"] ?? ""));
+    await waitFor(() => expect(onApply).toHaveBeenCalledWith("a rainy street at night"));
+  });
+
+  it("stays quiet for English text, or when the model reads Chinese", async () => {
+    mount(vi.fn(), true, "a rainy street");
+    await screen.findByText(en["web.ai.translate"] ?? "");
+    expect(screen.queryByText(en["web.ai.translate_en"] ?? "")).toBeNull();
   });
 });

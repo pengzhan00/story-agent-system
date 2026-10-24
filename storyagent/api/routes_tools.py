@@ -5,16 +5,25 @@ config folder, and the running server loads it at once; the worker does so when 
 """
 from __future__ import annotations
 
+import subprocess
+
 import anyio
 from fastapi import APIRouter, Request
 
+from storyagent.connect import clihelp
 from storyagent.connect.comfy_import import ImportResult, import_workflow
 from storyagent.connect.snippets import TEMPLATES, Checked, check_snippet, save_snippet, template
 from storyagent.connect.store import describe, save_comfy, workflows_dir
 
 from .context import ctx_of, translator_of
+from .errors import ApiError
 from .reloading import reload_now
 from .schemas import (
+    CliBuildRequest,
+    CliBuilt,
+    CliOption,
+    CliParsed,
+    CliParseRequest,
     ToolBinding,
     ToolChecked,
     ToolConnectorSaved,
@@ -108,3 +117,34 @@ async def save_connector(body: ToolSnippet, request: Request) -> ToolConnectorSa
     error = await anyio.to_thread.run_sync(reload_now, request.app, request.app.state.reload_loader)
     shown = _checked(request, checked)
     return ToolConnectorSaved(ref=checked.ref, reloaded=not error, error=error, issues=shown.issues)
+
+
+@router.post("/cli/parse", response_model=CliParsed)
+async def parse_cli(body: CliParseRequest) -> CliParsed:
+    """The options of a command-line tool, read from its ``--help`` (run without a shell, time-limited, no input) or
+    from help text the operator pasted. Nothing is written."""
+    text, ran = body.help_text, False
+    if not text.strip():
+        try:
+            text = await anyio.to_thread.run_sync(clihelp.run_help, body.program, body.help_arg)
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise ApiError(400, "invalid_input", str(exc)[:200]) from exc
+        ran = True
+    options = clihelp.parse_help(text)
+    if not options:
+        raise ApiError(400, "invalid_input", "no options found in the help text")
+    return CliParsed(program=body.program, options=[CliOption(**o.asdict()) for o in options],
+                     roles=list(clihelp.ROLES), ran=ran)
+
+
+@router.post("/cli/build", response_model=CliBuilt)
+def build_cli(body: CliBuildRequest) -> CliBuilt:
+    """The connector text for the chosen options, and the command it makes with sample values (nothing is written:
+    paste it into the connector editor, check and save)."""
+    options = [clihelp.Option(flag=o.flag, flags=o.flags or [o.flag], metavars=o.metavars, description=o.description,
+                              kind=o.kind, default=o.default, role=o.role, param=o.param, repeat=o.repeat,
+                              include=o.include) for o in body.options]
+    text, argv = clihelp.connector_text(body.ref, body.kind, body.program, options, ext=body.ext, cwd=body.cwd,
+                                        timeout_sec=body.timeout_sec, license_tag=body.license_tag)
+    _, params = clihelp.build_argv(body.program, options)
+    return CliBuilt(models=text, command=clihelp.preview(argv, params, body.sample, body.ext), argv=argv)

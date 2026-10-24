@@ -17,6 +17,14 @@ const PREVIEW = {
 const TEMPLATES = [{ name: "cli", models: '[models."my-cli"]\nkind = "audio.tts"\n', services: "" }];
 const OK = { ref: "my-cli", kind: "audio.tts", provider: "cli", ok: true, issues: [{ level: "warning", code: "license_empty", message: "Licence is empty" }] };
 const BAD = { ref: "my-cli", kind: "audio.tts", provider: "cli", ok: false, issues: [{ level: "error", code: "cli_argv", message: "argv must be a list" }] };
+const option = (flag: string, role: string, kind: string, extra: Record<string, unknown> = {}) => ({
+  flag, flags: [flag], metavars: kind === "bool" ? [] : ["N"], description: `${flag} text`, kind, default: null, role, param: flag.slice(2), repeat: false, include: true, ...extra,
+});
+const PARSED = {
+  program: "/tools/h3", ran: true, roles: ["param", "switch", "prompt", "image", "output", "fixed", "skip"],
+  options: [option("--prompt", "prompt", "string"), option("--output", "output", "path"), option("--first-frame", "image", "path"), option("--width", "param", "int", { default: 864 })],
+};
+const BUILT = { models: '[models."h3"]\nkind = "video.generate"\n', command: "/tools/h3 --prompt '<prompt>' --output '<work>/output.mp4'", argv: [] };
 let checkAnswer: unknown = OK;
 let calls: { method: string; url: string; body: unknown }[] = [];
 
@@ -32,6 +40,8 @@ beforeEach(() => {
     else if (url.includes("/api/meta")) json = { kinds: [{ value: "image.generate", label: "Image" }, { value: "text.story", label: "Story" }] };
     else if (url.endsWith("/api/tools")) json = [{ ref: "klein", kind: "image.edit", provider: "comfy", family: "flux2", workflow: "flux2_klein_edit", mine: false }];
     else if (url.endsWith("/api/tools/templates")) json = TEMPLATES;
+    else if (url.endsWith("/api/tools/cli/parse")) json = PARSED;
+    else if (url.endsWith("/api/tools/cli/build")) json = BUILT;
     else if (url.endsWith("/api/tools/connector/check")) json = checkAnswer;
     else if (url.endsWith("/api/tools/connector")) {
       json = { ref: "my-cli", reloaded: true, error: "", issues: [] };
@@ -114,5 +124,25 @@ describe("tools page", () => {
     expect(await screen.findByText("argv must be a list")).toBeTruthy();
     expect(screen.getByText(en["web.tools.checked_bad"]!)).toBeTruthy();
     expect(calls.some((c) => c.method === "POST" && c.url.endsWith("/api/tools/connector"))).toBe(false);
+  });
+
+  it("reads a tool's usage into rows and hands the built configuration to the connector editor", async () => {
+    mount();
+    fireEvent.change(await screen.findByLabelText(en["web.tools.wiz_program"]!), { target: { value: "/tools/h3" } });
+    fireEvent.click(screen.getByRole("button", { name: en["web.tools.wiz_read"]! }));
+    expect(await screen.findByText("--first-frame N")).toBeTruthy();
+    const role = screen.getByLabelText("--first-frame role") as HTMLSelectElement;
+    expect(role.value).toBe("image");                                                       // files are typed, not pathed
+    expect(screen.queryByLabelText("--first-frame value")).toBeNull();                      // no path to type for an input file
+    fireEvent.change(screen.getByLabelText("--width value"), { target: { value: "720" } });
+    fireEvent.click(screen.getByLabelText("--prompt"));                                     // leave one option out
+    fireEvent.change(screen.getByLabelText(en["web.tools.wiz_ref"]!), { target: { value: "h3-cli" } });
+    fireEvent.click(screen.getByRole("button", { name: en["web.tools.wiz_build"]! }));
+    expect(await screen.findByText(/--output '<work>\/output.mp4'/)).toBeTruthy();
+    const build = calls.find((c) => c.url.endsWith("/api/tools/cli/build"))!.body as { ref: string; options: { flag: string; include: boolean; default: unknown }[] };
+    expect(build.ref).toBe("h3-cli");
+    expect(build.options.find((o) => o.flag === "--prompt")!.include).toBe(false);
+    expect(build.options.find((o) => o.flag === "--width")!.default).toBe(720);
+    await waitFor(() => expect((screen.getByLabelText(en["web.tools.models_toml"]!) as HTMLTextAreaElement).value).toContain('[models."h3"]'));
   });
 });
