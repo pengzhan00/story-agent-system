@@ -5,7 +5,7 @@ Inputs:  ``prompt``; ``refs`` = files whose role follows from the extension and 
          FL2VA (first/last frame) and Ref2VA (reference images) are different model variants and cannot be mixed.
 Params:  width, height, frames (rounded to 5 + 17n unless ``snap_frames`` is false) or seconds (24 fps), steps,
          reuse (1 close .. 3 aggressive), layers (50 exact .. 40 aggressive), core_reuse (1|4|6), token_reduction,
-         ssd_streaming, render_width, render_height.
+         ssd_streaming, int8_row_fc2 (faster FC2 on M5), ref_image_size (match | max), render_width, render_height.
 Licence: the model's licence excludes EU/UK/South Korea/USA and requires the attribution text; both are carried by the
          model entry (``commercial_ok = false``) so the compliance gate asks for an explicit acknowledgement.
 """
@@ -40,6 +40,8 @@ SCHEMA: dict[str, dict[str, Any]] = {
     "token_reduction": {"type": "bool"},
     "ssd_streaming": {"type": "bool"},
     "snap_frames": {"type": "bool"},
+    "int8_row_fc2": {"type": "bool"},
+    "ref_image_size": {"type": "str", "choices": ["match", "max"]},
 }
 _STEP = re.compile(r"(?:step|pass|denois\w*)\D{0,12}(\d+)\s*/\s*(\d+)", re.IGNORECASE)
 FPS = 24
@@ -141,7 +143,10 @@ class H3Adapter(SubprocessAdapter):
             argv += ["--frames", str(snap_frames(frames) if p.get("snap_frames", True) else frames)]
         if job.seed is not None:
             argv += ["--seed", str(job.seed)]
-        for key, flag in (("token_reduction", "--token-reduction"), ("ssd_streaming", "--ssd-streaming")):
+        if "ref_image_size" in p:
+            argv += ["--ref-image-size", str(p["ref_image_size"])]
+        for key, flag in (("token_reduction", "--token-reduction"), ("ssd_streaming", "--ssd-streaming"),
+                          ("int8_row_fc2", "--use-int8-row-fc2")):
             if p.get(key):
                 argv.append(flag)
         roles = classify(job, ctx)

@@ -2262,6 +2262,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/tools/cli/build": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Build Cli
+         * @description The connector text for the chosen options, and the command it makes with sample values (nothing is written:
+         *     paste it into the connector editor, check and save).
+         */
+        post: operations["build_cli_api_tools_cli_build_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tools/cli/parse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Parse Cli
+         * @description The options of a command-line tool, read from its ``--help`` (run without a shell, time-limited, no input) or
+         *     from help text the operator pasted. Nothing is written.
+         */
+        post: operations["parse_cli_api_tools_cli_parse_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/tools/comfy": {
         parameters: {
             query?: never;
@@ -2923,6 +2965,168 @@ export interface components {
         /** CancelResult */
         CancelResult: {
             status: components["schemas"]["JobStatus"];
+        };
+        /** CliBuildRequest */
+        CliBuildRequest: {
+            /**
+             * Cwd
+             * @default
+             */
+            cwd: string;
+            /**
+             * Ext
+             * @default
+             */
+            ext: string;
+            /** Kind */
+            kind: string;
+            /**
+             * License Tag
+             * @default
+             */
+            license_tag: string;
+            /** Options */
+            options: components["schemas"]["CliOption-Input"][];
+            /** Program */
+            program: string;
+            /** Ref */
+            ref: string;
+            /** Sample */
+            sample?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Timeout Sec
+             * @default 3600
+             */
+            timeout_sec: number;
+        };
+        /** CliBuilt */
+        CliBuilt: {
+            /** Argv */
+            argv: unknown[];
+            /** Command */
+            command: string;
+            /** Models */
+            models: string;
+        };
+        /**
+         * CliOption
+         * @description One option of a command-line tool, as the wizard shows and edits it.
+         */
+        "CliOption-Input": {
+            /** Default */
+            default?: unknown;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Flag */
+            flag: string;
+            /** Flags */
+            flags?: string[];
+            /**
+             * Include
+             * @default true
+             */
+            include: boolean;
+            /**
+             * Kind
+             * @default string
+             */
+            kind: string;
+            /** Metavars */
+            metavars?: string[];
+            /**
+             * Param
+             * @default
+             */
+            param: string;
+            /**
+             * Repeat
+             * @default false
+             */
+            repeat: boolean;
+            /**
+             * Role
+             * @default param
+             */
+            role: string;
+        };
+        /**
+         * CliOption
+         * @description One option of a command-line tool, as the wizard shows and edits it.
+         */
+        "CliOption-Output": {
+            /** Default */
+            default: unknown;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Flag */
+            flag: string;
+            /** Flags */
+            flags: string[];
+            /**
+             * Include
+             * @default true
+             */
+            include: boolean;
+            /**
+             * Kind
+             * @default string
+             */
+            kind: string;
+            /** Metavars */
+            metavars: string[];
+            /**
+             * Param
+             * @default
+             */
+            param: string;
+            /**
+             * Repeat
+             * @default false
+             */
+            repeat: boolean;
+            /**
+             * Role
+             * @default param
+             */
+            role: string;
+        };
+        /** CliParseRequest */
+        CliParseRequest: {
+            /**
+             * Help Arg
+             * @default --help
+             */
+            help_arg: string;
+            /**
+             * Help Text
+             * @description the usage text pasted in (nothing is run)
+             * @default
+             */
+            help_text: string;
+            /**
+             * Program
+             * @description path or name of the tool; its --help is read unless help_text is given
+             */
+            program: string;
+        };
+        /** CliParsed */
+        CliParsed: {
+            /** Options */
+            options: components["schemas"]["CliOption-Output"][];
+            /** Program */
+            program: string;
+            /** Ran */
+            ran: boolean;
+            /** Roles */
+            roles: string[];
         };
         /** ContentStatusOut */
         ContentStatusOut: {
@@ -10676,6 +10880,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ToolModel"][];
+                };
+            };
+        };
+    };
+    build_cli_api_tools_cli_build_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CliBuildRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CliBuilt"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    parse_cli_api_tools_cli_parse_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CliParseRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CliParsed"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

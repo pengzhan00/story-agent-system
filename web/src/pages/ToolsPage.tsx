@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { ApiError } from "../api/client";
-import { useCheckConnector, usePreviewComfy, useSaveComfy, useSaveConnector, useToolModels, useToolTemplates } from "../api/tools";
+import { type CliOption, useBuildCli, useCheckConnector, useParseCli, usePreviewComfy, useSaveComfy, useSaveConnector, useToolModels, useToolTemplates } from "../api/tools";
 import { useMeta } from "../api/hooks";
 import { ErrorNote } from "../components/ErrorNote";
 import { useT } from "../i18n";
 
 const NOT_IMPORTABLE = ["text.", "compose.", "train."];
+const ROLES = ["param", "switch", "prompt", "negative_prompt", "seed", "image", "audio", "video", "file", "output", "output_dir", "fixed", "skip"];
 
 function detailOf(error: unknown): string {
   return error instanceof ApiError && typeof error.detail === "string" ? error.detail : "";
@@ -25,8 +26,139 @@ function Issues({ issues }: { issues: Issue[] }) {
   );
 }
 
+const NEEDS_VALUE = ["param", "fixed"];
+
+/** A command-line tool from its --help: every option a row, files by type, the output placed by the system. */
+function CliWizard({ roles, kinds, onBuilt }: { roles: string[]; kinds: { value: string; label: string }[]; onBuilt: (models: string) => void }) {
+  const t = useT();
+  const parse = useParseCli();
+  const build = useBuildCli();
+  const [program, setProgram] = useState("");
+  const [helpText, setHelpText] = useState("");
+  const [options, setOptions] = useState<CliOption[]>([]);
+  const [ref, setRef] = useState("");
+  const [kind, setKind] = useState("video.generate");
+  const [ext, setExt] = useState("mp4");
+  const edit = (i: number, patch: Partial<CliOption>) => {
+    setOptions((all) => all.map((o, j) => (j === i ? { ...o, ...patch } : o)));
+    build.reset();
+  };
+  const read = async () => {
+    build.reset();
+    const parsed = await parse.mutateAsync({ program, help_text: helpText });
+    setOptions(parsed.options);
+    if (!ref) setRef(program.split("/").pop()?.replace(/[^A-Za-z0-9._-]+/g, "-") ?? "");
+  };
+  const make = async () => {
+    const built = await build.mutateAsync({ ref, kind, program, options, ext, cwd: "", timeout_sec: 3600, license_tag: "", sample: {} });
+    onBuilt(built.models);
+  };
+  return (
+    <section className="stack">
+      <h2>{t("web.tools.wizard")}</h2>
+      <p className="muted small">{t("web.tools.wizard_hint")}</p>
+      <label className="field">
+        <span>{t("web.tools.wiz_program")}</span>
+        <input className="mono" value={program} onChange={(e) => setProgram(e.target.value)} />
+      </label>
+      <label className="field">
+        <span>{t("web.tools.wiz_help")}</span>
+        <textarea className="mono" rows={4} spellCheck={false} value={helpText} onChange={(e) => setHelpText(e.target.value)} />
+      </label>
+      <div>
+        <button disabled={(!program.trim() && !helpText.trim()) || parse.isPending} onClick={() => void read().catch(() => undefined)}>
+          {t("web.tools.wiz_read")}
+        </button>
+      </div>
+      <ErrorNote error={parse.error ?? build.error} />
+      {parse.data ? (
+        <p className="muted small">
+          {parse.data.ran
+            ? t("web.tools.wiz_ran", { program: parse.data.program, count: options.length })
+            : t("web.tools.wiz_pasted", { count: options.length })}
+        </p>
+      ) : null}
+      {options.length ? (
+        <>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>{t("web.tools.wiz_use")}</th>
+                  <th>{t("web.tools.wiz_option")}</th>
+                  <th>{t("web.tools.wiz_role")}</th>
+                  <th>{t("web.tools.wiz_value")}</th>
+                  <th>{t("web.tools.wiz_what")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {options.map((o, i) => (
+                  <tr key={o.flag}>
+                    <td>
+                      <input type="checkbox" aria-label={o.flag} checked={o.include} onChange={(e) => edit(i, { include: e.target.checked })} />
+                    </td>
+                    <td className="mono strong">{[o.flag, ...o.metavars].join(" ")}</td>
+                    <td>
+                      <select aria-label={`${o.flag} role`} value={o.role} onChange={(e) => edit(i, { role: e.target.value, include: e.target.value !== "skip" })}>
+                        {roles.map((r) => (
+                          <option key={r} value={r}>{t(`web.tools.role.${r}`)}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td>
+                      {NEEDS_VALUE.includes(o.role) ? (
+                        <input
+                          className="mono"
+                          aria-label={`${o.flag} value`}
+                          value={o.default == null ? "" : String(o.default)}
+                          onChange={(e) => edit(i, { default: o.kind === "int" || o.kind === "float" ? (e.target.value === "" ? null : Number(e.target.value)) : e.target.value })}
+                        />
+                      ) : null}
+                    </td>
+                    <td className="muted small">{o.description}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="form-grid">
+            <label className="field">
+              <span>{t("web.tools.wiz_ref")}</span>
+              <input value={ref} onChange={(e) => { setRef(e.target.value); build.reset(); }} />
+            </label>
+            <label className="field">
+              <span>{t("web.tools.kind")}</span>
+              <select value={kind} onChange={(e) => { setKind(e.target.value); build.reset(); }}>
+                {kinds.map((k) => (
+                  <option key={k.value} value={k.value}>{k.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>{t("web.tools.wiz_ext")}</span>
+              <input value={ext} onChange={(e) => { setExt(e.target.value); build.reset(); }} />
+            </label>
+          </div>
+          <div>
+            <button disabled={!ref.trim() || build.isPending} onClick={() => void make().catch(() => undefined)}>
+              {t("web.tools.wiz_build")}
+            </button>
+          </div>
+          {build.data ? (
+            <div className="stack">
+              <span className="muted small">{t("web.tools.wiz_command")}</span>
+              <pre className="transcript">{build.data.command}</pre>
+              <p className="muted small">{t("web.tools.wiz_loaded")}</p>
+            </div>
+          ) : null}
+        </>
+      ) : null}
+    </section>
+  );
+}
+
 /** Write a command-line tool or an HTTP service as configuration: pick a starting point, edit, check, save. */
-function ConnectorEditor() {
+function ConnectorEditor({ kinds, roles }: { kinds: { value: string; label: string }[]; roles: string[] }) {
   const t = useT();
   const templates = useToolTemplates();
   const check = useCheckConnector();
@@ -53,6 +185,8 @@ function ConnectorEditor() {
   };
   const failure = check.error ?? save.error;
   return (
+    <>
+    <CliWizard roles={roles} kinds={kinds} onBuilt={(text) => { setModels(text); setServices(""); clear(); }} />
     <section className="stack">
       <h2>{t("web.tools.connector")}</h2>
       <p className="muted small">{t("web.tools.connector_hint")}</p>
@@ -99,6 +233,7 @@ function ConnectorEditor() {
         </div>
       ) : null}
     </section>
+    </>
   );
 }
 
@@ -244,7 +379,7 @@ export function ToolsPage() {
         </section>
       ) : null}
 
-      <ConnectorEditor />
+      <ConnectorEditor kinds={kinds} roles={ROLES} />
 
       <section className="stack">
         <h2>{t("web.tools.models")}</h2>

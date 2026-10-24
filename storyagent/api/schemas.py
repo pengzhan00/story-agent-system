@@ -1450,6 +1450,52 @@ class ToolSnippet(BaseModel):
     force: bool = False
 
 
+class CliOption(Strict):
+    """One option of a command-line tool, as the wizard shows and edits it."""
+
+    flag: str
+    flags: list[str] = Field(default_factory=list)
+    metavars: list[str] = Field(default_factory=list)
+    description: str = ""
+    kind: str = "string"              # bool | int | float | string | path
+    default: Any = None
+    role: str = "param"               # see storyagent.connect.clihelp.ROLES
+    param: str = ""
+    repeat: bool = False
+    include: bool = True
+
+
+class CliParseRequest(BaseModel):
+    program: str = Field(description="path or name of the tool; its --help is read unless help_text is given")
+    help_text: str = Field(default="", description="the usage text pasted in (nothing is run)")
+    help_arg: str = "--help"
+
+
+class CliParsed(Strict):
+    program: str
+    options: list[CliOption]
+    roles: list[str]
+    ran: bool                         # the tool's own --help was run (False: the pasted text was read)
+
+
+class CliBuildRequest(BaseModel):
+    ref: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
+    kind: str
+    program: str
+    options: list[CliOption]
+    ext: str = ""
+    cwd: str = ""
+    timeout_sec: int = Field(default=3600, ge=1)
+    license_tag: str = ""
+    sample: dict[str, Any] = Field(default_factory=dict)
+
+
+class CliBuilt(Strict):
+    models: str                       # the [models."ref"] text, ready for the connector editor
+    command: str                      # the command a job would run, with sample values
+    argv: list[Any]
+
+
 class ToolIssue(Strict):
     level: str                        # "error" | "warning"
     code: str

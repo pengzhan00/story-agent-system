@@ -9,6 +9,10 @@ fallback (a JSON value or plain text) when the job has no such value.
 What the job does not have is *left out*, not guessed: a dict entry or a list item whose placeholder cannot be filled
 is dropped; in an argv list a nested list is one optional group (``[["--steps", "{steps}"]]`` vanishes as a whole).
 Only a placeholder that is required (``required=True``, e.g. in a URL path) raises ``Missing``.
+
+Two argv forms read the job's files and switches (they are what the command-line wizard writes):
+``["--ref-image", "{images.*}"]`` is repeated for every element of ``images`` (and absent when there is none), and
+``{ if = "token_reduction", args = ["--token-reduction"] }`` adds its ``args`` only when ``token_reduction`` is on.
 """
 from __future__ import annotations
 
@@ -19,7 +23,10 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-PLACEHOLDER = re.compile(r"\{([A-Za-z_][A-Za-z0-9_.]*)(?:\|([^{}]*))?\}")
+PLACEHOLDER = re.compile(r"\{([A-Za-z_][A-Za-z0-9_.]*\*?)(?:\|([^{}]*))?\}")
+IMAGE_EXT = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif"}
+AUDIO_EXT = {".wav", ".mp3", ".m4a", ".flac", ".ogg", ".aac"}
+VIDEO_EXT = {".mp4", ".mov", ".mkv", ".webm", ".avi"}
 NOTHING = object()
 
 
@@ -109,7 +116,20 @@ def render_argv(argv: Sequence[Any], values: Mapping[str, Any]) -> list[str]:
         if isinstance(item, str):
             out.append(str(render_string(item, values)))
             continue
+        if isinstance(item, Mapping):
+            value = lookup(values, str(item.get("if", "")))
+            if value is not NOTHING and value not in (False, 0, "", "0", "false", "off", "no"):
+                out += [str(render_string(str(x), values)) for x in item.get("args", [])]
+            continue
         if isinstance(item, list):
+            repeated = [m.group(1)[:-2] for x in item for m in PLACEHOLDER.finditer(str(x))
+                        if m.group(1).endswith(".*")]
+            if repeated:
+                found = lookup(values, repeated[0])
+                for i in range(len(found) if isinstance(found, list) else 0):
+                    star, nth = "{" + repeated[0] + ".*}", "{" + f"{repeated[0]}.{i}" + "}"
+                    out += [str(render_string(str(x).replace(star, nth), values)) for x in item]
+                continue
             try:
                 out += [str(render_string(str(x), values)) for x in item]
             except Missing:
@@ -133,6 +153,11 @@ def job_values(inputs: Mapping[str, Any], params: Mapping[str, Any], seed: int |
     values["refs"] = refs
     if refs:
         values["ref"] = refs[0]
+    for role, exts in (("image", IMAGE_EXT), ("audio", AUDIO_EXT), ("video", VIDEO_EXT)):
+        files = [r for r in refs if Path(r).suffix.lower() in exts]
+        if files:
+            values[f"{role}s"] = files
+            values.setdefault(role, files[0])
     if seed is not None:
         values["seed"] = seed
     values.update(extra or {})

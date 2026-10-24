@@ -11,6 +11,10 @@ export type ToolTemplate = S["ToolTemplate"];
 export type ToolChecked = S["ToolChecked"];
 export type ToolConnectorSaved = S["ToolConnectorSaved"];
 export type ToolSnippet = S["ToolSnippet"];
+export type CliOption = S["CliOption-Output"];
+export type CliParsed = S["CliParsed"];
+export type CliBuilt = S["CliBuilt"];
+export type CliBuild = S["CliBuildRequest"];
 
 export const useToolModels = () => useQuery({ queryKey: ["tools"], queryFn: () => api<ToolModel[]>("/api/tools") });
 
@@ -40,3 +44,8 @@ export function useSaveConnector() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["tools"] }),
   });
 }
+
+export const useParseCli = () =>
+  useMutation({ mutationFn: (v: { program: string; help_text: string }) => post<CliParsed>("/api/tools/cli/parse", v) });
+
+export const useBuildCli = () => useMutation({ mutationFn: (v: CliBuild) => post<CliBuilt>("/api/tools/cli/build", v) });
