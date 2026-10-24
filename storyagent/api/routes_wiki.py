@@ -7,11 +7,21 @@ from typing import Annotated
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import FileResponse
 
-from storyagent.wiki import Page, WikiStore
+from storyagent.wiki import FocusNotFound, Page, WikiStore, build_graph
+from storyagent.wiki.graph import DEFAULT_LIMIT, MAX_LIMIT
 
 from .context import ctx_of
 from .errors import ApiError
-from .schemas import WikiBrief, WikiCount, WikiList, WikiPageOut, WikiSyncOut
+from .schemas import (
+    WikiBrief,
+    WikiCount,
+    WikiGraphEdge,
+    WikiGraphNode,
+    WikiGraphOut,
+    WikiList,
+    WikiPageOut,
+    WikiSyncOut,
+)
 from .visibility import hidden, require_viewable
 
 router = APIRouter(prefix="/api/wiki", tags=["wiki"])
@@ -58,6 +68,52 @@ def list_pages(
         sources=[WikiCount(name=k, count=v) for k, v in sorted(sources.items())],
         tags=[WikiCount(name=k, count=v) for k, v in sorted(tags.items(), key=lambda kv: (-kv[1], kv[0]))],
         synced_at=store.last_sync(), configured=bool(ctx_of(request).settings.wiki.sources))
+
+
+@router.get("/graph", response_model=WikiGraphOut)
+def graph(
+    request: Request,
+    q: Annotated[str, Query(max_length=200)] = "",
+    source: str = "",
+    tag: str = "",
+    focus: Annotated[str, Query(max_length=500, description="a page slug, or model:<family>")] = "",
+    depth: Annotated[int, Query(ge=1, le=2)] = 1,
+    include_tags: bool = False,
+    shared_tags: bool = False,
+    include_models: bool = False,
+    limit: Annotated[int, Query(ge=1, le=MAX_LIMIT)] = DEFAULT_LIMIT,
+) -> WikiGraphOut:
+    """The pages and the links between them. A restricted page the caller may not see is not a node, not the end of an
+    edge and not in any count (``hidden`` says how many there are, as the page list does)."""
+    store = _store(request)
+    everything = store.all()
+    visible = [p for p in everything if _visible(p)]
+    if focus and not focus.startswith("model:"):
+        page = store.get(focus)
+        if page is None:
+            raise ApiError(404, "not_found", focus)
+        if page.rating != "general":
+            require_viewable(request, page.rating, None, what=f"wiki:{focus}")
+    matches = {p.slug for p, _snip, _score in store.search(q, visible)} if q.strip() else None
+    settings = ctx_of(request).settings
+    try:
+        built = build_graph(
+            visible, store.links(), settings.models, source=source, tag=tag, matches=matches, focus=focus, depth=depth,
+            include_tags=include_tags, shared_tags=shared_tags, include_models=include_models, limit=limit)
+    except FocusNotFound:
+        raise ApiError(404, "not_found", focus) from None
+    sources: dict[str, int] = {}
+    tags: dict[str, int] = {}
+    for p in visible:
+        sources[p.source] = sources.get(p.source, 0) + 1
+        for t in p.tags:
+            tags[t] = tags.get(t, 0) + 1
+    return WikiGraphOut(
+        nodes=[WikiGraphNode(**vars(n)) for n in built.nodes], edges=[WikiGraphEdge(**vars(e)) for e in built.edges],
+        total=len(visible), hidden=len(everything) - len(visible), matched=built.matched, truncated=built.truncated,
+        limit=limit, focus=built.focus, depth=depth,
+        sources=[WikiCount(name=k, count=v) for k, v in sorted(sources.items())],
+        tags=[WikiCount(name=k, count=v) for k, v in sorted(tags.items(), key=lambda kv: (-kv[1], kv[0]))])
 
 
 @router.get("/pages/{slug:path}", response_model=WikiPageOut)

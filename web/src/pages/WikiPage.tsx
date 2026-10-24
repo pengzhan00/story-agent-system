@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useMemo, type ReactNode } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useWikiList, useWikiPage, useWikiSync } from "../api/wiki";
 import type { WikiBrief } from "../api/types";
 import { ErrorNote } from "../components/ErrorNote";
+import { MiniGraph, WikiGraphView } from "../components/WikiGraphView";
 import { useT } from "../i18n";
 import { Markdown, headingsOf, readBlocks } from "../lib/markdown";
 
@@ -26,10 +27,16 @@ function PageRow({ page, active }: { page: WikiBrief; active: boolean }) {
   );
 }
 
-function Reader({ slug }: { slug: string }) {
+function Reader({ slug, search = "", mini = true }: { slug: string; search?: string; mini?: boolean }) {
   const t = useT();
   const page = useWikiPage(slug);
   const data = page.data;
+  const tagHref = (tag: string) => {
+    if (!search) return `/wiki?tag=${encodeURIComponent(tag)}`;
+    const next = new URLSearchParams(search);
+    next.set("tag", tag);
+    return `${hrefOf(slug)}?${next.toString()}`;
+  };
   const toc = useMemo(() => (data ? headingsOf(readBlocks(data.body, data.page.title)).filter((h) => h.level <= 3) : []), [data]);
   if (page.isLoading) return <p className="muted">{t("web.loading")}</p>;
   if (page.error) return <ErrorNote error={page.error} />;
@@ -46,7 +53,7 @@ function Reader({ slug }: { slug: string }) {
         {data.page.tags.length ? (
           <div className="row">
             {data.page.tags.map((tag) => (
-              <Link key={tag} className="chip chip-button" to={`/wiki?tag=${encodeURIComponent(tag)}`}>
+              <Link key={tag} className="chip chip-button" to={tagHref(tag)}>
                 {tag}
               </Link>
             ))}
@@ -68,6 +75,7 @@ function Reader({ slug }: { slug: string }) {
         </nav>
       ) : null}
       <Markdown source={data.body} dropTitle={data.page.title} />
+      {mini ? <MiniGraph slug={slug} /> : null}
       {data.backlinks.length ? (
         <section className="stack">
           <h3>{t("web.wiki.backlinks")}</h3>
@@ -96,26 +104,77 @@ function Reader({ slug }: { slug: string }) {
   );
 }
 
+type WikiCount = { name: string; count: number };
+
+function Filters({ q, source, tag, sources, tags, set }: {
+  q: string;
+  source: string;
+  tag: string;
+  sources: WikiCount[];
+  tags: WikiCount[];
+  set: (patch: Record<string, string>) => void;
+}): ReactNode {
+  const t = useT();
+  return (
+    <>
+      <input type="search" value={q} placeholder={t("web.wiki.search")} aria-label={t("web.wiki.search")} onChange={(e) => set({ q: e.target.value })} />
+      {sources.length > 1 ? (
+        <select aria-label={t("web.wiki.source")} value={source} onChange={(e) => set({ source: e.target.value })}>
+          <option value="">{t("web.wiki.source_all")}</option>
+          {sources.map((s) => (
+            <option key={s.name} value={s.name}>
+              {`${s.name} (${s.count})`}
+            </option>
+          ))}
+        </select>
+      ) : null}
+      {tags.length ? (
+        <div className="row">
+          {tags.slice(0, TOP_TAGS).map((c) => (
+            <button key={c.name} type="button" className={c.name === tag ? "chip chip-button chip-running" : "chip chip-button"} aria-pressed={c.name === tag} onClick={() => set({ tag: c.name === tag ? "" : c.name })}>
+              {c.name}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </>
+  );
+}
+
 export function WikiPage() {
   const t = useT();
   const slug = useParams()["*"] ?? "";
   const [params, setParams] = useSearchParams();
   const q = params.get("q") ?? "";
   const tag = params.get("tag") ?? "";
-  const [source, setSource] = useState("");
-  const list = useWikiList({ q, source, tag });
+  const source = params.get("source") ?? "";
+  const graphView = params.get("view") === "graph";
+  const scope = ["1", "2"].includes(params.get("scope") ?? "") ? (params.get("scope") as string) : "all";
+  const layerList = (params.get("layers") ?? "").split(",");
+  const layers = { tags: layerList.includes("tags"), shared: layerList.includes("shared"), models: layerList.includes("models") };
+  const list = useWikiList({ q, source, tag }, !graphView);
   const sync = useWikiSync();
   const data = list.data;
-  const set = (key: string, value: string) => {
+  const set = (patch: Record<string, string>) => {
     const next = new URLSearchParams(params);
-    if (value) next.set(key, value);
-    else next.delete(key);
+    for (const [key, value] of Object.entries(patch)) {
+      if (value) next.set(key, value);
+      else next.delete(key);
+    }
     setParams(next, { replace: true });
   };
+  const filters = (sources: WikiCount[], tags: WikiCount[]) => <Filters q={q} source={source} tag={tag} sources={sources} tags={tags} set={set} />;
   return (
     <div className="stack">
       <div className="row">
         <h2>{t("web.wiki.title")}</h2>
+        <div className="tabs" role="group" aria-label={t("web.wiki.view")}>
+          {(["list", "graph"] as const).map((v) => (
+            <button key={v} type="button" className={(v === "graph") === graphView ? "tab active" : "tab"} aria-pressed={(v === "graph") === graphView} onClick={() => set({ view: v === "graph" ? "graph" : "" })}>
+              {t(`web.wiki.view.${v}`)}
+            </button>
+          ))}
+        </div>
         <span className="spacer" />
         {data?.synced_at ? <span className="muted small">{t("web.wiki.synced_at", { when: data.synced_at.slice(0, 16).replace("T", " ") })}</span> : null}
         <button type="button" disabled={sync.isPending} onClick={() => sync.mutate()}>
@@ -133,48 +192,39 @@ export function WikiPage() {
           ))}
         </div>
       ) : null}
-      <div className="split wiki-split">
-        <aside className="stack">
-          <input
-            type="search"
-            value={q}
-            placeholder={t("web.wiki.search")}
-            aria-label={t("web.wiki.search")}
-            onChange={(e) => set("q", e.target.value)}
-          />
-          {data && data.sources.length > 1 ? (
-            <select aria-label={t("web.wiki.source")} value={source} onChange={(e) => setSource(e.target.value)}>
-              <option value="">{t("web.wiki.source_all")}</option>
-              {data.sources.map((s) => (
-                <option key={s.name} value={s.name}>
-                  {`${s.name} (${s.count})`}
-                </option>
+      {graphView ? (
+        <WikiGraphView
+          slug={slug}
+          q={q}
+          source={source}
+          tag={tag}
+          scope={scope}
+          model={params.get("model") ?? ""}
+          color={params.get("color") === "tag" ? "tag" : "source"}
+          layers={layers}
+          filters={filters}
+          set={set}
+          reader={slug ? <Reader slug={slug} search={`?${params.toString()}`} mini={false} /> : null}
+        />
+      ) : (
+        <div className="split wiki-split">
+          <aside className="stack">
+            {filters(data?.sources ?? [], data?.tags ?? [])}
+            <ErrorNote error={list.error} />
+            {data && data.hidden > 0 ? <p className="muted small">{t("web.wiki.hidden", { n: data.hidden })}</p> : null}
+            {data && data.pages.length === 0 ? (
+              <p className="empty">{data.total === 0 ? t("web.wiki.empty") : t("web.wiki.no_results")}</p>
+            ) : null}
+            {data && data.total === 0 && !data.configured ? <p className="muted small">{t("web.wiki.not_configured")}</p> : null}
+            <ul className="wiki-list">
+              {data?.pages.map((p) => (
+                <PageRow key={p.slug} page={p} active={p.slug === slug} />
               ))}
-            </select>
-          ) : null}
-          {data && data.tags.length ? (
-            <div className="row">
-              {data.tags.slice(0, TOP_TAGS).map((c) => (
-                <button key={c.name} type="button" className={c.name === tag ? "chip chip-button chip-running" : "chip chip-button"} aria-pressed={c.name === tag} onClick={() => set("tag", c.name === tag ? "" : c.name)}>
-                  {c.name}
-                </button>
-              ))}
-            </div>
-          ) : null}
-          <ErrorNote error={list.error} />
-          {data && data.hidden > 0 ? <p className="muted small">{t("web.wiki.hidden", { n: data.hidden })}</p> : null}
-          {data && data.pages.length === 0 ? (
-            <p className="empty">{data.total === 0 ? t("web.wiki.empty") : t("web.wiki.no_results")}</p>
-          ) : null}
-          {data && data.total === 0 && !data.configured ? <p className="muted small">{t("web.wiki.not_configured")}</p> : null}
-          <ul className="wiki-list">
-            {data?.pages.map((p) => (
-              <PageRow key={p.slug} page={p} active={p.slug === slug} />
-            ))}
-          </ul>
-        </aside>
-        <section>{slug ? <Reader slug={slug} /> : <p className="empty">{t("web.wiki.pick")}</p>}</section>
-      </div>
+            </ul>
+          </aside>
+          <section>{slug ? <Reader slug={slug} /> : <p className="empty">{t("web.wiki.pick")}</p>}</section>
+        </div>
+      )}
     </div>
   );
 }

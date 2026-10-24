@@ -7117,6 +7117,212 @@
         "title": "WikiCount",
         "type": "object"
       },
+      "WikiGraphEdge": {
+        "properties": {
+          "kind": {
+            "description": "link | tag | shared_tag | mention",
+            "title": "Kind",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          },
+          "weight": {
+            "description": "shared tags (shared_tag) or mentions (mention); 1 otherwise",
+            "title": "Weight",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "source",
+          "target",
+          "kind",
+          "weight"
+        ],
+        "title": "WikiGraphEdge",
+        "type": "object"
+      },
+      "WikiGraphNode": {
+        "properties": {
+          "id": {
+            "description": "the page slug; `tag:<name>` for a tag node, `model:<family>` for a model node",
+            "title": "Id",
+            "type": "string"
+          },
+          "isolated": {
+            "description": "a page without any edge in this view",
+            "title": "Isolated",
+            "type": "boolean"
+          },
+          "kind": {
+            "description": "page | tag | model",
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "links_in": {
+            "description": "links from other visible pages, over the whole wiki (not only this view)",
+            "title": "Links In",
+            "type": "integer"
+          },
+          "links_out": {
+            "title": "Links Out",
+            "type": "integer"
+          },
+          "match": {
+            "description": "false for the pages around the hits of a search, shown only for context",
+            "title": "Match",
+            "type": "boolean"
+          },
+          "model_kind": {
+            "title": "Model Kind",
+            "type": "string"
+          },
+          "pages": {
+            "description": "tag and model nodes: pages in this view that carry the tag or mention the model",
+            "title": "Pages",
+            "type": "integer"
+          },
+          "rating": {
+            "title": "Rating",
+            "type": "string"
+          },
+          "refs": {
+            "description": "model nodes: the models of the family (keys of models.toml)",
+            "items": {
+              "type": "string"
+            },
+            "title": "Refs",
+            "type": "array"
+          },
+          "slug": {
+            "description": "page nodes: the slug to open; empty for the others",
+            "title": "Slug",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "label",
+          "slug",
+          "source",
+          "rating",
+          "tags",
+          "summary",
+          "links_in",
+          "links_out",
+          "pages",
+          "refs",
+          "model_kind",
+          "isolated",
+          "match"
+        ],
+        "title": "WikiGraphNode",
+        "type": "object"
+      },
+      "WikiGraphOut": {
+        "properties": {
+          "depth": {
+            "title": "Depth",
+            "type": "integer"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/WikiGraphEdge"
+            },
+            "title": "Edges",
+            "type": "array"
+          },
+          "focus": {
+            "title": "Focus",
+            "type": "string"
+          },
+          "hidden": {
+            "description": "restricted pages this caller may not see right now (locked or too young)",
+            "title": "Hidden",
+            "type": "integer"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "matched": {
+            "description": "pages that passed the filters, before the cap",
+            "title": "Matched",
+            "type": "integer"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/WikiGraphNode"
+            },
+            "title": "Nodes",
+            "type": "array"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/WikiCount"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "tags": {
+            "items": {
+              "$ref": "#/components/schemas/WikiCount"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
+          "total": {
+            "description": "pages this caller may see, before the filters",
+            "title": "Total",
+            "type": "integer"
+          },
+          "truncated": {
+            "description": "more pages matched than `limit`: the best connected ones are shown",
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "nodes",
+          "edges",
+          "total",
+          "hidden",
+          "matched",
+          "truncated",
+          "limit",
+          "focus",
+          "depth",
+          "sources",
+          "tags"
+        ],
+        "title": "WikiGraphOut",
+        "type": "object"
+      },
       "WikiList": {
         "properties": {
           "configured": {
@@ -16495,6 +16701,138 @@
           }
         },
         "summary": "Asset",
+        "tags": [
+          "wiki"
+        ]
+      }
+    },
+    "/api/wiki/graph": {
+      "get": {
+        "description": "The pages and the links between them. A restricted page the caller may not see is not a node, not the end of an\nedge and not in any count (``hidden`` says how many there are, as the page list does).",
+        "operationId": "graph_api_wiki_graph_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "default": "",
+              "maxLength": 200,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "source",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Source",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tag",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Tag",
+              "type": "string"
+            }
+          },
+          {
+            "description": "a page slug, or model:<family>",
+            "in": "query",
+            "name": "focus",
+            "required": false,
+            "schema": {
+              "default": "",
+              "description": "a page slug, or model:<family>",
+              "maxLength": 500,
+              "title": "Focus",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "depth",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "maximum": 2,
+              "minimum": 1,
+              "title": "Depth",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_tags",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Tags",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "shared_tags",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Shared Tags",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_models",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Models",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 400,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WikiGraphOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Graph",
         "tags": [
           "wiki"
         ]

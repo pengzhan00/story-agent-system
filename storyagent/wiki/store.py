@@ -266,6 +266,10 @@ class WikiStore:
             (slug,)).fetchall()
         return [_row_page(r) for r in rows]
 
+    def links(self) -> list[tuple[str, str]]:
+        rows = self.db.conn.execute("SELECT src, dst FROM wiki_links ORDER BY src, dst").fetchall()
+        return [(r["src"], r["dst"]) for r in rows]
+
     def search(self, query: str, pages: list[Page] | None = None) -> list[tuple[Page, str, int]]:
         """Pages that contain every word of ``query`` (case ignored) in the title, the tags or the text, best first,
         each with a snippet around the first hit. The notes are few and short, so this reads them; no word splitter is
