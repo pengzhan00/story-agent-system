@@ -318,6 +318,7 @@ timeout_sec = 900
 engine = "cv3"
 model_dir = "~/models/cosyvoice3/Fun-CosyVoice3-0.5B"
 [models."cosyvoice3-0.5b".params]
+emotion_prompt = "请用非常{emotion}、情绪饱满强烈、语气起伏明显的语气说"   # a line's emotion text becomes this instruction
 mode = "zero_shot"
 sample_rate = 24000
 output_format = "wav"
@@ -338,6 +339,7 @@ prompt_profile = "plain"
 timeout_sec = 900
 engine = "cv2"
 [models."cosyvoice2-0.5b".params]
+emotion_prompt = "请用非常{emotion}、情绪饱满强烈、语气起伏明显的语气说"   # a line's emotion text becomes this instruction
 mode = "zero_shot"
 sample_rate = 24000
 output_format = "wav"

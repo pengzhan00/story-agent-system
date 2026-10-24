@@ -7,7 +7,7 @@ Inputs:
     voice_ref                  {"audio": <3-20 s wav>, "text": <transcript>, "consent": true}
                                (a missing transcript is produced with whisper unless auto_transcribe=false)
     instruct                   style instruction for mode=instruct (e.g. "speak softly, with a sad tone")
-    prompt                     the line's emotion ("furious", "犹豫"): with mode=zero_shot it is spoken in that tone
+    prompt                     the line's emotion ("furious", "hesitant"): with mode=zero_shot it is spoken in that tone
                                (the job runs as ``instruct`` with ``emotion_prompt``); ``emotion=false`` turns it off
 Params: mode (zero_shot | cross_lingual | instruct), speed (0.5-2.0), output_format (wav | mp3),
         emotion (bool, default true), emotion_prompt (template with {emotion}),
@@ -54,7 +54,7 @@ def mode_of(job: JobRecord) -> tuple[str, str]:
     instruct = str(job.inputs.get("instruct", "")).strip()
     emotion = str(job.inputs.get("prompt") or "").strip()
     if mode == "zero_shot" and emotion and not instruct and bool(job.params.get("emotion", True)):
-        template = str(job.params.get("emotion_prompt") or "请用非常{emotion}、情绪饱满强烈、语气起伏明显的语气说")
+        template = str(job.params.get("emotion_prompt") or "Speak in a very {emotion} tone, with strong feeling")
         return "instruct", template.replace("{emotion}", emotion)
     return mode, instruct
 
