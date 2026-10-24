@@ -11,7 +11,7 @@
 | 模型 | 体积 | 定位 | 局限 |
 |---|---|---|---|
 | `gemma4:31b` | 20 GB | 通用对话、原生多模态视觉、中文长文写作;**系统里所有角色目前都用它** | 吞吐慢,不适合高频补全;工具调用弱 |
-| `qwen3.8-27b-abliterated:q6k` | 23 GB | 本地去拒答模型,中文好;**受限分级的项目用它**(见下节「按内容分级选模型」) | 去拒答模型没有统一评测,指令遵循和事实性可能下降;会思考,系统对 qwen3 默认关思考 |
+| `qwen3.6-35b-a3b-abliterated:iq4xs` | 18 GB | Huihui 的 Qwen3.6-35B-A3B 去拒答版(MoE,每个 token 只激活约 3B 参数),从 `~/models/gguf/` 的 GGUF 导入。**受限分级的项目用它**(见下节「按内容分级选模型」)。实测(M5 Max,2026-10-25):稳态生成约 100 token/s,冷加载约 5 秒;对 `think:false` 有效(带 JSON 约束也无思考) | 去拒答模型没有统一评测,长篇中文叙事质量要靠你自己的成片判断;不带视觉模块 |
 | `nomic-embed-text` | 274 MB | 向量化 | |
 
 存储:`~/.ollama/models` 67 GB,磁盘可用约 448 GB。`gpt-oss-20b` 与 `~/models/gguf` 下的 gpt-oss GGUF 在 10-24 删除,共释放约 81 GB,所以推理/工具调用的位置目前是空的。
@@ -19,7 +19,7 @@
 
 候选(没有拉取):`qwen3.6:35b-coding`(约 23–24 GB,SWE-bench Verified 73.4%、Terminal-Bench 51.5%)补编码/agent 位;
 替换 uncensored 的 `mgraffam/gemma4-agentic-fable-abliterated`(14 GB,MoE 最快)、`FableForge-AI/mythos-v2-9b`(5.8 GB,最轻);
-**已试过、不好用,不要再选** `abliterant/qwen3.8-rana`(你的实测)。**不要选** 112 GB 的 `qwen3.8-flash-next-abliterated`(128 GB 机器上余量只有约 6 GB)。去拒答模型没有统一评测,指令遵循和事实性通常会下降,许可要回各自 README 核。
+**已试过、不要再选**:`abliterant/qwen3.8-rana`(不好用);`qwen3.8-27b-abliterated:q6k`(稠密 27B,约 2–9 token/s,太慢,已删)。**不要选** 112 GB 的 `qwen3.8-flash-next-abliterated`(128 GB 机器上余量只有约 6 GB)。去拒答模型没有统一评测,指令遵循和事实性通常会下降,许可要回各自 README 核。
 
 ## 按内容分级选模型
 
@@ -28,7 +28,7 @@
 ```toml
 [llm.ratings.restricted]            # 受限项目的所有角色
 backend = "ollama"
-model = "qwen3.8-27b-abliterated:q6k"
+model = "qwen3.6-35b-a3b-abliterated:iq4xs"
 ```
 
 某个角色想单独换,再加 `[llm.ratings.restricted.roles.<角色>]`(同样的 `backend`/`model`)。选择顺序:调用时指定的模型 > 这个项目在「语言模型」页的选择 > 分级路由 > 页面上的全局选择 > `[llm.roles.*]`。

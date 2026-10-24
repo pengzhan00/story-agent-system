@@ -103,6 +103,6 @@ allow_remote = false            # 不送云端模型(忽略项目的 allow_remot
 **启用**:默认 `mode = "off"`(单人,不登录)。要用账号:`data/config/auth.toml` 写 `[auth] mode = "token"`(或环境变量 `STORY_AGENT_AUTH=token`),重启后打开网页,登录页会直接让你创建第一个管理员(用户名、密码、出生日期,立即生效;`POST /api/auth/setup`,只在还没有任何账号时可用)。之后的注册、批准年龄、改角色都在网页「账号」页完成;命令行只是可选的替代。
 
 ## 语言模型按分级路由(2026-10-24)
-`llm.toml` 的 `[llm.ratings.<分级>]` 把该分级的项目分到指定的本地模型(例子见 `docs/examples/restricted-llm/llm.toml`,本机用 `qwen3.8-27b-abliterated:q6k`)。
+`llm.toml` 的 `[llm.ratings.<分级>]` 把该分级的项目分到指定的本地模型(例子见 `docs/examples/restricted-llm/llm.toml`,本机用 `qwen3.6-35b-a3b-abliterated:iq4xs`)。
 受限分级的 `allow_remote = false` 现在在语言模型这一层真正生效:路由到的后端不在本机,调用以 `remote_forbidden` 拒绝。
 语言模型页显示来源「按内容分级」。仍然只是接线,不含提示词。
