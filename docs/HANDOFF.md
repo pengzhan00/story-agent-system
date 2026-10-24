@@ -67,7 +67,7 @@ storyagent/
   cli.py       `python -m storyagent …`(所有命令的入口)
 web/           React+TS+Vite;pages/(Launch Projects Project Workshop Library Queue Prompts System)
 tests/         pytest(默认不含 live);tests/test_guards.py 是红线
-docs/          API CONFIGURATION MEDIA_CONTRACT RUNBOOK WORKFLOW USER_GUIDE PARITY_MATRIX SERIES HANDOFF(本文);reviews/ 审查报告
+docs/          API CONFIGURATION MEDIA_CONTRACT RUNBOOK WORKFLOW USER_GUIDE PARITY_MATRIX SERIES HANDOFF(本文) TOOLS(管线工具总览)；tools/ 各工具的命令与参数含义(LTX、Phosphene、h3.c、ComfyUI、ACE-Step、CosyVoice、Seed-VC、FLUX、LongCat、LLM、后期)；reviews/ 审查报告
 ```
 
 ### 3.1 核心数据流(必须记住)
