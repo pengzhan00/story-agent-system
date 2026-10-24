@@ -2893,6 +2893,10 @@
             "title": "Params",
             "type": "object"
           },
+          "prompt_language": {
+            "title": "Prompt Language",
+            "type": "string"
+          },
           "prompt_profile": {
             "title": "Prompt Profile",
             "type": "string"
@@ -2934,6 +2938,7 @@
           "commercial_ok",
           "attribution",
           "prompt_profile",
+          "prompt_language",
           "timeout_sec",
           "params",
           "tiers"

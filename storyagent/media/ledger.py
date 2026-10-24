@@ -20,7 +20,7 @@ from storyagent.db import Database
 from storyagent.domain import JobStatus
 from storyagent.domain.errors import ErrorCode
 from storyagent.pipelines import project_settings_for
-from storyagent.util import digest, dumps, iso_at, new_id
+from storyagent.util import digest, dumps, has_cjk, iso_at, new_id
 
 from .contracts import AssetRecord, JobRecord, MediaJob
 from .params import resolve_params
@@ -178,6 +178,9 @@ class Ledger:
                 ),
             )
             self.add_event(jid, "enqueued", model=model_ref, tier=job.tier.value)
+            if model.prompt_language == "en" and any(
+                    has_cjk(str(job.inputs.get(k) or "")) for k in ("prompt", "negative_prompt")):
+                self.add_event(jid, "prompt_language", "warning", model=model_ref, language=model.prompt_language)
             return self.get_job(jid), True
 
     # -- reads --------------------------------------------------------------------------------

@@ -471,6 +471,7 @@ class ModelOut(BaseModel):
     commercial_ok: bool
     attribution: str
     prompt_profile: str
+    prompt_language: str
     timeout_sec: int
     params: dict[str, Any]
     tiers: dict[str, dict[str, Any]]

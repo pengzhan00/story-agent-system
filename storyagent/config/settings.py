@@ -80,6 +80,7 @@ class ModelSpec:
     commercial_ok: bool = True
     attribution: str = ""
     prompt_profile: str = "plain"
+    prompt_language: str = ""        # "en": the model reads English prompts only ("" = any language)
     timeout_sec: int = 3600
     params: Mapping[str, Any] = field(default_factory=dict)
     tiers: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
@@ -410,8 +411,10 @@ def deep_merge(base: dict[str, Any], over: Mapping[str, Any]) -> dict[str, Any]:
 
 _MODEL_KNOWN = {
     "kind", "provider", "version", "family", "heavy", "est_memory_gib", "license_tag",
-    "commercial_ok", "attribution", "prompt_profile", "timeout_sec", "params", "tiers",
+    "commercial_ok", "attribution", "prompt_profile", "prompt_language", "timeout_sec", "params", "tiers",
 }
+# Dialects written for English-only models; ``prompt_language`` in models.toml overrides this default.
+ENGLISH_PROFILES = frozenset({"natural_en", "cinematic_en", "ltx_av", "h3_structured"})
 
 
 def _build_models(raw: Mapping[str, Any]) -> dict[str, ModelSpec]:
@@ -438,6 +441,8 @@ def _build_models(raw: Mapping[str, Any]) -> dict[str, ModelSpec]:
             commercial_ok=bool(spec.get("commercial_ok", True)),
             attribution=str(spec.get("attribution", "")),
             prompt_profile=str(spec.get("prompt_profile", "plain")),
+            prompt_language=str(spec.get("prompt_language", "en" if spec.get("prompt_profile") in ENGLISH_PROFILES
+                                         else "")),
             timeout_sec=int(spec.get("timeout_sec", 3600)),
             params=dict(spec.get("params", {})),
             tiers={t: dict(v) for t, v in tiers.items()},

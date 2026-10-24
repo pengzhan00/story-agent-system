@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
@@ -44,3 +45,11 @@ def home_file(home: Path, rel: str) -> Path | None:
     root = os.path.normpath(home)
     full = os.path.normpath(home / rel)
     return Path(full) if full != root and full.startswith(root + os.sep) else None
+
+
+_CJK = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\u3040-\u30ff\uac00-\ud7af]")
+
+
+def has_cjk(text: str) -> bool:
+    """Chinese, Japanese or Korean characters in ``text`` (what an English-only model cannot read)."""
+    return bool(_CJK.search(text or ""))

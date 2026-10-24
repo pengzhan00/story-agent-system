@@ -3699,6 +3699,8 @@ export interface components {
             params: {
                 [key: string]: unknown;
             };
+            /** Prompt Language */
+            prompt_language: string;
             /** Prompt Profile */
             prompt_profile: string;
             /** Provider */
