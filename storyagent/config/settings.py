@@ -25,6 +25,7 @@ from storyagent.domain import MediaKind, QualityTier
 from .content import ContentConfig, build_content
 from .grammar import Grammar, build_grammar
 from .platforms import Platforms, build_platforms
+from .setup import SetupConfig, build_setup
 from .wiki import WikiConfig, build_wiki
 
 ENV_HOME = "STORY_AGENT_HOME"
@@ -40,7 +41,7 @@ UNLOAD_POLICIES = ("never", "ask", "auto")
 EXPLICIT_LABEL_MODES = ("off", "overlay", "both")
 LLM_BACKEND_KINDS = ("ollama", "llamacpp", "openai_compat")
 _CONFIG_FILES = ("services", "models", "delivery", "compliance", "recipes", "llm", "pipelines", "kinds", "auth",
-                 "grammar", "platforms", "content", "wiki")
+                 "grammar", "platforms", "content", "wiki", "setup")
 AUTH_MODES = ("off", "token")
 CORE_KINDS = ("image.generate", "video.generate", "audio.tts", "audio.music", "compose.assemble")
 BRIEF_QUESTIONS = ("seasons", "episodes", "episode_sec", "audience", "platform")
@@ -239,6 +240,7 @@ class Settings:
     wiki: WikiConfig = field(default_factory=WikiConfig)  # wiki.toml: where the wiki pages come from
     platforms: Platforms = field(default_factory=Platforms)     # platforms.toml: delivery presets per destination
     content: ContentConfig = field(default_factory=ContentConfig)   # content.toml: ratings, vault, unlock, hard gates
+    setup: SetupConfig = field(default_factory=SetupConfig)         # setup.toml: the install guide's catalog
 
     # -- derived paths ----------------------------------------------------
     @property
@@ -792,6 +794,7 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         wiki=build_wiki(merged["wiki"], ConfigError),
         platforms=build_platforms(merged["platforms"], ConfigError),
         content=content,
+        setup=build_setup(merged["setup"], ConfigError),
     )
 
 

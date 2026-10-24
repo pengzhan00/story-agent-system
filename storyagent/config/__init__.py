@@ -20,6 +20,7 @@ from .settings import (
     get_settings,
     load_settings,
 )
+from .setup import SetupCapability, SetupCheck, SetupComponent, SetupConfig, SetupProfile, SetupStep
 
 __all__ = [
     "AuthConfig",
@@ -41,6 +42,12 @@ __all__ = [
     "Recipe",
     "RecipeStep",
     "ServiceConfig",
+    "SetupCapability",
+    "SetupCheck",
+    "SetupComponent",
+    "SetupConfig",
+    "SetupProfile",
+    "SetupStep",
     "Settings",
     "WorkKind",
     "get_settings",

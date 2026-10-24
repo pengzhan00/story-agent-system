@@ -2241,6 +2241,68 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Setup State
+         * @description The checks of a profile, component by component, with the steps for what is missing.
+         */
+        get: operations["setup_state_api_setup_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/setup/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Setup Config Preview */
+        get: operations["setup_config_preview_api_setup_config_get"];
+        put?: never;
+        /**
+         * Setup Config
+         * @description The configuration this machine needs. ``write`` false = a preview; true writes the changed files (the file a
+         *     write replaces is kept as ``<name>.bak-setup-<time>``) and loads them.
+         */
+        post: operations["setup_config_api_setup_config_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/setup/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Setup Verify
+         * @description The healthcheck, with everything the profile needs counted as required.
+         */
+        post: operations["setup_verify_api_setup_verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/tools": {
         parameters: {
             query?: never;
@@ -4851,6 +4913,229 @@ export interface components {
             password: string;
             /** Username */
             username: string;
+        };
+        /** SetupCapabilityOut */
+        SetupCapabilityOut: {
+            /** Components */
+            components: string[];
+            /** Label Key */
+            label_key: string;
+            /** Name */
+            name: string;
+            /** Need */
+            need: string;
+            /** Note Key */
+            note_key: string;
+            /** State */
+            state: string;
+        };
+        /** SetupCheckOut */
+        SetupCheckOut: {
+            /** Detail */
+            detail: string;
+            /** Label */
+            label: string;
+            /** State */
+            state: string;
+        };
+        /** SetupComponentOut */
+        SetupComponentOut: {
+            /** After */
+            after: string[];
+            /** Blocked By */
+            blocked_by: string[];
+            /** Capability */
+            capability: string;
+            /** Checks */
+            checks: components["schemas"]["SetupCheckOut"][];
+            /** Label Key */
+            label_key: string;
+            /** License */
+            license: string;
+            /** Measured */
+            measured: boolean;
+            /** Name */
+            name: string;
+            /** Need */
+            need: string;
+            /** Note Key */
+            note_key: string;
+            /** Size Gib */
+            size_gib: number;
+            /** State */
+            state: string;
+            /** Steps */
+            steps: components["schemas"]["SetupStepOut"][];
+            /** Url */
+            url: string;
+        };
+        /** SetupConfigBody */
+        SetupConfigBody: {
+            /**
+             * Extra
+             * @default []
+             */
+            extra: string[];
+            /**
+             * Llm Model
+             * @default
+             */
+            llm_model: string;
+            /**
+             * Profile
+             * @default full
+             */
+            profile: string;
+            /**
+             * Root
+             * @default
+             */
+            root: string;
+            /**
+             * Write
+             * @default false
+             */
+            write: boolean;
+        };
+        /** SetupConfigFileOut */
+        SetupConfigFileOut: {
+            /** Changed */
+            changed: boolean;
+            /** Changes */
+            changes: string[];
+            /** Exists */
+            exists: boolean;
+            /** Name */
+            name: string;
+            /** Path */
+            path: string;
+            /** Text */
+            text: string;
+        };
+        /** SetupConfigOut */
+        SetupConfigOut: {
+            /** Files */
+            files: components["schemas"]["SetupConfigFileOut"][];
+        };
+        /** SetupConfigWritten */
+        SetupConfigWritten: {
+            /** Files */
+            files: components["schemas"]["SetupConfigFileOut"][];
+            /** Written */
+            written: components["schemas"]["SetupWritten"][];
+        };
+        /** SetupMachineOut */
+        SetupMachineOut: {
+            /** Key */
+            key: string;
+            /** Params */
+            params: {
+                [key: string]: string;
+            };
+            /** State */
+            state: string;
+        };
+        /** SetupOut */
+        SetupOut: {
+            /** Capabilities */
+            capabilities: components["schemas"]["SetupCapabilityOut"][];
+            /** Capabilities All */
+            capabilities_all: string[];
+            /** Components */
+            components: components["schemas"]["SetupComponentOut"][];
+            /** Default Root */
+            default_root: string;
+            /** Download Gib */
+            download_gib: number;
+            /** Downloads */
+            downloads: components["schemas"]["SetupStepOut"][];
+            /** Health Required */
+            health_required: string[];
+            /** Machine */
+            machine: components["schemas"]["SetupMachineOut"][];
+            /** Missing Gib */
+            missing_gib: number;
+            /** Next Step */
+            next_step: string;
+            /** Profile */
+            profile: string;
+            /** Profiles */
+            profiles: components["schemas"]["SetupProfileOut"][];
+            /** Ready */
+            ready: boolean;
+            /** Root */
+            root: string;
+        };
+        /** SetupProfileOut */
+        SetupProfileOut: {
+            /** Label Key */
+            label_key: string;
+            /** Name */
+            name: string;
+            /** Note Key */
+            note_key: string;
+            /** Recommended */
+            recommended: string[];
+            /** Required */
+            required: string[];
+        };
+        /** SetupStepOut */
+        SetupStepOut: {
+            /** Component */
+            component: string;
+            /** Done */
+            done: boolean;
+            /** Error */
+            error: string;
+            /** File */
+            file: string;
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Needs Service */
+            needs_service: string;
+            /** Note Key */
+            note_key: string;
+            /** Runnable */
+            runnable: boolean;
+            /** Shell */
+            shell: string;
+            /** Size Gib */
+            size_gib: number | null;
+            /** Source */
+            source: string;
+        };
+        /** SetupVerifyEntry */
+        SetupVerifyEntry: {
+            /** Category */
+            category: string;
+            /** Detail */
+            detail: string;
+            /** Label */
+            label: string;
+            /** Name */
+            name: string;
+            /** Ok */
+            ok: boolean;
+            /** Required */
+            required: boolean;
+            /** State */
+            state: string;
+        };
+        /** SetupVerifyOut */
+        SetupVerifyOut: {
+            /** Entries */
+            entries: components["schemas"]["SetupVerifyEntry"][];
+            /** Ok */
+            ok: boolean;
+        };
+        /** SetupWritten */
+        SetupWritten: {
+            /** Backup */
+            backup: string;
+            /** Path */
+            path: string;
         };
         /** SpeakerBody */
         SpeakerBody: {
@@ -10654,6 +10939,139 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Ready"];
+                };
+            };
+        };
+    };
+    setup_state_api_setup_get: {
+        parameters: {
+            query?: {
+                profile?: string;
+                root?: string;
+                extra?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetupOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    setup_config_preview_api_setup_config_get: {
+        parameters: {
+            query?: {
+                profile?: string;
+                root?: string;
+                extra?: string;
+                llm_model?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetupConfigOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    setup_config_api_setup_config_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetupConfigBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetupConfigWritten"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    setup_verify_api_setup_verify_post: {
+        parameters: {
+            query?: {
+                profile?: string;
+                root?: string;
+                extra?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetupVerifyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

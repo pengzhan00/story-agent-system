@@ -21,6 +21,7 @@
     storyagent api openapi [--out FILE]
     storyagent ops llm-unload
     storyagent ops stop NAME [--force]      (end a service listed with stop = "port" in services.toml)
+    storyagent setup [--profile P] [--root DIR] | profiles | check | plan | config [--write] | run STEP | verify
 
 Commands that touch data migrate the database first (idempotent, snapshot taken before an upgrade).
 """
@@ -61,6 +62,7 @@ from storyagent.media.specs import SpecError, SpecLocked, SpecStore
 from storyagent.media.worker import Worker, run_once
 from storyagent.progressbar import render_run, render_stages
 from storyagent.projects import ProjectNotFound, ProjectStateError, ProjectStore
+from storyagent.setup.layout import SetupError
 from storyagent.workflow import STAGES, WorkflowEngine, WorkflowState, WorkflowStateError
 
 CONFIRM_HELP = "export a project of a restricted rating: confirms everyone shown is an adult and has consented"
@@ -1402,6 +1404,34 @@ def build_parser() -> argparse.ArgumentParser:
     wp.add_argument("role")
     wp.add_argument("--project", type=int)
 
+    from storyagent.setup import cli as setup_cli
+
+    su = sub.add_parser("setup", help="new-machine install guide")
+    setup_cli.add_arguments(su)
+    su.add_argument("--write-config", action="store_true", help="write the configuration without asking")
+    su.set_defaults(func=setup_cli.cmd_guide, write=False)
+    sus = su.add_subparsers(dest="cmd")
+    add(sus, "profiles", setup_cli.cmd_profiles)
+    sc = add(sus, "check", setup_cli.cmd_check)
+    setup_cli.add_arguments(sc)
+    sc.add_argument("--json", action="store_true")
+    sp_ = add(sus, "plan", setup_cli.cmd_plan)
+    setup_cli.add_arguments(sp_)
+    sp_.add_argument("--all", action="store_true", help="also the optional parts")
+    scf = add(sus, "config", setup_cli.cmd_config)
+    setup_cli.add_arguments(scf)
+    scf.add_argument("--llm-model", help="language model for every role (an Ollama model name)")
+    scf.add_argument("--write", action="store_true",
+                     help="write the files (a replaced one is kept as .bak-setup-*)")
+    sr = add(sus, "run", setup_cli.cmd_run)
+    setup_cli.add_arguments(sr)
+    sr.add_argument("step", help="step id from `setup plan`, e.g. uv.1")
+    sr.add_argument("--yes", action="store_true", help="you have read the step above and confirm it")
+    sv = add(sus, "verify", setup_cli.cmd_verify)
+    setup_cli.add_arguments(sv)
+    sv.add_argument("--start", action="store_true",
+                    help="first start the [launch.*] services that the profile needs")
+
     tool = sub.add_parser("tool").add_subparsers(dest="cmd", required=True)
     timp = tool.add_parser("import").add_subparsers(dest="source", required=True)
     tc = add(timp, "comfy", _cmd_tool_import_comfy)
@@ -1468,6 +1498,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
     except ProjectNotFound as exc:
         print(t("cli.error.project_not_found", id=str(exc)), file=sys.stderr)
+        return 1
+    except SetupError as exc:
+        print(t(f"api.error.setup_{exc.code}") + (f" ({exc.detail})" if exc.detail else ""), file=sys.stderr)
         return 1
     except CliError as exc:
         print(t(exc.key, **exc.params), file=sys.stderr)

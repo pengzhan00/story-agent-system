@@ -1478,3 +1478,128 @@ class ToolModel(Strict):
     workflow: str                     # template name ("" = none)
     mine: bool                        # the template is in the operator's own folder
 
+
+
+# -- setup guide -------------------------------------------------------------------------------------
+class SetupCheckOut(Strict):
+    label: str
+    state: str                  # ok | missing | unknown
+    detail: str
+
+
+class SetupStepOut(Strict):
+    id: str
+    component: str
+    kind: str                   # command | download | manual
+    shell: str                  # one copy-pasteable line
+    note_key: str
+    source: str
+    file: str
+    size_gib: float | None
+    needs_service: str
+    runnable: bool
+    done: bool
+    error: str
+
+
+class SetupComponentOut(Strict):
+    name: str
+    capability: str
+    need: str                   # required | recommended | optional
+    state: str                  # ok | partial | missing | unverified
+    label_key: str
+    note_key: str
+    size_gib: float
+    measured: bool
+    license: str
+    url: str
+    checks: list[SetupCheckOut]
+    after: list[str]
+    blocked_by: list[str]
+    steps: list[SetupStepOut]
+
+
+class SetupCapabilityOut(Strict):
+    name: str
+    need: str
+    state: str
+    label_key: str
+    note_key: str
+    components: list[str]
+
+
+class SetupMachineOut(Strict):
+    key: str
+    state: str                  # ok | warn | fail
+    params: dict[str, str]
+
+
+class SetupProfileOut(Strict):
+    name: str
+    label_key: str
+    note_key: str
+    required: list[str]
+    recommended: list[str]
+
+
+class SetupOut(Strict):
+    profile: str
+    root: str
+    default_root: str
+    profiles: list[SetupProfileOut]
+    capabilities_all: list[str]
+    machine: list[SetupMachineOut]
+    capabilities: list[SetupCapabilityOut]
+    components: list[SetupComponentOut]
+    downloads: list[SetupStepOut]
+    missing_gib: float
+    download_gib: float
+    ready: bool
+    health_required: list[str]
+    next_step: str
+
+
+class SetupConfigFileOut(Strict):
+    name: str
+    path: str
+    exists: bool
+    changed: bool
+    changes: list[str]
+    text: str
+
+
+class SetupConfigOut(Strict):
+    files: list[SetupConfigFileOut]
+
+
+class SetupConfigBody(BaseModel):
+    profile: str = "full"
+    root: str = ""
+    extra: list[str] = []
+    llm_model: str = ""
+    write: bool = False
+
+
+class SetupWritten(Strict):
+    path: str
+    backup: str
+
+
+class SetupConfigWritten(Strict):
+    files: list[SetupConfigFileOut]
+    written: list[SetupWritten]
+
+
+class SetupVerifyEntry(Strict):
+    name: str
+    category: str
+    state: str
+    label: str
+    detail: str
+    ok: bool
+    required: bool
+
+
+class SetupVerifyOut(Strict):
+    entries: list[SetupVerifyEntry]
+    ok: bool
