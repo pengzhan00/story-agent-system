@@ -101,3 +101,8 @@ allow_remote = false            # 不送云端模型(忽略项目的 allow_remot
 **分级门槛**:`content.toml` 每个分级有 `min_age`(默认 `general` 0、`pg13` 13、`age15` 15、`restricted` 18;排名越高 `min_age` 不能越低;带保险库/硬闸门的分级 `min_age` 不得低于 `min_adult_age`)。低于门槛的账号:项目列表里看不到该项目,`/api/projects/{id}/…` 一律 `403 age_restricted`(审计 `content.age_denied`),素材按遮掩处理、文件接口 403,不能新建这个分级的项目,也不能解锁(解锁要求批准的年龄 ≥ `min_adult_age`)。`mask_ui` 的分级仍要成年确认 + 解锁;`pg13/age15` 只按年龄开放,不遮掩。看过任何有年龄门槛或遮掩的文件都写审计 `content.view`(带 `rating`)。
 **命令行**:`storyagent user create NAME --role R --birth-date YYYY-MM-DD`;`storyagent user age NAME [--reject] [--birth-date D] [--note T]`;`user list` 显示年龄与状态。
 **启用**:默认 `mode = "off"`(单人,不登录)。要用账号:`data/config/auth.toml` 写 `[auth] mode = "token"`(或环境变量 `STORY_AGENT_AUTH=token`),重启后打开网页,登录页会直接让你创建第一个管理员(用户名、密码、出生日期,立即生效;`POST /api/auth/setup`,只在还没有任何账号时可用)。之后的注册、批准年龄、改角色都在网页「账号」页完成;命令行只是可选的替代。
+
+## 语言模型按分级路由(2026-10-24)
+`llm.toml` 的 `[llm.ratings.<分级>]` 把该分级的项目分到指定的本地模型(例子见 `docs/examples/restricted-llm/llm.toml`,本机用 `qwen3.8-27b-abliterated:q6k`)。
+受限分级的 `allow_remote = false` 现在在语言模型这一层真正生效:路由到的后端不在本机,调用以 `remote_forbidden` 拒绝。
+语言模型页显示来源「按内容分级」。仍然只是接线,不含提示词。

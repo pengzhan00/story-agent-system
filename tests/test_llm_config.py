@@ -10,9 +10,10 @@ import pytest
 from fastapi.testclient import TestClient
 
 from storyagent.api.app import create_app
-from storyagent.config import Settings, load_settings
-from storyagent.db import Database
-from storyagent.llm import LLMRouter
+from storyagent.config import ConfigError, Settings, load_settings
+from storyagent.db import Database, migrate
+from storyagent.llm import LLMRouter, overrides
+from storyagent.llm.errors import LLMError
 
 from .conftest import FAKE_MODELS, FAKE_SERVICES
 from .fakes.http_server import FakeServer
@@ -159,3 +160,64 @@ def test_an_edited_text_asset_is_a_new_version_and_the_old_one_stays_a_candidate
     assert client.get(f"/api/assets/{old.id}").json()["is_current"] is False
     img = ledger.register_asset(NewAsset(kind="image.generate", slot="x", path="texts/story.md"), project_id=None)
     assert client.put(f"/api/assets/{img.id}/text", json={"text": "x"}).status_code == 422
+
+
+# -- routing by content rating --------------------------------------------------------------------------------------
+def rated_settings(tmp_path: Path, server: FakeServer, extra: str = "", backend_extra: str = "") -> Settings:
+    home = tmp_path / "rated"
+    cfg = home / "config"
+    cfg.mkdir(parents=True)
+    (cfg / "models.toml").write_text(FAKE_MODELS)
+    (cfg / "services.toml").write_text(FAKE_SERVICES)
+    (cfg / "llm.toml").write_text(
+        f'[llm.backends.fake]\nkind = "openai_compat"\nurl = "{server.url}"\n{backend_extra}'
+        '[llm.roles.default]\nbackend = "fake"\nmodel = "m1"\n'
+        '[llm.roles.director]\nbackend = "fake"\nmodel = "m1"\n[llm.roles.writer]\nbackend = "fake"\nmodel = "m1"\n'
+        '[llm.ratings.restricted]\nbackend = "fake"\nmodel = "m2"\n'
+        '[llm.ratings.restricted.roles.writer]\nbackend = "fake"\nmodel = "m1"\n' + extra)
+    return load_settings({"STORY_AGENT_HOME": str(home)})
+
+
+def rated_project(db: Database, rating: str) -> int:
+    with db.transaction() as conn:
+        cur = conn.execute("INSERT INTO projects(name, slug, rating) VALUES (?, ?, ?)", (rating, rating, rating))
+        pid = int(cur.lastrowid or 0)
+    return pid
+
+
+def test_a_rating_routes_its_roles_to_its_own_model(tmp_path: Path, server: FakeServer) -> None:
+    s = rated_settings(tmp_path, server)
+    db = Database(s.db_path)
+    migrate(db)
+    router = LLMRouter(s, db)
+    plain, adult = rated_project(db, "general"), rated_project(db, "restricted")
+    assert router.resolve("director", project_id=plain)[1] == "m1"
+    assert router.resolve("director", project_id=adult)[1] == "m2"            # the rating's `*` entry
+    assert router.resolve("writer", project_id=adult)[1] == "m1"              # a role of its own beats `*`
+    assert router.resolve("director")[1] == "m1"                              # no project: no rating
+    assert router.resolve("director", "pinned", project_id=adult)[1] == "pinned"
+    overrides.put(db, overrides.GLOBAL, "director", "fake", "m1")
+    assert router.resolve("director", project_id=adult)[1] == "m2"            # a global choice does not undo the rating
+    overrides.put(db, overrides.project_scope(adult), "director", "fake", "m1")
+    assert router.resolve("director", project_id=adult)[1] == "m1"            # the project's own choice does
+
+
+def test_a_rating_that_never_leaves_the_computer_refuses_a_remote_backend(tmp_path: Path, server: FakeServer) -> None:
+    s = rated_settings(tmp_path, server, backend_extra="local = false\n")
+    db = Database(s.db_path)
+    migrate(db)
+    router = LLMRouter(s, db)
+    adult, plain = rated_project(db, "restricted"), rated_project(db, "general")
+    with pytest.raises(LLMError) as exc:
+        router.chat("director", "hi", project_id=adult)
+    assert exc.value.code == "remote_forbidden"
+    assert router.chat("director", "hi", project_id=plain).model == "m1"       # other ratings may use it
+    assert not server.requests or all(q.json["model"] == "m1" for q in server.requests if q.json)
+
+
+def test_a_rating_route_names_a_known_backend_and_rating(tmp_path: Path, server: FakeServer) -> None:
+    with pytest.raises(ConfigError, match="unknown backend"):
+        rated_settings(tmp_path / "a", server,
+                       extra='[llm.ratings.restricted.roles.x]\nbackend = "nope"\nmodel = "m"\n')
+    with pytest.raises(ConfigError, match="unknown rating"):
+        rated_settings(tmp_path / "b", server, extra='[llm.ratings.mystery]\nbackend = "fake"\nmodel = "m"\n')

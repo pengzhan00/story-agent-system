@@ -61,3 +61,18 @@ model = "gemma4:31b"
 [llm.roles.prompter]
 backend = "ollama"
 model = "gemma4:31b"
+
+# Per-rating routing (content.toml ratings): projects of that rating send their roles to these models instead. A rating
+# that is `allow_remote = false` is refused any backend that is not on this computer (a `local = true/false` key in a
+# backend's table overrides the loopback test). Empty by default; the example below is the shape, not a default:
+#
+#   [llm.ratings.restricted]                 # every role of a restricted project
+#   backend = "ollama"
+#   model = "your-local-model:tag"
+#
+#   [llm.ratings.restricted.roles.writer]    # one role only; beats the line above
+#   backend = "ollama"
+#   model = "another-local-model:tag"
+#
+# Order of choice: a model named by the call > the project's own choice on the language-model screen > this table >
+# the global choice on that screen > [llm.roles.*].

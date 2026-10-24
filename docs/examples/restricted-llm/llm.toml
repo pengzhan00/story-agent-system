@@ -1,0 +1,6 @@
+# Copy into $STORY_AGENT_HOME/config/llm.toml (the live config folder, e.g. data/config/llm.toml).
+# Projects whose content rating is `restricted` send every language-model role to the local Qwen below;
+# other projects keep using the models in the packaged llm.toml. Check with `storyagent llm roles --project N`.
+[llm.ratings.restricted]
+backend = "ollama"
+model = "qwen3.8-27b-abliterated:q6k"

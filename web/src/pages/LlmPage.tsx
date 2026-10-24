@@ -75,7 +75,7 @@ function RoleRow({ role, backends, projectId }: { role: LlmRole; backends: LlmBa
         <button type="button" className="link" disabled={test.isPending} onClick={() => test.mutate({ backend: role.backend, model: role.model })}>
           {test.isPending ? t("web.llm.testing") : t("web.llm.test")}
         </button>
-        {role.source !== "config" ? (
+        {role.source === "global" || role.source === "project" ? (
           <button type="button" className="link" disabled={reset.isPending} onClick={() => reset.mutate(role.name)}>
             {t("web.llm.reset")}
           </button>

@@ -7,6 +7,7 @@ import time
 from fastapi import APIRouter, Query, Request
 
 from storyagent.agents.runner import AgentRunner, language_name
+from storyagent.content import project_rating
 from storyagent.llm import LLMError, LLMRouter, overrides
 
 from .context import ctx_of
@@ -66,15 +67,21 @@ def llm_state(request: Request, project_id: int | None = Query(default=None)) ->
         ctx.projects.get(project_id)
     glob = overrides.listing(ctx.db, overrides.GLOBAL)
     mine = overrides.listing(ctx.db, overrides.project_scope(project_id)) if project_id is not None else {}
+    rating = project_rating(ctx.db, project_id)
     roles: list[LlmRoleOut] = []
     for name, cfg in ctx.settings.llm_roles.items():
-        chosen, source = (mine.get(name), "project") if name in mine else (glob.get(name), "global")
-        if chosen is None or chosen.backend not in ctx.settings.llm_backends:
-            chosen, source = None, "config"
+        backend, model, _ = router_.resolve(name, project_id=project_id)
+        if name in mine and mine[name].backend in ctx.settings.llm_backends:
+            source = "project"
+        elif ctx.settings.llm_route(rating, name) is not None:
+            source = "rating"
+        elif name in glob and glob[name].backend in ctx.settings.llm_backends:
+            source = "global"
+        else:
+            source = "config"
         roles.append(LlmRoleOut(
-            name=name, group=ROLE_GROUPS.get(name, "other"), backend=chosen.backend if chosen else cfg.backend,
-            model=chosen.model if chosen else cfg.model, source=source, config_backend=cfg.backend,
-            config_model=cfg.model))
+            name=name, group=ROLE_GROUPS.get(name, "other"), backend=backend, model=model, source=source,
+            config_backend=cfg.backend, config_model=cfg.model))
     roles.sort(key=lambda r: (_GROUP_ORDER.index(r.group), r.name))
     return LlmOut(backends=_backends(request, router_), roles=roles, project_id=project_id)
 

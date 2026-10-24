@@ -1,13 +1,17 @@
 """Role -> (backend, model) routing, structured output with validation + repair, and the call audit log."""
 from __future__ import annotations
 
+import ipaddress
 import json
 import logging
+import socket
 import time
 from collections.abc import Callable, Mapping
 from typing import Any
+from urllib.parse import urlparse
 
 from storyagent.config import Settings
+from storyagent.config.settings import LLMBackend
 from storyagent.content import digest_text, project_rating
 from storyagent.db import Database
 
@@ -18,6 +22,23 @@ from .jsonfix import parse_object
 from .schema import validate
 
 log = logging.getLogger(__name__)
+
+
+
+def backend_is_local(backend: LLMBackend) -> bool:
+    """A backend on this computer: ``local = true/false`` in its table decides, else its address must be loopback."""
+    if "local" in backend.options:
+        return bool(backend.options["local"])
+    host = urlparse(backend.url).hostname or ""
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        pass
+    try:
+        return all(ipaddress.ip_address(info[4][0]).is_loopback for info in socket.getaddrinfo(host, None))
+    except (OSError, ValueError):
+        return False
+
 
 TRANSCRIPT_CAP = 200_000     # characters kept per prompt / answer in generation_logs (a safety cap, not a summary)
 JSON_RULES = (
@@ -53,15 +74,31 @@ class LLMRouter:
     def resolve(
         self, role: str, override_model: str = "", project_id: int | None = None
     ) -> tuple[str, str, dict[str, Any]]:
-        """(backend, model, params): a model named by the call wins, then the project's choice, then the global
-        choice made on the screen, then ``llm.toml``."""
+        """(backend, model, params): a model named by the call wins, then the project's choice, then the model the
+        project's rating routes the role to (``[llm.ratings.X]``), then the global choice made on the screen, then
+        ``llm.toml``."""
         r = self.settings.llm_role(role)
-        backend, model = r.backend, r.model
+        backend, model, params = r.backend, r.model, dict(r.params)
+        routed = None
         if self.db is not None:
+            routed = self.settings.llm_route(project_rating(self.db, project_id), role)
             chosen = overrides.get(self.db, role, project_id)
+            if routed is not None and (chosen is None or chosen.scope == overrides.GLOBAL):
+                chosen = None
             if chosen is not None and chosen.backend in self.settings.llm_backends:
-                backend, model = chosen.backend, chosen.model
-        return backend, override_model or model, dict(r.params)
+                backend, model, routed = chosen.backend, chosen.model, None
+        if routed is not None:
+            backend, model, params = routed.backend, routed.model, {**params, **routed.params}
+        return backend, override_model or model, params
+
+    def check_local(self, backend: str, project_id: int | None) -> None:
+        """A rating that never leaves this computer (``allow_remote = false``) is refused a backend that is not."""
+        if self.db is None or project_id is None:
+            return
+        policy = self.settings.content.policy(project_rating(self.db, project_id))
+        if not policy.allow_remote and not backend_is_local(self.settings.llm_backends[backend]):
+            raise LLMError("remote_forbidden", f"backend {backend!r} is not on this computer and rating "
+                           f"{policy.name!r} is never sent away", backend=backend, rating=policy.name)
 
     def available(self, backend: str, refresh: bool = False) -> list[str]:
         if refresh or backend not in self._models:
@@ -137,6 +174,7 @@ class LLMRouter:
     ) -> ChatResult:
         self._wait_for_heavy()
         backend, model_name, params = self.resolve(role, model, project_id)
+        self.check_local(backend, project_id)
         merged = {"temperature": 0.7, "max_tokens": 4096, **params, **opts}
         res = self.client(backend).chat(
             model_name, system, prompt, temperature=float(merged["temperature"]),

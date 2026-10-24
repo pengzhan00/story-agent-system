@@ -242,6 +242,8 @@ class Settings:
     platforms: Platforms = field(default_factory=Platforms)     # platforms.toml: delivery presets per destination
     content: ContentConfig = field(default_factory=ContentConfig)   # content.toml: ratings, vault, unlock, hard gates
     setup: SetupConfig = field(default_factory=SetupConfig)         # setup.toml: the install guide's catalog
+    # llm.toml [llm.ratings.<rating>]: rating -> role ("*" = every role) -> the model that rating's projects use
+    llm_ratings: Mapping[str, Mapping[str, LLMRole]] = field(default_factory=dict)
 
     # -- derived paths ----------------------------------------------------
     @property
@@ -339,6 +341,11 @@ class Settings:
     def llm_role(self, role: str) -> LLMRole:
         """Role routing with fallback to the ``default`` role."""
         return self.llm_roles.get(role) or self.llm_roles["default"]
+
+    def llm_route(self, rating: str, role: str) -> LLMRole | None:
+        """The model a rating sends ``role`` to (its own entry for the role, else the rating's ``*``), or ``None``."""
+        routes = self.llm_ratings.get(rating or "")
+        return (routes.get(role) or routes.get("*")) if routes else None
 
     @property
     def llm_unload_policy(self) -> str:
@@ -628,7 +635,7 @@ def _build_kinds(raw: Mapping[str, Any], pipelines: Mapping[str, Pipeline]) -> d
 
 def _build_llm(
     raw: Mapping[str, Any], services: Mapping[str, ServiceConfig]
-) -> tuple[dict[str, LLMBackend], dict[str, LLMRole]]:
+) -> tuple[dict[str, LLMBackend], dict[str, LLMRole], dict[str, dict[str, LLMRole]]]:
     backends: dict[str, LLMBackend] = {}
     for name, spec in raw.get("llm", {}).get("backends", {}).items():
         kind = spec.get("kind", "")
@@ -654,7 +661,23 @@ def _build_llm(
         roles[name] = LLMRole(name, spec["backend"], spec["model"], dict(spec.get("params", {})))
     if "default" not in roles:
         raise ConfigError("llm.roles.default is required")
-    return backends, roles
+    return backends, roles, _build_llm_ratings(raw.get("llm", {}).get("ratings", {}), backends)
+
+
+def _build_llm_ratings(raw: Mapping[str, Any], backends: Mapping[str, LLMBackend]) -> dict[str, dict[str, LLMRole]]:
+    """``[llm.ratings.X]`` with ``backend`` + ``model`` (every role) and/or ``[llm.ratings.X.roles.R]`` (one role)."""
+    out: dict[str, dict[str, LLMRole]] = {}
+    for rating, spec in raw.items():
+        routes: dict[str, LLMRole] = {}
+        entries = ([("*", spec)] if "model" in spec or "backend" in spec else []) + list(spec.get("roles", {}).items())
+        for role, entry in entries:
+            if entry.get("backend") not in backends:
+                raise ConfigError(f"llm.ratings.{rating} {role!r}: unknown backend {entry.get('backend')!r}")
+            if not entry.get("model"):
+                raise ConfigError(f"llm.ratings.{rating} {role!r}: model is required")
+            routes[role] = LLMRole(role, entry["backend"], entry["model"], dict(entry.get("params", {})))
+        out[rating] = routes
+    return out
 
 
 def _build_api(raw: Mapping[str, Any]) -> dict[str, Any]:
@@ -767,7 +790,10 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     for name, plan in pipelines.items():
         if plan.rating and not content.known(plan.rating):
             raise ConfigError(f"pipeline {name!r}: unknown rating {plan.rating!r}; known: {sorted(content.ratings)}")
-    backends, roles = _build_llm(merged["llm"], services)
+    backends, roles, llm_ratings = _build_llm(merged["llm"], services)
+    for rating in llm_ratings:
+        if not content.known(rating):
+            raise ConfigError(f"llm.ratings.{rating}: unknown rating; known: {sorted(content.ratings)}")
     launch = _build_launch(merged["services"].get("launch", {}), services)
     legacy = env.get(ENV_LEGACY_DB)
     return Settings(
@@ -784,6 +810,7 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         recipes=_build_recipes(merged["recipes"], models, defaults),
         llm_backends=backends,
         llm_roles=roles,
+        llm_ratings=llm_ratings,
         healthcheck_required=required,
         healthcheck_min_free_gib=float(health_cfg.get("min_free_gib", 50)),
         legacy_db_path=Path(legacy).expanduser() if legacy else None,

@@ -11,7 +11,7 @@
 | 模型 | 体积 | 定位 | 局限 |
 |---|---|---|---|
 | `gemma4:31b` | 20 GB | 通用对话、原生多模态视觉、中文长文写作;**系统里所有角色目前都用它** | 吞吐慢,不适合高频补全;工具调用弱 |
-| `llama2-uncensored:70b` | 38 GB | 零审查自由文本 | 2023 底座,无工具调用,中文极弱,待替换 |
+| `qwen3.8-27b-abliterated:q6k` | 23 GB | 本地去拒答模型,中文好;**受限分级的项目用它**(见下节「按内容分级选模型」) | 去拒答模型没有统一评测,指令遵循和事实性可能下降;会思考,系统对 qwen3 默认关思考 |
 | `nomic-embed-text` | 274 MB | 向量化 | |
 
 存储:`~/.ollama/models` 67 GB,磁盘可用约 448 GB。`gpt-oss-20b` 与 `~/models/gguf` 下的 gpt-oss GGUF 在 10-24 删除,共释放约 81 GB,所以推理/工具调用的位置目前是空的。
@@ -20,6 +20,20 @@
 候选(没有拉取):`qwen3.6:35b-coding`(约 23–24 GB,SWE-bench Verified 73.4%、Terminal-Bench 51.5%)补编码/agent 位;
 替换 uncensored 的 `abliterant/qwen3.8-rana`(14–30 GB 多档量化)、`mgraffam/gemma4-agentic-fable-abliterated`(14 GB,MoE 最快)、`FableForge-AI/mythos-v2-9b`(5.8 GB,最轻);
 **不要选** 112 GB 的 `qwen3.8-flash-next-abliterated`(128 GB 机器上余量只有约 6 GB)。去拒答模型没有统一评测,指令遵循和事实性通常会下降,许可要回各自 README 核。
+
+## 按内容分级选模型
+
+受限分级(`content.toml` 里 `allow_remote = false` 的那种)的项目只走本机模型,并且可以和普通项目用不同的模型。在你自己的 `data/config/llm.toml` 里写:
+
+```toml
+[llm.ratings.restricted]            # 受限项目的所有角色
+backend = "ollama"
+model = "qwen3.8-27b-abliterated:q6k"
+```
+
+某个角色想单独换,再加 `[llm.ratings.restricted.roles.<角色>]`(同样的 `backend`/`model`)。选择顺序:调用时指定的模型 > 这个项目在「语言模型」页的选择 > 分级路由 > 页面上的全局选择 > `[llm.roles.*]`。
+语言模型页里这样的角色显示来源「按内容分级(llm.toml)」。分级不允许离开本机时,如果路由到的后端不在本机(地址不是本机回环;或后端表里写了 `local = false`),调用会被拒绝(`remote_forbidden`)。
+这只是接线:不改变任何提示词。故事怎么写由你的项目设定和角色文字决定,系统里的提示词模板仍是通用的。
 
 ## 命令
 

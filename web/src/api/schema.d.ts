@@ -3801,7 +3801,7 @@ export interface components {
             name: string;
             /**
              * Source
-             * @description config (llm.toml) | global (chosen on the screen) | project (chosen there)
+             * @description config (llm.toml) | rating (llm.toml [llm.ratings], by the project's rating) | global (chosen on the screen) | project (chosen there)
              */
             source: string;
         };

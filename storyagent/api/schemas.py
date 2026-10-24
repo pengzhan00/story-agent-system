@@ -1306,7 +1306,8 @@ class LlmRoleOut(Strict):
     group: str
     backend: str
     model: str
-    source: str = Field(description="config (llm.toml) | global (chosen on the screen) | project (chosen there)")
+    source: str = Field(description=("config (llm.toml) | rating (llm.toml [llm.ratings], by the project's rating) | "
+                                    "global (chosen on the screen) | project (chosen there)"))
     config_backend: str
     config_model: str
 
