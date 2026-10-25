@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -323,6 +324,83 @@ def test_regenerate_candidates_stale_and_review(client: TestClient, fsettings: S
     assert (dep["recorded"], dep["current"]) == (1, 2)
     client.post(f"{base}/shot.video/s1/acknowledge")
     assert client.get(f"{base}/review").json() == []
+
+
+def test_keyframe_regenerate_honors_the_projects_pipeline(tmp_path: Path) -> None:
+    """A project whose plan makes keyframes from words alone (keyframe_from_references = false) regenerates a
+    keyframe as image.generate, not composed into image.edit, even after the portraits exist. The regenerate path used
+    to read the global keyframe_from_references instead of the project's."""
+    from storyagent.config import load_settings
+
+    from .conftest import FAKE_SERVICES
+
+    home = tmp_path / "home"
+    cfg = home / "config"
+    cfg.mkdir(parents=True)
+    (cfg / "models.toml").write_text("""
+[defaults]
+"image.generate" = "f-img"
+"image.edit" = "f-edit"
+"video.generate" = "f-vid"
+"audio.tts" = "f-tts"
+"audio.music" = "f-mus"
+"compose.assemble" = "f-assemble"
+[models."f-img"]
+kind = "image.generate"
+provider = "fake"
+timeout_sec = 30
+[models."f-edit"]
+kind = "image.edit"
+provider = "fake"
+timeout_sec = 30
+[models."f-vid"]
+kind = "video.generate"
+provider = "fake"
+timeout_sec = 30
+[models."f-tts"]
+kind = "audio.tts"
+provider = "fake"
+timeout_sec = 30
+[models."f-mus"]
+kind = "audio.music"
+provider = "fake"
+timeout_sec = 30
+[models."f-assemble"]
+kind = "compose.assemble"
+provider = "fake"
+timeout_sec = 30
+""")
+    (cfg / "services.toml").write_text(FAKE_SERVICES)
+    (cfg / "pipelines.toml").write_text("""
+[pipelines.demo]
+delivery_profile = "shortdrama_vertical_720"
+tier = "draft"
+[pipelines.demo.models]
+"image.generate" = "f-img"
+"image.edit" = "f-edit"
+"video.generate" = "f-vid"
+"audio.tts" = "f-tts"
+"audio.music" = "f-mus"
+"compose.assemble" = "f-assemble"
+[pipelines.demo.workflow]
+keyframe_from_references = false
+""")
+    settings = load_settings({"STORY_AGENT_HOME": str(home)})
+    with TestClient(create_app(settings), raise_server_exceptions=False) as client:
+        pid = client.post("/api/projects", json={"name": "Demo", "pipeline": "demo"}).json()["id"]
+        [shot] = make_shots(settings, pid, 1)
+        base = f"/api/projects/{pid}/specs"
+        client.post(base, json=spec_body(kind="image.generate", model_ref="f-img"))
+        client.post(f"{base}/{SUBJ}/regenerate", json={"tier": "draft"})
+        reg = AdapterRegistry()
+        reg.register(FakeAdapter())
+        Worker(settings, Database(settings.db_path), reg, probes=[]).drain(15)
+        key = spec_body(subject_type="shot.keyframe", subject_id=str(shot), kind="image.generate",
+                        model_ref="f-img", prompt="the opening frame",
+                        depends_on=[{"subject_type": "character.portrait", "subject_id": "hero", "version": 1}])
+        client.post(base, json=key)
+        [job] = client.post(f"{base}/shot.keyframe/{shot}/regenerate", json={"tier": "draft"}).json()
+        assert job["kind"] == "image.generate" and job["model_ref"] == "f-img"
 
 
 def test_a_clip_made_by_hand_belongs_to_its_shot_and_starts_from_its_keyframe(

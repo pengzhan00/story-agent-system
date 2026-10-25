@@ -5,6 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Query, Request
 
 from storyagent.media.specs import SpecRecord, SpecStore
+from storyagent.pipelines import project_settings_for
 from storyagent.workflow.media import job_preparer
 
 from .context import ApiContext, ctx_of
@@ -164,6 +165,7 @@ def regenerate(
     jobs = ctx.specs.regenerate(
         project_id, subject_type, subject_id, slot, n_candidates=body.n_candidates, vary_seed=body.vary_seed,
         tier=body.tier, shot_id=body.shot_id, priority=body.priority, project_settings=pset,
-        prepare=job_preparer(ctx.settings, ctx.story, ctx.specs, ctx.ledger, dict(pset or {})),
+        prepare=job_preparer(project_settings_for(ctx.settings, ctx.db, project_id), ctx.story, ctx.specs,
+                             ctx.ledger, dict(pset or {})),
     )
     return [JobOut.model_validate(j) for j in jobs]
