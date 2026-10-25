@@ -4,7 +4,7 @@ ACE-Step 是本机做**带人声的歌**的工具。系统里对应的模型是 
 它不碰 ComfyUI,而是调 **独立的 ACE-Step REST 服务**(端口 8001)。
 实战细节在你的 Obsidian 笔记《本地 AI 出歌实战(ACE-Step 1.5 + 换声纹)》和《ACE-Step XL SFT 人声经验总结》;这一页是速查。
 
-相关页面:[工具总览](../TOOLS.md) · [Seed-VC 换声](SEEDVC.md)(歌声换音色) · [ComfyUI](COMFYUI.md)
+相关页面:[工具总览](../TOOLS.md) · [Seed-VC 换声](SEEDVC.md)(歌声换音色) · [ComfyUI](COMFYUI.md) · [YuE2](YUE2.md)(另一个出歌模型,Phosphene 面板里)
 
 ## 一句话结论
 

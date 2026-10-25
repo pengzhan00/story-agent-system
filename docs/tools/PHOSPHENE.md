@@ -128,6 +128,8 @@ curl -s -X POST http://127.0.0.1:8198/oneshot -H 'Content-Type: application/json
 
 ## 音乐引擎 YuE2(Audio → Compose)
 
+详细的安装、用法、用时和许可见 [YuE2](YUE2.md);这里只列系统和面板的字段对照。
+
 面板里的音乐引擎 YuE2-3B(MLX 移植,Python 3.12 独立 venv,权重约 11 GB,峰值 11 GB 内存,至少 24 GB 统一内存)按风格描述加歌词写一整首带人声和编曲的歌。
 装好后 `GET /status` 的 `music.available` 为 `true`。它和 LTX 共用面板的队列和 GPU 锁,所以在系统里也是重作业(一次一个)。
 

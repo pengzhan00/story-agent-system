@@ -18,7 +18,7 @@
 | 配音 / 声音克隆 | CosyVoice 3 / 2 | `cosyvoice3-0.5b` / `cosyvoice2-0.5b` | [CosyVoice](tools/COSYVOICE.md) |
 | 换声 / 歌声换音色 | Seed-VC + Demucs | `seed-vc-v2` | [Seed-VC](tools/SEEDVC.md) |
 | 配乐 / 主题曲(带人声) | ACE-Step 1.5 独立服务 | `acestep-1.5-turbo` | [ACE-Step](tools/ACESTEP.md) |
-| 配乐 / 主题曲(带人声,可选) | YuE2-3B(Phosphene 面板的音乐引擎) | `yue2-3b` | [Phosphene](tools/PHOSPHENE.md) |
+| 配乐 / 主题曲(带人声,可选) | YuE2-3B(Phosphene 面板的音乐引擎) | `yue2-3b` | [YuE2](tools/YUE2.md)、[Phosphene](tools/PHOSPHENE.md) |
 | 音效 | Stable Audio 3(ComfyUI) | `stable-audio-3-medium` | [ComfyUI](tools/COMFYUI.md) |
 | 听写 / 字幕 / 对白反查 | whisper.cpp | `whisper-large-v3-turbo` | [后期](tools/POST.md) |
 | 装配 / 响度 / 字幕 / 交付 / 质检 | ffmpeg(ffmpeg-full) | `ffmpeg-assemble` / `ffmpeg-deliver` | [后期](tools/POST.md) |
