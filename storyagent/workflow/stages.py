@@ -319,8 +319,14 @@ def script(ctx: Ctx) -> dict[str, Any]:
     shots_n = int(ctx.params.get("shots_per_scene") or sized[2] or 3)
     existing = ctx.store.get_script(ctx.pid, episode)
     ctx.store.ensure_episode(ctx.pid, episode, season=ctx.season_of(episode))
+    # a revision: the outline stays, the shots of the named scenes ("act.scene", all when none is named) are written
+    # again with the editor's feedback and the shots they have now
+    feedback = str(ctx.params.get("feedback") or "").strip()
+    revise = {str(x) for x in ctx.params.get("revise_scenes") or []}
+    if feedback and not (existing and existing["acts"]):
+        raise StageError("needs_stage", "there is no script to revise yet", stage="script")
 
-    if existing and existing["acts"] and not ctx.force():
+    if existing and existing["acts"] and (feedback or not ctx.force()):
         outline = {"title": existing["title"], "synopsis": existing["synopsis"], "acts": existing["acts"]}
     else:
         brief = _character_brief(chars)
@@ -350,13 +356,16 @@ def script(ctx: Ctx) -> dict[str, Any]:
     done = 0
     for act, scene in scenes:
         ctx.step(done, len(scenes), f"{act['number']}.{scene['number']}")
-        if scene.get("shots") and not ctx.force():
+        revising = bool(feedback) and (not revise or f"{act['number']}.{scene['number']}" in revise)
+        if scene.get("shots") and not ctx.force() and not revising:
             previous = scene.get("beat", "")
             done += 1
             continue
         data = ctx.run_agent("screenwriter.shots", {
             "title": outline["title"], "act_title": act.get("title", ""), "scene": scene,
-            "characters": _character_brief(chars), "shots_per_scene": shots_n, "previous": previous or "(start)"})
+            "characters": _character_brief(chars), "shots_per_scene": shots_n, "previous": previous or "(start)",
+            "feedback": feedback if revising else "(none)",
+            "current": dump(scene["shots"]) if revising and scene.get("shots") else "(none)"})
         shots = data["shots"]
         for i, shot in enumerate(shots, start=1):
             shot["shot_number"] = i

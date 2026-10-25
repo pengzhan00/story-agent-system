@@ -3,7 +3,7 @@ role = "writer"
 temperature = 0.75
 max_tokens = 3500
 schema = "scene_shots"
-inputs = ["language", "title", "act_title", "scene", "characters", "shots_per_scene", "previous"]
+inputs = ["language", "title", "act_title", "scene", "characters", "shots_per_scene", "previous", "feedback", "current"]
 system = """You are a professional screenwriter and storyboard artist for short vertical drama. You break one scene into
 shots with the dialogue spoken in each. Dialogue is short, in character, and moves the plot (at most 25 characters of
 spoken text per line, 1-3 lines per shot, none in purely visual shots). Write all story content in $language."""
@@ -14,6 +14,9 @@ Scene to break down: $scene
 
 Characters (use these names exactly): $characters
 What happened just before: $previous
+Editor feedback to apply (nothing to apply when it says "(none)"): $feedback
+Current shots of this scene (when there is feedback, keep what already works and change only what the feedback asks
+for; "(none)" means write them fresh): $current
 
 Produce exactly $shots_per_scene shots in order. Each shot: shot_number, camera_angle (wide / medium / close-up / ...),
 camera_movement, who is in frame, mood, what they do (action) and look like (expression), optional narration, the

@@ -388,6 +388,7 @@ def test_script_review_is_on_demand_and_changes_nothing(tmp_path: Path) -> None:
     review = engine.review_script(pid)
     assert review["score"] == 7 and review["issues"] == []
     assert client.calls[-1] == "review" and "Rain Night" in client.prompts[-1]
+    assert '"acts"' not in client.prompts[-1] and "### " in client.prompts[-1]      # read as text, not as stored JSON
     assert [r["status"] for r in engine.state.stages(pid)] == before
 
 

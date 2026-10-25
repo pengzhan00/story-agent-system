@@ -6,11 +6,13 @@ import threading
 from collections.abc import Callable, Sequence
 from typing import Any
 
+from storyagent import script_text
 from storyagent.agents import AgentRunner
 from storyagent.agents.registry import AgentSpecError
 from storyagent.agents.runner import language_name
 from storyagent.config import Settings
 from storyagent.db import Database
+from storyagent.i18n import LocaleError, get_catalog
 from storyagent.llm import LLMError, LLMRouter
 from storyagent.media.ledger import Ledger
 from storyagent.media.specs import SpecStore
@@ -68,9 +70,14 @@ class WorkflowEngine:
             raise WorkflowStateError("the script stage has not produced a script yet")
         chars = [{"name": c["name"], "role": c["role"], "personality": c["personality"]}
                  for c in self.store.list_characters(project_id)]
-        outline = {"title": script["title"], "synopsis": script["synopsis"], "acts": script["acts"]}
+        # the editor reads the script as text: given the stored structure as JSON it "finds" syntax errors in it
+        try:
+            labels = get_catalog(project.content_language)
+        except LocaleError:                 # a content language the interface has no texts for
+            labels = get_catalog("en")
+        text = script_text.render(script["title"], script["synopsis"], script["acts"], labels.t)
         data = self.agents.run("reviewer.script", {
-            "language": language_name(project.content_language), "script": json.dumps(outline, ensure_ascii=False),
+            "language": language_name(project.content_language), "script": text,
             "characters": json.dumps(chars, ensure_ascii=False)}, project_id=project_id).data
         return dict(data)
 
