@@ -156,7 +156,7 @@ docs/          API CONFIGURATION MEDIA_CONTRACT RUNBOOK WORKFLOW USER_GUIDE PARI
   | 虚拟环境 | `story-agent-system/.venv`(`uv pip install -e .`) | 工作树 `.venv`(带 `[dev]`) |
   | 数据 | `story-agent-system/data/`(数据库、媒体、`config/`);**不进 Git,要备份** | 工作树 `data/`(沙盒,随时可丢) |
   | 启动 | `scripts/start.sh`(端口 8765) | `scripts/start.sh --port 8766` |
-  | 更新 | 网页「系统 → 更新与重启」(同 `scripts/deploy.sh` 的步骤 + 热重启,见 RUNBOOK);或手动 `scripts/deploy.sh`(**不重启**)再重启 start.sh | 直接改代码、测试(工作树里更新按钮自动停用) |
+  | 更新 | 网页「系统 → 更新与重启」(同 `scripts/deploy.sh` 的步骤 + 热重启,见 RUNBOOK);或命令行 `scripts/deploy.sh`(调用同一套 `storyagent update run`,**不重启**)再重启 start.sh | 直接改代码、测试(工作树里更新按钮自动停用) |
   `data/config/services.toml` 覆盖 ffmpeg-full 路径(两套各一份)。网页:生产 `http://localhost:8765`。
   2026-10-21 已把数据库(含 LongCat/故事/剧本/图片的结果)和 `config/` 迁到生产 `data/`,生产已从主检出启动。
 - Ollama 0.40.6;已装 `gemma4:31b`(默认角色)、`gpt-oss-20b`(结构化 JSON 不稳,已退回)、`nomic-embed-text`。`qwen3.8:27b` 已放弃。

@@ -714,3 +714,27 @@ def test_start_sh_restarts_both_on_75_and_stops_on_ctrl_c(tmp_path: Path) -> Non
     assert markers[0].startswith("marker --pid") and markers[-1].endswith("--clear")      # cleared on the way out
     assert "restart requested" in err and "restarting worker and server" in err
     assert proc.returncode == 143
+
+
+# -- scripts/deploy.sh is only a wrapper around the same code ------------------------------------------------
+@pytest.mark.skipif(shutil.which("bash") is None or shutil.which("git") is None, reason="bash or git missing")
+def test_deploy_sh_checks_for_a_clean_tree_and_runs_the_update_command(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    (repo / "scripts").mkdir(parents=True)
+    (repo / ".venv" / "bin").mkdir(parents=True)
+    shutil.copy(ROOT / "scripts" / "deploy.sh", repo / "scripts" / "deploy.sh")
+    py = repo / ".venv" / "bin" / "python"
+    py.write_text('#!/bin/sh\necho "$*" >> "$FAKE_ROOT/calls.log"\n')
+    py.chmod(0o755)
+    git(repo, "init", "-b", "main")
+    git(repo, "add", "-A")
+    git(repo, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-m", "x")
+    env = {**os.environ, "FAKE_ROOT": str(repo)}
+    done = subprocess.run(["bash", str(repo / "scripts" / "deploy.sh")], env=env, capture_output=True, text=True)
+    assert done.returncode == 0, done.stderr
+    assert (repo / "calls.log").read_text().splitlines() == ["-m storyagent update run"]
+    assert "restart" in done.stdout
+    (repo / "scratch.txt").write_text("dirty")
+    (repo / "calls.log").unlink()
+    refused = subprocess.run(["bash", str(repo / "scripts" / "deploy.sh")], env=env, capture_output=True, text=True)
+    assert refused.returncode == 1 and "clean checkout" in refused.stderr and not (repo / "calls.log").exists()

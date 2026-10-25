@@ -2316,7 +2316,7 @@
   "cli.update.supervised": "scripts/start.sh 在守护:更新后可以热重启",
   "cli.update.unsupervised": "没有守护进程:更新后需要手动重启",
   "cli.update.restart_requested": "已请求重启(模式 {mode});worker 与 server 会自行退出,由 scripts/start.sh 重新拉起",
-  "cli.update.restart_manual": "更新完成。请重启 scripts/start.sh(或用它启动后再用 --restart)。",
+  "cli.update.restart_manual": "更新完成,没有重启。scripts/start.sh 在守护时:网页「系统 → 更新与重启」点「只重启」(或下次加 --restart);否则请 Ctrl-C 后重新运行 scripts/start.sh。",
   "web.update.title": "更新与重启",
   "web.update.subtitle": "把这个检出更新到远端的最新版本(与 scripts/deploy.sh 相同的步骤),然后重启 worker 和 server;只有管理员可用。",
   "web.update.disabled": "这里不能更新:{reason}",

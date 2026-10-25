@@ -87,7 +87,7 @@ Who can see what: with `[auth] mode = "off"` the unlock is only a guard against 
 前提:服务是用 `scripts/start.sh` 起的(它是守护);登录用户是管理员(`[auth] mode = "off"` 时就是本机操作员)。
 
 1. 网页「系统」页最下面的「更新与重启」卡片:显示当前版本(提交号 + 标题)、落后几个提交(附标题)、正在跑的任务;点「检查更新」会 `git fetch`。
-2. 点「更新并重启」:按 `scripts/deploy.sh` 的步骤依次做 —— 获取远端 → 比较 → `git merge --ff-only` → `uv pip install -e .` → `pnpm install --frozen-lockfile` → `pnpm build` → `db migrate`(先自动快照)→ `i18n check`。每一步的成败、输出的最后几行都在卡片里;完整日志在 `<home>/logs/update-<时间>.log`。**任何一步失败就停在那里**:不重启,旧代码继续跑(合并之后才失败的话,检出已经在新提交上,卡片里有起点提交,必要时 `git reset --hard <起点>` 手动回退)。
+2. 点「更新并重启」:依次做(与 `scripts/deploy.sh` 是同一套代码) —— 获取远端 → 比较 → `git merge --ff-only` → `uv pip install -e .` → `pnpm install --frozen-lockfile` → `pnpm build` → `db migrate`(先自动快照)→ `i18n check`。每一步的成败、输出的最后几行都在卡片里;完整日志在 `<home>/logs/update-<时间>.log`。**任何一步失败就停在那里**:不重启,旧代码继续跑(合并之后才失败的话,检出已经在新提交上,卡片里有起点提交,必要时 `git reset --hard <起点>` 手动回退)。
 3. 全部成功后请求重启:worker 立刻**停止领取新作业**,默认**等正在跑的任务做完**再退出;勾选「立即中断并重启」(会二次确认)则马上把运行中的作业放回队列(重任务会重做,或用适配器的续接),工作流在约一分钟内被新 worker 重新接手。等待期间卡片上有「立即中断并重启」和「取消重启」。
 4. worker 和 server 各自以**退出码 75** 干净退出(没有任何杀进程/发信号的代码),`scripts/start.sh` 发现 75 就先做 `db migrate`、再把两个都重新拉起(并重新执行自己,start.sh 本身改了也会生效)。网页自动重连,恢复后提示「已更新并重启」并给出「重新载入页面」。
 5. 没有守护(不是用 start.sh 起的,或另开终端跑的 `storyagent serve`):只更新、不重启,卡片和 `storyagent update run` 都会明确提示手动重启。
@@ -95,20 +95,26 @@ Who can see what: with `[auth] mode = "off"` the unlock is only a guard against 
 
 只有管理员能用(`/api/update` 是 `[auth] admin_prefixes`,路由里再校验一次);同一时间只允许一次更新;工作区必须干净;默认只在**主检出**(非 git 工作树、在 `main` 分支)启用,开发用的工作树会显示「不能更新」;`[update] enabled = true` 可强制开启,`false` 关闭(见 CONFIGURATION.md)。每次更新写审计:`update.start`、`update.finish`(状态、失败步骤、起止提交)、`update.restart`、`update.restart_cancel`,另有 HTTP 写请求的通用审计。
 
-命令行等价物:`storyagent update status | check | run [--restart [--now]]`(`run` 不加 `--restart` 只更新)。`storyagent update marker --pid N [--clear]` 是 start.sh 内部用的。
+命令行等价物:`storyagent update status | check | run|apply [--restart [--now]]`(`run` 不加 `--restart` 只更新;`scripts/deploy.sh` 就是它的包装)。`storyagent update marker --pid N [--clear]` 是 start.sh 内部用的。
 
 退出码约定:`RESTART_EXIT_CODE = 75`(`storyagent/restart.py`),`scripts/start.sh` 里的 `RESTART_EXIT=75` 与之相同(`tests/test_update.py` 校验)。worker 或 server 以 75 退出 = 请求整体重启;其他退出码仍是整体停止(Ctrl-C 只停这两个)。
 
-### 手动方式(没有守护,或网页不可用)
+### 命令行方式(`scripts/deploy.sh`,与按钮是同一套代码)
+
+`scripts/deploy.sh` 只做两件事:检查工作区干净、调用 `storyagent update run`(即 `storyagent/update.py`,网页按钮用的同一个函数)。步骤、检查项、日志格式(`<home>/logs/update-*.log`)、审计记录都与按钮一致,改一处两边生效。它**从不停止或重启任何东西**:
 
 ```bash
 cd <主检出>
-scripts/deploy.sh                 # 快进到 origin/main、安装、构建网页、迁移数据库(先自动快照)、检查 i18n;不重启任何东西
+scripts/deploy.sh                 # = storyagent update run:获取 → 比较 → 快进 → 安装 → 构建网页 → db migrate(先快照)→ i18n check
 .venv/bin/python -m storyagent media jobs --status running     # 没有重任务在跑再重启(重启会打断它,之后被重投)
-# Ctrl-C 停掉 scripts/start.sh,然后:
-scripts/start.sh                  # 数据库迁移 + worker + server(端口 8765)
 ```
+然后重启,两条路径:
+- **有守护**(`scripts/start.sh` 在跑):在网页「系统 → 更新与重启」点「只重启」(默认等运行中的任务做完;可取消),或下次直接用 `storyagent update run --restart [--now]`。
+- **没有守护**:Ctrl-C 停掉 `scripts/start.sh`,再 `scripts/start.sh`(数据库迁移 + worker + server,端口 8765)。
+
+`storyagent update apply` 是 `run` 的别名。
+
 备份:`data/` 不进 Git。至少定期备份 `data/storyagent.db`(用 `sqlite3 data/storyagent.db ".backup 备份路径"`,服务在跑时也安全)和 `data/projects/`、`data/library/`、`data/config/`。
-回滚:`git checkout <上一个提交>`,再 `scripts/deploy.sh` 的安装/构建步骤;数据库迁移前的快照在 `data/storyagent.db.bak-vN`。
+回滚:`git checkout <上一个提交>`,再 `.venv/bin/python -m storyagent update run` 的安装/构建步骤(或手动 `uv pip install -e .` 与 `pnpm build`);数据库迁移前的快照在 `data/storyagent.db.bak-vN`。
 
 首次升级到带这个功能的版本时,正在跑的旧 start.sh / worker / server 不认识重启请求:先用上面的手动方式更新并重启一次,之后才有热重启。

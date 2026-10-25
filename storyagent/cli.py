@@ -21,7 +21,7 @@
     storyagent api openapi [--out FILE]
     storyagent ops llm-unload
     storyagent ops stop NAME [--force]      (end a service listed with stop = "port" in services.toml)
-    storyagent update status | check | run [--restart] [--now]     (scripts/deploy.sh steps, optional hot restart)
+    storyagent update status | check | run|apply [--restart] [--now]   (scripts/deploy.sh runs this)
     storyagent update marker --pid N [--clear]                     (scripts/start.sh says it supervises worker + server)
     storyagent setup [--profile P] [--root DIR] | profiles | check | plan | config [--write] | run STEP | verify
 
@@ -1582,7 +1582,7 @@ def build_parser() -> argparse.ArgumentParser:
     up = sub.add_parser("update").add_subparsers(dest="cmd", required=True)
     add(up, "status", _cmd_update_status)
     add(up, "check", _cmd_update_check)
-    ur = add(up, "run", _cmd_update_run)
+    ur = add(up, "run", _cmd_update_run, aliases=["apply"])
     ur.add_argument("--restart", action="store_true", help="then restart worker and server (needs scripts/start.sh)")
     ur.add_argument("--now", action="store_true", help="with --restart: hand running work back at once, do not wait")
     um = add(up, "marker", _cmd_update_marker)

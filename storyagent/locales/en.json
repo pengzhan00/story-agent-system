@@ -2316,7 +2316,7 @@
   "cli.update.supervised": "scripts/start.sh supervises the processes: a hot restart is possible after an update",
   "cli.update.unsupervised": "Nothing supervises the processes: restart by hand after an update",
   "cli.update.restart_requested": "Restart requested (mode {mode}); worker and server leave by themselves and scripts/start.sh starts them again",
-  "cli.update.restart_manual": "Updated. Restart scripts/start.sh (or start it with it and use --restart next time).",
+  "cli.update.restart_manual": "Updated, not restarted. With scripts/start.sh supervising: use \"Restart only\" in the web client (System > Update and restart), or add --restart next time; otherwise press Ctrl-C and run scripts/start.sh again.",
   "web.update.title": "Update and restart",
   "web.update.subtitle": "Bring this checkout up to the remote's latest version (the steps of scripts/deploy.sh), then restart the worker and the server. Administrators only.",
   "web.update.disabled": "Updating is not available here: {reason}",

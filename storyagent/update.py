@@ -1,7 +1,7 @@
 """Update this checkout from its remote, step by step, and ask for a hot restart.
 
-The steps are those of ``scripts/deploy.sh``, run as argv lists (never through a shell), each line of their output going
-to ``<home>/logs/update-<id>.log``:
+These are the deploy steps, and the single source of them: ``scripts/deploy.sh`` just runs ``storyagent update run``.
+They run as argv lists (never through a shell), each line of output going to ``<home>/logs/update-<id>.log``:
 
     fetch -> compare -> merge (fast-forward only) -> install -> web_install -> web_build -> migrate -> i18n
 
