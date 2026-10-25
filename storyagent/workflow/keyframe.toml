@@ -19,7 +19,8 @@ Dark words (deep shadows, chiaroscuro, low-key, pitch dark) make the picture mur
 the face and torso well exposed. Always state the people's ethnicity and age range once, in the same words in every shot."""
 direct = """Image model: a text-to-image model with no reference images, so nothing but your words keeps a face the same
 from shot to shot. Start every prompt with the same few words for each person (age range, ethnicity, face shape, hair,
-skin) exactly as given in the character description, then the costume, then action, pose and light. Plain English
+skin) exactly as given in the character description, then what they are wearing in this shot (clothed or undressed as
+the scene calls for), then action, pose and light. Plain English
 sentences, concrete and visual. Say what you want to see ('natural matte skin with visible pores', 'bright, readable
 room'). Words such as wet, glistening, glossy, sheen, dewy or oily make skin look greasy and fake: describe skin as
 natural and matte, and show heat or effort through flushed cheeks, damp hair strands or fabric clinging. Dark words (deep
