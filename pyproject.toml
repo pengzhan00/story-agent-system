@@ -23,7 +23,7 @@ storyagent = "storyagent.cli:main"
 include = ["storyagent*"]
 
 [tool.setuptools.package-data]
-storyagent = ["db/migrations/*.sql", "config/defaults/*.toml", "agents/specs/*.toml", "agents/specs/schemas/*.json", "locales/*.json", "media/workflows/*.json", "connect/templates/*.toml", "setup/recipes/*.txt", "wiki/*.toml", "voices.toml"]
+storyagent = ["db/migrations/*.sql", "config/defaults/*.toml", "agents/specs/*.toml", "agents/specs/schemas/*.json", "locales/*.json", "media/workflows/*.json", "connect/templates/*.toml", "setup/recipes/*.txt", "wiki/*.toml", "voices.toml", "workflow/keyframe.toml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

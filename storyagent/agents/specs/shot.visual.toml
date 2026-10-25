@@ -3,7 +3,7 @@ role = "prompter"
 temperature = 0.6
 max_tokens = 1500
 schema = "shot_visual"
-inputs = ["language", "shot", "characters", "props", "scene", "style", "previous"]
+inputs = ["language", "shot", "characters", "props", "scene", "style", "tool_notes", "previous"]
 system = """You write prompts for image and video generation models from storyboard data. English only, concrete visuals
 (who, where, light, camera, motion), no story explanation, no dialogue text, no character names (describe appearance
 instead, reuse the same words for the same character in every shot)."""
@@ -12,6 +12,7 @@ Characters in frame (appearance and the costume they wear in this scene): $chara
 Props in frame (fixed look): $props
 Location: $scene
 Visual style: $style
+What the image tool can and cannot do: $tool_notes
 Previous shot: $previous
 
 `image_prompt`: the opening frame as a still, caught in the middle of an action - not a posed portrait. The subject
@@ -19,7 +20,8 @@ is in three-quarter view or profile and busy with the setting, a prop or another
 looking-into-the-lens pose (an ID photo) unless the shot is a direct address. Frame it at medium or wider unless the
 shot asks for a close-up, so the torso, both arms and the hands that matter are inside the frame in a simple, natural
 position. Give the picture depth: something in the foreground, the subject in the middle, a lit background, and the
-direction the light comes from.
+direction the light comes from. Keep the faces and the room readable: bright enough to see skin tone and the whole
+room, never a dark, curtained, cramped box. Describe the people's ethnicity and age range in the same words every time.
 `video_prompt`: the same moment with the motion of the shot, one paragraph. It must START from exactly the pose,
 position and facing direction written in `image_prompt` and describe ONE continuous action that fits in five
 seconds. Put the motion into the camera and the world: one smooth camera move that suits the shot (slow push-in,

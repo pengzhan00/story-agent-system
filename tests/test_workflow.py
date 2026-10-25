@@ -50,7 +50,8 @@ def test_specs_are_seeded_with_dependencies(tmp_path: Path) -> None:
     sp = engine.spec_store
     char = engine.store.find_character(pid, NAMES[0])
     portrait = sp.current(pid, "character.portrait", str(char["id"]))
-    assert portrait.author == "agent" and "grey coat" in portrait.prompt and portrait.negative_prompt == "blurry, text"
+    assert portrait.author == "agent" and "grey coat" in portrait.prompt \
+        and portrait.negative_prompt.startswith("blurry, text, oily skin") and portrait.seed is not None
     assert sp.current(pid, "character.voice", str(char["id"])).text_payload == "It is raining again."
     shot = engine.store.list_shots(pid)[0]
     key = sp.current(pid, "shot.keyframe", str(shot["id"]))

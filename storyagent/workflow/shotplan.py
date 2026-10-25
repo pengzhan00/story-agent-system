@@ -49,6 +49,19 @@ def shot_duration(
     return round(min(max(asked, spoken + 0.5, minimum), maximum), 2)
 
 
+def who_is_in_frame(shot: Mapping[str, Any], scene: Mapping[str, Any], dialogue: Sequence[Mapping[str, Any]],
+                    names: Sequence[str]) -> list[str]:
+    """Characters the shot lists; else the scene's; else its speakers and the cast named in what it shows or says."""
+    listed = [str(n).strip() for n in (shot.get("characters_present") or scene.get("characters") or [])
+              if str(n).strip()]
+    if listed:
+        return listed
+    text = " ".join(str(shot.get(k, "")) for k in ("action", "narration", "expression", "camera_movement"))
+    text += " " + str(scene.get("beat", "")) + " " + " ".join(str(d.get("line", "")) for d in dialogue)
+    speakers = {str(d.get("character", "")).strip() for d in dialogue}
+    return [n for n in names if n in speakers or (n and n in text)]
+
+
 def build_payload(
     *, scene: Mapping[str, Any], shot: Mapping[str, Any], dialogue: list[dict[str, str]],
     location: Mapping[str, Any] | None, characters: Mapping[str, Mapping[str, Any]], style: Mapping[str, Any],
@@ -56,7 +69,7 @@ def build_payload(
     looks: Sequence[Mapping[str, Any]] = (), props: Sequence[Mapping[str, Any]] = (),
     position: tuple[int, int, int] = (1, 1, 1),
 ) -> dict[str, Any]:
-    present = [n for n in (shot.get("characters_present") or scene.get("characters") or []) if str(n).strip()]
+    present = who_is_in_frame(shot, scene, dialogue, list(characters))
     subject = []
     for name in present:
         c = characters.get(str(name).strip())
@@ -125,8 +138,7 @@ def build_shot_rows(
                     profile=profile, scene_id=scene_id, duration=duration, previous=previous,
                     looks=looks, props=props, position=(episode, act_no, scene_no),
                 )
-                present = [str(n).strip() for n in (shot.get("characters_present") or scene.get("characters") or [])
-                           if str(n).strip()]
+                present = who_is_in_frame(shot, scene, dialogue, list(by_char))
                 rows.append({
                     "script_id": script.get("id"), "act_number": act_no, "scene_number": scene_no,
                     "shot_number": number,

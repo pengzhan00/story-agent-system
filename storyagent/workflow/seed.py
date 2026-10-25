@@ -10,6 +10,7 @@ from typing import Any
 from storyagent.domain import MediaKind
 from storyagent.media.specs import SpecLocked, SpecRecord, SpecStore
 
+from . import keyframe
 from .stages import Ctx
 
 PORTRAIT, VOICE, LOCATION = "character.portrait", "character.voice", "scene.keyframe"
@@ -61,11 +62,12 @@ class Seeder:
 def _shot_prompts(ctx: Ctx, shot: dict[str, Any], chars: dict[str, dict[str, Any]], style: dict[str, Any],
                   previous: str, use_llm: bool) -> dict[str, str]:
     payload = shot["render_payload"]
+    composed = bool(ctx.settings.workflow.get("keyframe_from_references", True))
     worn = {c["name"]: c.get("costume", "") for c in payload["subject"]["characters"]}
     looks = [{"appearance": chars.get(n, {}).get("appearance", ""), "costume": worn.get(n, ""),
               "stable_description": chars.get(n, {}).get("prompt_template", "")} for n in shot["characters"]]
     props = payload.get("continuity", {}).get("props", [])
-    base_style = str(style.get("visual_style", ""))
+    base_style = keyframe.clean(str(style.get("visual_style", "")))
     plain = ", ".join(x for x in (
         payload["camera"]["shot_type"],
         "; ".join(f"{lk['stable_description'] or lk['appearance']}"
@@ -88,6 +90,7 @@ def _shot_prompts(ctx: Ctx, shot: dict[str, Any], chars: dict[str, dict[str, Any
         data = ctx.run_agent("shot.visual", {"shot": {k: payload[k] for k in keys if k in payload},
                                              "characters": looks, "props": props, "scene": shot["location"],
                                              "style": base_style,
+                                             "tool_notes": keyframe.guide(with_references=composed),
                                              "previous": previous or "(start)"})
         return {k: str(data.get(k) or fallback[k]) for k in fallback}
     except Exception:  # an LLM hiccup on one shot must not stop the whole stage  # noqa: BLE001
@@ -114,7 +117,8 @@ def seed_specs(ctx: Ctx) -> dict[str, Any]:
     specs: SpecStore = ctx.spec_store
     seeder = Seeder(specs, ctx.pid)
     store, style = ctx.store, dict(ctx.state.get_data(ctx.pid, "style", {}) or {})
-    neg = str(style.get("negative_prompt", ""))
+    lang = ctx.project.content_language
+    neg = keyframe.negative_prompt(str(style.get("negative_prompt", "")), language=lang)
     visual = str(style.get("visual_style", ""))
     chars = {c["name"]: c for c in store.list_characters(ctx.pid)}
     portraits: dict[str, SpecRecord] = {}
@@ -124,12 +128,14 @@ def seed_specs(ctx: Ctx) -> dict[str, Any]:
     for i, c in enumerate(chars.values()):
         ctx.step(i, total, c["name"])
         extra = ctx.state.get_data(ctx.pid, f"character_extra:{c['name']}", {}) or {}
-        prompt = extra.get("image_prompt") or c["prompt_template"] or c["appearance"]
+        prompt = keyframe.image_prompt(extra.get("image_prompt") or c["prompt_template"] or c["appearance"],
+                                       language=lang)
         params: dict[str, Any] = {}
         if c["lora_ref"]:
             params["loras"] = [{"path": c["lora_ref"], "scale": 0.8}]
         portraits[c["name"]] = seeder.sync(PORTRAIT, str(c["id"]), MediaKind.IMAGE_GENERATE, prompt=prompt,
-                                           negative_prompt=neg, refs=list(c["ref_images"]), params=params)
+                                           negative_prompt=neg, refs=list(c["ref_images"]), params=params,
+                                           seed=keyframe.fixed_seed(ctx.pid, f"character:{c['name']}"))
         sample = extra.get("voice_sample_text") or ""
         vp = {"voice_ref": _voice_param(c)} if _voice_param(c) else {}
         voices[c["name"]] = seeder.sync(VOICE, str(c["id"]), MediaKind.AUDIO_TTS, prompt=c["voice_profile"],
@@ -140,7 +146,8 @@ def seed_specs(ctx: Ctx) -> dict[str, Any]:
         extra = ctx.state.get_data(ctx.pid, f"location_extra:{loc['name']}", {}) or {}
         locations[loc["name"]] = seeder.sync(
             LOCATION, str(loc["id"]), MediaKind.IMAGE_GENERATE, negative_prompt=neg, refs=list(loc["ref_images"]),
-            prompt=extra.get("image_prompt") or loc["prompt_template"] or loc["description"])
+            prompt=keyframe.scene_prompt(extra.get("image_prompt") or loc["prompt_template"] or loc["description"]),
+            seed=keyframe.fixed_seed(ctx.pid, f"location:{loc['name']}"))
 
     for m in store.list_music(ctx.pid):
         if m["kind"] == "theme":
@@ -193,10 +200,22 @@ def seed_specs(ctx: Ctx) -> dict[str, Any]:
         refs: list[Any] = []
         for n in shot["characters"]:
             refs += list(chars.get(n, {}).get("ref_images", []))
-        key = seeder.sync(KEYFRAME, sid, MediaKind.IMAGE_GENERATE, prompt=prompts["image_prompt"],
-                          negative_prompt=prompts["negative_prompt"] or neg, refs=refs, depends_on=deps)
-        seeder.sync(VIDEO, sid, MediaKind.VIDEO_GENERATE, prompt=prompts["video_prompt"],
-                    negative_prompt=prompts["negative_prompt"] or neg, depends_on=seeder.dep(key))
+        shown = prompts["image_prompt"]
+        composed = bool(ctx.settings.workflow.get("keyframe_from_references", True))
+        lead = shot["characters"][0] if shot["characters"] else f"location:{shot['location']}"
+        if shot["characters"]:
+            lead = f"character:{lead}"
+            shown = keyframe.image_prompt(shown, language=lang,
+                                          with_portraits=composed and any(portraits.get(n) for n in shot["characters"]))
+        else:
+            shown = keyframe.scene_prompt(shown)
+        shot_neg = (keyframe.negative_prompt(prompts["negative_prompt"], language=lang)
+                    if prompts["negative_prompt"] else neg)
+        key = seeder.sync(KEYFRAME, sid, MediaKind.IMAGE_GENERATE, prompt=shown,
+                          negative_prompt=shot_neg, refs=refs, depends_on=deps,
+                          seed=keyframe.fixed_seed(ctx.pid, lead))
+        seeder.sync(VIDEO, sid, MediaKind.VIDEO_GENERATE, prompt=keyframe.clean(prompts["video_prompt"]),
+                    negative_prompt=shot_neg, depends_on=seeder.dep(key))
         sync_dialogue(shot)
         sync_sfx(shot)
         previous = shot["narration"]

@@ -1,0 +1,52 @@
+# What the image model needs to hear, and what it must not be told. Read by workflow/keyframe.py.
+# The LLM-written style and character prompts are free text; whatever they say, these guardrails apply to every
+# portrait, scene image and shot keyframe prompt, so a wet-looking, dark or off-model picture is not the story's fault.
+
+# Appended to every image prompt.
+realism = "natural matte skin with visible pores and fine texture, soft diffused key light, well exposed with bright readable midtones, open spacious room with depth and a visible background"
+same_faces = "the people keep exactly the faces, hair and skin tone of the reference portraits"
+
+# Handed to the prompt-writing agent as `tool_notes` (what the tool can and cannot do). `edit`: the keyframe is composed
+# from the character portraits and the scene image (an image-edit model); `direct`: the picture model draws it from words.
+[guides]
+edit = """Image model: an image-edit model. Reference images carry identity: the faces and hair in the character
+portraits are kept, so say 'the woman / the man from the reference portrait' and describe action, pose and light, do not
+re-describe or change faces. It follows plain English sentences better than keyword lists, and it hardly obeys
+negative prompts: say what you want to see ('natural matte skin with visible pores', 'bright, readable room') instead
+of what you do not. Words such as wet, glistening, glossy, sheen, dewy or oily make skin look greasy and fake: describe
+skin as natural and matte, and show heat or effort through flushed cheeks, damp hair strands or fabric clinging.
+Dark words (deep shadows, chiaroscuro, low-key, pitch dark) make the picture murky: name real light sources and keep
+the face and torso well exposed. Always state the people's ethnicity and age range once, in the same words in every shot."""
+direct = """Image model: a text-to-image model with no reference images, so nothing but your words keeps a face the same
+from shot to shot. Start every prompt with the same few words for each person (age range, ethnicity, face shape, hair,
+skin) exactly as given in the character description, then the costume, then action, pose and light. Plain English
+sentences, concrete and visual. Say what you want to see ('natural matte skin with visible pores', 'bright, readable
+room'). Words such as wet, glistening, glossy, sheen, dewy or oily make skin look greasy and fake: describe skin as
+natural and matte, and show heat or effort through flushed cheeks, damp hair strands or fabric clinging. Dark words (deep
+shadows, chiaroscuro, low-key, pitch dark) make the picture murky: name real light sources and keep the faces and
+torsos well exposed. One or two people per picture, framed so faces are large enough to show their features."""
+
+# Per content language (prefix): who is in these pictures.
+[identity]
+zh = "East Asian Chinese people"
+
+# Extra things never to draw; `identity_negative` only where `identity` has the language.
+[negative]
+always = "oily skin, greasy shine, plastic skin, airbrushed, doll face, 3d render, underexposed, crushed shadows, claustrophobic, cramped framing, heavy vignette"
+zh = "Caucasian, Western facial features, non-Asian faces"
+# Tokens of the style's own negative prompt that work against us.
+drop = ["dry skin", "overly bright exposure"]
+
+# Rewrites of the words that make skin greasy or the frame murky: [pattern, replacement] (case-insensitive).
+[[rewrite]]
+pattern = '\b(?:wet|sweaty|oily|greasy|glistening|glossy|shiny|dewy|slick)\s+(?:skin|complexion|body|sheen)(?:\s+textures?)?'
+replace = "natural matte skin"
+[[rewrite]]
+pattern = '\b(?:wet|glossy|oily)\s+sheen\b|\bsheen of sweat\b'
+replace = "soft natural light"
+[[rewrite]]
+pattern = '\bmacro details? of sweat\b'
+replace = "fine fabric detail"
+[[rewrite]]
+pattern = '\b(?:deep|heavy|harsh) shadows?\b|\bchiaroscuro\b|\blow-key\b'
+replace = "soft shadow falloff"
