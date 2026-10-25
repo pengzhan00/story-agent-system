@@ -711,6 +711,7 @@
   "web.field.shot_number": "镜",
   "web.field.location": "场景",
   "web.field.narration": "旁白",
+  "web.field.action": "动作",
   "web.field.character": "角色",
   "web.field.line": "台词",
   "web.field.emotion": "情绪",
