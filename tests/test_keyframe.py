@@ -49,3 +49,7 @@ def test_a_fixed_seed_is_stable_per_project_and_key() -> None:
     assert keyframe.fixed_seed(4, "character:Lin") != keyframe.fixed_seed(4, "character:Gu")
     assert keyframe.fixed_seed(4, "character:Lin") != keyframe.fixed_seed(5, "character:Lin")
     assert 0 <= keyframe.fixed_seed(4, "x") < 2_000_000_000
+
+
+def test_anatomy_is_stated_in_the_prompt_and_the_negative() -> None:
+    assert "flat muscular chest" in keyframe.scene_prompt("a room") and "gynecomastia" in keyframe.negative_prompt("")

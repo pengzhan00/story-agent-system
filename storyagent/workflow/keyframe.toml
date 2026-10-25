@@ -3,7 +3,7 @@
 # portrait, scene image and shot keyframe prompt, so a wet-looking, dark or off-model picture is not the story's fault.
 
 # Appended to every image prompt.
-realism = "natural matte skin with visible pores and fine texture, soft diffused key light, well exposed with bright readable midtones, open spacious room with depth and a visible background"
+realism = "anatomically correct bodies with clearly separated, correctly placed body parts, men with a flat muscular chest, natural matte skin with visible pores and fine texture, soft diffused key light, well exposed with bright readable midtones, open spacious room with depth and a visible background"
 same_faces = "the people keep exactly the faces, hair and skin tone of the reference portraits"
 
 # Handed to the prompt-writing agent as `tool_notes` (what the tool can and cannot do). `edit`: the keyframe is composed
@@ -24,7 +24,7 @@ sentences, concrete and visual. Say what you want to see ('natural matte skin wi
 room'). Words such as wet, glistening, glossy, sheen, dewy or oily make skin look greasy and fake: describe skin as
 natural and matte, and show heat or effort through flushed cheeks, damp hair strands or fabric clinging. Dark words (deep
 shadows, chiaroscuro, low-key, pitch dark) make the picture murky: name real light sources and keep the faces and
-torsos well exposed. One or two people per picture, framed so faces are large enough to show their features."""
+torsos well exposed. Say plainly which body parts are visible and which way each person faces (front, back, side), and keep men and women anatomically distinct. One or two people per picture, framed so faces are large enough to show their features."""
 
 # Per content language (prefix): who is in these pictures.
 [identity]
@@ -32,7 +32,7 @@ zh = "East Asian Chinese people"
 
 # Extra things never to draw; `identity_negative` only where `identity` has the language.
 [negative]
-always = "oily skin, greasy shine, plastic skin, airbrushed, doll face, 3d render, underexposed, crushed shadows, claustrophobic, cramped framing, heavy vignette"
+always = "breasts on a man, gynecomastia, merged back and chest, fused bodies, wrong anatomy, extra or missing limbs, deformed torso, extra fingers, oily skin, greasy shine, plastic skin, airbrushed, doll face, 3d render, underexposed, crushed shadows, claustrophobic, cramped framing, heavy vignette"
 zh = "Caucasian, Western facial features, non-Asian faces"
 # Tokens of the style's own negative prompt that work against us.
 drop = ["dry skin", "overly bright exposure"]
