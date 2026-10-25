@@ -117,8 +117,9 @@ def auto_voices(project_id: int, request: Request) -> AutoVoicesOut:
     and put it on that character's spoken lines. A character whose gender cannot be told, or that has no voice of its
     gender left, is listed in ``unresolved``; the voice of a character that already has one is never changed."""
     ctx = ctx_of(request)
-    ctx.projects.get(project_id)
-    done = voices_mod.auto_assign(ctx.story, ctx.library, ctx.specs, project_id)
+    project = ctx.projects.get(project_id)
+    done = voices_mod.auto_assign(ctx.story, ctx.library, ctx.specs, project_id,
+                                  adults_only=ctx.settings.content.policy(project.rating).gates)
     return AutoVoicesOut(assigned=[VoiceAssignedOut(**vars(a)) for a in done.assigned],
                          unresolved=[VoiceAssignedOut(**vars(a)) for a in done.unresolved])
 

@@ -74,11 +74,20 @@ def _rank(item: LibraryItem) -> tuple[int, int, str]:
     return (1 if "pilot verification only" in desc else 0, 0 if "adult" in desc else 1, item.name)
 
 
-def auto_assign(store: StoryStore, library: Library, specs: SpecStore, project_id: int) -> AutoVoices:
+def _may_be_young(item: LibraryItem) -> bool:
+    """A voice whose speaker's age group reaches under 18 (``age:<14``, ``age:14-25``)."""
+    return any(tag in ("age:<14", "age:14-25") for tag in item.tags)
+
+
+def auto_assign(
+    store: StoryStore, library: Library, specs: SpecStore, project_id: int, *, adults_only: bool = False,
+) -> AutoVoices:
     """Give every character without a voice one from the library (a voice already on a character is kept), then put it
-    on that character's spoken lines that have none (a locked line is left alone)."""
+    on that character's spoken lines that have none (a locked line is left alone). ``adults_only`` (a gated rating)
+    leaves out voices whose speaker may be under 18."""
     out = AutoVoices()
-    voices = [v for v in library.list(role="voice") if v.meta.get("consent") and voice_gender(v)]
+    voices = [v for v in library.list(role="voice") if v.meta.get("consent") and voice_gender(v)
+              and not (adults_only and _may_be_young(v))]
     used = {str(c.get("voice_ref_audio", "")) for c in store.list_characters(project_id)}
     chars = store.list_characters(project_id)
     by_name = {c["name"]: c for c in chars}

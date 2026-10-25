@@ -1,9 +1,9 @@
-import { useLibraryItems } from "../api/library";
 import { useSpecActions } from "../api/specs";
 import type { PlannedTask, Spec } from "../api/types";
 import { useT } from "../i18n";
 import { ErrorNote } from "./ErrorNote";
 import { SpecEditor } from "./SpecEditor";
+import { VoicePicker } from "./VoicePicker";
 
 /**
  * One task of the production plan opened up: its prompt, text, model and parameters, editable (each save is a new version
@@ -16,27 +16,17 @@ export function PlanTaskEditor({
 }) {
   const t = useT();
   const act = useSpecActions(pid, spec);
-  const voices = (useLibraryItems().data ?? []).filter((i) => i.role === "voice");
   const voice = String(spec.params?.["voice_ref"] ?? "");
   const speech = spec.subject_type === "dialogue.line";
   return (
     <div className="card stack">
       {speech ? (
-        <label className="field">
-          <span>{t("web.plan.voice")}</span>
-          <select
-            value={voice}
-            disabled={spec.locked || act.edit.isPending}
-            onChange={(e) => act.edit.mutate({ params_patch: { voice_ref: e.target.value }, note: t("web.plan.voice") })}
-          >
-            <option value="">{t("web.plan.voice_none")}</option>
-            {voices.map((v) => (
-              <option key={v.id} value={v.ref}>
-                {v.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <VoicePicker
+          value={voice}
+          disabled={spec.locked}
+          busy={act.edit.isPending}
+          onApply={(ref) => act.edit.mutate({ params_patch: { voice_ref: ref }, note: t("web.plan.voice") })}
+        />
       ) : null}
       <SpecEditor pid={pid} spec={spec} review={false} onAcknowledge={() => undefined} />
       <div className="row">

@@ -582,6 +582,32 @@ def _cmd_library_add(s: Settings, a: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_library_import_aishell3(s: Settings, a: argparse.Namespace) -> int:
+    import tempfile
+
+    from storyagent import aishell
+    from storyagent.media.library import LibraryError
+
+    root = Path(a.dir).expanduser()
+    if not (root / "spk-info.txt").is_file():
+        raise CliError("cli.error.library", 1, detail=f"{root}/spk-info.txt")
+    ages = tuple(x.strip().upper() for x in a.ages.split(",") if x.strip())
+    genders = tuple(x.strip() for x in a.gender.split(",") if x.strip())
+    try:
+        with tempfile.TemporaryDirectory(prefix="aishell3-") as tmp:
+            rows = aishell.import_speakers(
+                s, _library(s), root, Path(tmp), ages=ages, genders=genders, only=tuple(a.speaker or ()),
+                limit=a.limit, consent=a.consent, replace=a.replace, dry_run=a.dry_run)
+    except LibraryError as exc:
+        raise CliError("cli.error.library", 1, detail=str(exc)) from exc
+    for r in rows:
+        print("\t".join([r.speaker, r.name or "-", f"{r.seconds:g}s" if r.name else "", r.skipped or r.text]))
+    made = sum(1 for r in rows if r.name)
+    print(t("cli.library.aishell_dry" if a.dry_run else "cli.library.aishell_done", n=made,
+            skipped=len(rows) - made))
+    return 0
+
+
 def _cmd_library_list(s: Settings, a: argparse.Namespace) -> int:
     for i in _library(s).list(role=a.role, tag=a.tag, q=a.q):
         print("\t".join([i.id, i.ref, ",".join(i.tags), i.description]))
@@ -1305,6 +1331,17 @@ def build_parser() -> argparse.ArgumentParser:
     la.add_argument("--text", help="voice: what the reference clip says")
     la.add_argument("--consent", action="store_true", help="voice: the speaker agreed to cloning")
     la.add_argument("--replace", action="store_true")
+    lx = add(li, "import-aishell3", _cmd_library_import_aishell3)
+    lx.add_argument("dir", help="the extracted corpus folder (the one that holds spk-info.txt)")
+    lx.add_argument("--ages", default="B,C,D",
+                    help="age groups to take: B 14-25, C 26-40, D over 40 (A, under 14, never)")
+    lx.add_argument("--speaker", action="append", metavar="SSBxxxx", help="only these speakers (repeatable)")
+    lx.add_argument("--gender", default="female,male")
+    lx.add_argument("--limit", type=int, default=0, help="at most this many speakers (0 = all)")
+    lx.add_argument("--consent", action="store_true",
+                    help="record that the speakers agreed to cloning (the corpus licence alone does not say so)")
+    lx.add_argument("--replace", action="store_true")
+    lx.add_argument("--dry-run", action="store_true", help="list what would be imported, change nothing")
     ll = add(li, "list", _cmd_library_list)
     ll.add_argument("--role")
     ll.add_argument("--tag")

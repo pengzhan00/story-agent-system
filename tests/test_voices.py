@@ -41,6 +41,7 @@ def test_each_character_gets_its_own_voice_of_its_gender_and_the_lines_follow(tm
     _voice(engine, tmp_path, "Lan", "adult female", tags=["female"])
     _voice(engine, tmp_path, "Reed", "synthetic male")
     _voice(engine, tmp_path, "NoConsent", "adult male", consent=False)
+    _voice(engine, tmp_path, "Teen", "female", tags=["female", "age:14-25"])
     lib = Library(engine.db, engine.settings)
     done = voices.auto_assign(engine.store, lib, engine.spec_store, pid)
     assert [(x.character, x.voice) for x in done.assigned] == [(NAMES[0], "Lan"), (NAMES[1], "Reed")]
@@ -83,3 +84,17 @@ def test_the_api_reports_who_got_a_voice_and_who_did_not(fsettings) -> None:  # 
         assert sorted((u["character"], u["reason"]) for u in body["unresolved"]) == [
             ("Ann", "no_voice_left"), ("Bo", "unknown_gender")]
         assert client.post("/api/projects/999/voices/auto").status_code == 404
+
+
+def test_a_gated_project_leaves_out_voices_whose_speaker_may_be_under_eighteen(tmp_path: Path) -> None:
+    engine, _, _ = make_engine(tmp_path)
+    pid = new_project(engine)
+    engine.run(pid, None, {"visual_prompts": False})
+    a = engine.store.find_character(pid, NAMES[0])
+    engine.store.update_character(a["id"], {"gender": "female"})
+    _voice(engine, tmp_path, "Young", "female", tags=["female", "age:14-25"])
+    lib = Library(engine.db, engine.settings)
+    shut = voices.auto_assign(engine.store, lib, engine.spec_store, pid, adults_only=True)
+    assert [x.reason for x in shut.unresolved if x.character == NAMES[0]] == ["no_voice_left"]
+    open_ = voices.auto_assign(engine.store, lib, engine.spec_store, pid)
+    assert [(x.character, x.voice) for x in open_.assigned] == [(NAMES[0], "Young")]
