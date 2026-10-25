@@ -763,6 +763,7 @@ class PlannedTaskOut(Strict):
     phase: int
     state: str = Field(description="new | stale | done | blocked | skip")
     reason: str = Field(description="why a blocked task cannot be made (no_model | no_voice | blocked_term)")
+    detail: str = Field(description="blocked_term: the term that was found")
     est_seconds: int
     needs: list[str]
 

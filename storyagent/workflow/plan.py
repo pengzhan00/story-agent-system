@@ -44,6 +44,7 @@ class PlannedTask:
     phase: int
     state: str
     reason: str = ""
+    detail: str = ""                                    # blocked_term: the term that was found
     est_seconds: int = 0
     needs: list[str] = field(default_factory=list)     # spec ids made earlier in the same run that this one builds on
 
@@ -112,9 +113,11 @@ def produce_plan(
                 state, reason = "blocked", "no_model"
             if spec.subject_type == "dialogue.line" and not spec.params.get("voice_ref") and not default_voice:
                 state, reason = "blocked", "no_voice"
-            if gated and state in ("new", "stale") and settings.content.blocked_in(
-                    f"{spec.prompt}\n{spec.negative_prompt}\n{spec.text_payload}"):
-                state, reason = "blocked", "blocked_term"
+            found = settings.content.blocked_in(f"{spec.prompt}\n{spec.negative_prompt}\n{spec.text_payload}") \
+                if gated and state in ("new", "stale") else None
+            detail = ""
+            if found:
+                state, reason, detail = "blocked", "blocked_term", found
             if spec.subject_type == "shot.video" and state == "new" and spec.subject_id not in picks:
                 state, reason = "skip", "still"
             guess = fallback_seconds(settings, model_ref, kind) if model_ref else FALLBACK_SECONDS.get(kind, 60.0)
@@ -125,7 +128,7 @@ def produce_plan(
             out.append(PlannedTask(
                 spec_id=spec.id, subject_type=spec.subject_type, subject_id=spec.subject_id,
                 label=_label(spec, names), kind=kind, model_ref=model_ref, phase=phase, state=state,
-                reason=reason, est_seconds=int(known or guess), needs=needs))
+                reason=reason, detail=detail, est_seconds=int(known or guess), needs=needs))
     return out
 
 

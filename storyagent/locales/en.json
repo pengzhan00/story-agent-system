@@ -1859,7 +1859,7 @@
   "web.plan.state.done": "up to date",
   "web.plan.reason.no_model": "no model",
   "web.plan.reason.no_voice": "no voice assigned",
-  "web.plan.reason.blocked_term": "contains a blocked term",
+  "web.plan.reason.blocked_term": "contains the blocked term \"{detail}\"",
   "web.plan.selected": "{n} selected, about {eta}",
   "web.plan.auto_voices": "Pick voices automatically",
   "web.plan.auto_voices_hint": "Chooses a library voice by each character's gender, one per character; a character that already has a voice keeps it. You can change it per line afterwards.",

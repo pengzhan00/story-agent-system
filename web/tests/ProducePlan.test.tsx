@@ -10,7 +10,7 @@ import { I18nProvider } from "../src/i18n";
 const en = JSON.parse(readFileSync(join(__dirname, "..", "..", "storyagent", "locales", "en.json"), "utf-8")) as Record<string, string>;
 
 const task = {
-  spec_id: "s1", subject_type: "character.portrait", subject_id: "11", label: "Ann", kind: "image.generate", model_ref: "flux", phase: 1, state: "new", reason: "", est_seconds: 60, needs: [],
+  spec_id: "s1", subject_type: "character.portrait", subject_id: "11", label: "Ann", kind: "image.generate", model_ref: "flux", phase: 1, state: "new", reason: "", detail: "", est_seconds: 60, needs: [],
 };
 const spec = {
   id: "s1", project_id: 4, subject_type: "character.portrait", subject_id: "11", slot: "main", kind: "image.generate", model_ref: "flux", version: 1, parent_version: null,

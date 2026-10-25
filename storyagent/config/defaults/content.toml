@@ -49,6 +49,14 @@ gates = true            # the hard gates below apply (must stay true for any rat
 min_adult_age = 18
 # A restricted project is refused when a prompt or character text points at a minor. Whole words for Latin text,
 # substrings for CJK. Add your own in $STORY_AGENT_HOME/config/content.toml (lists are replaced, not merged).
+# Wording that contains a blocked term but means something else is taken out before the terms are looked for: a regular
+# expression each (Python syntax; the letter of a key is case-sensitive so that "a minor" the person is not let through).
+# The packaged ones are musical: "D minor", "in A minor", "minor key / chord / scale ...". Lists are replaced, not merged.
+allowed_phrases = [
+    '\b[B-G][#b]?\s(?i:minor|major)\b',
+    '(?i:\b(?:in|key of|key)\s+a\s+minor\b)',
+    '(?i:\bminor\s+(?:key|keys|chord|chords|scale|scales|third|seventh|7th|mode|pentatonic|harmony|progression)\b)',
+]
 blocked_terms = [
     "child", "children", "kid", "kids", "minor", "minors", "underage", "under-age", "teen", "teens", "teenager",
     "schoolgirl", "schoolboy", "loli", "lolita", "shota", "toddler", "infant", "baby", "preteen", "juvenile",

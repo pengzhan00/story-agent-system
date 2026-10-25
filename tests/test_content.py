@@ -446,3 +446,13 @@ def test_a_vault_that_is_a_link_to_another_volume_is_still_served_and_paths_cann
         assert c.get(f"/api/assets/{asset['id']}/file").status_code == 404
         db.conn.execute("UPDATE media_assets SET path='/etc/hosts' WHERE id=?", (asset["id"],))
         assert c.get(f"/api/assets/{asset['id']}/file").status_code == 404
+
+
+def test_a_musical_key_is_not_a_blocked_term_but_a_minor_person_still_is(tmp_path: Path) -> None:
+    s = load_settings({"STORY_AGENT_HOME": str(tmp_path / "home")})
+    c = s.content
+    for fine in ("piano, 72 BPM, D minor", "in A minor, slow", "Bb minor ballad", "a dark minor key",
+                 "minor chords, strings", "C# major then F minor"):
+        assert c.blocked_in(fine) is None, fine
+    for bad in ("a minor walks in", "the minor child", "A minor was there", "minor", "a young child"):
+        assert c.blocked_in(bad) is not None, bad

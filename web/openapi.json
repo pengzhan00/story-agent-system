@@ -4136,6 +4136,11 @@
       },
       "PlannedTaskOut": {
         "properties": {
+          "detail": {
+            "description": "blocked_term: the term that was found",
+            "title": "Detail",
+            "type": "string"
+          },
           "est_seconds": {
             "title": "Est Seconds",
             "type": "integer"
@@ -4196,6 +4201,7 @@
           "phase",
           "state",
           "reason",
+          "detail",
           "est_seconds",
           "needs"
         ],

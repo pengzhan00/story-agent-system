@@ -37,6 +37,7 @@ class ContentConfig:
     unlock_ttl_sec: int = 900
     min_adult_age: int = 18
     blocked_terms: tuple[str, ...] = ()
+    allowed_phrases: tuple[re.Pattern[str], ...] = ()    # wording that contains a blocked term and means something else
     ratings: Mapping[str, RatingPolicy] = field(default_factory=lambda: {"general": RatingPolicy("general")})
 
     def policy(self, rating: str | None) -> RatingPolicy:
@@ -52,7 +53,10 @@ class ContentConfig:
         return pa.name if pa.rank >= pb.rank else pb.name
 
     def blocked_in(self, text: str) -> str | None:
-        """The first blocked term found in ``text`` (whole words for Latin terms, substring for the rest)."""
+        """The first blocked term found in ``text`` (whole words for Latin terms, substring for the rest), after the
+        ``allowed_phrases`` (a musical key such as "D minor") are taken out."""
+        for allowed in self.allowed_phrases:
+            text = allowed.sub(" ", text)
         low = text.lower()
         for term in self.blocked_terms:
             t = term.lower()
@@ -100,7 +104,14 @@ def build_content(raw: Mapping[str, Any], error: type[Exception]) -> ContentConf
     for r in ratings.values():
         if (r.vault or r.gates) and r.min_age < min_age:
             raise error(f"content.ratings.{r.name}: a rating with the vault or the gates needs min_age >= {min_age}")
+    phrases: list[re.Pattern[str]] = []
+    for raw_pattern in gates.get("allowed_phrases", ()):
+        try:
+            phrases.append(re.compile(str(raw_pattern)))
+        except re.error as exc:
+            raise error(f"content.gates.allowed_phrases: {raw_pattern!r} is not a valid pattern ({exc})") from exc
     return ContentConfig(
         default_rating=default, vault_dir=vault_dir, volume_mount=str(cfg.get("volume_mount", "")).strip(),
         encryption=encryption, unlock_ttl_sec=int(cfg.get("unlock_ttl_sec", 900)), min_adult_age=min_age,
-        blocked_terms=tuple(str(t) for t in gates.get("blocked_terms", ())), ratings=ratings)
+        blocked_terms=tuple(str(t) for t in gates.get("blocked_terms", ())), allowed_phrases=tuple(phrases),
+        ratings=ratings)

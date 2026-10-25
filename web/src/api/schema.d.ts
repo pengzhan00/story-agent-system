@@ -4484,6 +4484,11 @@ export interface components {
         };
         /** PlannedTaskOut */
         PlannedTaskOut: {
+            /**
+             * Detail
+             * @description blocked_term: the term that was found
+             */
+            detail: string;
             /** Est Seconds */
             est_seconds: number;
             /** Kind */

@@ -1859,7 +1859,7 @@
   "web.plan.state.done": "已是最新",
   "web.plan.reason.no_model": "没有模型",
   "web.plan.reason.no_voice": "没指定声音",
-  "web.plan.reason.blocked_term": "含被禁用词",
+  "web.plan.reason.blocked_term": "含被禁用词「{detail}」",
   "web.plan.selected": "已选 {n} 项,约 {eta}",
   "web.plan.auto_voices": "自动指定声音",
   "web.plan.auto_voices_hint": "按角色性别从素材库选声音,每个角色一个;已经有声音的不动。之后可以在每句台词里改。",

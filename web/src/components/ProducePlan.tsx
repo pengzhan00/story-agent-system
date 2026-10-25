@@ -148,7 +148,7 @@ export function ProducePlan({ id, onClose, defaultTier = "draft" }: { id: number
                       <span className="spacer" />
                       {x.state === "blocked" ? (
                         <button type="button" className="chip chip-failed chip-button" disabled={!spec} onClick={() => setOpen(open === x.spec_id ? null : x.spec_id)}>
-                          {`${t(`web.plan.reason.${x.reason}`)} · ${t("web.plan.fix")}`}
+                          {`${t(`web.plan.reason.${x.reason}`, { detail: x.detail })} · ${t("web.plan.fix")}`}
                         </button>
                       ) : (
                         <span className={x.state === "done" ? "chip chip-completed" : "chip"}>{t(`web.plan.state.${x.state}`)}</span>
