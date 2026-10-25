@@ -3,7 +3,7 @@
 # portrait, scene image and shot keyframe prompt, so a wet-looking, dark or off-model picture is not the story's fault.
 
 # Appended to every image prompt.
-realism = "anatomically correct bodies with clearly separated, correctly placed body parts, men with a flat muscular chest, natural matte skin with visible pores and fine texture, soft diffused key light, well exposed with bright readable midtones, open spacious room with depth and a visible background"
+realism = "one or two separate, distinct people with clear, uncrossed silhouettes and no merged or fused bodies, each person with exactly one head, two arms, two legs and five fingers per hand, correct body proportions, anatomically correct bodies with clearly separated, correctly placed body parts, correct front-and-back torso orientation, men with a flat muscular chest, natural matte skin with visible pores and fine texture, soft diffused key light, well exposed with bright readable midtones, open spacious room with depth and a visible background"
 same_faces = "the people keep exactly the faces, hair and skin tone of the reference portraits"
 
 # Handed to the prompt-writing agent as `tool_notes` (what the tool can and cannot do). `edit`: the keyframe is composed
@@ -32,7 +32,7 @@ zh = "East Asian Chinese people"
 
 # Extra things never to draw; `identity_negative` only where `identity` has the language.
 [negative]
-always = "breasts on a man, gynecomastia, merged back and chest, fused bodies, wrong anatomy, extra or missing limbs, deformed torso, extra fingers, oily skin, greasy shine, plastic skin, airbrushed, doll face, 3d render, underexposed, crushed shadows, claustrophobic, cramped framing, heavy vignette"
+always = "breasts on a man, gynecomastia, merged back and chest, fused bodies, conjoined bodies, two heads on one body, extra arms, extra legs, twisted limbs, dislocated joints, fused fingers, wrong anatomy, extra or missing limbs, deformed torso, extra fingers, oily skin, greasy shine, plastic skin, airbrushed, doll face, 3d render, underexposed, crushed shadows, claustrophobic, cramped framing, heavy vignette"
 zh = "Caucasian, Western facial features, non-Asian faces"
 # Tokens of the style's own negative prompt that work against us.
 drop = ["dry skin", "overly bright exposure"]
