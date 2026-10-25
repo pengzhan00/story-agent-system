@@ -38,7 +38,7 @@
 
 - `storyagent serve [--port 8765]`:FastAPI + 构建好的网页(`web/dist`)+ SSE 事件流。
 - `storyagent worker`:执行**媒体作业**(`media_jobs`)和**工作流运行**(`workflow_runs`),线程池,租约+心跳,重启后接管/重投。
-- `scripts/start.sh`:一起起这两个(Ctrl-C 只停这两个)。
+- `scripts/start.sh`:一起起这两个(Ctrl-C 只停这两个);也是重启守护:worker 或 server 以退出码 75 退出(`storyagent/restart.py`)就把两个都重新拉起,网页「更新并重启」靠它。
 - 外部服务(Ollama、ACE-Step、Phosphene/Pinokio)**系统不替人管**:网页「启动台」/`storyagent ops launch` 只启动 `[launch.<服务>]` 里列出且被要求的,**从不停止/杀任何进程**。禁止 `pkill`,只用明确的 PID。
 - 改了 Python 代码必须重启 worker 和 server(长驻进程只加载一次)。**重启 worker 会打断正在跑的重任务**(租约过期后会被重投)。
 
@@ -156,7 +156,7 @@ docs/          API CONFIGURATION MEDIA_CONTRACT RUNBOOK WORKFLOW USER_GUIDE PARI
   | 虚拟环境 | `story-agent-system/.venv`(`uv pip install -e .`) | 工作树 `.venv`(带 `[dev]`) |
   | 数据 | `story-agent-system/data/`(数据库、媒体、`config/`);**不进 Git,要备份** | 工作树 `data/`(沙盒,随时可丢) |
   | 启动 | `scripts/start.sh`(端口 8765) | `scripts/start.sh --port 8766` |
-  | 更新 | `scripts/deploy.sh`(快进+安装+构建网页+迁移,**不重启**),再重启 start.sh | 直接改代码、测试 |
+  | 更新 | 网页「系统 → 更新与重启」(同 `scripts/deploy.sh` 的步骤 + 热重启,见 RUNBOOK);或手动 `scripts/deploy.sh`(**不重启**)再重启 start.sh | 直接改代码、测试(工作树里更新按钮自动停用) |
   `data/config/services.toml` 覆盖 ffmpeg-full 路径(两套各一份)。网页:生产 `http://localhost:8765`。
   2026-10-21 已把数据库(含 LongCat/故事/剧本/图片的结果)和 `config/` 迁到生产 `data/`,生产已从主检出启动。
 - Ollama 0.40.6;已装 `gemma4:31b`(默认角色)、`gpt-oss-20b`(结构化 JSON 不稳,已退回)、`nomic-embed-text`。`qwen3.8:27b` 已放弃。
@@ -165,7 +165,7 @@ docs/          API CONFIGURATION MEDIA_CONTRACT RUNBOOK WORKFLOW USER_GUIDE PARI
 - LongCat(已实测通过):`~/myworkspace/longcat-avatar-mlx`(自带 py3.11 venv,权重 `LongCat-Video-Avatar-1.5-q4-dmd-merged`);
   它脚本要从 HF 缓存读 whisper 特征配置(`openai/whisper-large-v3`),陈旧的 `.locks` 文件曾卡死;适配器设了离线环境变量+`PYTHONUNBUFFERED`。
   **实测:一条 draft(832×480、93 帧 = 3.1 秒、30fps、无音轨)用了 54 分钟,口型和表情会动,首帧有些过饱和/变形**——本机数字人视频极慢,是整个规划的约束(见 SERIES.md S4)。
-- 生产更新流程:在开发工作树改+测+推送 `origin/main` → 主检出 `scripts/deploy.sh` → 确认没有在跑的重任务 → Ctrl-C 停 `scripts/start.sh` 再启动。需要开机自启/崩溃自拉起时再加 launchd(会改系统设置,须先问用户)。
+- 生产更新流程:在开发工作树改+测+推送 `origin/main` → 网页「更新并重启」(默认等运行中的任务做完,失败就停在原地、旧代码继续跑),或手动:主检出 `scripts/deploy.sh` → 确认没有在跑的重任务 → Ctrl-C 停 `scripts/start.sh` 再启动。需要开机自启/崩溃自拉起时再加 launchd(会改系统设置,须先问用户)。
 - 重启服务:server 偶尔忽略 SIGTERM,用明确 PID 先 `kill` 再必要时 `kill -9`(从不 pkill)。
 
 ## 7. 已做 / 未做(诚实清单)

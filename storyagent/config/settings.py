@@ -194,6 +194,20 @@ class AuthConfig:
         return self.mode == "token"
 
 
+UPDATE_MODES = ("auto", "on", "off")
+
+
+@dataclass(frozen=True)
+class UpdateConfig:
+    """``[update]`` in services.toml: the in-app "update and restart" (``storyagent.update``)."""
+
+    enabled: str = "auto"          # auto = only on the production checkout, on = always, off = never
+    remote: str = "origin"
+    branch: str = "main"
+    step_timeout_sec: float = 1800.0
+    keep_logs: int = 20
+
+
 @dataclass(frozen=True)
 class LLMBackend:
     name: str
@@ -242,6 +256,7 @@ class Settings:
     platforms: Platforms = field(default_factory=Platforms)     # platforms.toml: delivery presets per destination
     content: ContentConfig = field(default_factory=ContentConfig)   # content.toml: ratings, vault, unlock, hard gates
     setup: SetupConfig = field(default_factory=SetupConfig)         # setup.toml: the install guide's catalog
+    update: UpdateConfig = field(default_factory=UpdateConfig)      # services.toml [update]: update and hot restart
     # llm.toml [llm.ratings.<rating>]: rating -> role ("*" = every role) -> the model that rating's projects use
     llm_ratings: Mapping[str, Mapping[str, LLMRole]] = field(default_factory=dict)
 
@@ -484,6 +499,20 @@ def _build_auth(raw: Mapping[str, Any], mode_override: str | None) -> AuthConfig
         registration_role=str(a.get("registration_role", "viewer")),
         max_pending_registrations=int(a.get("max_pending_registrations", 50)),
     )
+
+
+def _build_update(raw: Mapping[str, Any]) -> UpdateConfig:
+    value = raw.get("enabled", "auto")
+    mode = "on" if value is True else "off" if value is False else str(value).strip().lower()
+    if mode not in UPDATE_MODES:
+        raise ConfigError(f"[update] enabled must be true, false or \"auto\", got {value!r}")
+    remote, branch = str(raw.get("remote", "origin")).strip(), str(raw.get("branch", "main")).strip()
+    if not remote or not branch or remote.startswith("-") or branch.startswith("-"):
+        raise ConfigError("[update] remote and branch must be names (not empty, not starting with '-')")
+    timeout, keep = float(raw.get("step_timeout_sec", 1800)), int(raw.get("keep_logs", 20))
+    if timeout <= 0 or keep < 1:
+        raise ConfigError("[update] step_timeout_sec and keep_logs must be positive")
+    return UpdateConfig(enabled=mode, remote=remote, branch=branch, step_timeout_sec=timeout, keep_logs=keep)
 
 
 LICENSE_MODES = ("block", "alert", "off")
@@ -827,6 +856,7 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         platforms=build_platforms(merged["platforms"], ConfigError),
         content=content,
         setup=build_setup(merged["setup"], ConfigError),
+        update=_build_update(merged["services"].get("update", {})),
     )
 
 

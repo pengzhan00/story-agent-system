@@ -27,8 +27,10 @@ from storyagent.media.ledger import Ledger
 from storyagent.media.library import Library
 from storyagent.media.specs import SpecStore
 from storyagent.projects import ProjectStore
+from storyagent.restart import RESTART_EXIT_CODE, SERVER_GRACE_SEC, server_should_leave
 from storyagent.review import ReviewStore
 from storyagent.story import StoryStore
+from storyagent.update import Updater
 from storyagent.workflow import WorkflowState
 
 from . import (
@@ -56,6 +58,7 @@ from . import (
     routes_story,
     routes_system,
     routes_tools,
+    routes_update,
     routes_wiki,
     routes_workflow,
     routes_workshop,
@@ -98,6 +101,26 @@ def mount_web(app: FastAPI, root: Path) -> None:
         return FileResponse(root / "index.html")        # client-side routes
 
 
+async def watch_restart(app: FastAPI, interval: float = 1.0) -> None:
+    """Once the worker has stopped for a restart request, give the browser a moment to see it and then leave with the
+    restart exit code (``serve`` ends uvicorn; ``scripts/start.sh`` starts worker and server again)."""
+    settings: Settings = app.state.ctx.settings
+    since: float | None = None
+    while True:
+        await asyncio.sleep(interval)
+        try:
+            ready = await asyncio.to_thread(server_should_leave, settings)
+        except Exception:                               # noqa: BLE001 - a bad file must not stop the watcher
+            continue
+        if not ready:
+            since = None
+            continue
+        since = since if since is not None else asyncio.get_running_loop().time()
+        if asyncio.get_running_loop().time() - since >= SERVER_GRACE_SEC:
+            app.state.leave(RESTART_EXIT_CODE)
+            return
+
+
 def create_app(settings: Settings | None = None, *, loader: Callable[[], Settings] | None = None) -> FastAPI:
     """``loader`` reads the configuration afresh (default: the process settings, re-read); without it and with explicit
     ``settings`` (tests) the server does not watch the config folder."""
@@ -113,6 +136,14 @@ def create_app(settings: Settings | None = None, *, loader: Callable[[], Setting
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.ctx = build_context(settings)
+        auth = app.state.ctx.auth
+        app.state.updater = Updater(settings, audit=lambda action, by, detail: auth.audit(
+            action, actor=by or "local", detail=detail))
+        app.state.updater.forget_restart()          # a restart request that is still here is the one that brought us up
+        app.state.exit_code = 0
+        if not hasattr(app.state, "leave"):
+            app.state.leave = lambda code: setattr(app.state, "exit_code", code)
+        restart_task = asyncio.create_task(watch_restart(app))
         app.state.reload_error = ""
         app.state.reload_loader = reread
         app.state.seen = fingerprint(settings.config_dir)
@@ -121,6 +152,7 @@ def create_app(settings: Settings | None = None, *, loader: Callable[[], Setting
         try:
             yield
         finally:
+            restart_task.cancel()
             if task is not None:
                 task.cancel()
 
@@ -144,7 +176,7 @@ def create_app(settings: Settings | None = None, *, loader: Callable[[], Setting
                    routes_library, routes_pack, routes_pipeline, routes_delivery, routes_content, routes_grammar,
                    routes_interchange,
                    routes_scripts, routes_specs, routes_story, routes_workflow, routes_system, routes_ai, routes_launch,
-                   routes_workshop, routes_llm, routes_wiki, routes_tools, routes_setup):
+                   routes_workshop, routes_llm, routes_wiki, routes_tools, routes_setup, routes_update):
         app.include_router(module.router)
     web = web_root(settings)
     if web is not None:
@@ -152,12 +184,19 @@ def create_app(settings: Settings | None = None, *, loader: Callable[[], Setting
     return app
 
 
-def serve(settings: Settings, host: str | None = None, port: int | None = None) -> None:
+def serve(settings: Settings, host: str | None = None, port: int | None = None) -> int:
+    """Run the API until it is stopped. Returns the exit code the process should end with: ``RESTART_EXIT_CODE`` when a
+    restart was requested and the worker has stopped (the supervisor then starts both again), else 0."""
     import uvicorn
 
-    uvicorn.run(
-        create_app(settings, loader=lambda: get_settings(reload=True)),    # a changed config folder is read again
-        host=host or str(settings.api["host"]),
-        port=port or int(settings.api["port"]),
-        log_level="info",
-    )
+    app = create_app(settings, loader=lambda: get_settings(reload=True))    # a changed config folder is read again
+    server = uvicorn.Server(uvicorn.Config(
+        app, host=host or str(settings.api["host"]), port=port or int(settings.api["port"]), log_level="info"))
+
+    def leave(code: int) -> None:
+        app.state.exit_code = code
+        server.should_exit = True
+
+    app.state.leave = leave
+    server.run()
+    return int(getattr(app.state, "exit_code", 0))

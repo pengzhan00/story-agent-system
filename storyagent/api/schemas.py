@@ -1773,3 +1773,107 @@ class SetupVerifyEntry(Strict):
 class SetupVerifyOut(Strict):
     entries: list[SetupVerifyEntry]
     ok: bool
+
+
+# -- update and hot restart ----------------------------------------------------------------------------
+class UpdateCommitOut(Strict):
+    sha: str
+    short: str
+    subject: str
+
+
+class UpdateStepOut(Strict):
+    id: str
+    label: str
+    status: str
+    status_label: str
+    note: str
+    detail: str
+    exit_code: int | None
+    started_at: float | None
+    finished_at: float | None
+
+
+class UpdateRunOut(Strict):
+    id: str
+    status: str
+    label: str
+    by: str
+    started_at: float
+    finished_at: float | None
+    before: UpdateCommitOut | None
+    after: UpdateCommitOut | None
+    behind: list[UpdateCommitOut]
+    failed_step: str
+    steps: list[UpdateStepOut]
+    restart: str
+    restart_label: str
+    restart_mode: str
+    log_file: str
+
+
+class UpdateJobOut(Strict):
+    id: str
+    kind: str
+    model: str
+    heavy: bool
+    project_id: int | None
+    progress: float
+    started_at: str | None
+
+
+class UpdateRunOfWorkOut(Strict):
+    id: str
+    project_id: int
+    started_at: str | None
+
+
+class UpdateWorkOut(Strict):
+    jobs: list[UpdateJobOut]
+    runs: list[UpdateRunOfWorkOut]
+    queued: int
+    heavy: int
+
+
+class UpdateRestartOut(Strict):
+    supervised: bool
+    phase: str
+    phase_label: str
+    mode: str
+    requested_at: float | None
+    running: int
+
+
+class UpdateOut(Strict):
+    enabled: bool
+    reason: str
+    reason_label: str
+    boot_id: str
+    started_at: float
+    now: float
+    current: UpdateCommitOut | None
+    branch: str
+    remote_ref: str
+    remote_known: bool
+    clean: bool
+    dirty: list[str]
+    behind: list[UpdateCommitOut]
+    behind_count: int
+    ahead_count: int
+    checked_at: float | None
+    tools_missing: list[str]
+    busy: bool
+    can_update: bool
+    run: UpdateRunOut | None
+    log_tail: list[str]
+    work: UpdateWorkOut
+    restart: UpdateRestartOut
+
+
+class UpdateRunBody(BaseModel):
+    restart: bool = True
+    interrupt: bool = False         # "now": running work is handed back at once instead of being waited for
+
+
+class UpdateRestartBody(BaseModel):
+    interrupt: bool = False

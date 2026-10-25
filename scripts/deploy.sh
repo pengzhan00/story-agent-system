@@ -4,6 +4,9 @@
 # It never stops or restarts anything: after it finishes, stop the running scripts/start.sh (Ctrl-C) and start it
 # again - the worker and the server load the code once. Check `storyagent media jobs --status running` first: a
 # restart interrupts a running heavy job (it is re-queued).
+# The same steps run from the web client ("System > Update and restart", admins) or `storyagent update run` -
+# storyagent/update.py - and, when scripts/start.sh supervises worker and server, the update ends with a hot restart
+# (both exit with code 75 and start.sh starts them again). Keep the two lists of steps in step with each other.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 [ -z "$(git status --porcelain)" ] || { echo "uncommitted changes here; production must be a clean checkout" >&2; exit 1; }

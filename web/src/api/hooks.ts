@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, del, patch, post, put } from "./client";
-import type { Agent, AgentEdit, AiCallDetail, AutoVoices, AiCallRow, BriefAnswers, Estimate, FlowStep, Health, Launch, ProjectCard, ProducePlan, SeriesBoard, ProjectFromText, ScriptReview, Job, Meta, Project, QueueState, Row, WorkflowOverview, WorkflowRun, WorkflowRunRow } from "./types";
+import { ApiError, api, del, patch, post, put } from "./client";
+import type { Agent, AgentEdit, AiCallDetail, AutoVoices, AiCallRow, BriefAnswers, Estimate, FlowStep, Health, Launch, ProjectCard, ProducePlan, SeriesBoard, ProjectFromText, ScriptReview, Job, Meta, Project, QueueState, Row, UpdateState, WorkflowOverview, WorkflowRun, WorkflowRunRow } from "./types";
 import { useI18n } from "../i18n";
 
 /** Polling is the fallback; the SSE feed (``events.ts``) pushes the same data much sooner. */
@@ -300,3 +300,32 @@ export function useUpdateSeason(id: number) {
 /** The dashboard: every season and episode with stage states and how much media is made. */
 export const useSeries = (id: number) =>
   useQuery({ queryKey: ["series", id], queryFn: () => api<SeriesBoard>(`/api/projects/${id}/series`), refetchInterval: 5000 });
+
+/** Update and restart: polls quickly while an update runs or a restart is under way (and while the service is away). */
+export const useUpdate = () =>
+  useQuery({
+    queryKey: ["update"],
+    queryFn: () => api<UpdateState>("/api/update"),
+    retry: false,
+    refetchInterval: (q) => {
+      if (q.state.error instanceof ApiError) return false; // refused (not an admin, ...): asking again will not help
+      const d = q.state.data;
+      return q.state.error || (d && (d.busy || d.restart.phase !== "none")) ? 1500 : 15000;
+    },
+  });
+export function useUpdateActions() {
+  const qc = useQueryClient();
+  const keep = (data: UpdateState) => qc.setQueryData(["update"], data);
+  return {
+    check: useMutation({ mutationFn: () => post<UpdateState>("/api/update/check"), onSuccess: keep }),
+    run: useMutation({
+      mutationFn: (body: { restart: boolean; interrupt: boolean }) => post<UpdateState>("/api/update/run", body),
+      onSuccess: keep,
+    }),
+    restart: useMutation({
+      mutationFn: (interrupt: boolean) => post<UpdateState>("/api/update/restart", { interrupt }),
+      onSuccess: keep,
+    }),
+    cancel: useMutation({ mutationFn: () => api<UpdateState>("/api/update/restart", { method: "DELETE" }), onSuccess: keep }),
+  };
+}

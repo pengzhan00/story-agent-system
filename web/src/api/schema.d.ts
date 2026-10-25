@@ -2545,6 +2545,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Update State
+         * @description Version, commits waiting on the remote, what a restart would interrupt, the last run step by step.
+         */
+        get: operations["update_state_api_update_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/update/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Update Check
+         * @description ``git fetch`` and compare; changes nothing in the checkout.
+         */
+        post: operations["update_check_api_update_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/update/restart": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Update Restart
+         * @description Restart worker and server without updating (or, with ``interrupt``, stop waiting for the running work).
+         */
+        post: operations["update_restart_api_update_restart_post"];
+        /**
+         * Update Cancel Restart
+         * @description Withdraw a restart that has not happened yet; the worker takes work again.
+         */
+        delete: operations["update_cancel_restart_api_update_restart_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/update/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Update Run
+         * @description Start the update (the steps of ``scripts/deploy.sh``). With ``restart``, and a supervisor, the worker and the
+         *     server restart once everything passed: after the running work ends, or at once with ``interrupt``.
+         */
+        post: operations["update_run_api_update_run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/users": {
         parameters: {
             query?: never;
@@ -6004,6 +6089,185 @@ export interface components {
              * @default
              */
             password: string;
+        };
+        /** UpdateCommitOut */
+        UpdateCommitOut: {
+            /** Sha */
+            sha: string;
+            /** Short */
+            short: string;
+            /** Subject */
+            subject: string;
+        };
+        /** UpdateJobOut */
+        UpdateJobOut: {
+            /** Heavy */
+            heavy: boolean;
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Model */
+            model: string;
+            /** Progress */
+            progress: number;
+            /** Project Id */
+            project_id: number | null;
+            /** Started At */
+            started_at: string | null;
+        };
+        /** UpdateOut */
+        UpdateOut: {
+            /** Ahead Count */
+            ahead_count: number;
+            /** Behind */
+            behind: components["schemas"]["UpdateCommitOut"][];
+            /** Behind Count */
+            behind_count: number;
+            /** Boot Id */
+            boot_id: string;
+            /** Branch */
+            branch: string;
+            /** Busy */
+            busy: boolean;
+            /** Can Update */
+            can_update: boolean;
+            /** Checked At */
+            checked_at: number | null;
+            /** Clean */
+            clean: boolean;
+            current: components["schemas"]["UpdateCommitOut"] | null;
+            /** Dirty */
+            dirty: string[];
+            /** Enabled */
+            enabled: boolean;
+            /** Log Tail */
+            log_tail: string[];
+            /** Now */
+            now: number;
+            /** Reason */
+            reason: string;
+            /** Reason Label */
+            reason_label: string;
+            /** Remote Known */
+            remote_known: boolean;
+            /** Remote Ref */
+            remote_ref: string;
+            restart: components["schemas"]["UpdateRestartOut"];
+            run: components["schemas"]["UpdateRunOut"] | null;
+            /** Started At */
+            started_at: number;
+            /** Tools Missing */
+            tools_missing: string[];
+            work: components["schemas"]["UpdateWorkOut"];
+        };
+        /** UpdateRestartBody */
+        UpdateRestartBody: {
+            /**
+             * Interrupt
+             * @default false
+             */
+            interrupt: boolean;
+        };
+        /** UpdateRestartOut */
+        UpdateRestartOut: {
+            /** Mode */
+            mode: string;
+            /** Phase */
+            phase: string;
+            /** Phase Label */
+            phase_label: string;
+            /** Requested At */
+            requested_at: number | null;
+            /** Running */
+            running: number;
+            /** Supervised */
+            supervised: boolean;
+        };
+        /** UpdateRunBody */
+        UpdateRunBody: {
+            /**
+             * Interrupt
+             * @default false
+             */
+            interrupt: boolean;
+            /**
+             * Restart
+             * @default true
+             */
+            restart: boolean;
+        };
+        /** UpdateRunOfWorkOut */
+        UpdateRunOfWorkOut: {
+            /** Id */
+            id: string;
+            /** Project Id */
+            project_id: number;
+            /** Started At */
+            started_at: string | null;
+        };
+        /** UpdateRunOut */
+        UpdateRunOut: {
+            after: components["schemas"]["UpdateCommitOut"] | null;
+            before: components["schemas"]["UpdateCommitOut"] | null;
+            /** Behind */
+            behind: components["schemas"]["UpdateCommitOut"][];
+            /** By */
+            by: string;
+            /** Failed Step */
+            failed_step: string;
+            /** Finished At */
+            finished_at: number | null;
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Log File */
+            log_file: string;
+            /** Restart */
+            restart: string;
+            /** Restart Label */
+            restart_label: string;
+            /** Restart Mode */
+            restart_mode: string;
+            /** Started At */
+            started_at: number;
+            /** Status */
+            status: string;
+            /** Steps */
+            steps: components["schemas"]["UpdateStepOut"][];
+        };
+        /** UpdateStepOut */
+        UpdateStepOut: {
+            /** Detail */
+            detail: string;
+            /** Exit Code */
+            exit_code: number | null;
+            /** Finished At */
+            finished_at: number | null;
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Note */
+            note: string;
+            /** Started At */
+            started_at: number | null;
+            /** Status */
+            status: string;
+            /** Status Label */
+            status_label: string;
+        };
+        /** UpdateWorkOut */
+        UpdateWorkOut: {
+            /** Heavy */
+            heavy: number;
+            /** Jobs */
+            jobs: components["schemas"]["UpdateJobOut"][];
+            /** Queued */
+            queued: number;
+            /** Runs */
+            runs: components["schemas"]["UpdateRunOfWorkOut"][];
         };
         /** UserCreateBody */
         UserCreateBody: {
@@ -12177,6 +12441,132 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ToolTemplate"][];
+                };
+            };
+        };
+    };
+    update_state_api_update_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdateOut"];
+                };
+            };
+        };
+    };
+    update_check_api_update_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdateOut"];
+                };
+            };
+        };
+    };
+    update_restart_api_update_restart_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateRestartBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_cancel_restart_api_update_restart_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdateOut"];
+                };
+            };
+        };
+    };
+    update_run_api_update_run_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateRunBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

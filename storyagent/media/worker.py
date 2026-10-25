@@ -87,6 +87,7 @@ class Worker:
         self._wf_pool = ThreadPoolExecutor(max_workers=max(self._wf_max, 1), thread_name_prefix="workflow-run")
         self._wf_futures: dict[str, Future[None]] = {}
         self._stop = threading.Event()
+        self._paused = threading.Event()          # no new work is claimed (a restart is waiting for the running work)
         self._lease = float(settings.runtime.get("lease_seconds", 60))
         self._beat = float(settings.runtime.get("heartbeat_seconds", 15))
 
@@ -96,6 +97,9 @@ class Worker:
         led = self.ledger
         led.requeue_expired()
         self._futures = {j: f for j, f in self._futures.items() if not f.done()}
+        if self._paused.is_set():
+            self._wf_futures = {r: f for r, f in self._wf_futures.items() if not f.done()}
+            return 0
         started = 0
         while len(self._futures) < self._max_threads:
             queued = led.queued()
@@ -150,6 +154,17 @@ class Worker:
         self._workflow = None                                  # rebuilt with the new settings on its next run
         if self._auto_probes:
             self.probes = build_probes(settings)
+
+    def pause(self) -> None:
+        """Stop claiming media jobs and workflow runs; what is running carries on (``storyagent.restart``)."""
+        self._paused.set()
+
+    def resume(self) -> None:
+        self._paused.clear()
+
+    def busy(self) -> int:
+        """How many media jobs and workflow runs this worker is running right now."""
+        return sum(not f.done() for f in self._futures.values()) + sum(not f.done() for f in self._wf_futures.values())
 
     def _idle(self) -> bool:
         return all(f.done() for f in self._futures.values()) and all(f.done() for f in self._wf_futures.values())

@@ -110,7 +110,7 @@ uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python -e '.[de
 ```bash
 .venv/bin/python -m storyagent ops launch --all        # 启动 [launch.*] 里列出且 bulk 的服务(Ollama、ACE-Step、打开 Pinokio);只启动、不停止
 .venv/bin/python -m storyagent setup verify --profile full       # = media healthcheck,方案需要的算必需项;退出码 0 = 都可用
-scripts/start.sh                                       # worker + 网页服务(端口见 [api])
+scripts/start.sh                                       # worker + 网页服务(端口见 [api]);也是重启守护,之后可在网页「系统」页「更新并重启」
 ```
 
 `setup verify --start` 会先替你启动方案需要且在 `[launch.*]` 里列出的服务(同样只启动)。Phosphene 要在 Pinokio 里点 Start;ComfyUI 要自己打开;这两个系统不会替你启动。

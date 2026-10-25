@@ -211,6 +211,21 @@ poll_seconds = 1.0
 # How many takes per spec in the first pass (the creative panel can always make more).
 takes = 1
 
+# "Update and restart" in the web client / `storyagent update`: fetch, fast-forward to <remote>/<branch>, install, build
+# the web client, migrate, check i18n - the steps of scripts/deploy.sh - and then restart worker and server when
+# scripts/start.sh supervises them (exit code 75). Admins only; one update at a time; the workspace must be clean.
+#   enabled           "auto" (default) = only on the production checkout (the main work tree, on <branch>; a development
+#                     work tree is left alone), true = on any checkout, false = never
+#   remote, branch    what to fast-forward to
+#   step_timeout_sec  a step that takes longer is stopped and fails
+#   keep_logs         how many update logs to keep in <home>/logs/update-*.log
+[update]
+enabled = "auto"
+remote = "origin"
+branch = "main"
+step_timeout_sec = 1800
+keep_logs = 20
+
 [healthcheck]
 # Entries that must be "ok" for the healthcheck exit code to be 0. Names: a service (ollama), or tool.<name>.
 required = ["ollama", "acestep", "phosphene", "tool.ffmpeg"]

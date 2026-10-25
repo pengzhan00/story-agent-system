@@ -20,7 +20,7 @@ public_prefixes = ["/api/auth/login", "/api/auth/register", "/api/auth/setup", "
 # any signed-in user (their own session and password), whatever the role
 signed_in_prefixes = ["/api/auth/", "/api/content/unlock", "/api/wiki/ask"]
 # need the admin flag
-admin_prefixes = ["/api/users", "/api/audit", "/api/launch", "/api/config", "/api/tools", "/api/setup"]
+admin_prefixes = ["/api/users", "/api/audit", "/api/launch", "/api/config", "/api/tools", "/api/setup", "/api/update"]
 # POST/DELETE on these need the create_project flag
 project_prefixes = ["/api/projects"]
 

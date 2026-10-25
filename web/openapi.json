@@ -7589,6 +7589,556 @@
         "title": "UnlockBody",
         "type": "object"
       },
+      "UpdateCommitOut": {
+        "properties": {
+          "sha": {
+            "title": "Sha",
+            "type": "string"
+          },
+          "short": {
+            "title": "Short",
+            "type": "string"
+          },
+          "subject": {
+            "title": "Subject",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sha",
+          "short",
+          "subject"
+        ],
+        "title": "UpdateCommitOut",
+        "type": "object"
+      },
+      "UpdateJobOut": {
+        "properties": {
+          "heavy": {
+            "title": "Heavy",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "progress": {
+            "title": "Progress",
+            "type": "number"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "model",
+          "heavy",
+          "project_id",
+          "progress",
+          "started_at"
+        ],
+        "title": "UpdateJobOut",
+        "type": "object"
+      },
+      "UpdateOut": {
+        "properties": {
+          "ahead_count": {
+            "title": "Ahead Count",
+            "type": "integer"
+          },
+          "behind": {
+            "items": {
+              "$ref": "#/components/schemas/UpdateCommitOut"
+            },
+            "title": "Behind",
+            "type": "array"
+          },
+          "behind_count": {
+            "title": "Behind Count",
+            "type": "integer"
+          },
+          "boot_id": {
+            "title": "Boot Id",
+            "type": "string"
+          },
+          "branch": {
+            "title": "Branch",
+            "type": "string"
+          },
+          "busy": {
+            "title": "Busy",
+            "type": "boolean"
+          },
+          "can_update": {
+            "title": "Can Update",
+            "type": "boolean"
+          },
+          "checked_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked At"
+          },
+          "clean": {
+            "title": "Clean",
+            "type": "boolean"
+          },
+          "current": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UpdateCommitOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dirty": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Dirty",
+            "type": "array"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "log_tail": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Log Tail",
+            "type": "array"
+          },
+          "now": {
+            "title": "Now",
+            "type": "number"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "reason_label": {
+            "title": "Reason Label",
+            "type": "string"
+          },
+          "remote_known": {
+            "title": "Remote Known",
+            "type": "boolean"
+          },
+          "remote_ref": {
+            "title": "Remote Ref",
+            "type": "string"
+          },
+          "restart": {
+            "$ref": "#/components/schemas/UpdateRestartOut"
+          },
+          "run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UpdateRunOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "started_at": {
+            "title": "Started At",
+            "type": "number"
+          },
+          "tools_missing": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tools Missing",
+            "type": "array"
+          },
+          "work": {
+            "$ref": "#/components/schemas/UpdateWorkOut"
+          }
+        },
+        "required": [
+          "enabled",
+          "reason",
+          "reason_label",
+          "boot_id",
+          "started_at",
+          "now",
+          "current",
+          "branch",
+          "remote_ref",
+          "remote_known",
+          "clean",
+          "dirty",
+          "behind",
+          "behind_count",
+          "ahead_count",
+          "checked_at",
+          "tools_missing",
+          "busy",
+          "can_update",
+          "run",
+          "log_tail",
+          "work",
+          "restart"
+        ],
+        "title": "UpdateOut",
+        "type": "object"
+      },
+      "UpdateRestartBody": {
+        "properties": {
+          "interrupt": {
+            "default": false,
+            "title": "Interrupt",
+            "type": "boolean"
+          }
+        },
+        "title": "UpdateRestartBody",
+        "type": "object"
+      },
+      "UpdateRestartOut": {
+        "properties": {
+          "mode": {
+            "title": "Mode",
+            "type": "string"
+          },
+          "phase": {
+            "title": "Phase",
+            "type": "string"
+          },
+          "phase_label": {
+            "title": "Phase Label",
+            "type": "string"
+          },
+          "requested_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested At"
+          },
+          "running": {
+            "title": "Running",
+            "type": "integer"
+          },
+          "supervised": {
+            "title": "Supervised",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "supervised",
+          "phase",
+          "phase_label",
+          "mode",
+          "requested_at",
+          "running"
+        ],
+        "title": "UpdateRestartOut",
+        "type": "object"
+      },
+      "UpdateRunBody": {
+        "properties": {
+          "interrupt": {
+            "default": false,
+            "title": "Interrupt",
+            "type": "boolean"
+          },
+          "restart": {
+            "default": true,
+            "title": "Restart",
+            "type": "boolean"
+          }
+        },
+        "title": "UpdateRunBody",
+        "type": "object"
+      },
+      "UpdateRunOfWorkOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "project_id": {
+            "title": "Project Id",
+            "type": "integer"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "started_at"
+        ],
+        "title": "UpdateRunOfWorkOut",
+        "type": "object"
+      },
+      "UpdateRunOut": {
+        "properties": {
+          "after": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UpdateCommitOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "before": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UpdateCommitOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "behind": {
+            "items": {
+              "$ref": "#/components/schemas/UpdateCommitOut"
+            },
+            "title": "Behind",
+            "type": "array"
+          },
+          "by": {
+            "title": "By",
+            "type": "string"
+          },
+          "failed_step": {
+            "title": "Failed Step",
+            "type": "string"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "log_file": {
+            "title": "Log File",
+            "type": "string"
+          },
+          "restart": {
+            "title": "Restart",
+            "type": "string"
+          },
+          "restart_label": {
+            "title": "Restart Label",
+            "type": "string"
+          },
+          "restart_mode": {
+            "title": "Restart Mode",
+            "type": "string"
+          },
+          "started_at": {
+            "title": "Started At",
+            "type": "number"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/UpdateStepOut"
+            },
+            "title": "Steps",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "label",
+          "by",
+          "started_at",
+          "finished_at",
+          "before",
+          "after",
+          "behind",
+          "failed_step",
+          "steps",
+          "restart",
+          "restart_label",
+          "restart_mode",
+          "log_file"
+        ],
+        "title": "UpdateRunOut",
+        "type": "object"
+      },
+      "UpdateStepOut": {
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "exit_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exit Code"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "status_label": {
+            "title": "Status Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "status",
+          "status_label",
+          "note",
+          "detail",
+          "exit_code",
+          "started_at",
+          "finished_at"
+        ],
+        "title": "UpdateStepOut",
+        "type": "object"
+      },
+      "UpdateWorkOut": {
+        "properties": {
+          "heavy": {
+            "title": "Heavy",
+            "type": "integer"
+          },
+          "jobs": {
+            "items": {
+              "$ref": "#/components/schemas/UpdateJobOut"
+            },
+            "title": "Jobs",
+            "type": "array"
+          },
+          "queued": {
+            "title": "Queued",
+            "type": "integer"
+          },
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/UpdateRunOfWorkOut"
+            },
+            "title": "Runs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "jobs",
+          "runs",
+          "queued",
+          "heavy"
+        ],
+        "title": "UpdateWorkOut",
+        "type": "object"
+      },
       "UserCreateBody": {
         "properties": {
           "birth_date": {
@@ -18091,6 +18641,154 @@
         "summary": "Templates",
         "tags": [
           "tools"
+        ]
+      }
+    },
+    "/api/update": {
+      "get": {
+        "description": "Version, commits waiting on the remote, what a restart would interrupt, the last run step by step.",
+        "operationId": "update_state_api_update_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Update State",
+        "tags": [
+          "update"
+        ]
+      }
+    },
+    "/api/update/check": {
+      "post": {
+        "description": "``git fetch`` and compare; changes nothing in the checkout.",
+        "operationId": "update_check_api_update_check_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Update Check",
+        "tags": [
+          "update"
+        ]
+      }
+    },
+    "/api/update/restart": {
+      "delete": {
+        "description": "Withdraw a restart that has not happened yet; the worker takes work again.",
+        "operationId": "update_cancel_restart_api_update_restart_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Update Cancel Restart",
+        "tags": [
+          "update"
+        ]
+      },
+      "post": {
+        "description": "Restart worker and server without updating (or, with ``interrupt``, stop waiting for the running work).",
+        "operationId": "update_restart_api_update_restart_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRestartBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Restart",
+        "tags": [
+          "update"
+        ]
+      }
+    },
+    "/api/update/run": {
+      "post": {
+        "description": "Start the update (the steps of ``scripts/deploy.sh``). With ``restart``, and a supervisor, the worker and the\nserver restart once everything passed: after the running work ends, or at once with ``interrupt``.",
+        "operationId": "update_run_api_update_run_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRunBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Run",
+        "tags": [
+          "update"
         ]
       }
     },

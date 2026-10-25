@@ -1,5 +1,6 @@
 import { useHealth } from "../api/hooks";
 import { ErrorNote } from "../components/ErrorNote";
+import { UpdatePanel } from "../components/UpdatePanel";
 import { useT } from "../i18n";
 
 export function SystemPage() {
@@ -37,6 +38,7 @@ export function SystemPage() {
       <button onClick={() => health.refetch()} disabled={health.isFetching}>
         {t("web.system.recheck")}
       </button>
+      <UpdatePanel />
     </div>
   );
 }

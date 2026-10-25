@@ -21,6 +21,8 @@
     storyagent api openapi [--out FILE]
     storyagent ops llm-unload
     storyagent ops stop NAME [--force]      (end a service listed with stop = "port" in services.toml)
+    storyagent update status | check | run [--restart] [--now]     (scripts/deploy.sh steps, optional hot restart)
+    storyagent update marker --pid N [--clear]                     (scripts/start.sh says it supervises worker + server)
     storyagent setup [--profile P] [--root DIR] | profiles | check | plan | config [--write] | run STEP | verify
 
 Commands that touch data migrate the database first (idempotent, snapshot taken before an upgrade).
@@ -62,7 +64,16 @@ from storyagent.media.specs import SpecError, SpecLocked, SpecStore
 from storyagent.media.worker import Worker, run_once
 from storyagent.progressbar import render_run, render_stages
 from storyagent.projects import ProjectNotFound, ProjectStateError, ProjectStore
+from storyagent.restart import (
+    RESTART_EXIT_CODE,
+    WorkerGate,
+    clear_supervisor,
+    read_supervisor,
+    watch_worker,
+    write_supervisor,
+)
 from storyagent.setup.layout import SetupError
+from storyagent.update import UpdateError, Updater, repo_root, running_work
 from storyagent.workflow import STAGES, WorkflowEngine, WorkflowState, WorkflowStateError
 
 CONFIRM_HELP = "export a project of a restricted rating: confirms everyone shown is an adult and has consented"
@@ -300,8 +311,7 @@ def _cmd_serve(s: Settings, a: argparse.Namespace) -> int:
 
     migrate(Database(s.db_path))
     print(t("cli.serve.starting", host=a.host or s.api["host"], port=a.port or s.api["port"]))
-    serve(s, a.host, a.port)
-    return 0
+    return serve(s, a.host, a.port)           # RESTART_EXIT_CODE when a restart was requested (scripts/start.sh)
 
 
 # -- media ------------------------------------------------------------------------------------------
@@ -774,6 +784,83 @@ def _cmd_spec_regen(s: Settings, a: argparse.Namespace) -> int:
     return 0
 
 
+# -- update -----------------------------------------------------------------------------------------
+def _commit_line(c: Any) -> str:
+    return f"{c.short} {c.subject}" if c else "-"
+
+
+def _updater(s: Settings) -> Updater:
+    sup = read_supervisor(s)
+    return Updater(s, parent_pid=sup.pid if sup else None, audit=lambda action, by, detail: AuthStore(
+        Database(s.db_path), s).audit(action, actor=by or "local", detail=detail))
+
+
+def _cmd_update_status(s: Settings, _a: argparse.Namespace) -> int:
+    u = _updater(s)
+    i = u.inspect()
+    if not i.available.enabled:
+        print(t("cli.update.disabled", reason=t(f"update.reason.{i.available.reason}")))
+    print(t("cli.update.current", commit=_commit_line(i.current), branch=i.branch or "-"))
+    print(t("cli.update.behind", count=i.behind_count, ref=i.remote_ref))
+    for c in i.behind:
+        print(f"  {_commit_line(c)}")
+    if not i.clean:
+        print(t("cli.update.dirty", count=len(i.dirty)))
+    work = running_work(_ctx(s).db)
+    print(t("cli.update.running", jobs=len(work.jobs), runs=len(work.runs), queued=work.queued))
+    print(t("cli.update.supervised" if u.is_supervised() else "cli.update.unsupervised"))
+    return 0
+
+
+def _cmd_update_check(s: Settings, a: argparse.Namespace) -> int:
+    try:
+        _updater(s).check()
+    except UpdateError as exc:
+        print(t(f"api.error.{exc.code}") + (f" ({exc.detail})" if exc.detail else ""), file=sys.stderr)
+        return 1
+    return _cmd_update_status(s, a)
+
+
+def _cmd_update_run(s: Settings, a: argparse.Namespace) -> int:
+    u = _updater(s)
+    try:
+        run = u.start(by="cli", restart=a.restart, mode="now" if a.now else "wait")
+    except UpdateError as exc:
+        print(t(f"api.error.{exc.code}") + (f" ({exc.detail})" if exc.detail else ""), file=sys.stderr)
+        return 1
+    log_path, seen = Path(run.log_file), 0
+    while True:
+        done = not u.busy()
+        try:
+            lines = log_path.read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError:
+            lines = []
+        for line in lines[seen:]:
+            print(line)
+        seen = len(lines)
+        if done:
+            break
+        time.sleep(0.5)
+    u.wait()
+    state = u.last_run
+    status = state.status if state else "failed"
+    print(t(f"update.run.{status}"))
+    if state and state.restart == "requested":
+        print(t("cli.update.restart_requested", mode=state.restart_mode))
+    elif state and status == "succeeded":
+        print(t("cli.update.restart_manual"))
+    return 0 if status in ("succeeded", "current") else 1
+
+
+def _cmd_update_marker(s: Settings, a: argparse.Namespace) -> int:
+    """Used by scripts/start.sh: tell the API which process supervises worker and server."""
+    if a.clear:
+        clear_supervisor(s, a.pid)
+    else:
+        write_supervisor(s, a.pid, repo_root())
+    return 0
+
+
 # -- worker / ops -----------------------------------------------------------------------------------
 def _cmd_worker(s: Settings, a: argparse.Namespace) -> int:
     c = _ctx(s)
@@ -791,7 +878,12 @@ def _cmd_worker(s: Settings, a: argparse.Namespace) -> int:
         fresh = get_settings(reload=True)
         return fresh, default_registry(fresh)
 
+    gate = WorkerGate(s, worker)
+    watch_worker(gate, stop)
     worker.run_forever(stop, reload=reread)
+    if gate.leaving:
+        print(t("cli.worker.restarting"))
+        return RESTART_EXIT_CODE           # scripts/start.sh starts worker and server again
     return 0
 
 
@@ -1486,6 +1578,16 @@ def build_parser() -> argparse.ArgumentParser:
     api = sub.add_parser("api").add_subparsers(dest="cmd", required=True)
     wp = add(api, "openapi", _cmd_api_openapi)
     wp.add_argument("--out", help="write the OpenAPI document here (web/openapi.json feeds `pnpm gen:api`)")
+
+    up = sub.add_parser("update").add_subparsers(dest="cmd", required=True)
+    add(up, "status", _cmd_update_status)
+    add(up, "check", _cmd_update_check)
+    ur = add(up, "run", _cmd_update_run)
+    ur.add_argument("--restart", action="store_true", help="then restart worker and server (needs scripts/start.sh)")
+    ur.add_argument("--now", action="store_true", help="with --restart: hand running work back at once, do not wait")
+    um = add(up, "marker", _cmd_update_marker)
+    um.add_argument("--pid", type=int, required=True, help="the pid of scripts/start.sh")
+    um.add_argument("--clear", action="store_true")
 
     ops = sub.add_parser("ops").add_subparsers(dest="cmd", required=True)
     add(ops, "llm-unload", _cmd_llm_unload)
