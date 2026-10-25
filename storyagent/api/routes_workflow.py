@@ -9,6 +9,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
 
+from storyagent import voices as voices_mod
 from storyagent.compose.export import ExportError, build_package
 from storyagent.content import plan_gates, project_rating
 from storyagent.domain import QualityTier
@@ -22,6 +23,7 @@ from storyagent.workflow.tiering import policy_from
 from .context import ctx_of
 from .errors import ApiError
 from .schemas import (
+    AutoVoicesOut,
     PlanGate,
     PlannedTaskOut,
     PlanTotals,
@@ -29,6 +31,7 @@ from .schemas import (
     ScriptReviewOut,
     SeriesBoardOut,
     VideoSummary,
+    VoiceAssignedOut,
     WorkflowOut,
     WorkflowRunCreate,
     WorkflowRunOut,
@@ -106,6 +109,18 @@ def get_produce_plan(project_id: int, request: Request, tier: str = "", force: b
     return ProducePlanOut(tier=level.value, tasks=[PlannedTaskOut.model_validate(t.__dict__) for t in tasks],
                           gates=[PlanGate(**g) for g in gates], totals=PlanTotals.model_validate(totals(tasks)),
                           video=VideoSummary.model_validate(video_summary(tasks, budget)))
+
+
+@router.post("/projects/{project_id}/voices/auto", response_model=AutoVoicesOut)
+def auto_voices(project_id: int, request: Request) -> AutoVoicesOut:
+    """Give every character that has no voice one from the library (by gender, one each, consent-flagged voices only)
+    and put it on that character's spoken lines. A character whose gender cannot be told, or that has no voice of its
+    gender left, is listed in ``unresolved``; the voice of a character that already has one is never changed."""
+    ctx = ctx_of(request)
+    ctx.projects.get(project_id)
+    done = voices_mod.auto_assign(ctx.story, ctx.library, ctx.specs, project_id)
+    return AutoVoicesOut(assigned=[VoiceAssignedOut(**vars(a)) for a in done.assigned],
+                         unresolved=[VoiceAssignedOut(**vars(a)) for a in done.unresolved])
 
 
 @router.get("/projects/{project_id}/workflow/runs", response_model=list[WorkflowRunOut])

@@ -2163,6 +2163,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{project_id}/voices/auto": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Auto Voices
+         * @description Give every character that has no voice one from the library (by gender, one each, consent-flagged voices only)
+         *     and put it on that character's spoken lines. A character whose gender cannot be told, or that has no voice of its
+         *     gender left, is listed in ``unresolved``; the voice of a character that already has one is never changed.
+         */
+        post: operations["auto_voices_api_projects__project_id__voices_auto_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{project_id}/workflow": {
         parameters: {
             query?: never;
@@ -3117,6 +3139,13 @@ export interface components {
              * @enum {string}
              */
             mode: "off" | "token";
+        };
+        /** AutoVoicesOut */
+        AutoVoicesOut: {
+            /** Assigned */
+            assigned: components["schemas"]["VoiceAssignedOut"][];
+            /** Unresolved */
+            unresolved: components["schemas"]["VoiceAssignedOut"][];
         };
         /**
          * BriefAnswers
@@ -6071,6 +6100,26 @@ export interface components {
              * @description shots that have a clip task
              */
             shots: number;
+        };
+        /** VoiceAssignedOut */
+        VoiceAssignedOut: {
+            /** Character */
+            character: string;
+            /**
+             * Lines
+             * @description spoken lines that were given the voice
+             */
+            lines: number;
+            /**
+             * Reason
+             * @description when no voice was chosen: unknown_gender | no_voice_left
+             */
+            reason: string;
+            /**
+             * Voice
+             * @description the library voice chosen; empty when none could be
+             */
+            voice: string;
         };
         /** WikiAskIn */
         WikiAskIn: {
@@ -11460,6 +11509,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AssetOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    auto_voices_api_projects__project_id__voices_auto_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutoVoicesOut"];
                 };
             };
             /** @description Validation Error */

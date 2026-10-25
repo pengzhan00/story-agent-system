@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useProducePlan, useStartRun } from "../api/hooks";
+import { useAutoVoices, useProducePlan, useStartRun } from "../api/hooks";
 import { useSpecs } from "../api/specs";
 import type { PlannedTask } from "../api/types";
 import { useT } from "../i18n";
@@ -23,6 +23,7 @@ export function ProducePlan({ id, onClose, defaultTier = "draft" }: { id: number
   const start = useStartRun(id);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState<string | null>(null);
+  const voices = useAutoVoices(id);
   const specs = useSpecs(id);
   const specOf = useMemo(() => new Map((specs.data ?? []).map((x) => [x.id, x])), [specs.data]);
   const tasks = useMemo(() => plan.data?.tasks ?? [], [plan.data]);
@@ -78,6 +79,29 @@ export function ProducePlan({ id, onClose, defaultTier = "draft" }: { id: number
               <li key={`${g.reason}:${g.name}:${g.detail}`}>{t(`web.plan.gate.${g.reason}`, { name: g.name, detail: g.detail })}</li>
             ))}
           </ul>
+        </div>
+      ) : null}
+      {tasks.some((x) => x.reason === "no_voice") || voices.data ? (
+        <div className="stack">
+          <div className="row">
+            <button type="button" disabled={voices.isPending} onClick={() => voices.mutate()}>
+              {t("web.plan.auto_voices")}
+            </button>
+            <span className="muted small">{t("web.plan.auto_voices_hint")}</span>
+          </div>
+          {voices.data ? (
+            <ul className="plain small">
+              {voices.data.assigned.map((a) => (
+                <li key={a.character}>{t("web.plan.auto_voices_done", { name: a.character, voice: a.voice, n: a.lines })}</li>
+              ))}
+              {voices.data.unresolved.map((a) => (
+                <li key={a.character} className="bad">
+                  {t(`web.plan.auto_voices_${a.reason}`, { name: a.character })}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <ErrorNote error={voices.error} />
         </div>
       ) : null}
       {tasks.length === 0 && !plan.isLoading ? <p className="empty">{t("web.plan.empty")}</p> : null}

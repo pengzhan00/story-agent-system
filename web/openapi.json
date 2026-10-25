@@ -670,6 +670,30 @@
         "title": "AuthModeOut",
         "type": "object"
       },
+      "AutoVoicesOut": {
+        "properties": {
+          "assigned": {
+            "items": {
+              "$ref": "#/components/schemas/VoiceAssignedOut"
+            },
+            "title": "Assigned",
+            "type": "array"
+          },
+          "unresolved": {
+            "items": {
+              "$ref": "#/components/schemas/VoiceAssignedOut"
+            },
+            "title": "Unresolved",
+            "type": "array"
+          }
+        },
+        "required": [
+          "assigned",
+          "unresolved"
+        ],
+        "title": "AutoVoicesOut",
+        "type": "object"
+      },
       "BriefAnswers": {
         "description": "The plan made up front. Anything left out takes the default of the kind of work.",
         "properties": {
@@ -7854,6 +7878,37 @@
           "budget_seconds"
         ],
         "title": "VideoSummary",
+        "type": "object"
+      },
+      "VoiceAssignedOut": {
+        "properties": {
+          "character": {
+            "title": "Character",
+            "type": "string"
+          },
+          "lines": {
+            "description": "spoken lines that were given the voice",
+            "title": "Lines",
+            "type": "integer"
+          },
+          "reason": {
+            "description": "when no voice was chosen: unknown_gender | no_voice_left",
+            "title": "Reason",
+            "type": "string"
+          },
+          "voice": {
+            "description": "the library voice chosen; empty when none could be",
+            "title": "Voice",
+            "type": "string"
+          }
+        },
+        "required": [
+          "character",
+          "voice",
+          "lines",
+          "reason"
+        ],
+        "title": "VoiceAssignedOut",
         "type": "object"
       },
       "WikiAskIn": {
@@ -17034,6 +17089,49 @@
         "tags": [
           "library",
           "assets"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/voices/auto": {
+      "post": {
+        "description": "Give every character that has no voice one from the library (by gender, one each, consent-flagged voices only)\nand put it on that character's spoken lines. A character whose gender cannot be told, or that has no voice of its\ngender left, is listed in ``unresolved``; the voice of a character that already has one is never changed.",
+        "operationId": "auto_voices_api_projects__project_id__voices_auto_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoVoicesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Auto Voices",
+        "tags": [
+          "workflow"
         ]
       }
     },

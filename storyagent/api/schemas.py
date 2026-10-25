@@ -786,6 +786,18 @@ class PlanGate(Strict):
     detail: str = Field(description="the age, the term or the mount point")
 
 
+class VoiceAssignedOut(Strict):
+    character: str
+    voice: str = Field(description="the library voice chosen; empty when none could be")
+    lines: int = Field(description="spoken lines that were given the voice")
+    reason: str = Field(description="when no voice was chosen: unknown_gender | no_voice_left")
+
+
+class AutoVoicesOut(Strict):
+    assigned: list[VoiceAssignedOut]
+    unresolved: list[VoiceAssignedOut]
+
+
 class ProducePlanOut(Strict):
     tier: str
     gates: list[PlanGate] = Field(description="what stops every job of the project before it starts; empty = none")

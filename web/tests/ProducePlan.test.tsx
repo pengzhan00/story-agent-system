@@ -17,19 +17,26 @@ const spec = {
   prompt: "a tired woman in a rain-lit doorway", negative_prompt: "", text_payload: "", params: {}, seed: null, refs: [], depends_on: [], locked: false, author: "agent", note: "", created_at: "2026-10-25T00:00:00Z",
 };
 let gates: { reason: string; name: string; detail: string }[] = [];
+let tasks: unknown[] = [task];
+let posted: string[] = [];
 
 beforeEach(() => {
+  tasks = [task];
+  posted = [];
   localStorage.setItem("storyagent.locale", "en");
-  vi.stubGlobal("fetch", async (url: string) => {
+  vi.stubGlobal("fetch", async (url: string, init?: { method?: string }) => {
+    if (init?.method === "POST") posted.push(url);
     const json: unknown = url.includes("/api/i18n")
       ? en
+      : url.includes("/voices/auto")
+        ? { assigned: [{ character: "Ann", voice: "Mei", lines: 2, reason: "" }], unresolved: [{ character: "Bo", voice: "", lines: 0, reason: "unknown_gender" }] }
       : url.includes("/specs")
         ? [spec]
         : url.includes("/api/library")
           ? []
           : url.includes("/api/meta")
             ? { models: [], defaults: {} }
-            : { tier: "draft", gates, tasks: [task], totals: { count: 1, est_seconds: 60, by_state: {} }, video: { shots: 0, chosen: 0, est_seconds: 0, budget_seconds: null } };
+            : { tier: "draft", gates, tasks, totals: { count: 1, est_seconds: 60, by_state: {} }, video: { shots: 0, chosen: 0, est_seconds: 0, budget_seconds: null } };
     return { ok: true, status: 200, statusText: "", json: async () => json, text: async () => JSON.stringify(json) };
   });
 });
@@ -71,5 +78,15 @@ describe("the production plan", () => {
     expect(await screen.findByDisplayValue("a tired woman in a rain-lit doorway")).toBeTruthy();
     expect(screen.getByRole("button", { name: en["web.plan.make_only"]! })).toBeTruthy();
     expect(screen.getByRole("button", { name: en["web.plan.confirmed"]! })).toBeTruthy();   // new tasks start selected
+  });
+
+  it("offers to pick voices for lines without one and says who got which and who could not", async () => {
+    gates = [];
+    tasks = [{ ...task, spec_id: "d1", subject_type: "dialogue.line", state: "blocked", reason: "no_voice", label: "1.2.1 #1: hi" }];
+    mount();
+    fireEvent.click(await screen.findByRole("button", { name: en["web.plan.auto_voices"]! }));
+    expect(await screen.findByText(/"Ann" → Mei \(2 lines\)/)).toBeTruthy();
+    expect(screen.getByText(/Cannot tell "Bo"'s gender/)).toBeTruthy();
+    expect(posted).toContain("/api/projects/4/voices/auto");
   });
 });

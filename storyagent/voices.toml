@@ -1,0 +1,11 @@
+# Words that say a character (or a library voice) is a woman or a man, for choosing a voice automatically
+# (storyagent/voices.py). Latin words are matched as whole words, the CJK ones as substrings. `noise` words contain one
+# of them without meaning it ("other", "they") and are dropped before counting.
+[female]
+cjk = ["女", "她", "妻", "姐", "妹", "母", "娘", "太太"]
+
+[male]
+cjk = ["男", "他", "夫", "哥", "弟", "父", "爷", "先生"]
+
+[noise]
+cjk = ["其他", "他们", "他人", "其它"]

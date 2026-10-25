@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, del, patch, post, put } from "./client";
-import type { Agent, AgentEdit, AiCallDetail, AiCallRow, BriefAnswers, Estimate, FlowStep, Health, Launch, ProjectCard, ProducePlan, SeriesBoard, ProjectFromText, ScriptReview, Job, Meta, Project, QueueState, Row, WorkflowOverview, WorkflowRun, WorkflowRunRow } from "./types";
+import type { Agent, AgentEdit, AiCallDetail, AutoVoices, AiCallRow, BriefAnswers, Estimate, FlowStep, Health, Launch, ProjectCard, ProducePlan, SeriesBoard, ProjectFromText, ScriptReview, Job, Meta, Project, QueueState, Row, WorkflowOverview, WorkflowRun, WorkflowRunRow } from "./types";
 import { useI18n } from "../i18n";
 
 /** Polling is the fallback; the SSE feed (``events.ts``) pushes the same data much sooner. */
@@ -98,6 +98,16 @@ export function useStartRun(id: number) {
     mutationFn: (body: { stages?: string[]; params?: Record<string, unknown> }) =>
       post<WorkflowRun>(`/api/projects/${id}/workflow/runs`, body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["workflow", id] }),
+  });
+}
+
+export function useAutoVoices(id: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => post<AutoVoices>(`/api/projects/${id}/voices/auto`),
+    onSuccess: () => {
+      for (const k of ["produce-plan", "specs", "story"]) void qc.invalidateQueries({ queryKey: [k] });
+    },
   });
 }
 

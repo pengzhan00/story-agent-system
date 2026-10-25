@@ -4,6 +4,7 @@ type S = components["schemas"];
 export type Project = S["ProjectOut"];
 export type Job = S["JobOut"];
 export type Meta = S["Meta"];
+export type AutoVoices = S["AutoVoicesOut"];
 export type WorkflowRun = S["WorkflowRunOut"];
 export type WorkflowRunRow = S["WorkflowRunRow"];
 export type ScriptReview = S["ScriptReviewOut"];
