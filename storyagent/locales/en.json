@@ -711,6 +711,7 @@
   "web.field.shot_number": "Shot",
   "web.field.location": "Location",
   "web.field.narration": "Narration",
+  "web.field.action": "Action",
   "web.field.character": "Character",
   "web.field.line": "Line",
   "web.field.emotion": "Emotion",

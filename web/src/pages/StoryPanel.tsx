@@ -46,9 +46,9 @@ const EDITABLE: Partial<Record<StoryPart, Field[]>> = {
   ],
   sfx: [],
   shots: [
-    { key: "location", type: "text" }, { key: "narration", type: "area", rows: 2 }, { key: "mood", type: "text" },
-    { key: "time_of_day", type: "text" }, { key: "weather", type: "text" }, { key: "camera_notes", type: "area", rows: 2 },
-    { key: "treatment", type: "select", options: ["auto", "video", "still"] },
+    { key: "action", type: "area", rows: 3 }, { key: "location", type: "text" }, { key: "narration", type: "area", rows: 2 },
+    { key: "mood", type: "text" }, { key: "time_of_day", type: "text" }, { key: "weather", type: "text" },
+    { key: "camera_notes", type: "area", rows: 2 }, { key: "treatment", type: "select", options: ["auto", "video", "still"] },
   ],
 };
 

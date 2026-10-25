@@ -76,6 +76,8 @@ def _decode(table: str, row: Any) -> dict[str, Any]:
         out["locked"] = bool(out.get("locked"))
     if table == "shots":
         out["locked"] = bool(out.get("locked"))
+        payload = out.get("render_payload") or {}
+        out["action"] = (payload.get("subject") or {}).get("action", "")
     return out
 
 
@@ -408,7 +410,15 @@ class StoryStore:
             raise ShotLocked(f"shot {shot_id} is locked")
         if "status" in data and data["status"] not in {s.value for s in ShotStatus}:
             raise StoryError(f"unknown shot status {data['status']!r}")
-        self._update("shots", shot_id, data)
+        d = dict(data)
+        if "action" in d:
+            action = d.pop("action")
+            payload = dict(shot.get("render_payload") or {})
+            subject = dict(payload.get("subject") or {})
+            subject["action"] = action
+            payload["subject"] = subject
+            d["render_payload"] = payload
+        self._update("shots", shot_id, d)
         return self.get_shot(shot_id)
 
     def set_shot_lock(self, shot_id: int, locked: bool) -> dict[str, Any]:
