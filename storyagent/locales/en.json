@@ -942,6 +942,7 @@
   "web.voice.title": "Voice sample",
   "web.voice.current": "Current reference: {ref}",
   "web.voice.none": "No voice sample yet: dialogue uses the default voice, if one is configured.",
+  "web.voice.select_none": "None",
   "web.voice.file": "Choose a recording",
   "web.voice.consent": "The speaker agreed to have this voice cloned.",
   "web.voice.upload": "Upload and use",

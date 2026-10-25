@@ -942,6 +942,7 @@
   "web.voice.title": "声音样本",
   "web.voice.current": "当前参考：{ref}",
   "web.voice.none": "还没有声音样本：台词会使用默认声线（如已配置）。",
+  "web.voice.select_none": "不指定",
   "web.voice.file": "选择录音",
   "web.voice.consent": "发声者已同意这段声音被克隆。",
   "web.voice.upload": "上传并使用",

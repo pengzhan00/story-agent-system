@@ -1,13 +1,14 @@
 import { useMemo, useState } from "react";
 import { STORY_PARTS, useStory, useStoryEdit, type StoryPart } from "../api/hooks";
-import type { Row } from "../api/types";
+import { useLibraryItems } from "../api/library";
+import type { LibraryItem, Row } from "../api/types";
 import { ErrorNote } from "../components/ErrorNote";
 import { PromptAssist } from "../components/PromptAssist";
 import { ScriptOutline } from "../components/ScriptOutline";
 import { VoiceUpload } from "../components/VoiceUpload";
 import { useT } from "../i18n";
 
-type FieldType = "text" | "area" | "number" | "select" | "bool";
+type FieldType = "text" | "area" | "number" | "select" | "bool" | "voice";
 interface Field {
   key: string;
   type: FieldType;
@@ -30,7 +31,7 @@ const EDITABLE: Partial<Record<StoryPart, Field[]>> = {
     { key: "name", type: "text" }, { key: "role", type: "text" }, { key: "age", type: "text" }, { key: "gender", type: "text" },
     { key: "appearance", type: "area", rows: 3 }, { key: "personality", type: "area" }, { key: "background", type: "area" },
     { key: "voice_profile", type: "area", rows: 2 }, { key: "prompt_template", type: "area" },
-    { key: "voice_ref_audio", type: "text" }, { key: "voice_ref_text", type: "text" },
+    { key: "voice_ref_audio", type: "voice" }, { key: "voice_ref_text", type: "text" },
     { key: "adult_confirmed", type: "bool" }, { key: "locked", type: "bool" },
   ],
   locations: [
@@ -161,6 +162,7 @@ export function RowEditor({ pid, part, row, onDone }: { pid: number; part: Story
   const t = useT();
   const fields = EDITABLE[part] ?? [];
   const edit = useStoryEdit(pid, part);
+  const voices = (useLibraryItems().data ?? []).filter((i) => i.role === "voice").sort((a, b) => a.name.localeCompare(b.name));
   const [draft, setDraft] = useState<Record<string, string>>(() => Object.fromEntries(fields.map((f) => [f.key, cell(row[f.key])])));
   const changes = useMemo(() => {
     const out: Row = {};
@@ -191,6 +193,8 @@ export function RowEditor({ pid, part, row, onDone }: { pid: number; part: Story
                   </option>
                 ))}
               </select>
+            ) : f.type === "voice" ? (
+              <VoiceField value={draft[f.key] ?? ""} disabled={locked} voices={voices} onChange={(v) => setDraft({ ...draft, [f.key]: v })} />
             ) : f.type === "area" ? (
               <>
                 <textarea rows={f.rows ?? 2} value={draft[f.key] ?? ""} disabled={locked} onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })} />
@@ -227,6 +231,25 @@ export function RowEditor({ pid, part, row, onDone }: { pid: number; part: Story
       </div>
       <p className="muted small">{t("web.story.then_specs")}</p>
       <ErrorNote error={edit.update.error ?? edit.lock.error ?? edit.remove.error} />
+    </div>
+  );
+}
+
+function VoiceField({ value, disabled, voices, onChange }: { value: string; disabled: boolean; voices: LibraryItem[]; onChange: (v: string) => void }) {
+  const t = useT();
+  const heard = voices.find((v) => v.ref === value);
+  return (
+    <div className="stack">
+      <select value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)}>
+        <option value="">{t("web.voice.select_none")}</option>
+        {!heard && value ? <option value={value}>{value}</option> : null}
+        {voices.map((v) => (
+          <option key={v.id} value={v.ref}>
+            {v.name}
+          </option>
+        ))}
+      </select>
+      {heard ? <audio className="audio" src={`/api/assets/${heard.asset.id}/file`} controls preload="none" aria-label={t("web.voice.title")} /> : null}
     </div>
   );
 }
