@@ -5,6 +5,7 @@ version) when the story changed; one a person edited (``author='user'``) or lock
 """
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from storyagent.domain import MediaKind
@@ -59,13 +60,23 @@ class Seeder:
                  "version": spec.version}] if spec else []
 
 
+_COSTUME = re.compile(r"\b(wears|wearing|dressed in|dons|dresses)\b", re.IGNORECASE)
+
+
+def _identity(template: str) -> str:
+    """The character's identity-only description (face, hair, skin, build) with any costume sentence removed,
+    so a shot prompt describes clothing per shot instead of copying the character's default outfit."""
+    parts = re.split(r"(?<=[.!?])\s+", template)
+    return " ".join(p for p in parts if not _COSTUME.search(p)).strip()
+
+
 def _shot_prompts(ctx: Ctx, shot: dict[str, Any], chars: dict[str, dict[str, Any]], style: dict[str, Any],
                   previous: str, use_llm: bool) -> dict[str, str]:
     payload = shot["render_payload"]
     composed = bool(ctx.settings.workflow.get("keyframe_from_references", True))
     worn = {c["name"]: c.get("costume", "") for c in payload["subject"]["characters"]}
     looks = [{"appearance": chars.get(n, {}).get("appearance", ""), "costume": worn.get(n, ""),
-              "stable_description": chars.get(n, {}).get("prompt_template", "")} for n in shot["characters"]]
+              "stable_description": _identity(chars.get(n, {}).get("prompt_template", ""))} for n in shot["characters"]]
     props = payload.get("continuity", {}).get("props", [])
     base_style = keyframe.clean(str(style.get("visual_style", "")))
     plain = ", ".join(x for x in (
