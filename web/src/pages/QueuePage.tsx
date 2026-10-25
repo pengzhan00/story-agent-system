@@ -9,6 +9,7 @@ import { ProgressBar } from "../components/ProgressBar";
 import { StatusChip } from "../components/StatusChip";
 import { duration } from "../lib/format";
 import { jobError } from "../lib/jobError";
+import { StoryRuns } from "../components/StoryRuns";
 import { useT } from "../i18n";
 
 const ACTIVE = new Set(["queued", "running"]);
@@ -181,6 +182,8 @@ export function QueuePage() {
   return (
     <div className="stack">
       <h1>{t("web.nav.queue")}</h1>
+      <StoryRuns />
+      <h2>{t("web.queue.media")}</h2>
       <JobsPanel />
     </div>
   );

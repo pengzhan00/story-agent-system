@@ -75,9 +75,17 @@ def _label(spec: SpecRecord, names: dict[str, dict[str, str]]) -> str:
     return names[table].get(head, head)
 
 
+def _orphan(spec: SpecRecord, names: dict[str, dict[str, str]]) -> bool:
+    """A spec whose subject is gone (a shot a re-plan dropped, a scene a rerun replaced): nothing to make for it."""
+    head = spec.subject_id.partition("#")[0]
+    table = {"character": "character", "shot": "shot", "dialogue": "shot", "music": "music", "sfx": "sfx"}.get(
+        spec.subject_type.split(".")[0], "location")
+    return head not in names[table]
+
+
 def produce_plan(
     settings: Settings, store: StoryStore, specs: SpecStore, ledger: Ledger, project_id: int, tier: QualityTier,
-    *, force: bool = False, project_settings: dict[str, Any] | None = None,
+    *, force: bool = False, project_settings: dict[str, Any] | None = None, gated: bool = False,
 ) -> list[PlannedTask]:
     names = _labels(store, project_id)
     default_voice = default_voice_of(settings, project_settings)
@@ -88,7 +96,7 @@ def produce_plan(
     by_key = {(s.subject_type, s.subject_id, s.slot): s for s in current}
     for phase, types in enumerate(PHASES, 1):
         for spec in current:
-            if spec.subject_type not in types:
+            if spec.subject_type not in types or _orphan(spec, names):
                 continue
             asset = current_asset(ledger, spec)
             state = "new" if asset is None else "done" if up_to_date(ledger, spec, settings) and not force else "stale"
@@ -104,6 +112,9 @@ def produce_plan(
                 state, reason = "blocked", "no_model"
             if spec.subject_type == "dialogue.line" and not spec.params.get("voice_ref") and not default_voice:
                 state, reason = "blocked", "no_voice"
+            if gated and state in ("new", "stale") and settings.content.blocked_in(
+                    f"{spec.prompt}\n{spec.negative_prompt}\n{spec.text_payload}"):
+                state, reason = "blocked", "blocked_term"
             if spec.subject_type == "shot.video" and state == "new" and spec.subject_id not in picks:
                 state, reason = "skip", "still"
             guess = fallback_seconds(settings, model_ref, kind) if model_ref else FALLBACK_SECONDS.get(kind, 60.0)

@@ -724,6 +724,12 @@ class WorkflowRunOut(Strict):
     finished_at: str | None = None
 
 
+class WorkflowRunRow(WorkflowRunOut):
+    """A run in the queue list of every project."""
+
+    project_name: str
+
+
 class WorkflowStageOut(Strict):
     stage: str
     status: Literal["pending", "running", "completed", "failed", "stale"]
@@ -756,7 +762,7 @@ class PlannedTaskOut(Strict):
     model_ref: str
     phase: int
     state: str = Field(description="new | stale | done | blocked | skip")
-    reason: str = Field(description="why a blocked task cannot be made (no_model | no_voice)")
+    reason: str = Field(description="why a blocked task cannot be made (no_model | no_voice | blocked_term)")
     est_seconds: int
     needs: list[str]
 
@@ -774,8 +780,15 @@ class VideoSummary(Strict):
     budget_seconds: int | None = Field(description="series-wide clip budget, null = none")
 
 
+class PlanGate(Strict):
+    reason: str = Field(description="adult_not_confirmed | minor_age | blocked_term | vault_unavailable")
+    name: str = Field(description="the character it is about, when it is about one")
+    detail: str = Field(description="the age, the term or the mount point")
+
+
 class ProducePlanOut(Strict):
     tier: str
+    gates: list[PlanGate] = Field(description="what stops every job of the project before it starts; empty = none")
     tasks: list[PlannedTaskOut]
     totals: PlanTotals
     video: VideoSummary

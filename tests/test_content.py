@@ -179,6 +179,21 @@ def test_a_minor_age_or_a_blocked_term_stops_the_job_whatever_else_is_set(rclien
     assert rclient.get(f"/api/jobs/{third['id']}").json()["error_code"] == "content_blocked"
 
 
+def test_the_production_plan_names_what_would_stop_a_restricted_project(rclient: TestClient) -> None:
+    pid = restricted_project(rclient, adults=False, characters=("Ann", "Bo"))
+    plan = rclient.get(f"/api/projects/{pid}/produce/plan").json()
+    assert sorted((g["reason"], g["name"]) for g in plan["gates"]) == [("adult_not_confirmed", "Ann"),
+                                                                       ("adult_not_confirmed", "Bo")]
+    for c in rclient.get(f"/api/projects/{pid}/characters").json():
+        rclient.patch(f"/api/projects/{pid}/characters/{c['id']}", json={"adult_confirmed": 1})
+    assert rclient.get(f"/api/projects/{pid}/produce/plan").json()["gates"] == []
+    cid = rclient.get(f"/api/projects/{pid}/characters").json()[0]["id"]
+    rclient.patch(f"/api/projects/{pid}/characters/{cid}", json={"age": "15"})
+    assert [g["reason"] for g in rclient.get(f"/api/projects/{pid}/produce/plan").json()["gates"]] == ["minor_age"]
+    general = rclient.post("/api/projects", json={"name": "Open"}).json()["id"]
+    assert rclient.get(f"/api/projects/{general}/produce/plan").json()["gates"] == []
+
+
 def test_an_unmounted_vault_volume_refuses_restricted_jobs_but_not_general_ones(tmp_path: Path) -> None:
     home = tmp_path / "home"
     (home / "config").mkdir(parents=True)

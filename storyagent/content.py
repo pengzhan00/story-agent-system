@@ -99,6 +99,25 @@ def _blocked(code: str, **params: object) -> ValidationIssue:
                            {"reason": code, **params})
 
 
+def character_gate_issues(settings: Settings, db: Database, project_id: int) -> tuple[list[ValidationIssue], list[str]]:
+    """The gates that hold for a whole project, whatever the job: every character an adult and confirmed, and the
+    vault there. Also returns the characters' own texts, which are checked for blocked terms with the job's."""
+    cfg = settings.content
+    issues: list[ValidationIssue] = []
+    texts: list[str] = []
+    rows = db.conn.execute(
+        "SELECT name, role, age, appearance, personality, background, prompt_template, adult_confirmed "
+        "FROM characters WHERE project_id=?", (project_id,)).fetchall()
+    for c in rows:
+        if not c["adult_confirmed"]:
+            issues.append(_blocked("adult_not_confirmed", name=c["name"]))
+        ages = [int(x) for x in _DIGITS.findall(str(c["age"]))]
+        if ages and min(ages) < cfg.min_adult_age:
+            issues.append(_blocked("minor_age", name=c["name"], age=c["age"]))
+        texts += [str(c[k]) for k in ("role", "appearance", "personality", "background", "prompt_template")]
+    return issues, texts
+
+
 def gate_issues(settings: Settings, db: Database, job: JobRecord, project_id: int | None, rating: str
                 ) -> list[ValidationIssue]:
     """The checks a job of a gated rating must pass. The first two cannot be switched off by the project or by the
@@ -113,16 +132,9 @@ def gate_issues(settings: Settings, db: Database, job: JobRecord, project_id: in
                                       {"mount": cfg.volume_mount}))
     texts = list(_strings(job.inputs))
     if project_id is not None:
-        rows = db.conn.execute(
-            "SELECT name, role, age, appearance, personality, background, prompt_template, adult_confirmed "
-            "FROM characters WHERE project_id=?", (project_id,)).fetchall()
-        for c in rows:
-            if not c["adult_confirmed"]:
-                issues.append(_blocked("adult_not_confirmed", name=c["name"]))
-            ages = [int(x) for x in _DIGITS.findall(str(c["age"]))]
-            if ages and min(ages) < cfg.min_adult_age:
-                issues.append(_blocked("minor_age", name=c["name"], age=c["age"]))
-            texts += [str(c[k]) for k in ("role", "appearance", "personality", "background", "prompt_template")]
+        found, own = character_gate_issues(settings, db, project_id)
+        issues += found
+        texts += own
     for text in texts:
         term = cfg.blocked_in(text)
         if term:
@@ -139,6 +151,27 @@ def gate_issues(settings: Settings, db: Database, job: JobRecord, project_id: in
                                       {"model": job.model_ref,
                                        "service": str(model.extra.get("service", model.provider))}))
     return issues
+
+
+def plan_gates(settings: Settings, db: Database, project_id: int, rating: str) -> list[dict[str, str]]:
+    """What would stop every job of this project before it starts, listed for the production plan (``[]`` when the
+    rating has no gates). The characters' own texts are checked for blocked terms like a job's."""
+    policy = settings.content.policy(rating)
+    if not policy.gates:
+        return []
+    out: list[dict[str, str]] = []
+    if policy.vault and not vault_ready(settings):
+        out.append({"reason": "vault_unavailable", "name": "", "detail": settings.content.volume_mount})
+    issues, texts = character_gate_issues(settings, db, project_id)
+    for i in issues:
+        out.append({"reason": str(i.params.get("reason", "")), "name": str(i.params.get("name", "")),
+                    "detail": str(i.params.get("age", ""))})
+    for text in texts:
+        term = settings.content.blocked_in(text)
+        if term:
+            out.append({"reason": "blocked_term", "name": "", "detail": term})
+            break
+    return out
 
 
 # -- unlock sessions -----------------------------------------------------------------------------------------

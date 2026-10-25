@@ -5,6 +5,7 @@ export type Project = S["ProjectOut"];
 export type Job = S["JobOut"];
 export type Meta = S["Meta"];
 export type WorkflowRun = S["WorkflowRunOut"];
+export type WorkflowRunRow = S["WorkflowRunRow"];
 export type ScriptReview = S["ScriptReviewOut"];
 export type RunProgress = S["RunProgressOut"];
 export type StageProgress = S["StageProgressOut"];

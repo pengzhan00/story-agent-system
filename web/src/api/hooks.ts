@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, del, patch, post, put } from "./client";
-import type { Agent, AgentEdit, AiCallDetail, AiCallRow, BriefAnswers, Estimate, FlowStep, Health, Launch, ProjectCard, ProducePlan, SeriesBoard, ProjectFromText, ScriptReview, Job, Meta, Project, QueueState, Row, WorkflowOverview, WorkflowRun } from "./types";
+import type { Agent, AgentEdit, AiCallDetail, AiCallRow, BriefAnswers, Estimate, FlowStep, Health, Launch, ProjectCard, ProducePlan, SeriesBoard, ProjectFromText, ScriptReview, Job, Meta, Project, QueueState, Row, WorkflowOverview, WorkflowRun, WorkflowRunRow } from "./types";
 import { useI18n } from "../i18n";
 
 /** Polling is the fallback; the SSE feed (``events.ts``) pushes the same data much sooner. */
@@ -88,6 +88,10 @@ export const useWorkflow = (id: number, episode = 1) =>
     refetchInterval: (q) => (q.state.data?.active_run ? LIVE_MS : false),
   });
 
+/** The story runs (plan, characters, script, shots, ...) of every project: the part of the queue that is not media. */
+export const useAllRuns = () =>
+  useQuery({ queryKey: ["workflow", "runs"], queryFn: () => api<WorkflowRunRow[]>("/api/workflow/runs?limit=30"), refetchInterval: LIVE_MS });
+
 export function useStartRun(id: number) {
   const qc = useQueryClient();
   return useMutation({
@@ -99,6 +103,14 @@ export function useStartRun(id: number) {
 
 export const useReviewScript = (id: number) =>
   useMutation({ mutationFn: () => post<ScriptReview>(`/api/projects/${id}/review`) });
+
+export function useCancelAnyRun() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (runId: string) => post<WorkflowRun>(`/api/workflow/runs/${runId}/cancel`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["workflow"] }),
+  });
+}
 
 export function useCancelRun(id: number) {
   const qc = useQueryClient();

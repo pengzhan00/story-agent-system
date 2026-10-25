@@ -3993,6 +3993,32 @@
         "title": "PipelineView",
         "type": "object"
       },
+      "PlanGate": {
+        "properties": {
+          "detail": {
+            "description": "the age, the term or the mount point",
+            "title": "Detail",
+            "type": "string"
+          },
+          "name": {
+            "description": "the character it is about, when it is about one",
+            "title": "Name",
+            "type": "string"
+          },
+          "reason": {
+            "description": "adult_not_confirmed | minor_age | blocked_term | vault_unavailable",
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason",
+          "name",
+          "detail"
+        ],
+        "title": "PlanGate",
+        "type": "object"
+      },
       "PlanOut": {
         "properties": {
           "delivery_profile": {
@@ -4114,7 +4140,7 @@
             "type": "integer"
           },
           "reason": {
-            "description": "why a blocked task cannot be made (no_model | no_voice)",
+            "description": "why a blocked task cannot be made (no_model | no_voice | blocked_term)",
             "title": "Reason",
             "type": "string"
           },
@@ -4319,6 +4345,14 @@
       },
       "ProducePlanOut": {
         "properties": {
+          "gates": {
+            "description": "what stops every job of the project before it starts; empty = none",
+            "items": {
+              "$ref": "#/components/schemas/PlanGate"
+            },
+            "title": "Gates",
+            "type": "array"
+          },
           "tasks": {
             "items": {
               "$ref": "#/components/schemas/PlannedTaskOut"
@@ -4339,6 +4373,7 @@
         },
         "required": [
           "tier",
+          "gates",
           "tasks",
           "totals",
           "video"
@@ -8619,6 +8654,118 @@
           "finished_at"
         ],
         "title": "WorkflowRunOut",
+        "type": "object"
+      },
+      "WorkflowRunRow": {
+        "description": "A run in the queue list of every project.",
+        "properties": {
+          "cancel_requested": {
+            "title": "Cancel Requested",
+            "type": "boolean"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": true,
+            "title": "Params",
+            "type": "object"
+          },
+          "progress": {
+            "$ref": "#/components/schemas/RunProgressOut"
+          },
+          "project_id": {
+            "title": "Project Id",
+            "type": "integer"
+          },
+          "project_name": {
+            "title": "Project Name",
+            "type": "string"
+          },
+          "stages": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Stages",
+            "type": "array"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "failed",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "stages",
+          "params",
+          "status",
+          "progress",
+          "cancel_requested",
+          "error_code",
+          "error_message",
+          "created_at",
+          "started_at",
+          "finished_at",
+          "project_name"
+        ],
+        "title": "WorkflowRunRow",
         "type": "object"
       },
       "WorkflowStageOut": {
@@ -18351,6 +18498,64 @@
         "summary": "Sync",
         "tags": [
           "wiki"
+        ]
+      }
+    },
+    "/api/workflow/runs": {
+      "get": {
+        "description": "The story runs (plan, characters, script, shots, ...) of every project, for the queue page: the waiting and\nrunning ones first, then the newest. A project the caller is too young for is left out.",
+        "operationId": "list_all_runs_api_workflow_runs_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "active",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Active",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 30,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/WorkflowRunRow"
+                  },
+                  "title": "Response List All Runs Api Workflow Runs Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List All Runs",
+        "tags": [
+          "workflow"
         ]
       }
     },

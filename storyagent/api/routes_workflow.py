@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
 
 from storyagent.compose.export import ExportError, build_package
+from storyagent.content import plan_gates, project_rating
 from storyagent.domain import QualityTier
 from storyagent.llm import LLMError
 from storyagent.pipelines import project_settings_for
@@ -21,6 +22,7 @@ from storyagent.workflow.tiering import policy_from
 from .context import ctx_of
 from .errors import ApiError
 from .schemas import (
+    PlanGate,
     PlannedTaskOut,
     PlanTotals,
     ProducePlanOut,
@@ -30,9 +32,10 @@ from .schemas import (
     WorkflowOut,
     WorkflowRunCreate,
     WorkflowRunOut,
+    WorkflowRunRow,
     WorkflowStageOut,
 )
-from .visibility import allow_export
+from .visibility import allow_export, too_young
 
 router = APIRouter(prefix="/api", tags=["workflow"])
 
@@ -95,11 +98,13 @@ def get_produce_plan(project_id: int, request: Request, tier: str = "", force: b
         level = QualityTier(tier)
     except ValueError:
         raise ApiError(422, "invalid", f"unknown tier {tier!r}") from None
+    rating = project_rating(ctx.db, project_id)
+    gates = plan_gates(ctx.settings, ctx.db, project_id, rating)
     tasks = produce_plan(cfg, ctx.story, ctx.specs, ctx.ledger, project_id, level, force=force,
-                         project_settings=project.settings)
+                         project_settings=project.settings, gated=ctx.settings.content.policy(rating).gates)
     budget = policy_from(cfg.workflow, project.settings, 1.0).budget_sec
     return ProducePlanOut(tier=level.value, tasks=[PlannedTaskOut.model_validate(t.__dict__) for t in tasks],
-                          totals=PlanTotals.model_validate(totals(tasks)),
+                          gates=[PlanGate(**g) for g in gates], totals=PlanTotals.model_validate(totals(tasks)),
                           video=VideoSummary.model_validate(video_summary(tasks, budget)))
 
 
@@ -108,6 +113,17 @@ def list_runs(project_id: int, request: Request, limit: int = 20) -> list[Workfl
     ctx = ctx_of(request)
     ctx.projects.get(project_id)
     return [run_out(r) for r in ctx.workflow.list_runs(project_id, min(max(limit, 1), 100))]
+
+
+@router.get("/workflow/runs", response_model=list[WorkflowRunRow])
+def list_all_runs(request: Request, active: bool = False, limit: int = 30) -> list[WorkflowRunRow]:
+    """The story runs (plan, characters, script, shots, ...) of every project, for the queue page: the waiting and
+    running ones first, then the newest. A project the caller is too young for is left out."""
+    ctx = ctx_of(request)
+    names = {p.id: p.name for p in ctx.projects.list() if not too_young(p.rating, None)}
+    runs = ctx.workflow.list_all(min(max(limit, 1), 100) * 3, active_only=active)
+    return [WorkflowRunRow(**run_out(r).model_dump(), project_name=names[r["project_id"]])
+            for r in runs if r["project_id"] in names][:min(max(limit, 1), 100)]
 
 
 @router.get("/workflow/runs/{run_id}", response_model=WorkflowRunOut)

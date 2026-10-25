@@ -236,6 +236,14 @@ class WorkflowState:
             (project_id, limit)).fetchall()
         return [self._run(r) for r in rows]
 
+    def list_all(self, limit: int = 30, *, active_only: bool = False) -> list[dict[str, Any]]:
+        """Runs of every project, the queued and running ones first, then the newest."""
+        where = "WHERE status IN ('queued','running')" if active_only else ""
+        rows = self.db.conn.execute(
+            f"SELECT * FROM workflow_runs {where} ORDER BY (status IN ('queued','running')) DESC,"
+            " created_at DESC, rowid DESC LIMIT ?", (limit,)).fetchall()
+        return [self._run(r) for r in rows]
+
     def recent_active(self, project_id: int | None = None, finished_within_sec: float = 60.0) -> list[dict[str, Any]]:
         """Queued and running runs plus those that ended recently (the stream's last frame), oldest first."""
         cutoff = iso_at(_ts(now_iso()) - finished_within_sec)

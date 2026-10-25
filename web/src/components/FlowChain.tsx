@@ -65,7 +65,7 @@ function MediaRow({ m, health }: { m: FlowMedia; health: Map<string, { ok: boole
   );
 }
 
-function Step({ step, index, health }: { step: FlowStep; index: number; health: Map<string, { ok: boolean; label: string }> }) {
+function Step({ step, index, health, projectId }: { step: FlowStep; index: number; health: Map<string, { ok: boolean; label: string }>; projectId?: number }) {
   const t = useT();
   return (
     <li className={`flow-step flow-${step.how}`}>
@@ -108,6 +108,11 @@ function Step({ step, index, health }: { step: FlowStep; index: number; health: 
           ))}
         </ul>
       ) : null}
+      {projectId !== undefined && (step.stage === "produce" || step.stage === "compose") ? (
+        <p className="small">
+          <Link to={`/projects/${projectId}/workflow`}>{t("web.flow.go_start")}</Link>
+        </p>
+      ) : null}
       {step.media.length > 0 ? (
         <ul className="plain flow-medias">
           {step.media.map((m) => (
@@ -132,7 +137,7 @@ export function FlowChain({ projectId }: { projectId?: number }) {
       {flow.isLoading ? <p className="muted">{t("web.loading")}</p> : null}
       <ol className="flow">
         {flow.data?.steps.map((s, i) => (
-          <Step key={s.stage} step={s} index={i} health={states} />
+          <Step key={s.stage} step={s} index={i} health={states} projectId={projectId} />
         ))}
       </ol>
     </div>

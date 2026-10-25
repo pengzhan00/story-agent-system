@@ -2693,6 +2693,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/workflow/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List All Runs
+         * @description The story runs (plan, characters, script, shots, ...) of every project, for the queue page: the waiting and
+         *     running ones first, then the newest. A project the caller is too young for is left out.
+         */
+        get: operations["list_all_runs_api_workflow_runs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/workflow/runs/{run_id}": {
         parameters: {
             query?: never;
@@ -4375,6 +4396,24 @@ export interface components {
             /** Rows */
             rows: components["schemas"]["PipelineRow"][];
         };
+        /** PlanGate */
+        PlanGate: {
+            /**
+             * Detail
+             * @description the age, the term or the mount point
+             */
+            detail: string;
+            /**
+             * Name
+             * @description the character it is about, when it is about one
+             */
+            name: string;
+            /**
+             * Reason
+             * @description adult_not_confirmed | minor_age | blocked_term | vault_unavailable
+             */
+            reason: string;
+        };
         /** PlanOut */
         PlanOut: {
             /** Delivery Profile */
@@ -4430,7 +4469,7 @@ export interface components {
             phase: number;
             /**
              * Reason
-             * @description why a blocked task cannot be made (no_model | no_voice)
+             * @description why a blocked task cannot be made (no_model | no_voice | blocked_term)
              */
             reason: string;
             /** Spec Id */
@@ -4512,6 +4551,11 @@ export interface components {
         };
         /** ProducePlanOut */
         ProducePlanOut: {
+            /**
+             * Gates
+             * @description what stops every job of the project before it starts; empty = none
+             */
+            gates: components["schemas"]["PlanGate"][];
             /** Tasks */
             tasks: components["schemas"]["PlannedTaskOut"][];
             /** Tier */
@@ -6375,6 +6419,42 @@ export interface components {
             progress: components["schemas"]["RunProgressOut"];
             /** Project Id */
             project_id: number;
+            /** Stages */
+            stages: string[];
+            /** Started At */
+            started_at: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "running" | "completed" | "failed" | "cancelled";
+        };
+        /**
+         * WorkflowRunRow
+         * @description A run in the queue list of every project.
+         */
+        WorkflowRunRow: {
+            /** Cancel Requested */
+            cancel_requested: boolean;
+            /** Created At */
+            created_at: string;
+            /** Error Code */
+            error_code: string | null;
+            /** Error Message */
+            error_message: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /** Id */
+            id: string;
+            /** Params */
+            params: {
+                [key: string]: unknown;
+            };
+            progress: components["schemas"]["RunProgressOut"];
+            /** Project Id */
+            project_id: number;
+            /** Project Name */
+            project_name: string;
             /** Stages */
             stages: string[];
             /** Started At */
@@ -12323,6 +12403,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WikiSyncOut"];
+                };
+            };
+        };
+    };
+    list_all_runs_api_workflow_runs_get: {
+        parameters: {
+            query?: {
+                active?: boolean;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowRunRow"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

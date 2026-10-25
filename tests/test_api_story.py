@@ -383,3 +383,20 @@ def test_looks_and_props_api(client: TestClient) -> None:
     assert client.delete(f"{base}/looks/{look.json()['id']}").status_code == 204
     other = client.post("/api/projects", json={"name": "Other"}).json()["id"]
     assert client.get(f"/api/projects/{other}/looks/{look.json()['id']}").status_code == 404
+
+
+def test_the_queue_lists_the_story_runs_of_every_project(client: TestClient, fsettings: Settings) -> None:
+    first = new_project(client)
+    second = int(client.post("/api/projects", json={"name": "Snow", "description": "A quiet town."}).json()["id"])
+    old = started(client, first)
+    run_to_end(fsettings)
+    waiting = started(client, second, stages=["analyze"])
+    rows = client.get("/api/workflow/runs").json()
+    assert [r["id"] for r in rows] == [waiting["id"], old["id"]]           # the waiting one first, then the newest
+    assert [(r["project_name"], r["status"]) for r in rows] == [("Snow", "queued"), ("Rain", "completed")]
+    assert [r["id"] for r in client.get("/api/workflow/runs", params={"active": True}).json()] == [waiting["id"]]
+    assert len(client.get("/api/workflow/runs", params={"limit": 1}).json()) == 1
+    assert client.post(f"/api/workflow/runs/{waiting['id']}/cancel").json()["status"] == "cancelled"
+    binned = client.delete(f"/api/projects/{second}")                     # a project in the bin leaves the list
+    assert binned.status_code == 200, binned.text
+    assert [r["project_name"] for r in client.get("/api/workflow/runs").json()] == ["Rain"]

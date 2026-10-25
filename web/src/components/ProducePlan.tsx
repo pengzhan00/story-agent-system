@@ -22,6 +22,7 @@ export function ProducePlan({ id, onClose, defaultTier = "draft" }: { id: number
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const tasks = useMemo(() => plan.data?.tasks ?? [], [plan.data]);
   useEffect(() => setPicked(new Set(tasks.filter((x) => runnable(x) && x.subject_type !== VIDEO).map((x) => x.spec_id))), [tasks]);
+  const gates = plan.data?.gates ?? [];
   const chosen = tasks.filter((x) => picked.has(x.spec_id));
   const eta = chosen.reduce((n, x) => n + x.est_seconds, 0);
   const toggle = (specId: string, on: boolean) =>
@@ -54,6 +55,16 @@ export function ProducePlan({ id, onClose, defaultTier = "draft" }: { id: number
       </div>
       <p className="muted small">{t("web.plan.intro")}</p>
       <ErrorNote error={plan.error ?? start.error} />
+      {gates.length > 0 ? (
+        <div role="alert" className="stack">
+          <strong className="bad">{t("web.plan.gates_title")}</strong>
+          <ul className="plain stack small">
+            {gates.map((g) => (
+              <li key={`${g.reason}:${g.name}:${g.detail}`}>{t(`web.plan.gate.${g.reason}`, { name: g.name, detail: g.detail })}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       {tasks.length === 0 && !plan.isLoading ? <p className="empty">{t("web.plan.empty")}</p> : null}
       <div className="row small">
         <button type="button" className="chip chip-button" onClick={() => setWhere(() => true)}>
@@ -105,7 +116,7 @@ export function ProducePlan({ id, onClose, defaultTier = "draft" }: { id: number
       <div className="row">
         <span>{t("web.plan.selected", { n: chosen.length, eta: duration(eta) })}</span>
         <span className="spacer" />
-        <button type="button" className="primary" disabled={chosen.length === 0 || start.isPending} onClick={confirm}>
+        <button type="button" className="primary" disabled={chosen.length === 0 || gates.length > 0 || start.isPending} onClick={confirm}>
           {t("web.plan.confirm")}
         </button>
       </div>
