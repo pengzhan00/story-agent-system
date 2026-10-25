@@ -392,6 +392,29 @@ def test_script_review_is_on_demand_and_changes_nothing(tmp_path: Path) -> None:
     assert [r["status"] for r in engine.state.stages(pid)] == before
 
 
+def test_a_script_is_revised_with_feedback_keeping_the_outline_and_the_other_scenes(tmp_path: Path) -> None:
+    engine, client, _ = make_engine(tmp_path)
+    pid = new_project(engine)
+    for stage in STORY[:5]:
+        engine.run_stage(pid, stage, {"visual_prompts": False})
+    before = engine.store.get_script(pid, 1)
+    first = before["acts"][0]["scenes"][0]
+    calls = len(client.calls)
+    engine.run_stage(pid, "script", {"feedback": "Make the ending hit harder", "revise_scenes": ["1.1"]})
+    shots_prompts = [p for c, p in zip(client.calls[calls:], client.prompts[calls:], strict=True) if c == "shots"]
+    assert len(shots_prompts) == 1                                      # only the named scene was written again
+    assert "Make the ending hit harder" in shots_prompts[0] and first["shots"][0]["action"] in shots_prompts[0]
+    after = engine.store.get_script(pid, 1)
+    assert after["title"] == before["title"] and after["synopsis"] == before["synopsis"]
+    beats = lambda row: [[sc["beat"] for sc in a["scenes"]] for a in row["acts"]]  # noqa: E731
+    assert beats(after) == beats(before)
+    calls = len(client.calls)
+    engine.run_stage(pid, "script", {"feedback": "Tighter dialogue"})        # no scene named: every scene
+    assert client.calls[calls:].count("shots") == sum(len(a["scenes"]) for a in after["acts"])
+    with pytest.raises(StageError):
+        engine.run_stage(new_project(engine), "script", {"feedback": "x"})
+
+
 def test_the_target_length_sizes_the_story_and_the_planned_shots(tmp_path: Path) -> None:
     engine, client, _ = make_engine(tmp_path)
     pid = new_project(engine)

@@ -3,6 +3,7 @@ import { useLibraryItems } from "../api/library";
 import { useCancelRun, useMeta, useProject, useProjectSettings, useReviewScript, useStartRun, useUpdateProject, useWorkflow } from "../api/hooks";
 import { ErrorNote } from "../components/ErrorNote";
 import { ProgressBar } from "../components/ProgressBar";
+import { ScriptRevise } from "../components/ScriptRevise";
 import { ProducePlan } from "../components/ProducePlan";
 import { ProduceRoadmap } from "../components/ProduceRoadmap";
 import { SeasonCard } from "../components/SeasonCard";
@@ -257,6 +258,7 @@ export function WorkflowPanel({ id }: { id: number }) {
             </button>
           </div>
           <ErrorNote error={review.error} />
+          <ScriptRevise key={review.data ? JSON.stringify(review.data.issues) : "own"} id={id} episode={episode} issues={review.data?.issues ?? []} />
           {review.data ? (
             <div className="stack">
               <strong>

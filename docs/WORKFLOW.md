@@ -53,6 +53,8 @@ storyagent workflow watch [RUN_ID] [--project 1]       # follow a queued/running
 
 Params: `premise`, `acts`, `episode`, `source_text`, `visual_prompts` (false = deterministic prompts, no extra LLM call per shot), `min_shot_sec`, `max_shot_sec`, `force`.
 
+**Revising with feedback**: `--stage script --param feedback="..."` (optionally `revise_scenes=["1.3","2.1"]`, as `act.scene`) keeps the outline and writes again the shots of the named scenes (every scene when none is named) from the feedback and their current shots (`screenwriter.shots` inputs `feedback`, `current`). The Web "工作流" page offers it under the script review: tick the review issues to apply, add own notes.
+
 ## i18n key list for the UI
 
 `workflow.stage.<stage>`, `workflow.status.<pending|queued|running|completed|failed|stale|cancelled>`, `workflow.progress.{stage_of,items,elapsed,eta,eta_unknown,working,queued}`, run `error_code` → `llm.error.<code>` / `workflow.error.<code>` (+ `.remediation`), API errors `api.error.{shot_locked,nothing_to_do}`. `GET /api/meta` returns `workflow_stages` and `workflow_statuses` with labels.
