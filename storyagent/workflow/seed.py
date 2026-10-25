@@ -109,7 +109,7 @@ def _sfx_prompts(ctx: Ctx, shot: dict[str, Any], cues: list[str], use_llm: bool)
     except Exception:  # an LLM hiccup on one shot must not stop the whole stage  # noqa: BLE001
         ctx.extra.setdefault("sfx_prompt_fallbacks", []).append(shot["id"])
         return {}
-    return {str(e["cue"]).strip(): (str(e["prompt"]), min(max(float(e.get("duration_sec") or 0), 0.0), 6.0))
+    return {str(e["cue"]).strip(): (str(e["prompt"]), min(max(float(e.get("duration_sec") or 0), 1.0), 6.0))
             for e in data.get("effects", [])}
 
 
