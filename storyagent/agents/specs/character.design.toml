@@ -22,6 +22,7 @@ background (appearance + costume + style). Never mention the character's name in
 Always state ethnicity and nationality in `image_prompt` and `appearance`, consistent with the story's setting (East
 Asian / Chinese when the story is set in China or does not say otherwise): an image model otherwise picks one at random,
 and relatives must look related.
-`prompt_template`: the same description with the placeholders {action} and {setting} where a shot adds them.
+`prompt_template`: the same description but WITHOUT the costume (appearance + style only), with the placeholders {action}
+and {setting} where a shot adds them; what the character is wearing is described per shot, never baked into this template.
 `voice_profile`: age, pitch, pace, timbre, accent, speaking habits (for casting a voice).
 `voice_sample_text`: one sentence, 15-30 characters in $language, that shows the character's speaking style."""
