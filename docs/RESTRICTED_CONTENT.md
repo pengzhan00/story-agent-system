@@ -51,7 +51,7 @@ allow_remote = false            # 不送云端模型(忽略项目的 allow_remot
 - 受限素材在列表、看板、预览里**只给遮掩图**(封存时一并生成的低分辨率模糊缩略图,单独存放),不显示文件名与提示词摘要。
 - **解锁会话**:界面上"查看受限内容"→ 输入/确认 → 限时会话(`unlock_ttl_sec`)内才能取原文件和播放;会话到期自动重新上锁;每次解锁/查看/导出写**审计记录**(谁、何时、哪个对象)。
 - API:`GET /assets/{id}/file` 对未解锁的受限素材返回 403(错误码 `content.locked`,带 remediation);SSE、作业列表、`/api/meta` 不含受限素材的路径与缩略图。
-- 日志与 LLM 记录:`log_prompts=false` 的级别,提示词在日志和 `llm_transcripts` 里存摘要哈希而不是原文。
+- 日志与 LLM 记录:`log_prompts=false` 的级别,提示词在日志和 `llm_transcripts` 里存摘要哈希而不是原文。想留原文,在 `$STORY_AGENT_HOME/config/content.toml` 写 `[content.ratings.restricted]` 加 `log_prompts = true`(只覆盖这一项,其余保持;配置热加载,不用重启)。原文会进数据库(未加密),只对**之后**的调用生效,之前已存成摘要的找不回来。
 
 ## 五、导出与外发
 - 默认:**交付包、素材包、FCPXML 往返包都排除受限素材**;要包含,必须显式选择并确认"对象已满足年龄与同意要求",确认记入审计与包内清单。
