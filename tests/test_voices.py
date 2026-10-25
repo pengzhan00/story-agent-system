@@ -98,3 +98,42 @@ def test_a_gated_project_leaves_out_voices_whose_speaker_may_be_under_eighteen(t
     assert [x.reason for x in shut.unresolved if x.character == NAMES[0]] == ["no_voice_left"]
     open_ = voices.auto_assign(engine.store, lib, engine.spec_store, pid)
     assert [(x.character, x.voice) for x in open_.assigned] == [(NAMES[0], "Young")]
+
+
+def test_a_voice_change_propagates_to_the_characters_lines(tmp_path: Path) -> None:
+    engine, _, _ = make_engine(tmp_path)
+    pid = new_project(engine)
+    engine.run(pid, None, {"visual_prompts": False})
+    a = engine.store.find_character(pid, NAMES[0])
+    shot = next(s for s in engine.store.list_shots(pid) if s["dialogue"])
+    subj = f"{shot['id']}#0"
+    before = engine.spec_store.current(pid, "dialogue.line", subj)
+    assert before.params.get("voice_ref") is None
+    _voice(engine, tmp_path, "Warm", "adult female", tags=["female"])
+    engine.store.update_character(a["id"], {"voice_ref_audio": "library:voice/Warm", "voice_ref_consent": 1})
+    assert voices.propagate_voice(engine.store, engine.spec_store, pid, a["id"]) >= 1
+    after = engine.spec_store.current(pid, "dialogue.line", subj)
+    assert after.params["voice_ref"] == "library:voice/Warm" and after.version == before.version + 1
+    # an unchanged voice leaves the line alone
+    assert voices.propagate_voice(engine.store, engine.spec_store, pid, a["id"]) == 0
+    assert engine.spec_store.current(pid, "dialogue.line", subj).version == after.version
+
+
+def test_patching_a_character_voice_propagates_to_its_lines(tmp_path: Path) -> None:
+    from fastapi.testclient import TestClient
+
+    from storyagent.api.app import create_app
+
+    engine, _, settings = make_engine(tmp_path)
+    pid = new_project(engine)
+    engine.run(pid, None, {"visual_prompts": False})
+    a = engine.store.find_character(pid, NAMES[0])
+    _voice(engine, tmp_path, "Warm", "adult female", tags=["female"])
+    shot = next(s for s in engine.store.list_shots(pid) if s["dialogue"])
+    subj = f"{shot['id']}#0"
+    before = engine.spec_store.current(pid, "dialogue.line", subj)
+    with TestClient(create_app(settings), raise_server_exceptions=False) as client:
+        r = client.patch(f"/api/projects/{pid}/characters/{a['id']}", json={"voice_ref_audio": "library:voice/Warm"})
+        assert r.status_code == 200
+    after = engine.spec_store.current(pid, "dialogue.line", subj)
+    assert after.params["voice_ref"] == "library:voice/Warm" and after.version == before.version + 1
