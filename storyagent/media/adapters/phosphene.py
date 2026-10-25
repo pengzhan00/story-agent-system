@@ -1,4 +1,4 @@
-"""Phosphene panel adapter: LTX-2.5 text/image-to-video with synchronized sound, and audio-driven lip-sync.
+"""Phosphene panel adapter: LTX-2.5 text/image-to-video with synchronized sound, audio-driven lip-sync, and YuE2 songs.
 
 The panel (a Pinokio app, default port 8198) owns the model and its own queue; this adapter submits to it and
 follows the job by id, so a restarted worker can re-attach to a render that is still running.
@@ -7,12 +7,18 @@ Panel protocol (form-encoded): ``POST /queue/add`` -> ``GET /status`` (``current
 Cancel: ``POST /stop?id=`` for the running job, ``POST /queue/remove`` for a queued one.
 
 Kinds: ``video.av`` (picture + sound), ``video.generate`` (picture only: the sound is stripped), ``video.lipsync``
-(portrait image + speech audio -> the mouth follows the audio).
+(portrait image + speech audio -> the mouth follows the audio), ``audio.music`` (a song from style + lyrics by YuE2,
+the panel's music engine: the same queue and GPU lock, a WAV in ``output_path``).
 
 Parameters (defaults in models.toml; the best recipe from the operator's notes is the starting point):
     width, height (multiples of 32)   frames (must satisfy frames % 8 == 1; 121 = 5 s at 24 fps)   frame_rate
     quality (balanced|high)   stage1_steps, stage2_steps   cfg_scale   upscale (off|fit_720p|fit_1080p)
     upscale_method   enhance (bool; keep false to preserve the dialogue text verbatim)   mode (override)
+Music parameters: ``duration`` (a ceiling in seconds, 8-360: the song ends with its lyrics, never stretched),
+``music_quality`` (draft = 8 synthesis steps | final = 32), ``score_mode`` (full | melody | off), ``precision``
+(bf16 | 8bit | 4bit), ``cfg_scale``, ``instrumental`` (default: true when there are no lyrics), ``title``.
+Music inputs: ``prompt`` = the style in prose (genre, instruments, singer, language, tempo), ``text`` = lyrics with
+``[Verse]`` / ``[Chorus]`` tags on their own lines (a tag with no words under it is an instrumental passage).
 Inputs: ``prompt``, ``negative_prompt``, ``refs`` = files: a str (kind guessed from the extension) or
 {"role": image|audio|start_image|end_image, "path": ...}.
 Known panel behaviours handled here: it silently clamps oversized resolutions (reported in metadata and as
@@ -20,6 +26,7 @@ a warning event) and above 121 frames only ``quality=high`` keeps a character's 
 """
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -36,6 +43,7 @@ from ..contracts import (
     HealthState,
     JobContext,
     JobRecord,
+    MediaJob,
     Progress,
     ValidationIssue,
 )
@@ -65,7 +73,15 @@ SCHEMA: dict[str, dict[str, Any]] = {
     "mode": {"type": "str"},
     "negative_prompt": {"type": "str"},
     "keep_audio": {"type": "bool"},
+    "duration": {"type": "float", "min": 8, "max": 360},
+    "music_quality": {"type": "str"},
+    "score_mode": {"type": "str"},
+    "precision": {"type": "str"},
+    "instrumental": {"type": "bool"},
+    "title": {"type": "str"},
 }
+_MUSIC_QUALITY = ("draft", "final")
+_SCORE_MODES = ("full", "melody", "off")
 _DONE = {"done", "completed", "complete", "success", "succeeded"}
 _CANCELLED = {"cancelled", "canceled", "stopped", "aborted"}
 
@@ -106,8 +122,9 @@ class PhospheneAdapter(AdapterBase):
 
     def capabilities(self) -> Capabilities:
         return Capabilities(
-            kinds=(MediaKind.VIDEO_AV, MediaKind.VIDEO_GENERATE, MediaKind.VIDEO_LIPSYNC), heavy=True,
-            supports_cancel=True, supports_reattach=True, param_schema=SCHEMA, poll_interval_sec=self.poll_interval_sec,
+            kinds=(MediaKind.VIDEO_AV, MediaKind.VIDEO_GENERATE, MediaKind.VIDEO_LIPSYNC, MediaKind.AUDIO_MUSIC),
+            heavy=True, supports_cancel=True, supports_reattach=True, param_schema=SCHEMA,
+            poll_interval_sec=self.poll_interval_sec,
         )
 
     # -- health -------------------------------------------------------------------------------
@@ -149,6 +166,8 @@ class PhospheneAdapter(AdapterBase):
             issues.append(ValidationIssue(code, msg, {"detail": msg, **params}))
 
         p = job.params
+        if job.kind is MediaKind.AUDIO_MUSIC:
+            return self._validate_music(job, bad, issues)
         if not (job.inputs.get("prompt") or job.kind is MediaKind.VIDEO_LIPSYNC):
             bad(ErrorCode.INVALID_INPUT, "a prompt is required")
         frames = int(p.get("frames", 121))
@@ -170,8 +189,47 @@ class PhospheneAdapter(AdapterBase):
                 bad(ErrorCode.INVALID_INPUT, f"{role} reference not found: {files[role]}", path=str(files[role]))
         return issues
 
+    def _validate_music(self, job: JobRecord, bad: Any, issues: list[ValidationIssue]) -> list[ValidationIssue]:
+        p = job.params
+        if not (job.inputs.get("prompt") or job.inputs.get("text")):
+            bad(ErrorCode.INVALID_INPUT, "needs a style description or lyrics")
+        if str(p.get("music_quality", "final")) not in _MUSIC_QUALITY:
+            bad(ErrorCode.INVALID_PARAMS, f"music_quality must be one of {_MUSIC_QUALITY}")
+        if str(p.get("score_mode", "full")) not in _SCORE_MODES:
+            bad(ErrorCode.INVALID_PARAMS, f"score_mode must be one of {_SCORE_MODES}")
+        try:
+            music = (self.client.json("GET", "/status", timeout=10).get("music")) or {}
+        except AdapterError as exc:
+            return issues + [ValidationIssue(exc.code, exc.message, exc.params)]
+        if not music.get("available"):
+            why = "; ".join(music.get("missing") or []) or str(music.get("reason") or "not installed")
+            issues.append(ValidationIssue(ErrorCode.MISSING_MODEL, f"the panel's music engine (YuE2) is not ready: "
+                                          f"{why}", {"model": "yue2", "detail": why}))
+        return issues
+
     # -- submit / poll ------------------------------------------------------------------------
+    @staticmethod
+    def _music_form(job: JobRecord | MediaJob) -> dict[str, Any]:
+        """The panel's ``music_*`` fields for a song; with no lyrics it is an instrumental one unless said otherwise."""
+        p, lyrics = job.params, str(job.inputs.get("text", "")).strip()
+        form: dict[str, Any] = {
+            "mode": "music", "engine": "music", "music_style": str(job.inputs.get("prompt", "")),
+            "music_lyrics": lyrics, "music_instrumental": bool(p.get("instrumental", not lyrics)),
+            "music_quality": p.get("music_quality", "final"), "music_mode": p.get("score_mode", "full"),
+            "music_max_seconds": int(float(p.get("duration", 240)) + 0.999),
+            "music_seed": min(job.seed, 2**32 - 1) if job.seed is not None else -1,
+        }
+        for key, field in (("precision", "music_precision"), ("cfg_scale", "music_cfg_scale"),
+                           ("title", "music_title")):
+            if key in p:
+                form[field] = p[key]
+        return form
+
     def _form(self, job: JobRecord, ctx: JobContext) -> dict[str, str]:
+        if job.kind is MediaKind.AUDIO_MUSIC:
+            song = {**self._music_form(job), "label": f"storyagent-{job.id[:8]}"}
+            return {k: (str(v).lower() if isinstance(v, bool) else str(v))
+                    for k, v in song.items() if v not in (None, "")}
         form: dict[str, Any] = {k: job.params[k] for k in _FORM if k in job.params}
         form.update(
             mode=self.mode_for(job), prompt=str(job.inputs.get("prompt", "")),
@@ -257,7 +315,11 @@ class PhospheneAdapter(AdapterBase):
         if src is None or not src.is_file():
             raise AdapterError(ErrorCode.OUTPUT_MISSING, f"panel reports done but no file: {rec.get('output_path')}",
                                path=str(rec.get("output_path")))
-        meta: dict[str, Any] = {"panel_job_id": external_id, "panel_file": str(src), "mode": self.mode_for(job)}
+        meta: dict[str, Any] = {"panel_job_id": external_id, "panel_file": str(src)}
+        if job.kind is MediaKind.AUDIO_MUSIC:
+            vocals = not self._music_form(job)["music_instrumental"]
+            return [ArtifactSpec(src, metadata={**meta, **self._song_facts(src), "vocals": vocals})]
+        meta["mode"] = self.mode_for(job)
         info = probe(ctx.settings, src)
         want_w, want_h = job.params.get("width"), job.params.get("height")
         upscaled = str(job.params.get("upscale", "off")) not in ("", "off")
@@ -271,6 +333,16 @@ class PhospheneAdapter(AdapterBase):
             src = self._strip_audio(src, ctx)
             meta["audio_stripped"] = True
         return [ArtifactSpec(src, metadata=meta)]
+
+    @staticmethod
+    def _song_facts(wav: Path) -> dict[str, Any]:
+        """What the engine wrote beside the song (its ``.json`` sidecar): the score and the recipe it ran, in short."""
+        try:
+            side = json.loads(Path(str(wav) + ".json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return {}
+        keep = ("title", "steps", "seed", "mode", "precision", "instrumental_recipe", "engine_pin", "duration_sec")
+        return {f"yue2_{k}": side[k] for k in keep if k in side}
 
     @staticmethod
     def _strip_audio(src: Path, ctx: JobContext) -> Path:

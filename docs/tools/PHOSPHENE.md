@@ -125,3 +125,28 @@ curl -s -X POST http://127.0.0.1:8198/oneshot -H 'Content-Type: application/json
 - [[音视频工具矩阵]]
 
 (这些链接在知识库里指向同步进来的笔记;没同步笔记时只显示名字。)
+
+## 音乐引擎 YuE2(Audio → Compose)
+
+面板里的音乐引擎 YuE2-3B(MLX 移植,Python 3.12 独立 venv,权重约 11 GB,峰值 11 GB 内存,至少 24 GB 统一内存)按风格描述加歌词写一整首带人声和编曲的歌。
+装好后 `GET /status` 的 `music.available` 为 `true`。它和 LTX 共用面板的队列和 GPU 锁,所以在系统里也是重作业(一次一个)。
+
+系统里的模型是 `yue2-3b`(`audio.music`,`provider = "phosphene"`),**不是默认**:默认还是 `acestep-1.5-turbo`,要用 YuE2 就在项目/规格里选它。
+
+| 系统里的字段 | 面板字段 | 说明 |
+|---|---|---|
+| 提示词 `prompt` | `music_style` | 风格用一段话写:曲风、乐器、歌手、语言、速度 |
+| 歌词 `text` | `music_lyrics` | `[Verse]` / `[Chorus]` 标签单独成行;标签下面没词 = 纯器乐段 |
+| `instrumental` | `music_instrumental` | 没写歌词时默认 `true`(纯器乐) |
+| `duration`(秒,8–360) | `music_max_seconds` | 只是上限:歌随歌词结束,不会被拉长 |
+| `music_quality` = `draft`/`final` | `music_quality` | 8 步 / 32 步;`draft` 档位默认用 draft |
+| `score_mode` = `full`/`melody`/`off` | `music_mode` | 先写曲谱再合成;`off` = 不写曲谱 |
+| `precision` = `bf16`/`8bit`/`4bit` | `music_precision` | 默认 8bit |
+| `cfg_scale`、`title`、`seed` | `music_cfg_scale`、`music_title`、`music_seed` | |
+
+交付物是 `mlx_outputs/music_<时间>_<名字>.wav`,旁边有 `.wav.json`(记录引擎版本、种子、纯器乐做法),系统把摘要写进资产元数据(`yue2_*`)。
+估计用时(面板在 M4 Max 上的实测拟合):final 约 0.93× 歌长,draft 约 0.43×,加载约 12 秒。
+
+**许可**:YuE2 是 CC BY-NC 4.0 加"个人创作者"许可,首次使用要在面板里同意一次(未同意时面板对排队请求返回 HTTP 451)。
+系统里 `commercial_ok = false`,商用交付会被许可门拦下。纯器乐如果装了面板的可选器乐 LoRA(`music/lora/fetch`)效果更干净,没装时用"空段标签"做法。
+提交前系统会先问面板引擎是否就绪(`/status` 的 `music`),没装好就在校验阶段报缺模型,不会排进队列。

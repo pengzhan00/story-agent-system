@@ -280,6 +280,33 @@ cfg = 1.0
 sampler_name = "lcm"
 scheduler = "simple"
 
+# YuE2-3B through the Phosphene panel's music engine (Audio -> Compose; MLX port by vanch007, weights ~11 GB, peak 11 GB):
+# a whole song with sung vocals and an arrangement from a style description plus lyrics. Length follows the lyrics;
+# `duration` is only a ceiling (8-360 s). Measured by the panel on an M4 Max: final (32 steps) ~0.93x real time, draft
+# (8 steps) ~0.43x. Licence: CC BY-NC 4.0 plus the individual-creator permission, accepted once in the panel: not for
+# commercial delivery. It shares the panel's queue and GPU lock with LTX, so it is a heavy job here too.
+# Style is prose (genre, instruments, singer, language, tempo); lyrics carry [Verse] / [Chorus] tags on their own lines;
+# a tag with no words under it is an instrumental passage. Not the default: choose it per project, or per spec.
+[models."yue2-3b"]
+kind = "audio.music"
+provider = "phosphene"
+version = "yue2-3b-mlx"
+family = "yue2"
+heavy = true
+est_memory_gib = 12
+license_tag = "yue2-cc-by-nc-4.0"
+commercial_ok = false
+attribution = "Generated with YuE2 by Multimodal Art Projection"
+prompt_profile = "natural_en"
+timeout_sec = 1800
+[models."yue2-3b".params]
+duration = 120
+music_quality = "final"
+score_mode = "full"
+precision = "8bit"
+[models."yue2-3b".tiers.draft]
+music_quality = "draft"
+
 [models."acestep-1.5-xl-sft"]
 kind = "audio.music"
 provider = "acestep"

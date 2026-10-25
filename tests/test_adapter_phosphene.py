@@ -8,7 +8,7 @@ from urllib.parse import parse_qs
 
 import pytest
 
-from storyagent.domain import JobStatus, MediaKind
+from storyagent.domain import JobStatus, MediaKind, QualityTier
 from storyagent.domain.errors import ErrorCode
 from storyagent.media.adapters._http import ServiceClient
 from storyagent.media.adapters.phosphene import PhospheneAdapter
@@ -34,6 +34,16 @@ quality = "high"
 kind = "video.generate"
 provider = "phosphene"
 timeout_sec = 30
+[models."yue2-test"]
+kind = "audio.music"
+provider = "phosphene"
+heavy = true
+timeout_sec = 30
+[models."yue2-test".params]
+duration = 90
+music_quality = "final"
+[models."yue2-test".tiers.draft]
+music_quality = "draft"
 [models."ltx-test-lipsync"]
 kind = "video.lipsync"
 provider = "phosphene"
@@ -293,3 +303,55 @@ def test_default_video_models_keep_the_full_step_count_in_preview_and_a_clean_av
         negative = str(model.params["negative_prompt"])
         assert "sword" not in negative and "dark" not in negative       # leftovers of one genre, and a lit-scene bias
         assert "banding" in negative and "flicker" in negative
+
+
+def music_panel(tmp_path: Path, available: bool = True) -> Any:
+    wav = tmp_path / "panel_out" / "music_20261025_song.wav"
+    wav.parent.mkdir(exist_ok=True)
+    subprocess.run([find_tool_path(), "-y", "-loglevel", "error", "-f", "lavfi", "-i", "sine=frequency=330:duration=1",
+                    str(wav)], check=True)
+    Path(str(wav) + ".json").write_text('{"title": "Rain", "steps": 8, "seed": 7, "engine_pin": "abc"}')
+    srv = FakeServer()
+    srv.route("POST", "/queue/add", {"ok": True, "id": "mj-1"})
+    music = {"available": available, "missing": [] if available else ["generator/model.safetensors"]}
+    srv.route("GET", "/status", {**status(history=[{"id": "mj-1", "status": "done", "output_path": str(wav)}]),
+                                 "music": music})
+    return srv
+
+
+@needs_ffmpeg
+def test_a_song_is_asked_of_the_panel_music_engine_and_kept(tmp_path: Path) -> None:
+    with music_panel(tmp_path) as srv:
+        r = rig(tmp_path, srv)
+        rec, assets = r.run(job(MediaKind.AUDIO_MUSIC, "yue2-test",
+                             {"prompt": "melancholic piano ballad, female voice, Mandarin, 70 bpm",
+                              "text": "[Verse]\nrain on the glass\n\n[Chorus]\ncarry me home"},
+                             seed=7, params={"duration": 119.2, "title": "Rain"}, tier=QualityTier.DRAFT))
+        assert rec.status is JobStatus.COMPLETED, (rec.error_code, rec.error_message)
+        [a] = assets
+        f = form(next(q for q in srv.requests if q.path == "/queue/add"))
+        assert f["mode"] == "music" and f["engine"] == "music" and f["music_quality"] == "draft"
+        assert f["music_style"].startswith("melancholic piano") and "[Chorus]" in f["music_lyrics"]
+        assert f["music_instrumental"] == "false" and f["music_max_seconds"] == "120" and f["music_seed"] == "7"
+        assert f["music_mode"] == "full" and f["music_title"] == "Rain"
+        assert a.kind == "audio.music" and a.metadata["vocals"] is True
+        assert a.metadata["yue2_title"] == "Rain" and a.metadata["yue2_engine_pin"] == "abc"
+
+
+def test_a_song_without_lyrics_is_instrumental_unless_said_otherwise(tmp_path: Path) -> None:
+    quiet = job(MediaKind.AUDIO_MUSIC, "yue2-test", {"prompt": "slow strings"}, params={})
+    assert PhospheneAdapter._music_form(quiet)["music_instrumental"] is True
+    sung = job(MediaKind.AUDIO_MUSIC, "yue2-test", {"prompt": "x", "text": "la"}, params={"instrumental": False})
+    assert PhospheneAdapter._music_form(sung)["music_instrumental"] is False
+    assert PhospheneAdapter._music_form(quiet)["music_max_seconds"] == 240          # the panel's own ceiling
+
+
+@needs_ffmpeg
+def test_a_song_is_refused_early_when_the_music_engine_is_not_installed(tmp_path: Path) -> None:
+    with music_panel(tmp_path, available=False) as srv:
+        r = rig(tmp_path, srv)
+        rec, assets = r.run(job(MediaKind.AUDIO_MUSIC, "yue2-test", {"prompt": "slow strings"}))
+        assert rec.status is JobStatus.FAILED_VALIDATION and rec.error_code == ErrorCode.MISSING_MODEL.value
+        assert not assets and not [q for q in srv.requests if q.path == "/queue/add"]
+        rec2, _ = r.run(job(MediaKind.AUDIO_MUSIC, "yue2-test", {"prompt": ""}))
+        assert rec2.status is JobStatus.FAILED_VALIDATION
