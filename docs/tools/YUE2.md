@@ -19,7 +19,7 @@ YuE2-3B 是 Multimodal Art Projection 的音乐基础模型:给一段**风格描
 | 运行脚本 | 面板内 `scripts/music/yue2_run.py`,引擎提交号写在 `scripts/music/engine_pin.txt` |
 | 输出 | `mlx_outputs/music_<时间>_<名字>.wav` 和旁边的 `.wav.json`(引擎版本、种子、纯器乐做法);每首歌的中间产物(曲谱、语义 token、潜变量、噪声)在 `state/music/<任务>/` |
 | 安装 | 面板里点"Install music engine (YuE2, ~11 GB)",或 Pinokio 侧栏的"Install the music engine";可续传,磁盘要有 14 GB 空闲 |
-| 本机状态 | `GET http://127.0.0.1:8198/status` 的 `music.available = true`(2026-10-25 读到);器乐 LoRA 包(约 300 MB)2026-10-25 已装好(`mlx_models/yue2-loras`,面板 `music.loras.complete = true`);翻唱模型(2.8 GB)**没装** |
+| 本机状态 | `GET http://127.0.0.1:8198/status` 的 `music.available = true`(2026-10-25 读到);器乐 LoRA 包(约 300 MB)2026-10-25 已装好(`mlx_models/yue2-loras`,面板 `music.loras.complete = true`);翻唱模型(SheetSage2 + MERT2,约 2.6 GB,`mlx_models/yue2-cover`)也已装好,面板 `music.cover.ready = true`;系统的适配器还没接翻唱 |
 | 残留目录 | `yue2-mlx.broken-20261024` 是更早一次坏掉的检出,在用的是 `yue2-mlx`,可以确认后删除 |
 
 内存下限 24 GB 统一内存(`MUSIC_MIN_RAM_GB`),实测峰值约 11 GB 进程内存。本机 128 GB,绰绰有余,但它和 LTX 共用面板的 GPU 锁,**一次只跑一个**。
