@@ -1,4 +1,5 @@
 import { Fragment, useState } from "react";
+import { Link } from "react-router-dom";
 import { ValueView } from "../components/ValueView";
 import { formatValue, useLabel } from "../lib/labels";
 import { useJobActions, useJobEvents, useJobs, useQueueState } from "../api/hooks";
@@ -83,6 +84,11 @@ function JobRow({ job, siblings }: { job: Job; siblings: string[] }) {
       <td>
         <StatusChip status={job.status} group="status" />
         {job.error_code ? <div className="muted small">{jobError(t, job).text}</div> : null}
+        {job.error_code && job.spec_id && job.project_id != null ? (
+          <div className="small">
+            <Link to={`/projects/${job.project_id}/creative?spec=${encodeURIComponent(job.spec_id)}`}>{t("web.jobs.fix_spec")}</Link>
+          </div>
+        ) : null}
         {retries > 0 && job.retried_by ? (
           <div className="small">
             <span className="chip chip-stale">{retries > 1 ? t("web.jobs.retried_n", { n: retries }) : t("web.jobs.retried")}</span>{" "}

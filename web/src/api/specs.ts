@@ -45,7 +45,7 @@ export const useSpecJobs = (s: Spec | null) =>
 export function useSpecActions(pid: number, s: Spec | null) {
   const qc = useQueryClient();
   const refresh = () => {
-    for (const k of ["specs", "spec-review", "spec-versions", "spec-assets", "jobs", "stale"]) {
+    for (const k of ["specs", "spec-review", "spec-versions", "spec-assets", "jobs", "stale", "produce-plan"]) {
       qc.invalidateQueries({ queryKey: [k] });
     }
   };

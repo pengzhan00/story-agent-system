@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { MemoryRouter } from "react-router-dom";
@@ -12,6 +12,10 @@ const en = JSON.parse(readFileSync(join(__dirname, "..", "..", "storyagent", "lo
 const task = {
   spec_id: "s1", subject_type: "character.portrait", subject_id: "11", label: "Ann", kind: "image.generate", model_ref: "flux", phase: 1, state: "new", reason: "", est_seconds: 60, needs: [],
 };
+const spec = {
+  id: "s1", project_id: 4, subject_type: "character.portrait", subject_id: "11", slot: "main", kind: "image.generate", model_ref: "flux", version: 1, parent_version: null,
+  prompt: "a tired woman in a rain-lit doorway", negative_prompt: "", text_payload: "", params: {}, seed: null, refs: [], depends_on: [], locked: false, author: "agent", note: "", created_at: "2026-10-25T00:00:00Z",
+};
 let gates: { reason: string; name: string; detail: string }[] = [];
 
 beforeEach(() => {
@@ -19,7 +23,13 @@ beforeEach(() => {
   vi.stubGlobal("fetch", async (url: string) => {
     const json: unknown = url.includes("/api/i18n")
       ? en
-      : { tier: "draft", gates, tasks: [task], totals: { count: 1, est_seconds: 60, by_state: {} }, video: { shots: 0, chosen: 0, est_seconds: 0, budget_seconds: null } };
+      : url.includes("/specs")
+        ? [spec]
+        : url.includes("/api/library")
+          ? []
+          : url.includes("/api/meta")
+            ? { models: [], defaults: {} }
+            : { tier: "draft", gates, tasks: [task], totals: { count: 1, est_seconds: 60, by_state: {} }, video: { shots: 0, chosen: 0, est_seconds: 0, budget_seconds: null } };
     return { ok: true, status: 200, statusText: "", json: async () => json, text: async () => JSON.stringify(json) };
   });
 });
@@ -51,5 +61,15 @@ describe("the production plan", () => {
     await screen.findByText("Ann");
     await vi.waitFor(() => expect((screen.getByRole("button", { name: en["web.plan.confirm"]! }) as HTMLButtonElement).disabled).toBe(false));
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("shows each task's prompt and opens it for editing and confirming", async () => {
+    gates = [];
+    mount();
+    expect(await screen.findByText(/a tired woman in a rain-lit doorway/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: en["web.plan.details"]! }));
+    expect(await screen.findByDisplayValue("a tired woman in a rain-lit doorway")).toBeTruthy();
+    expect(screen.getByRole("button", { name: en["web.plan.make_only"]! })).toBeTruthy();
+    expect(screen.getByRole("button", { name: en["web.plan.confirmed"]! })).toBeTruthy();   // new tasks start selected
   });
 });

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useMeta, useStory } from "../api/hooks";
 import { useReview, useSpecActions, useSpecAssets, useSpecJobs, useSpecs } from "../api/specs";
 import type { Spec } from "../api/types";
@@ -20,7 +21,9 @@ export function CreativePanel({ id }: { id: number }) {
   const music = useStory(id, "music");
   const sfx = useStory(id, "sfx");
   const shots = useStory(id, "shots");
+  const [params] = useSearchParams();
   const [selected, setSelected] = useState<string | null>(null);
+  const wanted = params.get("spec");               // a link from a failed job: open that spec
   const [filter, setFilter] = useState("");
 
   const story: StoryIndex = useMemo(
@@ -36,7 +39,7 @@ export function CreativePanel({ id }: { id: number }) {
     }
     return [...m.entries()];
   }, [specs.data, filter]);
-  const current = (specs.data ?? []).find((s) => key(s) === selected) ?? null;
+  const current = (specs.data ?? []).find((s) => (selected ? key(s) === selected : s.id === wanted)) ?? null;
 
   return (
     <div className="split">

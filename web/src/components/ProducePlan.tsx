@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useProducePlan, useStartRun } from "../api/hooks";
+import { useSpecs } from "../api/specs";
 import type { PlannedTask } from "../api/types";
 import { useT } from "../i18n";
 import { duration } from "../lib/format";
 import { ErrorNote } from "./ErrorNote";
+import { PlanTaskEditor } from "./PlanTaskEditor";
 
 const PHASES = [1, 2, 3];
 const VIDEO = "shot.video";
@@ -20,8 +22,21 @@ export function ProducePlan({ id, onClose, defaultTier = "draft" }: { id: number
   const plan = useProducePlan(id, tier, true);
   const start = useStartRun(id);
   const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [open, setOpen] = useState<string | null>(null);
+  const specs = useSpecs(id);
+  const specOf = useMemo(() => new Map((specs.data ?? []).map((x) => [x.id, x])), [specs.data]);
   const tasks = useMemo(() => plan.data?.tasks ?? [], [plan.data]);
-  useEffect(() => setPicked(new Set(tasks.filter((x) => runnable(x) && x.subject_type !== VIDEO).map((x) => x.spec_id))), [tasks]);
+  // the first plan of a tier starts with everything but the videos ticked; a plan reloaded after an edit keeps the choice
+  const seeded = useRef("");
+  useEffect(() => {
+    if (tasks.length === 0) return;
+    if (seeded.current !== tier) {
+      seeded.current = tier;
+      setPicked(new Set(tasks.filter((x) => runnable(x) && x.subject_type !== VIDEO).map((x) => x.spec_id)));
+    } else {
+      setPicked((p) => new Set(tasks.filter((x) => (runnable(x) || optional(x)) && p.has(x.spec_id)).map((x) => x.spec_id)));
+    }
+  }, [tasks, tier]);
   const gates = plan.data?.gates ?? [];
   const chosen = tasks.filter((x) => picked.has(x.spec_id));
   const eta = chosen.reduce((n, x) => n + x.est_seconds, 0);
@@ -90,25 +105,45 @@ export function ProducePlan({ id, onClose, defaultTier = "draft" }: { id: number
           <div key={phase} className="stack">
             <strong className="small">{`${t(`web.plan.phase.${phase}`)} (${rows.filter(runnable).length}/${rows.length})`}</strong>
             <ul className="plain stack">
-              {rows.map((x) => (
-                <li key={x.spec_id} className="row small">
-                  <input
-                    type="checkbox"
-                    aria-label={x.label}
-                    disabled={!runnable(x) && !optional(x)}
-                    checked={picked.has(x.spec_id)}
-                    onChange={(e) => toggle(x.spec_id, e.target.checked)}
-                  />
-                  <span className="chip">{t(`spec.subject.${x.subject_type}`)}</span>
-                  <span>{x.label}</span>
-                  <span className="muted">{`${t(`media.kind.${x.kind}`)} · ${x.model_ref || "-"}`}</span>
-                  <span className="spacer" />
-                  <span className={x.state === "blocked" ? "chip chip-failed" : x.state === "done" ? "chip chip-completed" : "chip"}>
-                    {x.state === "blocked" ? t(`web.plan.reason.${x.reason}`) : t(`web.plan.state.${x.state}`)}
-                  </span>
-                  {runnable(x) || optional(x) ? <span className="muted">{`~${duration(x.est_seconds)}`}</span> : null}
-                </li>
-              ))}
+              {rows.map((x) => {
+                const spec = specOf.get(x.spec_id);
+                const shown = spec ? (spec.prompt || spec.text_payload).replace(/\s+/g, " ").trim() : "";
+                return (
+                  <li key={x.spec_id} className="stack">
+                    <div className="row small">
+                      <input
+                        type="checkbox"
+                        aria-label={x.label}
+                        disabled={!runnable(x) && !optional(x)}
+                        checked={picked.has(x.spec_id)}
+                        onChange={(e) => toggle(x.spec_id, e.target.checked)}
+                      />
+                      <span className="chip">{t(`spec.subject.${x.subject_type}`)}</span>
+                      <span>{x.label}</span>
+                      <span className="muted">{`${t(`media.kind.${x.kind}`)} · ${x.model_ref || "-"}`}</span>
+                      <span className="spacer" />
+                      {x.state === "blocked" ? (
+                        <button type="button" className="chip chip-failed chip-button" disabled={!spec} onClick={() => setOpen(open === x.spec_id ? null : x.spec_id)}>
+                          {`${t(`web.plan.reason.${x.reason}`)} · ${t("web.plan.fix")}`}
+                        </button>
+                      ) : (
+                        <span className={x.state === "done" ? "chip chip-completed" : "chip"}>{t(`web.plan.state.${x.state}`)}</span>
+                      )}
+                      {runnable(x) || optional(x) ? <span className="muted">{`~${duration(x.est_seconds)}`}</span> : null}
+                      <button type="button" className="link" disabled={!spec} onClick={() => setOpen(open === x.spec_id ? null : x.spec_id)}>
+                        {open === x.spec_id ? t("web.plan.hide") : t("web.plan.details")}
+                      </button>
+                    </div>
+                    {open !== x.spec_id && shown ? <p className="muted small">{shown.length > 160 ? `${shown.slice(0, 160)}…` : shown}</p> : null}
+                    {open === x.spec_id && spec ? (
+                      <PlanTaskEditor
+                        pid={id} spec={spec} task={x} tier={tier} picked={picked.has(x.spec_id)}
+                        onConfirm={() => toggle(x.spec_id, true)} onClose={() => setOpen(null)}
+                      />
+                    ) : null}
+                  </li>
+                );
+              })}
             </ul>
           </div>
         );
