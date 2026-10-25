@@ -122,3 +122,37 @@ def auto_assign(
             if line["character"] in given:
                 given[line["character"]].lines += 1
     return out
+
+
+def _voice_value(character: dict[str, Any]) -> Any:
+    """What a dialogue line should carry for this character: a library ref, a reference object, or none (the default
+    voice). Mirrors the seeder so the two never disagree."""
+    ref = str(character.get("voice_ref_audio", "")).strip()
+    if not ref:
+        return None
+    if ref.startswith("library:"):
+        return ref
+    return {"audio": ref, "text": character.get("voice_ref_text", ""),
+            "consent": bool(character.get("voice_ref_consent"))}
+
+
+def propagate_voice(store: StoryStore, specs: SpecStore, project_id: int, character_id: int) -> int:
+    """A character's voice changed: put the new voice on its spoken lines. Each save is a new spec version, so the
+    old audio goes stale and is re-made on the next produce run. Returns how many lines changed."""
+    char = store.get_character(character_id)
+    name = str(char["name"])
+    new = _voice_value(char)
+    changed = 0
+    for shot in store.list_shots(project_id):
+        for idx, line in enumerate(shot["dialogue"]):
+            if str(line.get("character", "")) != name:
+                continue
+            subject_id = f"{shot['id']}#{idx}"
+            spec = specs.current(project_id, "dialogue.line", subject_id)
+            if spec is None or specs.is_locked(project_id, "dialogue.line", subject_id):
+                continue
+            if spec.params.get("voice_ref") == new:
+                continue
+            specs.edit(project_id, "dialogue.line", subject_id, params_patch={"voice_ref": new}, note="voice changed")
+            changed += 1
+    return changed

@@ -5,10 +5,12 @@ project and is only reachable through it.
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from fastapi import APIRouter, Request
 
+from storyagent import voices
 from storyagent.story import StoryNotFound
 
 from .context import ctx_of
@@ -25,7 +27,7 @@ def _owned(row: Row, project_id: int) -> Row:
 
 
 def _crud(path: str, name: str, getter: str, lister: str, creator: str | None, updater: str | None,
-          deleter: str | None) -> None:
+          deleter: str | None, *, after_update: Callable[[Any, int, int, Row, Row], None] | None = None) -> None:
     """Register list / create / get / patch / delete for one entity from the store's method names."""
     def store(request: Request) -> Any:
         return ctx_of(request).story
@@ -53,8 +55,11 @@ def _crud(path: str, name: str, getter: str, lister: str, creator: str | None, u
 
     if updater:
         def patch(project_id: int, item_id: int, body: Row, request: Request) -> Row:
-            _owned(getattr(store(request), getter)(item_id), project_id)
-            updated: Row = getattr(store(request), updater)(item_id, body)
+            ctx = ctx_of(request)
+            _owned(getattr(ctx.story, getter)(item_id), project_id)
+            updated: Row = getattr(ctx.story, updater)(item_id, body)
+            if after_update:
+                after_update(ctx, project_id, item_id, body, updated)
             return updated
 
         router.patch(f"/{path}/{{item_id}}", name=f"update_{name}")(patch)
@@ -67,8 +72,14 @@ def _crud(path: str, name: str, getter: str, lister: str, creator: str | None, u
         router.delete(f"/{path}/{{item_id}}", status_code=204, name=f"delete_{name}")(delete)
 
 
+def _character_voice_changed(ctx: Any, project_id: int, item_id: int, body: Row, updated: Row) -> None:
+    """A character's voice was edited: push it onto the character's spoken lines so the old audio goes stale."""
+    if "voice_ref_audio" in body:
+        voices.propagate_voice(ctx.story, ctx.specs, project_id, item_id)
+
+
 _crud("characters", "character", "get_character", "list_characters", "create_character", "update_character",
-      "delete_character")
+      "delete_character", after_update=_character_voice_changed)
 _crud("locations", "location", "get_location", "list_locations", "create_location", "update_location",
       "delete_location")
 _crud("looks", "look", "get_look", "list_looks", "create_look", "update_look", "delete_look")
