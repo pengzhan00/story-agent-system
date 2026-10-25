@@ -53,3 +53,9 @@ def test_a_fixed_seed_is_stable_per_project_and_key() -> None:
 
 def test_anatomy_is_stated_in_the_prompt_and_the_negative() -> None:
     assert "flat muscular chest" in keyframe.scene_prompt("a room") and "gynecomastia" in keyframe.negative_prompt("")
+
+
+def test_skin_that_glistens_is_rewritten_but_other_liquids_are_left_alone() -> None:
+    out = keyframe.clean("her body glistening slightly with heat-induced sheen, his skin glistening under the lamp, "
+                         "liquid glistening on her back")
+    assert "with a faint natural flush" in out and "lit by the lamp" in out and "glistening on her back" in out

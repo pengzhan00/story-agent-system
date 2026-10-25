@@ -50,3 +50,9 @@ replace = "fine fabric detail"
 [[rewrite]]
 pattern = '\b(?:deep|heavy|harsh) shadows?\b|\bchiaroscuro\b|\blow-key\b'
 replace = "soft shadow falloff"
+[[rewrite]]
+pattern = '\bglistening\s+under\b'
+replace = "lit by"
+[[rewrite]]
+pattern = '\bglistening\s+(?:slightly\s+)?with\s+(?:[\w-]+\s+)?(?:sheen|sweat)\b'
+replace = "with a faint natural flush"
