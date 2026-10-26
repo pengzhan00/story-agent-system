@@ -70,6 +70,34 @@ def _identity(template: str) -> str:
     return " ".join(p for p in parts if not _COSTUME.search(p)).strip()
 
 
+def _character_identity(template: str) -> str:
+    """A short, clean identity (age, face, hair, skin, build) extracted from a character's English prompt_template,
+    with the portrait framing, costume and style/lighting tail removed. Injected verbatim so the same person looks the
+    same in every shot instead of relying on the prompter LLM to re-write it."""
+    t = _identity(template)
+    t = re.sub(r"^A\s+(?:cinematic\s+)?close-up\s+portrait\s+of\s+", "", t, flags=re.IGNORECASE)
+    cut = len(t)
+    for marker in ("{action}", "{setting}", "lighting", "cinematic", "8k", "resolution", "background", "atmosphere"):
+        m = re.search(re.escape(marker), t, re.IGNORECASE)
+        if m and m.start() < cut:
+            cut = m.start()
+    t = t[:cut].strip()
+    t = re.sub(r"[^.!?]*$", "", t)  # drop a trailing partial sentence
+    return t.strip().rstrip(",;. ")
+
+
+def _character_identities(shot: dict[str, Any], chars: dict[str, dict[str, Any]]) -> str:
+    """'The woman is ... The man is ...' block naming each character in order, for verbatim injection."""
+    labels = ("the woman", "the man", "the third person", "the fourth person")
+    parts: list[str] = []
+    for i, name in enumerate(shot["characters"]):
+        c = chars.get(name, {})
+        ident = _character_identity(c.get("prompt_template", "") or c.get("appearance", ""))
+        if ident:
+            parts.append(f"{labels[i] if i < len(labels) else f'the person {i + 1}'} is {ident}.")
+    return " ".join(parts)
+
+
 def _shot_prompts(ctx: Ctx, shot: dict[str, Any], chars: dict[str, dict[str, Any]], style: dict[str, Any],
                   previous: str, use_llm: bool) -> dict[str, str]:
     payload = shot["render_payload"]
@@ -212,10 +240,15 @@ def seed_specs(ctx: Ctx) -> dict[str, Any]:
         for n in shot["characters"]:
             refs += list(chars.get(n, {}).get("ref_images", []))
         shown = prompts["image_prompt"]
+        video_shown = prompts["video_prompt"]
         composed = bool(ctx.settings.workflow.get("keyframe_from_references", True))
         lead = shot["characters"][0] if shot["characters"] else f"location:{shot['location']}"
         if shot["characters"]:
             lead = f"character:{lead}"
+            ident = _character_identities(shot, chars)
+            if ident:
+                shown = f"{shown} {ident}"
+                video_shown = f"{video_shown} {ident}"
             shown = keyframe.image_prompt(shown, language=lang,
                                           with_portraits=composed and any(portraits.get(n) for n in shot["characters"]))
         else:
@@ -225,7 +258,7 @@ def seed_specs(ctx: Ctx) -> dict[str, Any]:
         key = seeder.sync(KEYFRAME, sid, MediaKind.IMAGE_GENERATE, prompt=shown,
                           negative_prompt=shot_neg, refs=refs, depends_on=deps,
                           seed=keyframe.fixed_seed(ctx.pid, lead))
-        seeder.sync(VIDEO, sid, MediaKind.VIDEO_GENERATE, prompt=keyframe.clean(prompts["video_prompt"]),
+        seeder.sync(VIDEO, sid, MediaKind.VIDEO_GENERATE, prompt=keyframe.clean(video_shown),
                     negative_prompt=shot_neg, depends_on=seeder.dep(key))
         sync_dialogue(shot)
         sync_sfx(shot)

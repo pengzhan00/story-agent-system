@@ -5,11 +5,10 @@ max_tokens = 1500
 schema = "shot_visual"
 inputs = ["language", "shot", "characters", "props", "scene", "style", "tool_notes", "previous"]
 system = """You write prompts for image and video generation models from storyboard data. English only, concrete visuals
-(who, where, light, camera, motion), no story explanation, no dialogue text, no character names (describe appearance
-instead, and copy each character's identity words — age, hair, face, skin — verbatim so the same person looks the same
-in every shot)."""
+(who, where, light, camera, motion), no story explanation, no dialogue text, no character names and no character
+identity (age, hair, face, skin and ethnicity are appended automatically — call each person only 'the woman' / 'the man')."""
 prompt = """Shot: $shot
-Characters in frame (appearance — face, hair, skin, age, for identity): $characters
+Characters in frame (reference only — do NOT copy their identity; call them 'the woman' / 'the man' in order): $characters
 Props in frame (fixed look): $props
 Location: $scene
 Visual style: $style
@@ -35,8 +34,9 @@ frame for the whole clip, so do not zoom in until the arms leave the frame and d
 face unless the shot asks for it. Never make the subject turn around, change facing or cross a large distance unless
 `image_prompt` already shows it. Keep the exposure readable: name the light sources that let the subject be seen, and
 avoid fog, mist, haze and smoke.
-Copy each character's face, hair, skin and age WORD FOR WORD from the description: the exact same age number, hair and
-skin words in every shot, never the character's name, never rephrase the age. Describe what each character is wearing
-from THIS shot — the scene may show them partly or fully undressed — and describe every prop with the words given.
+Do NOT write any character's age, hair, face, skin or ethnicity — they are appended automatically outside this prompt.
+Refer to each person only as 'the woman' / 'the man' (in the order given) plus their action and pose. Describe what each
+character is wearing from THIS shot — the scene may show them partly or fully undressed — and describe every prop with
+the words given.
 `negative_prompt`: short list of things to avoid; always include missing arm, disappearing limbs, extra limbs,
 deformed hands, floating hand, cropped body, stiff posed portrait."""
