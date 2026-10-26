@@ -138,6 +138,13 @@ def _check_tools(settings: Settings, run: Runner) -> list[Entry]:
         else ["Seed-VC runtime"],
         vc_missing if sv_root and (sv_root / "checkpoints").is_dir() else ["Seed-VC checkpoints"],
     )
+    entry(
+        "demucs",
+        [] if _exists(tp("seedvc", "python"), executable=True) or _exists(tp("demucs", "python"), executable=True)
+        else ["Demucs runtime (rides in the Seed-VC venv)"],
+        [],  # the weights download into the HF cache on the first run
+        "vocal/accompaniment separation (htdemucs); weights are fetched on first use",
+    )
     wh_model = tp("whisper", "model")
     entry(
         "whisper",

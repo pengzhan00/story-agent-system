@@ -43,6 +43,7 @@
   "media.kind.audio.music": "Music",
   "media.kind.audio.sfx": "Sound effects",
   "media.kind.audio.enhance": "Audio processing",
+  "media.kind.audio.separate": "Vocal separation (Demucs)",
   "media.kind.audio.convert": "Voice conversion",
   "media.kind.text.asr": "Transcription",
   "media.kind.compose.assemble": "Episode assembly",
@@ -2439,5 +2440,8 @@
   "agent.wiki.ask.title": "Knowledge base answer",
   "agent.wiki.ask.desc": "Answers your question using only the numbered excerpts that were found, marks every statement with its excerpt number, and says what is missing when the excerpts do not hold the answer.",
   "agent.wiki.ask.out": "Whether an answer was found, the answer text, the excerpt numbers it cites",
-  "agent.var.so_far": "Episodes planned so far"
+  "agent.var.so_far": "Episodes planned so far",
+  "workshop.module.post": "Post-production",
+  "workshop.module.separate": "Vocal separation",
+  "workshop.field.video": "Video"
 }

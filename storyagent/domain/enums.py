@@ -26,6 +26,7 @@ class MediaKind(StrEnum):
     AUDIO_SFX = "audio.sfx"
     AUDIO_CONVERT = "audio.convert"  # voice conversion: keep the words/performance, swap the speaker
     AUDIO_ENHANCE = "audio.enhance"  # denoise / loudness / ducking stems
+    AUDIO_SEPARATE = "audio.separate"  # split a mix into stems (Demucs: vocals + accompaniment)
     TEXT_STORY = "text.story"  # idea -> story (treatment) written by a language model
     TEXT_SCRIPT = "text.script"  # story -> script (scenes, action, dialogue) written by a language model
     TEXT_ASR = "text.asr"  # transcription (subtitles, clone ref_text)

@@ -1,0 +1,30 @@
+# Append to the operator's config/models.toml (merge an existing [defaults] table instead of duplicating it).
+# The standard Draw Things download resolves to this file on the inspected 26.1013.0 installation.
+# Keep the API model explicit: another model selected in the app must not become the production model by accident.
+[defaults]
+"image.generate" = "flux2-klein-4b-drawthings"
+# Explicit, optional image-edit jobs use ComfyUI until Draw Things reference editing is integrated.
+# Automatic reference compositing is disabled in the paired pipeline overrides.
+"image.edit" = "flux2-klein-4b-edit-comfy"
+
+[models."flux2-klein-4b-drawthings"]
+kind = "image.generate"
+provider = "drawthings"
+version = "klein-4b-distilled"
+family = "flux2-klein"
+heavy = true
+est_memory_gib = 24
+license_tag = "flux2-klein-4b-apache-2.0"
+commercial_ok = true
+prompt_profile = "natural_en"
+negative_prompt = false
+size_multiple = 64
+timeout_sec = 1800
+api_model = "flux_2_klein_4b_q8p.ckpt"
+[models."flux2-klein-4b-drawthings".params]
+width = 704
+height = 1280
+steps = 4
+guidance = 1.0
+shift = 3.0
+sampler = "Euler A Trailing"

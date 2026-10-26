@@ -25,6 +25,7 @@
 "video.avatar" = "longcat-avatar-1.5-q4"
 "audio.tts" = "cosyvoice3-0.5b"
 "audio.convert" = "seed-vc-v2"
+"audio.separate" = "demucs-htdemucs"
 "text.story" = "llm-story"
 "text.script" = "llm-script"
 "text.asr" = "whisper-large-v3-turbo"
@@ -395,6 +396,21 @@ rate = 180           # words per minute
 # because its own hub lookup is not local) and v1 with f0_condition (singing; pitch-aware 44.1 kHz).
 # separate_vocals = true runs Demucs first and mixes the accompaniment back (a song). Code is GPL-3.0; the weights'
 # own terms were not verified here: check before commercial use. A 10-30 s clean reference matches the timbre best.
+# Vocal separation through Demucs (htdemucs): a mixed recording in, the vocals and the accompaniment out. The
+# runtime rides in the Seed-VC venv (demucs + torch), so no extra install; the weights download on the first run.
+[models."demucs-htdemucs"]
+kind = "audio.separate"
+provider = "demucs"
+version = "htdemucs (Demucs 4.1)"
+heavy = false
+license_tag = "mit"   # the code is MIT; the weights carry the model's own terms
+commercial_ok = true
+prompt_profile = "plain"
+timeout_sec = 600
+[models."demucs-htdemucs".params]
+model = "htdemucs"
+device = "mps"
+
 [models."seed-vc-v2"]
 kind = "audio.convert"
 provider = "seedvc"

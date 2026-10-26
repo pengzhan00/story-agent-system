@@ -68,16 +68,21 @@ def test_inputs_follow_the_kind_description() -> None:
 
 def test_every_module_kind_has_a_default_model_and_an_output() -> None:
     s = load_settings({"STORY_AGENT_HOME": "/nonexistent-home"})
+    # the post module's audio.enhance / video.enhance are wired to a per-machine CLI/HTTP connector, not a packaged
+    # model, so they have no packaged default (the operator's config points at them)
+    connector_only = {MediaKind.AUDIO_ENHANCE.value, MediaKind.VIDEO_ENHANCE.value}
     for m in MODULES:
         for k in m.kinds:
-            assert k.kind.value in s.default_models, k.kind
+            if k.kind.value not in connector_only:
+                assert k.kind.value in s.default_models, k.kind
             assert output_media(k.kind) in ("image", "audio", "video", "text", "lora")
 
 
 # ---- API ----------------------------------------------------------------------------------------
 def test_modules_describe_models_params_and_inputs(api: TestClient) -> None:
     mods = {m["id"]: m for m in api.get("/api/workshop").json()}
-    assert set(mods) == {"story", "script", "image", "lora", "song", "voice", "video", "episode", "transcript"}
+    assert set(mods) == {"story", "script", "image", "lora", "song", "voice", "separate", "video", "episode",
+                        "transcript", "post"}
     gen = next(k for k in mods["image"]["kinds"] if k["kind"] == "image.generate")
     assert any(m["ref"] == "fake-image" for m in gen["models"])
     assert [f["name"] for f in gen["inputs"]][:2] == ["prompt", "negative_prompt"] and gen["output"] == "image"

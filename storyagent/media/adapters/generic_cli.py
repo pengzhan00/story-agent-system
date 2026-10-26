@@ -146,7 +146,29 @@ class CliAdapter(SubprocessAdapter):
     def collect(self, job: JobRecord, ctx: JobContext) -> list[ArtifactSpec]:
         spec = self._spec(job, ctx)
         values = self._values(job, ctx, spec)
-        pattern = str(render_string(str(spec.get("output") or "{out}"), values))
+        outputs = spec.get("outputs")
+        if outputs is not None and (not isinstance(outputs, dict) or not outputs):
+            raise AdapterError(ErrorCode.INVALID_PARAMS, "connector.outputs must be a non-empty slot/path table",
+                               detail="connector.outputs")
+        patterns = outputs if outputs is not None else {job.slot: spec.get("output") or "{out}"}
+        artifacts = []
+        for slot, raw in patterns.items():
+            if not isinstance(slot, str) or not slot or not isinstance(raw, str) or not raw:
+                raise AdapterError(ErrorCode.INVALID_PARAMS, "connector.outputs needs non-empty strings",
+                                   detail="connector.outputs")
+            try:
+                pattern = str(render_string(raw, values))
+            except Missing as exc:
+                raise AdapterError(ErrorCode.INVALID_INPUT, f"missing output placeholder: {exc.name}",
+                                   detail=exc.name) from exc
+            found = self._find_output(pattern, ctx)
+            artifacts.append(ArtifactSpec(
+                found, slot=slot, metadata={"connector": "cli", "argv0": Path(str(spec["argv"][0])).name,
+                                           "prompt": str(job.inputs.get("prompt", ""))[:500]}))
+        return artifacts
+
+    @staticmethod
+    def _find_output(pattern: str, ctx: JobContext) -> Path:
         p = Path(pattern).expanduser()
         if not p.is_absolute():
             p = ctx.work_dir / p
@@ -159,8 +181,7 @@ class CliAdapter(SubprocessAdapter):
         if found is None or found.stat().st_size == 0:
             raise AdapterError(ErrorCode.OUTPUT_MISSING, f"the tool finished but wrote no file at {pattern}",
                                detail=pattern)
-        return [ArtifactSpec(found, metadata={"connector": "cli", "argv0": Path(str(spec["argv"][0])).name,
-                                              "prompt": str(job.inputs.get("prompt", ""))[:500]})]
+        return found
 
     def health(self) -> HealthReport:
         missing: list[str] = []

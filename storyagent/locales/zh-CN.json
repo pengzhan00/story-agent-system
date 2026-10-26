@@ -43,6 +43,7 @@
   "media.kind.audio.music": "配乐",
   "media.kind.audio.sfx": "音效",
   "media.kind.audio.enhance": "音频处理",
+  "media.kind.audio.separate": "人声分离(Demucs)",
   "media.kind.audio.convert": "声音转换",
   "media.kind.text.asr": "语音转写",
   "media.kind.compose.assemble": "成片装配",
@@ -2439,5 +2440,8 @@
   "agent.wiki.ask.title": "知识库问答",
   "agent.wiki.ask.desc": "只根据检索到的编号选段回答你的问题,每个结论标注出处编号;选段里没有答案时如实说明缺什么。",
   "agent.wiki.ask.out": "是否找到答案、回答正文、引用的选段编号",
-  "agent.var.so_far": "已规划的前几集"
+  "agent.var.so_far": "已规划的前几集",
+  "workshop.module.post": "后期处理",
+  "workshop.module.separate": "人声分离",
+  "workshop.field.video": "视频"
 }

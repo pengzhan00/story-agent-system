@@ -126,6 +126,9 @@ MODULES: tuple[Module, ...] = (
             Field("consent", "voice_ref.consent", "bool"),
         )),
     )),
+    Module("separate", (
+        KindSpec(MediaKind.AUDIO_SEPARATE, (Field("audio", "audio", "media", "audio", required=True),)),
+    )),
     Module("video", (
         KindSpec(MediaKind.VIDEO_AV, (_P, _NEG, Field("image", "refs[]", "media", "image"))),
         KindSpec(MediaKind.VIDEO_GENERATE, (_P, _NEG, Field("image", "refs[]", "media", "image"))),
@@ -142,6 +145,10 @@ MODULES: tuple[Module, ...] = (
     )),
     Module("transcript", (
         KindSpec(MediaKind.TEXT_ASR, (Field("audio", "audio", "media", "audio", required=True),)),
+    )),
+    Module("post", (
+        KindSpec(MediaKind.AUDIO_ENHANCE, (Field("audio", "refs[]", "media", "audio", required=True),)),
+        KindSpec(MediaKind.VIDEO_ENHANCE, (Field("video", "refs[]", "media", "video", required=True),)),
     )),
 )
 

@@ -1,0 +1,43 @@
+# Append to config/pipelines.toml, merging tables if they already exist.
+# Local default transition: Draw Things generation; ComfyUI editing is explicitly optional.
+# Existing project-level model overrides and frozen jobs are not rewritten.
+
+[pipelines.vertical_drama]
+requires = ["ollama", "acestep", "phosphene", "tool.ffmpeg", "tool.cosyvoice", "drawthings"]
+[pipelines.vertical_drama.models]
+"image.generate" = "flux2-klein-4b-drawthings"
+"image.edit" = "flux2-klein-4b-edit-comfy"
+[pipelines.vertical_drama.workflow]
+keyframe_from_references = false
+
+[pipelines.landscape_drama]
+requires = ["ollama", "acestep", "phosphene", "tool.ffmpeg", "tool.cosyvoice", "drawthings"]
+[pipelines.landscape_drama.models]
+"image.generate" = "flux2-klein-4b-drawthings"
+"image.edit" = "flux2-klein-4b-edit-comfy"
+[pipelines.landscape_drama.workflow]
+keyframe_from_references = false
+
+[pipelines.tv_series]
+requires = ["ollama", "acestep", "phosphene", "tool.ffmpeg", "tool.cosyvoice", "drawthings"]
+[pipelines.tv_series.models]
+"image.generate" = "flux2-klein-4b-drawthings"
+"image.edit" = "flux2-klein-4b-edit-comfy"
+[pipelines.tv_series.workflow]
+keyframe_from_references = false
+
+[pipelines.advert]
+requires = ["ollama", "acestep", "phosphene", "tool.ffmpeg", "tool.cosyvoice", "drawthings"]
+[pipelines.advert.models]
+"image.generate" = "flux2-klein-4b-drawthings"
+"image.edit" = "flux2-klein-4b-edit-comfy"
+[pipelines.advert.workflow]
+keyframe_from_references = false
+
+[pipelines.feature_film]
+requires = ["ollama", "acestep", "phosphene", "tool.ffmpeg", "tool.cosyvoice", "drawthings"]
+[pipelines.feature_film.models]
+"image.generate" = "flux2-klein-4b-drawthings"
+"image.edit" = "flux2-klein-4b-edit-comfy"
+[pipelines.feature_film.workflow]
+keyframe_from_references = false

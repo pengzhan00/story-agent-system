@@ -77,6 +77,12 @@ def _say(settings: Settings) -> Adapter:
     return SayAdapter()
 
 
+def _demucs(settings: Settings) -> Adapter:
+    from .adapters.demucs import DemucsAdapter
+
+    return DemucsAdapter()
+
+
 def _llm(settings: Settings) -> Adapter:
     from .adapters.llm import LlmAdapter
 
@@ -151,7 +157,7 @@ def _http(settings: Settings) -> Adapter:
 
 _BUILTIN: list[Callable[[Settings], Adapter]] = [
     _acestep, _comfy, _drawthings, _phosphene, _cosyvoice, _say, _whisper, _llm, _remote_video, _mflux, _lora_train,
-    _seedvc, _ffmpeg, _delivery, _h3, _longcat, _cli, _http,
+    _seedvc, _demucs, _ffmpeg, _delivery, _h3, _longcat, _cli, _http,
 ]
 
 

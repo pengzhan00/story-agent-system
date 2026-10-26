@@ -16,6 +16,8 @@ use the model selected in the app. The reply carries base64 images; the first on
 from __future__ import annotations
 
 import base64
+import binascii
+import subprocess
 import threading
 import time
 from dataclasses import dataclass, field
@@ -38,10 +40,12 @@ from ..contracts import (
     Progress,
     ValidationIssue,
 )
+from ..probe import find_tool
 from ._http import ServiceClient, clean
 
 _RENAME = {"guidance": "guidance_scale"}
 _ALLOWED = {"width", "height", "steps", "guidance_scale", "sampler", "shift", "strength", "clip_skip", "loras"}
+_VIDEO = MediaKind.VIDEO_GENERATE
 SCHEMA: dict[str, dict[str, Any]] = {
     "width": {"type": "int", "min": 64, "max": 4096},
     "height": {"type": "int", "min": 64, "max": 4096},
@@ -53,6 +57,8 @@ SCHEMA: dict[str, dict[str, Any]] = {
     "clip_skip": {"type": "int", "min": 1, "max": 12},
     "loras": {"type": "list"},
     "request": {"type": "dict"},
+    "frames": {"type": "int", "min": 9, "max": 361},
+    "fps": {"type": "int", "min": 1, "max": 60},
 }
 
 
@@ -61,6 +67,7 @@ class _Run:
     thread: threading.Thread | None = None
     started: float = field(default_factory=time.monotonic)
     image: bytes | None = None
+    frames: list[bytes] = field(default_factory=list)
     error: AdapterError | None = None
     cancelled: bool = False
 
@@ -77,7 +84,8 @@ class DrawThingsAdapter(AdapterBase):
 
     def capabilities(self) -> Capabilities:
         # The app cannot be told to stop a render that has begun: a cancel is honoured when the image arrives.
-        return Capabilities(kinds=(MediaKind.IMAGE_GENERATE,), heavy=True, supports_cancel=True,
+        return Capabilities(kinds=(MediaKind.IMAGE_GENERATE, MediaKind.IMAGE_EDIT, _VIDEO),
+                            heavy=True, supports_cancel=True,
                             supports_reattach=False, param_schema=SCHEMA, poll_interval_sec=self.poll_interval_sec)
 
     def health(self) -> HealthReport:
@@ -91,6 +99,27 @@ class DrawThingsAdapter(AdapterBase):
         issues: list[ValidationIssue] = []
         if not str(job.inputs.get("prompt", "")).strip():
             issues.append(ValidationIssue(ErrorCode.INVALID_INPUT, "a prompt is required", {"detail": "prompt empty"}))
+        refs = job.inputs.get("refs", [])
+        if len(refs) > 1 or (job.kind is MediaKind.IMAGE_EDIT and len(refs) != 1):
+            issues.append(ValidationIssue(ErrorCode.INVALID_INPUT, "the HTTP API supports one reference image",
+                                          {"detail": "refs: one image only; multi-reference needs another transport"}))
+        for ref in refs:
+            if not isinstance(ref, str) or not Path(ref).is_file():
+                issues.append(ValidationIssue(ErrorCode.INVALID_INPUT, "reference image is missing",
+                                              {"detail": "refs"}))
+        if job.kind is _VIDEO:
+            frames, fps = job.params.get("frames", 121), job.params.get("fps", 24)
+            if not isinstance(frames, int) or not 9 <= frames <= 361 or frames % 8 != 1:
+                issues.append(ValidationIssue(ErrorCode.INVALID_PARAMS, "frames must be 8n+1, from 9 to 361",
+                                              {"detail": "frames"}))
+            if not isinstance(fps, int) or not 1 <= fps <= 60:
+                issues.append(ValidationIssue(ErrorCode.INVALID_PARAMS, "fps must be from 1 to 60",
+                                              {"detail": "fps"}))
+            if not self._api_models.get(job.model_ref):
+                issues.append(ValidationIssue(ErrorCode.INVALID_PARAMS, "video needs an explicit api_model",
+                                              {"detail": "api_model"}))
+            if find_tool(ctx.settings, "ffmpeg") is None:
+                issues.append(ValidationIssue(ErrorCode.MISSING_TOOL, "ffmpeg is required", {"tool": "ffmpeg"}))
         if self.health().state is not HealthState.OK:
             issues.append(ValidationIssue(
                 ErrorCode.SERVICE_UNREACHABLE, "Draw Things' API server does not answer",
@@ -115,6 +144,11 @@ class DrawThingsAdapter(AdapterBase):
         extra = job.params.get("request")
         if isinstance(extra, dict):
             body.update(extra)
+        # The frame array has no timing or audio. Always freeze video timing and model in the request,
+        # even when the app's saved fps is 5 or a request table contains stale settings.
+        if job.kind is _VIDEO:
+            body.update(num_frames=job.params.get("frames", 121), fps=job.params.get("fps", 24),
+                        batch_size=1, model=self._api_models[job.model_ref])
         return route, body
 
     def _work(self, run: _Run, job: JobRecord, timeout: float) -> None:
@@ -125,10 +159,29 @@ class DrawThingsAdapter(AdapterBase):
             if not images:
                 raise AdapterError(ErrorCode.OUTPUT_MISSING, "the reply carries no image",
                                    service=self.client.service.name)
-            raw = str(images[0])
-            run.image = base64.b64decode(raw.split(",", 1)[-1], validate=False)
+            if run.cancelled:
+                return
+            if job.kind is _VIDEO and len(images) != int(job.params.get("frames", 121)):
+                raise AdapterError(ErrorCode.OUTPUT_INVALID, "video reply has the wrong frame count")
+            decoded: list[bytes] = []
+            total = 0
+            for raw in images if job.kind is _VIDEO else images[:1]:
+                raw = str(raw).split(",", 1)[-1]
+                if len(raw) > 48 * 1024 * 1024:
+                    raise AdapterError(ErrorCode.OUTPUT_INVALID, "image exceeds the reply limit")
+                data = base64.b64decode(raw, validate=True)
+                total += len(data)
+                if total > 512 * 1024 * 1024:
+                    raise AdapterError(ErrorCode.OUTPUT_INVALID, "frame array exceeds the reply limit")
+                decoded.append(data)
+            if job.kind is _VIDEO:
+                run.frames = decoded
+            else:
+                run.image = decoded[0]
         except AdapterError as exc:
             run.error = exc
+        except (binascii.Error, ValueError) as exc:
+            run.error = AdapterError(ErrorCode.OUTPUT_INVALID, f"invalid image encoding: {type(exc).__name__}")
         except OSError as exc:  # a reference image that cannot be read
             run.error = AdapterError(ErrorCode.INVALID_INPUT, f"{type(exc).__name__}: {exc}", detail=str(exc)[:200])
         except Exception as exc:  # noqa: BLE001 - a crash in the thread must end the job, not hang it
@@ -162,13 +215,41 @@ class DrawThingsAdapter(AdapterBase):
 
     def fetch(self, external_id: str, job: JobRecord, ctx: JobContext) -> list[ArtifactSpec]:
         run = self._runs.pop(external_id, None)
-        if run is None or not run.image:
+        if run is None or not (run.image or run.frames):
             raise AdapterError(ErrorCode.OUTPUT_MISSING, "no image came back")
+        if job.kind is _VIDEO:
+            return self._video(run, job, ctx)
         dest = ctx.work_dir / "image.png"
+        if run.image is None:
+            raise AdapterError(ErrorCode.OUTPUT_MISSING, "no image data came back")
         dest.write_bytes(run.image)
         params = {k: v for k, v in job.params.items() if k != "request"}
         return [ArtifactSpec(dest, metadata={"api_model": self._api_models.get(job.model_ref, ""),
                                              "params_sent": sorted(params)})]
+
+    def _video(self, run: _Run, job: JobRecord, ctx: JobContext) -> list[ArtifactSpec]:
+        binary = find_tool(ctx.settings, "ffmpeg")
+        if binary is None:
+            raise AdapterError(ErrorCode.MISSING_TOOL, "ffmpeg is required", tool="ffmpeg")
+        folder = ctx.work_dir / "frames"
+        folder.mkdir(parents=True, exist_ok=True)
+        for i, frame in enumerate(run.frames):
+            (folder / f"frame-{i:05d}.png").write_bytes(frame)
+        dest = ctx.work_dir / "video.mp4"
+        fps = int(job.params.get("fps", 24))
+        try:
+            proc = subprocess.run(
+                [str(binary), "-y", "-nostdin", "-loglevel", "error", "-framerate", str(fps),
+                 "-i", str(folder / "frame-%05d.png"), "-frames:v", str(len(run.frames)), "-an",
+                 "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(dest)],
+                capture_output=True, timeout=120, check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise AdapterError(ErrorCode.TOOL_FAILED, f"frame encoding: {type(exc).__name__}") from exc
+        if proc.returncode:
+            raise AdapterError(ErrorCode.OUTPUT_INVALID, proc.stderr.decode(errors="replace")[-400:])
+        return [ArtifactSpec(dest, metadata={"api_model": self._api_models.get(job.model_ref, ""),
+                                             "frames": len(run.frames), "fps": fps, "audio_from_api": False})]
 
     def cancel(self, external_id: str, job: JobRecord, ctx: JobContext) -> None:
         run = self._runs.get(external_id)
