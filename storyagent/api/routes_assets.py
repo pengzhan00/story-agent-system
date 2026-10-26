@@ -157,6 +157,22 @@ def purge_project_assets(request: Request, project_id: int, include_current: boo
     return {"purged": purged, "skipped": skipped}
 
 
+@router.post("/assets/purge-trash")
+def purge_trash_assets(request: Request) -> dict[str, int]:
+    """Hard-delete every trashed asset (the recycle bin). Published library assets are left alone."""
+    ctx = ctx_of(request)
+    rows = ctx.ledger.db.conn.execute(
+        "SELECT id, is_current FROM media_assets WHERE trashed_at IS NOT NULL").fetchall()
+    purged = skipped = 0
+    for r in rows:
+        try:
+            ctx.ledger.purge_asset(r["id"])
+            purged += 1
+        except Exception:  # noqa: BLE001 - published guard: count and keep going
+            skipped += 1
+    return {"purged": purged, "skipped": skipped}
+
+
 @router.post("/assets/{asset_id}/purge-version")
 def purge_asset_version(asset_id: str, request: Request) -> dict[str, int]:
     """Hard-delete every asset of the same spec version as this asset. Refused while any is current."""

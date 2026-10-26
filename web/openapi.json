@@ -10163,6 +10163,32 @@
         ]
       }
     },
+    "/api/assets/purge-trash": {
+      "post": {
+        "description": "Hard-delete every trashed asset (the recycle bin). Published library assets are left alone.",
+        "operationId": "purge_trash_assets_api_assets_purge_trash_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "title": "Response Purge Trash Assets Api Assets Purge Trash Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Purge Trash Assets",
+        "tags": [
+          "assets"
+        ]
+      }
+    },
     "/api/assets/{asset_id}": {
       "get": {
         "operationId": "get_asset_api_assets__asset_id__get",

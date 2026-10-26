@@ -139,9 +139,10 @@ function JobRow({ job, siblings }: { job: Job; siblings: string[] }) {
 export function JobsPanel({ projectId }: { projectId?: number }) {
   const t = useT();
   const [filter, setFilter] = useState<Filter>("all");
-  const [limit, setLimit] = useState(100);
-  const jobs = useJobs(projectId, [...FILTERS[filter]], limit);
-  const more = (jobs.data?.length ?? 0) >= limit && limit < 500;
+  const PAGE = 100;
+  const [page, setPage] = useState(0);
+  const jobs = useJobs(projectId, [...FILTERS[filter]], PAGE, page * PAGE);
+  const more = (jobs.data?.length ?? 0) >= PAGE;
   const queue = useQueueState(projectId);
   const count = (f: Filter) => (f === "running" ? queue.data?.running : f === "waiting" ? queue.data?.queued : undefined);
   return (
@@ -182,10 +183,16 @@ export function JobsPanel({ projectId }: { projectId?: number }) {
           </table>
         </div>
       ) : null}
-      {more ? (
-        <button onClick={() => setLimit((l) => Math.min(l + 100, 500))}>
-          {t("web.jobs.load_more", { shown: jobs.data?.length ?? 0 })}
-        </button>
+      {more || page > 0 ? (
+        <div className="row small">
+          <button disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>
+            {t("web.jobs.prev_page")}
+          </button>
+          <span className="muted">{t("web.jobs.page_n", { n: page + 1 })}</span>
+          <button disabled={!more} onClick={() => setPage((p) => p + 1)}>
+            {t("web.jobs.next_page")}
+          </button>
+        </div>
       ) : null}
     </div>
   );

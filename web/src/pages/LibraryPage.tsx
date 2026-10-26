@@ -428,11 +428,27 @@ export function LibraryPage() {
         (trashed.data ?? []).filter((a) => a.trashed_at).length === 0 ? (
           <p className="empty">{t("web.library.empty_trash")}</p>
         ) : (
-          <ul className="grid">
-            {(trashed.data ?? []).filter((a) => a.trashed_at).map((a) => (
-              <TrashedCard key={a.id} asset={a} source={projectName(a.project_id)} />
-            ))}
-          </ul>
+          <>
+            <div className="row small">
+              <span className="muted">{t("web.library.trash_count", { n: (trashed.data ?? []).filter((a) => a.trashed_at).length })}</span>
+              <span className="spacer" />
+              <button
+                className="link"
+                disabled={batch.purgeTrash.isPending}
+                onClick={() => {
+                  if (window.confirm(t("web.library.purge_trash_all_confirm"))) batch.purgeTrash.mutate();
+                }}
+              >
+                {t("web.library.purge_trash_all")}
+              </button>
+              <ErrorNote error={batch.purgeTrash.error} />
+            </div>
+            <ul className="grid">
+              {(trashed.data ?? []).filter((a) => a.trashed_at).map((a) => (
+                <TrashedCard key={a.id} asset={a} source={projectName(a.project_id)} />
+              ))}
+            </ul>
+          </>
         )
       ) : shown.length === 0 ? (
         <p className="empty">{t("web.library.empty")}</p>

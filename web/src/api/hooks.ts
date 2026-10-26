@@ -160,11 +160,11 @@ export function useStoryEdit(id: number, part: StoryRows) {
 }
 
 /** ``statuses`` empty = every job. The same filter drives the list a count on the page opens. */
-export const useJobs = (projectId?: number, statuses: string[] = [], limit = 100) =>
+export const useJobs = (projectId?: number, statuses: string[] = [], limit = 100, offset = 0) =>
   useQuery({
-    queryKey: ["jobs", projectId ?? "all", statuses.join(","), limit],
+    queryKey: ["jobs", projectId ?? "all", statuses.join(","), limit, offset],
     queryFn: () => {
-      const q = new URLSearchParams({ limit: String(limit) });
+      const q = new URLSearchParams({ limit: String(limit), offset: String(offset) });
       if (projectId) q.set("project_id", String(projectId));
       for (const st of statuses) q.append("status", st);
       return api<Job[]>(`/api/jobs?${q.toString()}`);

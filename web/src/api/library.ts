@@ -64,5 +64,9 @@ export function useLibraryActions() {
         ),
       onSuccess: refresh,
     }),
+    purgeTrash: useMutation({
+      mutationFn: () => post<{ purged: number; skipped: number }>("/api/assets/purge-trash"),
+      onSuccess: refresh,
+    }),
   };
 }
