@@ -1907,6 +1907,8 @@
   "web.season.planned": "计划集数",
   "web.season.write": "生成本季分集大纲",
   "web.season.rewrite": "重写本季分集大纲",
+  "web.season.confirm_write": "确定要生成本季分集大纲吗？这会覆盖本季的剧集大纲，并使脚本、分镜等下游内容失效。",
+  "web.season.confirm_rewrite": "确定要重写本季分集大纲吗？这会覆盖现有大纲，并使脚本、分镜等下游内容失效。",
   "web.season.episode_label": "第 {season} 季 第 {n} 集",
   "web.season.hint": "单集或单部影片可以不填。计划了多集时会先写分集大纲:每集的标题、梗概、开场钩子和结尾悬念,之后每一集的剧本都按它来写。",
   "web.tab.series": "全剧",

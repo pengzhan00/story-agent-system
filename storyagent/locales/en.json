@@ -1907,6 +1907,8 @@
   "web.season.planned": "Episodes planned",
   "web.season.write": "Write the season outline",
   "web.season.rewrite": "Rewrite the season outline",
+  "web.season.confirm_write": "Write this season's episode outline? It overwrites the current outline and invalidates the downstream script and shots.",
+  "web.season.confirm_rewrite": "Rewrite this season's episode outline? It overwrites the current outline and invalidates the downstream script and shots.",
   "web.season.episode_label": "S{season} E{n}",
   "web.season.hint": "Leave it unplanned for a single film or episode. With several episodes planned the outline is written first: a title, summary, opening hook and closing cliffhanger for each episode, and every script follows it.",
   "web.tab.series": "Series",

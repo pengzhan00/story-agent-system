@@ -47,7 +47,12 @@ export function SeasonCard({ id, busy }: { id: number; busy: boolean }) {
         <button
           className="primary"
           disabled={busy || start.isPending || planned < 1 || draft !== null}
-          onClick={() => start.mutate({ stages: ["outline"], params: { season, force: mine.some((e) => e.hook) } })}
+          onClick={() => {
+            const rewrite = mine.some((e) => e.hook);
+            if (window.confirm(t(rewrite ? "web.season.confirm_rewrite" : "web.season.confirm_write"))) {
+              start.mutate({ stages: ["outline"], params: { season, force: rewrite } });
+            }
+          }}
         >
           {mine.some((e) => e.hook) ? t("web.season.rewrite") : t("web.season.write")}
         </button>
