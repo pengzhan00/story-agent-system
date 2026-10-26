@@ -2918,6 +2918,7 @@
           "audio.sfx",
           "audio.convert",
           "audio.enhance",
+          "audio.separate",
           "text.story",
           "text.script",
           "text.asr",
@@ -10100,6 +10101,63 @@
           }
         },
         "summary": "List Assets",
+        "tags": [
+          "assets"
+        ]
+      }
+    },
+    "/api/assets/purge-project": {
+      "post": {
+        "description": "Hard-delete a project's assets. Trashed ones by default; ``include_current`` also takes the current assets\n(they are soft-deleted first, then hard-deleted). Published library assets are left alone.",
+        "operationId": "purge_project_assets_api_assets_purge_project_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_current",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Current",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "title": "Response Purge Project Assets Api Assets Purge Project Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Purge Project Assets",
         "tags": [
           "assets"
         ]

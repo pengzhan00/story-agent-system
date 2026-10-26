@@ -98,6 +98,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/assets/purge-project": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Purge Project Assets
+         * @description Hard-delete a project's assets. Trashed ones by default; ``include_current`` also takes the current assets
+         *     (they are soft-deleted first, then hard-deleted). Published library assets are left alone.
+         */
+        post: operations["purge_project_assets_api_assets_purge_project_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/assets/{asset_id}": {
         parameters: {
             query?: never;
@@ -4201,7 +4222,7 @@ export interface components {
          *     i18n keys: ``media.kind.<value>``.
          * @enum {string}
          */
-        MediaKind: "image.generate" | "image.edit" | "video.generate" | "video.av" | "video.avatar" | "video.lipsync" | "video.enhance" | "audio.tts" | "audio.music" | "audio.sfx" | "audio.convert" | "audio.enhance" | "text.story" | "text.script" | "text.asr" | "compose.assemble" | "compose.deliver" | "analyze.qc" | "train.lora";
+        MediaKind: "image.generate" | "image.edit" | "video.generate" | "video.av" | "video.avatar" | "video.lipsync" | "video.enhance" | "audio.tts" | "audio.music" | "audio.sfx" | "audio.convert" | "audio.enhance" | "audio.separate" | "text.story" | "text.script" | "text.asr" | "compose.assemble" | "compose.deliver" | "analyze.qc" | "train.lora";
         /** MemoryOut */
         MemoryOut: {
             /** Free Gib */
@@ -7177,6 +7198,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AssetOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    purge_project_assets_api_assets_purge_project_post: {
+        parameters: {
+            query: {
+                project_id: number;
+                include_current?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: number;
+                    };
                 };
             };
             /** @description Validation Error */

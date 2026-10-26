@@ -360,7 +360,17 @@ export function LibraryPage() {
               </button>
             </>
           ) : null}
-          <ErrorNote error={batch.trashMany.error ?? batch.purgeMany.error} />
+          {scope !== "" && scope !== WORKSHOP ? (
+            <button className="link" disabled={batch.purgeProject.isPending} onClick={() => {
+              const pid = Number(scope);
+              if (Number.isFinite(pid) && window.confirm(t("web.library.purge_project_confirm", { n: shown.length }))) {
+                batch.purgeProject.mutate({ projectId: pid, includeCurrent: false });
+              }
+            }}>
+              {t("web.library.purge_project")}
+            </button>
+          ) : null}
+          <ErrorNote error={batch.trashMany.error ?? batch.purgeMany.error ?? batch.purgeProject.error} />
         </div>
       ) : null}
       {tab === SCRIPTS ? (

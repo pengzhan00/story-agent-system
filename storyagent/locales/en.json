@@ -1774,6 +1774,8 @@
   "web.library.selected_n": "{n} selected",
   "web.library.trash_many_confirm": "Move the {n} selected assets to the trash?",
   "web.library.purge_many_confirm": "Permanently delete the {n} selected assets? This cannot be undone.",
+  "web.library.purge_project": "Clear this project's trash",
+  "web.library.purge_project_confirm": "Permanently delete this project's {n} trashed assets? This cannot be undone.",
   "web.library.all": "All",
   "web.library.named": "Named library",
   "web.library.scope": "From",

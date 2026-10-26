@@ -128,6 +128,27 @@ def purge_asset(asset_id: str, request: Request) -> AssetOut:
     return AssetOut.model_validate(ledger.purge_asset(asset_id))
 
 
+@router.post("/assets/purge-project")
+def purge_project_assets(request: Request, project_id: int, include_current: bool = False) -> dict[str, int]:
+    """Hard-delete a project's assets. Trashed ones by default; ``include_current`` also takes the current assets
+    (they are soft-deleted first, then hard-deleted). Published library assets are left alone."""
+    ctx = ctx_of(request)
+    ctx.projects.get(project_id)
+    where = "project_id=?" if include_current else "project_id=? AND trashed_at IS NOT NULL"
+    rows = ctx.ledger.db.conn.execute(
+        f"SELECT id, is_current FROM media_assets WHERE {where}", (project_id,)).fetchall()
+    purged = skipped = 0
+    for r in rows:
+        try:
+            if r["is_current"]:
+                ctx.ledger.trash_asset(r["id"])
+            ctx.ledger.purge_asset(r["id"])
+            purged += 1
+        except Exception:  # noqa: BLE001 - published/current guards: count and keep going
+            skipped += 1
+    return {"purged": purged, "skipped": skipped}
+
+
 @router.post("/assets/{asset_id}/purge-version")
 def purge_asset_version(asset_id: str, request: Request) -> dict[str, int]:
     """Hard-delete every asset of the same spec version as this asset. Refused while any is current."""

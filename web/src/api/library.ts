@@ -48,5 +48,12 @@ export function useLibraryActions() {
       },
       onSuccess: refresh,
     }),
+    purgeProject: useMutation({
+      mutationFn: (p: { projectId: number; includeCurrent: boolean }) =>
+        post<{ purged: number; skipped: number }>(
+          `/api/assets/purge-project?project_id=${p.projectId}&include_current=${p.includeCurrent}`,
+        ),
+      onSuccess: refresh,
+    }),
   };
 }

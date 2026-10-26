@@ -1774,6 +1774,8 @@
   "web.library.selected_n": "已选 {n} 项",
   "web.library.trash_many_confirm": "把选中的 {n} 个资产移入回收站?",
   "web.library.purge_many_confirm": "永久删除选中的 {n} 个资产?此操作不可撤销。",
+  "web.library.purge_project": "清空本项目(回收站)",
+  "web.library.purge_project_confirm": "永久删除本项目的 {n} 个回收站资产?此操作不可撤销。",
   "web.library.all": "全部",
   "web.library.named": "命名库",
   "web.library.scope": "来源",
