@@ -172,9 +172,8 @@ def build_timeline(inp: TimelineInput) -> Timeline:
             if ln["text"].strip():
                 end = round(start + ln["duration"], 3)
                 subtitles.append({"start": round(start, 3), "end": end, "text": ln["text"]})
-        if shot.narration.strip() and not lines_out:
-            subtitles.append({"start": round(cursor + lead, 3), "end": round(cursor + min(duration, lead + 3.5), 3),
-                              "text": shot.narration})
+        # The shot's own narration is a visual/action description for the prompter, not a spoken line: it must not
+        # appear on screen as a subtitle (it made the finished film look like a wall of descriptive text).
         for asset, offset in shot.sfx:            # an effect ends with its shot (the mixer trims it to ``duration``)
             room = max(duration - offset, 0.0)
             length = min(asset.duration_sec, room) if asset.duration_sec else room

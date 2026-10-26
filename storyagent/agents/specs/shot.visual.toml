@@ -26,8 +26,10 @@ room, never a dark, curtained, cramped box. Describe the people's ethnicity and 
 position and facing direction written in `image_prompt` and describe ONE continuous action that fits in five
 seconds. Put the motion into the camera and the world: one smooth camera move that suits the shot (slow push-in,
 tracking alongside, an arc around the subject, a rise; locked-off only for a deliberate hold) and life around the
-subject (hair and clothes moving, light flickering, dust, screens, background people). Keep the subject's own movement
-simple - breathing, a turn of the head, a shift of weight, one step. Video models break arms and hands, so do not ask
+subject (hair and clothes moving, light flickering, dust, screens, background people). The subject must move visibly:
+give them ONE clear action from the shot (`action`: a turn, a reach, a lift, a push, a rise, a fall back, a step) that
+reads in five seconds — a still pose with only a slow camera drift looks like a photo, not a clip. Video models break
+arms and hands, so do not ask
 a limb for a new, precise gesture: when the action needs a hand (pointing, holding, pressing, pushing up glasses) the
 hand is already in that pose in `image_prompt` and only moves slightly. Both arms stay attached to the body and in
 frame for the whole clip, so do not zoom in until the arms leave the frame and do not end on an extreme close-up of the
