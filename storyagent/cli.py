@@ -418,6 +418,32 @@ def _cmd_maintain_prune_orphans(s: Settings, a: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_maintain_prune_history(s: Settings, a: argparse.Namespace) -> int:
+    from storyagent.util import iso_at
+
+    db = _ctx(s).db
+    if a.project:
+        ProjectStore(db, s).get(a.project)
+    cutoff = iso_at(time.time() - a.days * 86400)
+    deleted: dict[str, int] = {}
+    for table, col in (("audit_log", "at"), ("generation_logs", "created_at"), ("job_events", "ts")):
+        where, args = f"{col} < ?", [cutoff]
+        if a.project and table != "job_events":
+            where += " AND project_id=?"
+            args.append(a.project)
+        if a.dry_run:
+            n = db.conn.execute(f"SELECT COUNT(*) FROM {table} WHERE {where}", args).fetchone()[0]
+        else:
+            n = db.conn.execute(f"DELETE FROM {table} WHERE {where}", args).rowcount
+        deleted[table] = n
+    if not a.dry_run:
+        db.conn.commit()
+    print(t("cli.maintain.history_pruned", n=sum(deleted.values()), days=a.days,
+            detail=", ".join(f"{k}={v}" for k, v in deleted.items()),
+            mode=t("cli.maintain.dry_run") if a.dry_run else ""))
+    return 0
+
+
 # -- uploads and the library ------------------------------------------------------------------------
 def _cmd_asset_import(s: Settings, a: argparse.Namespace) -> int:
     from storyagent.media.library import LibraryError, import_file
@@ -1431,6 +1457,10 @@ def build_parser() -> argparse.ArgumentParser:
     mo = add(mt, "prune-orphans", _cmd_maintain_prune_orphans)
     mo.add_argument("--project", type=int, required=True)
     mo.add_argument("--dry-run", action="store_true")
+    mh = add(mt, "prune-history", _cmd_maintain_prune_history)
+    mh.add_argument("--project", type=int)
+    mh.add_argument("--days", type=int, default=30, help="delete history older than this many days")
+    mh.add_argument("--dry-run", action="store_true")
 
     gr = sub.add_parser("grammar").add_subparsers(dest="cmd", required=True)
     gc = add(gr, "check", _cmd_grammar_check)

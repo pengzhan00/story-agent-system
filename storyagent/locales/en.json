@@ -133,6 +133,7 @@
   "cli.asset.purged": "Hard-deleted asset {id}.",
   "cli.asset.purged_many": "Hard-deleted {n} trashed assets.",
   "cli.maintain.pruned": "Pruned {specs} orphan spec(s) and {assets} asset(s){mode}.",
+  "cli.maintain.history_pruned": "Pruned {n} history row(s) older than {days} days ({detail}){mode}.",
   "cli.maintain.dry_run": " (dry run, nothing deleted)",
   "cli.spec.created": "Spec created: {id} (v{version})",
   "cli.spec.edited": "Spec updated: v{version}",
