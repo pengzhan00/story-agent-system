@@ -40,10 +40,11 @@ def clean(text: str) -> str:
 def image_prompt(prompt: str, *, language: str = "", with_portraits: bool = False) -> str:
     """A prompt for a picture with people in it: cleaned, then who they are and how it should look."""
     data = _data()
-    parts = [clean(prompt).strip().rstrip(".,; ")]
+    body = clean(prompt).strip().rstrip(".,; ")
     who = _for_language(data["identity"], language)
-    if who:
-        parts.append(who)
+    # The ethnicity goes first: models latched onto Western faces read the leading words strongest, so a trailing
+    # "East Asian Chinese people" is too weak to hold the face (seen first in the Lustify checkpoint).
+    parts = ([who] if who else []) + [body]
     if with_portraits:
         parts.append(data["same_faces"])
     parts.append(data["realism"])

@@ -1,4 +1,4 @@
-"""Draw Things image generation through its built-in HTTP API server (A1111-compatible ``/sdapi/v1`` routes).
+"""Draw Things image and silent video generation through its built-in HTTP API server (``/sdapi/v1`` routes).
 
 Draw Things runs models in its own ``.ckpt`` format, so a model only Draw Things can run (for instance a Krea-2 based
 checkpoint) is reached here, with the app open and its API Server switched on (Advanced settings -> API Server).
@@ -11,7 +11,8 @@ Params:  width, height, steps, guidance (-> guidance_scale), sampler, shift, str
          ``request`` = a table merged over the body as it is sent: the way to pass any key this adapter does not know
          about, without a code change.
 The model file is ``api_model`` of the model entry (Draw Things' own file name, e.g. ``xxx_f16.ckpt``); leave it out to
-use the model selected in the app. The reply carries base64 images; the first one is the artifact.
+use the model selected in the app. Image jobs take the first encoded image; video jobs require the requested
+8n+1 frames and encode all of them at the explicit fps. This HTTP transport does not return audio.
 """
 from __future__ import annotations
 
@@ -159,6 +160,8 @@ class DrawThingsAdapter(AdapterBase):
             if not images:
                 raise AdapterError(ErrorCode.OUTPUT_MISSING, "the reply carries no image",
                                    service=self.client.service.name)
+            if not isinstance(images, list) or any(not isinstance(raw, str) for raw in images):
+                raise AdapterError(ErrorCode.OUTPUT_INVALID, "images must be an array of encoded strings")
             if run.cancelled:
                 return
             if job.kind is _VIDEO and len(images) != int(job.params.get("frames", 121)):

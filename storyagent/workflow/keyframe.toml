@@ -34,7 +34,7 @@ zh = "East Asian Chinese people"
 # Extra things never to draw; `identity_negative` only where `identity` has the language.
 [negative]
 always = "breasts on a man, gynecomastia, merged back and chest, fused bodies, wrong anatomy, extra or missing limbs, deformed torso, extra fingers, deformed hands, fused fingers, six fingers, oily skin, greasy shine, plastic skin, airbrushed, doll face, 3d render, underexposed, crushed shadows, claustrophobic, cramped framing, heavy vignette"
-zh = "Caucasian, Western facial features, non-Asian faces"
+zh = "Caucasian, Western facial features, non-Asian faces, European face, white person, blonde hair, blue eyes, fair-skinned foreigner"
 # Tokens of the style's own negative prompt that work against us.
 drop = ["dry skin", "overly bright exposure"]
 

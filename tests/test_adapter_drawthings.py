@@ -180,3 +180,84 @@ def test_a_refused_licence_keeps_the_values_of_its_message(tmp_path: Path, serve
     rec, assets = r.run(job(MediaKind.IMAGE_GENERATE, "dt-test", {"prompt": "x"}))
     assert rec.error_code == ErrorCode.LICENSE_ACK_REQUIRED.value and not assets
     assert rec.error_params == {"model": "dt-test"}
+
+
+VIDEO_MODELS = '''
+[models."dt-video"]
+kind = "video.generate"
+provider = "drawthings"
+api_model = "ltx_test.ckpt"
+timeout_sec = 20
+[models."dt-video".params]
+frames = 9
+fps = 24
+'''
+
+
+def video_rig(tmp_path: Path, server: FakeServer):  # noqa: ANN201
+    s = make_settings(tmp_path, services=f'[services.drawthings]\nurl = "{server.url}"\n', models=VIDEO_MODELS)
+    adapter = DrawThingsAdapter(ServiceClient(s.service("drawthings")), {"dt-video": "ltx_test.ckpt"},
+                                poll_interval_sec=0.01)
+    return make_rig(s, adapter)
+
+
+def test_video_encodes_all_frames_with_explicit_timing(tmp_path: Path, server: FakeServer) -> None:
+    import json
+    import subprocess
+
+    from storyagent.media.probe import find_tool
+
+    server.route("POST", "/sdapi/v1/txt2img", {"images": reply()["images"] * 9})
+    r = video_rig(tmp_path, server)
+    rec, assets = r.run(job(MediaKind.VIDEO_GENERATE, "dt-video", {"prompt": "a river"},
+                            params={"request": {"fps": 5, "num_frames": 1, "model": "stale.ckpt"}}))
+    assert rec.status is JobStatus.COMPLETED, (rec.error_code, rec.error_message)
+    [asset] = assets
+    assert asset.metadata["audio_from_api"] is False
+    binary = find_tool(r.settings, "ffprobe")
+    assert binary
+    probe = subprocess.run([str(binary), "-v", "error", "-show_streams", "-of", "json",
+                            str(r.settings.home / asset.path)],
+                           check=True, capture_output=True, text=True)
+    [stream] = json.loads(probe.stdout)["streams"]
+    assert stream["codec_type"] == "video" and stream["nb_frames"] == "9"
+    assert stream["r_frame_rate"] == "24/1" and float(stream["duration"]) == pytest.approx(9 / 24)
+    body = next(q.json for q in server.requests if q.path == "/sdapi/v1/txt2img")
+    assert (body["fps"], body["num_frames"], body["model"]) == (24, 9, "ltx_test.ckpt")
+
+
+@pytest.mark.parametrize("frames,fps", [(10, 24), (1, 24), (369, 24), (9, 0), (9, 61)])
+def test_video_rejects_bad_timing_before_render(tmp_path: Path, server: FakeServer, frames: int, fps: int) -> None:
+    r = video_rig(tmp_path, server)
+    rec, assets = r.run(job(MediaKind.VIDEO_GENERATE, "dt-video", {"prompt": "river"},
+                            params={"frames": frames, "fps": fps}))
+    assert rec.error_code == ErrorCode.INVALID_PARAMS.value and not assets
+    assert not any(q.path.startswith("/sdapi") for q in server.requests)
+
+
+@pytest.mark.parametrize("images", [reply()["images"], "not-an-array", [None] * 9, ["!invalid!"] * 9])
+def test_video_rejects_incomplete_or_malformed_frames(tmp_path: Path, server: FakeServer, images: Any) -> None:
+    server.route("POST", "/sdapi/v1/txt2img", {"images": images})
+    r = video_rig(tmp_path, server)
+    rec, assets = r.run(job(MediaKind.VIDEO_GENERATE, "dt-video", {"prompt": "river"}))
+    assert rec.error_code == ErrorCode.OUTPUT_INVALID.value and not assets
+
+
+def test_multiple_references_are_rejected_instead_of_silently_dropped(tmp_path: Path, server: FakeServer) -> None:
+    r, _ = rig(tmp_path, server)
+    ref = tmp_path / "ref.png"
+    ref.write_bytes(png_bytes())
+    rec, assets = r.run(job(MediaKind.IMAGE_GENERATE, "dt-test", {"prompt": "x", "refs": [str(ref), str(ref)]}))
+    assert rec.error_code == ErrorCode.INVALID_INPUT.value and not assets
+    assert not any(q.path.startswith("/sdapi") for q in server.requests)
+
+
+def test_optional_profiles_do_not_replace_defaults(tmp_path: Path) -> None:
+    example = EXAMPLES.parent / "optional-capabilities" / "models.toml"
+    base = make_settings(tmp_path / "base")
+    settings = make_settings(tmp_path / "optional", models=example.read_text())
+    assert settings.default_models == base.default_models
+    video = settings.models["ltx-2.3-drawthings"]
+    assert video.provider == "drawthings" and video.kind == "video.generate"
+    assert (video.params["steps"], video.params["guidance"], video.params["fps"]) == (8, 1.0, 24)
+    assert settings.models["juggernaut-sdxl-drawthings"].kind == "image.generate"

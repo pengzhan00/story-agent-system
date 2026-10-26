@@ -15,7 +15,7 @@ def test_greasy_and_murky_words_are_rewritten() -> None:
 
 def test_a_chinese_project_names_the_people_and_ties_them_to_the_portraits() -> None:
     out = keyframe.image_prompt("a man pours tea.", language="zh-CN", with_portraits=True)
-    assert out.startswith("a man pours tea, East Asian Chinese people")
+    assert out.startswith("East Asian Chinese people, a man pours tea")
     assert "reference portraits" in out and "natural matte skin" in out
     assert "East Asian" not in keyframe.image_prompt("a man pours tea", language="en")
     assert "reference portraits" not in keyframe.scene_prompt("an empty living room")
