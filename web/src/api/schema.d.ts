@@ -175,6 +175,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/assets/{asset_id}/purge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Purge Asset
+         * @description Hard delete: remove the row and its file from disk. Refused while the asset is current.
+         */
+        post: operations["purge_asset_api_assets__asset_id__purge_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/assets/{asset_id}/purge-version": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Purge Asset Version
+         * @description Hard-delete every asset of the same spec version as this asset. Refused while any is current.
+         */
+        post: operations["purge_asset_version_api_assets__asset_id__purge_version_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/assets/{asset_id}/text": {
         parameters: {
             query?: never;
@@ -854,6 +894,46 @@ export interface paths {
          * @description One short question to a model: does it answer, and how long does the first answer take.
          */
         post: operations["test_model_api_llm_test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/maintain/prune-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Prune History
+         * @description Delete audit_log / generation_logs / job_events rows older than ``days`` days.
+         */
+        post: operations["prune_history_api_maintain_prune_history_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/maintain/prune-orphans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Prune Orphans
+         * @description Drop shot.keyframe/shot.video specs whose shot no longer exists (and their assets). Safe to run.
+         */
+        post: operations["prune_orphans_api_maintain_prune_orphans_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4940,6 +5020,11 @@ export interface components {
              * @description share of an episode's shots that get a video clip (0-1); null = default
              */
             video_share?: number | null;
+            /**
+             * Video With Sound
+             * @description generate each shot clip with its own sound (LTX-2.5-av, the line is spoken in the clip) instead of a silent clip plus a separate TTS pass; null = off
+             */
+            video_with_sound?: boolean | null;
         };
         /** PromptAssistIn */
         PromptAssistIn: {
@@ -7216,6 +7301,70 @@ export interface operations {
             };
         };
     };
+    purge_asset_api_assets__asset_id__purge_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                asset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    purge_asset_version_api_assets__asset_id__purge_version_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                asset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: number;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     edit_text_asset_api_assets__asset_id__text_put: {
         parameters: {
             query?: never;
@@ -8463,6 +8612,75 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LlmTestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    prune_history_api_maintain_prune_history_post: {
+        parameters: {
+            query?: {
+                days?: number;
+                project_id?: number | null;
+                dry_run?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    prune_orphans_api_maintain_prune_orphans_post: {
+        parameters: {
+            query: {
+                project_id: number;
+                dry_run?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: number;
+                    };
                 };
             };
             /** @description Validation Error */

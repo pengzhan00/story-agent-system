@@ -157,6 +157,10 @@ class ProjectSettingsPatch(BaseModel):
                     "title_sec / recap_sec / next_sec / scene_fade_sec (seconds); null = the delivery defaults")
     default_voice: str | None = Field(
         default=None, description="voice (library:voice/<name>) for characters with none; null = the global one")
+    video_with_sound: bool | None = Field(
+        default=None,
+        description="generate each shot clip with its own sound (LTX-2.5-av, the line is spoken in the clip) "
+                    "instead of a silent clip plus a separate TTS pass; null = off")
 
 
 # -- jobs -------------------------------------------------------------------------------------------

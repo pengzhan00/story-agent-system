@@ -29,7 +29,8 @@ def prune_history(
     cutoff = iso_at(time.time() - days * 86400)
     deleted: dict[str, int] = {}
     for table, col in HISTORY_TABLES:
-        where, args = f"{col} < ?", [cutoff]
+        where: str = f"{col} < ?"
+        args: list[Any] = [cutoff]
         if project_id is not None and table != "job_events":
             where += " AND project_id=?"
             args.append(project_id)

@@ -109,6 +109,14 @@ function Spec({ id }: { id: number }) {
         </label>
       </div>
       <p className="muted small">{t("web.workflow.video_hint")}</p>
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={project.data?.settings?.["video_with_sound"] === true}
+          onChange={(e) => settings.mutate({ video_with_sound: e.target.checked })}
+        />
+        <span>{t("web.workflow.video_with_sound")}</span>
+      </label>
       <div className="row">
         {(["recap_card", "title_card", "next_card"] as const).map((key) => (
           <label key={key} className="check">

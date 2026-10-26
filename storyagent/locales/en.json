@@ -1965,6 +1965,7 @@
   "web.workflow.video_budget": "Clip budget (machine hours, 0 = none)",
   "web.workflow.default": "default",
   "web.workflow.video_hint": "A clip takes minutes to hours, a keyframe seconds. The hook, the cliffhanger and act openers get clips first; every shot can be set to video or still in the Story tab.",
+  "web.workflow.video_with_sound": "Sound inside the clip (LTX-2.5-av speaks the line; no separate TTS pass)",
   "web.field.locked": "Locked (the cast step never redesigns it)",
   "web.field.introduced_episode": "First seen in episode",
   "compose.card.recap": "Previously",

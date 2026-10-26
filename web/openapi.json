@@ -4990,6 +4990,18 @@
             ],
             "description": "share of an episode's shots that get a video clip (0-1); null = default",
             "title": "Video Share"
+          },
+          "video_with_sound": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "generate each shot clip with its own sound (LTX-2.5-av, the line is spoken in the clip) instead of a silent clip plus a separate TTS pass; null = off",
+            "title": "Video With Sound"
           }
         },
         "title": "ProjectSettingsPatch",
@@ -10234,6 +10246,96 @@
         ]
       }
     },
+    "/api/assets/{asset_id}/purge": {
+      "post": {
+        "description": "Hard delete: remove the row and its file from disk. Refused while the asset is current.",
+        "operationId": "purge_asset_api_assets__asset_id__purge_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "asset_id",
+            "required": true,
+            "schema": {
+              "title": "Asset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Purge Asset",
+        "tags": [
+          "assets"
+        ]
+      }
+    },
+    "/api/assets/{asset_id}/purge-version": {
+      "post": {
+        "description": "Hard-delete every asset of the same spec version as this asset. Refused while any is current.",
+        "operationId": "purge_asset_version_api_assets__asset_id__purge_version_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "asset_id",
+            "required": true,
+            "schema": {
+              "title": "Asset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "title": "Response Purge Asset Version Api Assets  Asset Id  Purge Version Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Purge Asset Version",
+        "tags": [
+          "assets"
+        ]
+      }
+    },
     "/api/assets/{asset_id}/text": {
       "put": {
         "description": "Save an edited story / script / transcript as a NEW version of the same slot (the one before stays as a\ncandidate, so the edit can be undone by adopting it again).",
@@ -12170,6 +12272,135 @@
         "summary": "Test Model",
         "tags": [
           "llm"
+        ]
+      }
+    },
+    "/api/maintain/prune-history": {
+      "post": {
+        "description": "Delete audit_log / generation_logs / job_events rows older than ``days`` days.",
+        "operationId": "prune_history_api_maintain_prune_history_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 30,
+              "title": "Days",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "project_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "dry_run",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Dry Run",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Prune History Api Maintain Prune History Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Prune History",
+        "tags": [
+          "maintain"
+        ]
+      }
+    },
+    "/api/maintain/prune-orphans": {
+      "post": {
+        "description": "Drop shot.keyframe/shot.video specs whose shot no longer exists (and their assets). Safe to run.",
+        "operationId": "prune_orphans_api_maintain_prune_orphans_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "dry_run",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Dry Run",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "title": "Response Prune Orphans Api Maintain Prune Orphans Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Prune Orphans",
+        "tags": [
+          "maintain"
         ]
       }
     },

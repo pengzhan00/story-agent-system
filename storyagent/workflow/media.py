@@ -184,10 +184,27 @@ def _plan_phase(
                 continue
             extra["refs"] = [f"asset:{frame.id}"]
         job = store.build_job(spec, tier=tier, seed=spec.seed, shot_id=_shot_id(spec), extra_inputs=extra)
+        if spec.subject_type == "shot.video" and ctx.project.settings.get("video_with_sound"):
+            job = shot_with_sound(store, spec, job)
         if spec.subject_type == "shot.keyframe":
             job = keyframe_from_references(ctx, ledger, spec, job)
         out.append((spec, job))
     return out
+
+
+SOUND_VIDEO_MODEL = "ltx-2.5-av"
+
+
+def shot_with_sound(store: SpecStore, spec: SpecRecord, job: MediaJob) -> MediaJob:
+    """The clip carries its own sound: LTX-2.5-av speaks the shot's lines, so the separate TTS pass is not needed."""
+    lines = [str(line.text_payload) for line in store.list_current(spec.project_id, "dialogue.line")
+             if line.subject_id.split("#")[0] == str(spec.subject_id) and line.text_payload]
+    return MediaJob(**{
+        **job.__dict__,
+        "kind": MediaKind.VIDEO_AV,
+        "model_ref": SOUND_VIDEO_MODEL,
+        "inputs": {**job.inputs, "text": " ".join(lines)},
+    })
 
 
 def compose_keyframe(
