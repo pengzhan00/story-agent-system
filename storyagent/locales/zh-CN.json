@@ -2422,5 +2422,21 @@
   "agent.var.season": "季",
   "agent.var.target": "目标",
   "agent.var.text": "文本",
-  "agent.var.tool_notes": "工具说明"
+  "agent.var.tool_notes": "工具说明",
+  "agent.prompt.suggest.title": "提示词:AI 建议",
+  "agent.prompt.suggest.desc": "每个提示词旁边的“AI 建议”按钮:按你的改写指令重写提示词,保留你的原意、细节和权重、标签等特殊写法。",
+  "agent.prompt.suggest.out": "改写后的提示词",
+  "agent.prompt.translate.title": "提示词:翻译",
+  "agent.prompt.translate.desc": "每个提示词旁边的“翻译”按钮:忠实翻译成另一种语言,保留权重、占位符、触发词等特殊写法,可直接粘贴给模型。",
+  "agent.prompt.translate.out": "译文提示词",
+  "agent.screenwriter.season.title": "编剧:规划整季",
+  "agent.screenwriter.season.desc": "在写任何一集剧本之前先规划整季:每一集都推进剧情,以钩子开场,以反转或悬念收尾,让观众想点下一集。",
+  "agent.screenwriter.season.out": "季标题、季概要、每集的标题、梗概、开场钩子、结尾悬念",
+  "agent.subtitle.translate.title": "字幕翻译",
+  "agent.subtitle.translate.desc": "把竖屏短剧的字幕逐条翻译成目标语言:口语化、简短、能在屏幕上停留的时间内读完,不合并也不拆分。",
+  "agent.subtitle.translate.out": "与原台词逐条对应的译文",
+  "agent.wiki.ask.title": "知识库问答",
+  "agent.wiki.ask.desc": "只根据检索到的编号选段回答你的问题,每个结论标注出处编号;选段里没有答案时如实说明缺什么。",
+  "agent.wiki.ask.out": "是否找到答案、回答正文、引用的选段编号",
+  "agent.var.so_far": "已规划的前几集"
 }

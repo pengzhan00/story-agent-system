@@ -2422,5 +2422,21 @@
   "agent.var.season": "Season",
   "agent.var.target": "Target",
   "agent.var.text": "Text",
-  "agent.var.tool_notes": "Tool notes"
+  "agent.var.tool_notes": "Tool notes",
+  "agent.prompt.suggest.title": "Prompt: AI suggestion",
+  "agent.prompt.suggest.desc": "The AI suggestion button next to every prompt: rewrites your prompt following your instruction and keeps your intent, details and special syntax such as weights and tags.",
+  "agent.prompt.suggest.out": "The rewritten prompt",
+  "agent.prompt.translate.title": "Prompt: translate",
+  "agent.prompt.translate.desc": "The translate button next to every prompt: a faithful translation into another language that keeps weights, placeholders and trigger words, ready to paste into a model.",
+  "agent.prompt.translate.out": "The translated prompt",
+  "agent.screenwriter.season.title": "Screenwriter: plan the season",
+  "agent.screenwriter.season.desc": "Plans a whole season before any episode is written: every episode advances the story, opens on a hook and ends on a reversal or a question that makes viewers press play on the next one.",
+  "agent.screenwriter.season.out": "Season title and summary; per episode: title, synopsis, opening hook, cliffhanger",
+  "agent.subtitle.translate.title": "Subtitle translation",
+  "agent.subtitle.translate.desc": "Translates the subtitles of a vertical short drama line by line: short, natural spoken language that can be read in the time the line is on screen, never merging or splitting lines.",
+  "agent.subtitle.translate.out": "One translation per original line, in order",
+  "agent.wiki.ask.title": "Knowledge base answer",
+  "agent.wiki.ask.desc": "Answers your question using only the numbered excerpts that were found, marks every statement with its excerpt number, and says what is missing when the excerpts do not hold the answer.",
+  "agent.wiki.ask.out": "Whether an answer was found, the answer text, the excerpt numbers it cites",
+  "agent.var.so_far": "Episodes planned so far"
 }

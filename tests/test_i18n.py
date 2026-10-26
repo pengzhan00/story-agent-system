@@ -69,3 +69,22 @@ def test_every_enum_value_has_a_label(locale: str) -> None:
             assert cat.messages.get(key), f"{locale}: missing label {key}"
             if prefix == "error":
                 assert cat.messages.get(f"{key}.remediation"), f"{locale}: missing remediation {key}"
+
+
+def test_every_agent_has_a_title_a_description_an_output_line_and_a_label_for_each_input() -> None:
+    """The prompts page shows these for every packaged agent; a missing one is shown as a raw key."""
+    import tomllib
+    from pathlib import Path
+
+    import storyagent
+
+    specs = sorted((Path(storyagent.__file__).parent / "agents" / "specs").glob("*.toml"))
+    assert specs
+    for locale in ("zh-CN", "en"):
+        catalog = get_catalog(locale)
+        for path in specs:
+            spec = tomllib.loads(path.read_text("utf-8"))
+            needed = [f"agent.{spec['name']}.{part}" for part in ("title", "desc", "out")]
+            needed += [f"agent.var.{name}" for name in spec["inputs"]]
+            missing = [key for key in needed if key not in catalog.messages]
+            assert not missing, f"{locale}: {path.name} lacks {missing}"
