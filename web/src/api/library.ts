@@ -31,5 +31,6 @@ export function useLibraryActions() {
     }),
     remove: useMutation({ mutationFn: (id: string) => del(`/api/library/${id}`), onSuccess: refresh }),
     trash: useMutation({ mutationFn: (id: string) => post<Asset>(`/api/assets/${id}/trash`), onSuccess: refresh }),
+    purge: useMutation({ mutationFn: (id: string) => post<Asset>(`/api/assets/${id}/purge`), onSuccess: refresh }),
   };
 }

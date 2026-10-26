@@ -134,7 +134,7 @@ function AssetCard({
   modules: ReturnType<typeof useWorkshop>["data"];
 }) {
   const t = useT();
-  const { trash } = useLibraryActions();
+  const { trash, purge } = useLibraryActions();
   const [filing, setFiling] = useState(false);
   const cat = categoryOf(asset);
   const targets = targetsFor(modules ?? [], mediaOfAsset(asset));
@@ -180,6 +180,17 @@ function AssetCard({
         >
           {t("web.library.trash")}
         </button>
+        {!asset.is_current ? (
+          <button
+            className="link"
+            disabled={purge.isPending}
+            onClick={() => {
+              if (window.confirm(t("web.creative.purge_confirm"))) purge.mutate(asset.id);
+            }}
+          >
+            {t("web.creative.purge")}
+          </button>
+        ) : null}
       </div>
       {filing ? <FileAs asset={asset} roles={roles} onDone={() => setFiling(false)} /> : null}
       <ErrorNote error={trash.error} />
