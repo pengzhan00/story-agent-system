@@ -158,6 +158,10 @@ def _starts(path: str, prefixes: tuple[str, ...]) -> bool:
     return any(path.startswith(p) for p in prefixes)
 
 
+# Hard deletes (file and record gone for good) are an admin's decision, whatever the role's ``write`` flag says.
+_HARD_DELETE = re.compile(r"/api/assets/[^/]+/purge(-version)?")
+
+
 def decide(cfg: AuthConfig, user: User | None, method: str, path: str) -> str | None:
     """``None`` = allowed, else the API error code: ``unauthorized`` (sign in first) or ``forbidden`` (role too low).
 
@@ -173,7 +177,7 @@ def decide(cfg: AuthConfig, user: User | None, method: str, path: str) -> str | 
         return "forbidden"
     if _starts(path, cfg.signed_in_prefixes):
         return None
-    if _starts(path, cfg.admin_prefixes):
+    if _starts(path, cfg.admin_prefixes) or _HARD_DELETE.fullmatch(path):
         return None if role.admin else "forbidden"
     if method in SAFE_METHODS:
         return None

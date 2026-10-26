@@ -59,3 +59,16 @@ def test_skin_that_glistens_is_rewritten_but_other_liquids_are_left_alone() -> N
     out = keyframe.clean("her body glistening slightly with heat-induced sheen, his skin glistening under the lamp, "
                          "liquid glistening on her back")
     assert "with a faint natural flush" in out and "lit by the lamp" in out and "glistening on her back" in out
+
+
+def test_people_are_named_by_their_own_description_not_by_the_order_they_are_listed() -> None:
+    from storyagent.workflow.seed import _character_identities
+
+    woman = {"prompt_template": "A young Chinese woman with delicate features, soft black hair. She wears a blouse."}
+    man = {"prompt_template": "A handsome East Asian male, 25 years old, sharp jaw. He wears a white shirt."}
+    chars = {"Lin": woman, "Gu": man, "Mei": woman}
+    assert _character_identities({"characters": ["Gu"]}, chars).startswith("the man is a handsome East Asian male")
+    both = _character_identities({"characters": ["Gu", "Lin"]}, chars)
+    assert both.startswith("the man is a handsome") and "the woman is a young Chinese woman" in both
+    twice = _character_identities({"characters": ["Lin", "Mei"]}, chars)
+    assert "the first woman is" in twice and "the second woman is" in twice

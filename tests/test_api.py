@@ -63,7 +63,7 @@ def job_body(project_id: int, **over: Any) -> dict[str, Any]:
 
 # ---- basics ---------------------------------------------------------------------------------------
 def test_ready_and_meta(client: TestClient) -> None:
-    assert client.get("/api/ready").json() == {"ok": True, "schema_version": 21}
+    assert client.get("/api/ready").json() == {"ok": True, "schema_version": 22}
     m = client.get("/api/meta").json()
     assert {"value": "video.generate", "label": "Video"} in [
         {"value": k["value"], "label": k["label"]} for k in m["kinds"]

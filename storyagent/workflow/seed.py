@@ -86,15 +86,30 @@ def _character_identity(template: str) -> str:
     return t.strip().rstrip(",;. ")
 
 
+_FEMALE = re.compile(r"\b(woman|female|girl|lady)\b", re.IGNORECASE)
+_MALE = re.compile(r"\b(man|male|boy|gentleman)\b", re.IGNORECASE)
+_ORDINALS = ("first", "second", "third", "fourth")
+
+
 def _character_identities(shot: dict[str, Any], chars: dict[str, dict[str, Any]]) -> str:
-    """'The woman is ... The man is ...' block naming each character in order, for verbatim injection."""
-    labels = ("the woman", "the man", "the third person", "the fourth person")
-    parts: list[str] = []
-    for i, name in enumerate(shot["characters"]):
+    """'The woman is ... the man is ...' block for verbatim injection. A person is called by the sex their own
+    description gives (never by the order they are listed in: a lone man is 'the man'); two of the same sex are told
+    apart as 'the first woman' / 'the second woman'."""
+    found: list[tuple[str, str]] = []
+    for name in shot["characters"]:
         c = chars.get(name, {})
         ident = _character_identity(c.get("prompt_template", "") or c.get("appearance", ""))
-        if ident:
-            parts.append(f"{labels[i] if i < len(labels) else f'the person {i + 1}'} is {ident}.")
+        if not ident:
+            continue
+        noun = "woman" if _FEMALE.search(ident) else "man" if _MALE.search(ident) else "person"
+        found.append((noun, ident[0].lower() + ident[1:]))
+    total = {noun: sum(1 for n, _ in found if n == noun) for noun, _ in found}
+    seen: dict[str, int] = {}
+    parts: list[str] = []
+    for noun, ident in found:
+        seen[noun] = seen.get(noun, 0) + 1
+        label = f"the {noun}" if total[noun] == 1 else f"the {_ORDINALS[min(seen[noun], 4) - 1]} {noun}"
+        parts.append(f"{label} is {ident}.")
     return " ".join(parts)
 
 

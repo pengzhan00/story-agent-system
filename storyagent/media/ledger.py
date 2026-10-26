@@ -591,30 +591,45 @@ class Ledger:
         )
         return self.get_asset(asset_id)
 
-    def purge_asset(self, asset_id: str) -> AssetRecord:
-        """Hard delete: remove the row and its file from disk. Refuse to purge a current asset (trash it first)."""
-        a = self.get_asset(asset_id)
-        if a.is_current:
-            raise LedgerError("trash a current asset before purging it")
-        if a.path:
-            (self.settings.home / a.path).unlink(missing_ok=True)
-        self.db.conn.execute("DELETE FROM media_assets WHERE id=?", (asset_id,))
-        self.db.conn.commit()
-        return a
-
-    def purge_version(self, spec_id: str, version: int) -> int:
-        """Hard-delete every asset of one spec version (rows and files). Refuse while any is current."""
+    def _library_names(self, asset_ids: list[str]) -> list[str]:
+        """Library entries made from these assets: deleting an asset row would cascade to them (and the file they
+        point to would be gone), so a published asset is never purged."""
+        if not asset_ids:
+            return []
+        marks = ",".join("?" * len(asset_ids))
         rows = self.db.conn.execute(
-            "SELECT id, path, is_current FROM media_assets WHERE spec_id=? AND spec_version=?",
-            (spec_id, version)).fetchall()
-        for r in rows:
-            if r["is_current"]:
-                raise LedgerError("trash the current asset of this version before purging it")
-        n = 0
+            f"SELECT role, name FROM library_items WHERE asset_id IN ({marks})", asset_ids).fetchall()
+        return [f"{r['role']}/{r['name']}" for r in rows]
+
+    def _purge_rows(self, rows: list[Any]) -> int:
+        """Delete the records in one transaction first, the files after it: a file is never lost for a record that
+        stays (an asset whose file is gone is not 'completed')."""
+        names = self._library_names([r["id"] for r in rows])
+        if names:
+            raise LedgerError(f"published in the library ({', '.join(names)}); remove it there first")
+        with self.db.transaction() as conn:
+            for r in rows:
+                conn.execute("DELETE FROM media_assets WHERE id=?", (r["id"],))
         for r in rows:
             if r["path"]:
                 (self.settings.home / r["path"]).unlink(missing_ok=True)
-            self.db.conn.execute("DELETE FROM media_assets WHERE id=?", (r["id"],))
-            n += 1
-        self.db.conn.commit()
-        return n
+        return len(rows)
+
+    def purge_asset(self, asset_id: str) -> AssetRecord:
+        """Hard delete: remove the row and its file from disk. Refuse to purge a current asset (trash it first) or one
+        that is published in the library."""
+        a = self.get_asset(asset_id)
+        if a.is_current:
+            raise LedgerError("trash a current asset before purging it")
+        self._purge_rows([{"id": a.id, "path": a.path}])
+        return a
+
+    def purge_version(self, spec_id: str, version: int) -> int:
+        """Hard-delete every asset of one spec version (rows and files). Refuse while any is current or published in
+        the library."""
+        rows = self.db.conn.execute(
+            "SELECT id, path, is_current FROM media_assets WHERE spec_id=? AND spec_version=?",
+            (spec_id, version)).fetchall()
+        if any(r["is_current"] for r in rows):
+            raise LedgerError("trash the current asset of this version before purging it")
+        return self._purge_rows(rows)

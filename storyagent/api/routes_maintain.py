@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Query, Request
 
 from storyagent import maintain
 
@@ -22,7 +22,7 @@ def prune_orphans(project_id: int, request: Request, dry_run: bool = False) -> d
 
 @router.post("/prune-history")
 def prune_history(
-    request: Request, days: int = 30, project_id: int | None = None, dry_run: bool = False
+    request: Request, days: int = Query(30, ge=1, le=3650), project_id: int | None = None, dry_run: bool = False
 ) -> dict[str, Any]:
     """Delete audit_log / generation_logs / job_events rows older than ``days`` days."""
     ctx = ctx_of(request)

@@ -19,7 +19,7 @@ from storyagent.domain import MediaKind, QualityTier
 from storyagent.util import dumps, loads, new_id
 
 from .contracts import AssetRecord, JobRecord, MediaJob
-from .ledger import Ledger
+from .ledger import Ledger, LedgerError
 from .prompts import render_prompt
 
 _SUBJECT = re.compile(r"^[a-z][a-z_]*\.[a-z][a-z_]*$")
@@ -203,13 +203,22 @@ class SpecStore:
             f"AND {shot_of} NOT IN (SELECT id FROM shots WHERE project_id=?)",
             (project_id, project_id),
         ).fetchall()
-        assets_freed = 0
+        assets_freed = kept = 0
         if not dry_run:
             for row in orphans:
-                assets_freed += self.ledger.purge_version(row["id"], row["version"])
+                # a slot nobody asks for any more: leave it empty (soft) before the files go
+                self.db.conn.execute(
+                    "UPDATE media_assets SET is_current=0, trashed_at=COALESCE(trashed_at, ?) "
+                    "WHERE spec_id=? AND spec_version=? AND is_current=1",
+                    (self.ledger._now(), row["id"], row["version"]))
+                try:
+                    assets_freed += self.ledger.purge_version(row["id"], row["version"])
+                except LedgerError:
+                    kept += 1          # published in the library: the spec and its assets stay
+                    continue
                 self.db.conn.execute("DELETE FROM gen_specs WHERE id=?", (row["id"],))
             self.db.conn.commit()
-        return {"specs": len(orphans), "assets": assets_freed}
+        return {"specs": len(orphans) - kept, "assets": assets_freed, "kept": kept}
 
     def edit(
         self, project_id: int, subject_type: str, subject_id: str, slot: str = "main", *,

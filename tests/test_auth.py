@@ -73,6 +73,11 @@ def test_the_permission_matrix(fsettings: Settings, store: AuthStore) -> None:
     assert verdict("producer", "GET", "/api/users") == "forbidden"
     assert verdict("editor", "GET", "/api/audit") == "forbidden"
     assert verdict("admin", "GET", "/api/users") is None and verdict("admin", "POST", "/api/users") is None
+    for hard in ("/api/maintain/prune-history", "/api/maintain/prune-orphans", "/api/assets/abc/purge",
+                 "/api/assets/abc/purge-version"):          # deleting for good (even the audit log) is an admin's call
+        assert verdict("producer", "POST", hard) == "forbidden" and verdict("editor", "POST", hard) == "forbidden"
+        assert verdict("admin", "POST", hard) is None
+    assert verdict("editor", "POST", "/api/assets/abc/trash") is None           # the soft delete stays a plain write
     off = token_settings(fsettings, "off").auth
     assert decide(off, None, "DELETE", "/api/projects/1") is None              # auth off: everything is allowed
 

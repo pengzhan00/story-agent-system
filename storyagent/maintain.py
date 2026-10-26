@@ -25,14 +25,18 @@ def prune_orphans(specs: SpecStore, project_id: int, *, dry_run: bool = False) -
 def prune_history(
     db: Database, *, days: int = 30, project_id: int | None = None, dry_run: bool = False
 ) -> dict[str, Any]:
-    """Delete rows older than ``days`` days from the history tables (audit log, LLM logs, job events)."""
+    """Delete rows older than ``days`` days from the history tables (audit log, LLM logs, job events). With
+    ``project_id`` only that project's rows go (job events through the jobs they belong to)."""
+    if days < 1:
+        raise ValueError("days must be at least 1")
     cutoff = iso_at(time.time() - days * 86400)
     deleted: dict[str, int] = {}
     for table, col in HISTORY_TABLES:
         where: str = f"{col} < ?"
         args: list[Any] = [cutoff]
-        if project_id is not None and table != "job_events":
-            where += " AND project_id=?"
+        if project_id is not None:
+            where += (" AND job_id IN (SELECT id FROM media_jobs WHERE project_id=?)" if table == "job_events"
+                      else " AND project_id=?")
             args.append(project_id)
         if dry_run:
             n = db.conn.execute(f"SELECT COUNT(*) FROM {table} WHERE {where}", args).fetchone()[0]

@@ -86,6 +86,8 @@ def allowed_models(settings: Settings, spec: SpecRecord) -> set[str]:
             allowed.add(settings.default_model(MediaKind.IMAGE_EDIT.value).ref)
     except ConfigError:
         pass
+    if spec.subject_type == "shot.video" and not spec.model_ref:
+        allowed.add(SOUND_VIDEO_MODEL)      # a clip that carries its own sound (project option video_with_sound)
     return allowed
 
 
@@ -262,7 +264,8 @@ def job_preparer(
             frame = current_asset(ledger, key) if key else None
             if frame is None:
                 return job
-            return MediaJob(**{**job.__dict__, "inputs": {**job.inputs, "refs": [f"asset:{frame.id}"]}})
+            job = MediaJob(**{**job.__dict__, "inputs": {**job.inputs, "refs": [f"asset:{frame.id}"]}})
+            return shot_with_sound(spec_store, spec, job) if (project_settings or {}).get("video_with_sound") else job
         if spec.subject_type == "dialogue.line" and not spec.params.get("voice_ref"):
             voice = default_voice_of(settings, project_settings)
             if voice:
