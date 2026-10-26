@@ -6,6 +6,7 @@ Everything user-editable goes through here; media generation never touches these
 from __future__ import annotations
 
 import json
+import uuid
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
@@ -362,6 +363,54 @@ class StoryStore:
 
     def list_scripts(self, project_id: int) -> list[dict[str, Any]]:
         return self._list("scripts", project_id)
+
+    # -- workflow snapshots: one-click undo for stages that rewrite story tables -------------------
+    _SNAPSHOT_SEASON_FIELDS = ("title", "summary", "planned_episodes", "status")
+    _SNAPSHOT_EPISODE_FIELDS = ("title", "summary", "hook", "cliffhanger", "status")
+
+    def snapshot_story(self, project_id: int, stage: str = "outline") -> str:
+        """Snapshot the seasons and episodes of a project so a stage that rewrites them can be undone."""
+        seasons = [dict(r) for r in self.db.conn.execute(
+            "SELECT * FROM seasons WHERE project_id=?", (project_id,)).fetchall()]
+        episodes = [dict(r) for r in self.db.conn.execute(
+            "SELECT * FROM episodes WHERE project_id=?", (project_id,)).fetchall()]
+        payload = json.dumps({"seasons": seasons, "episodes": episodes}, ensure_ascii=False, default=str)
+        sid = uuid.uuid4().hex
+        self.db.conn.execute(
+            "INSERT INTO workflow_snapshots(id, project_id, stage, created_at, payload) VALUES(?,?,?,?,?)",
+            (sid, project_id, stage, now_iso(), payload))
+        self.db.conn.commit()
+        return sid
+
+    def list_snapshots(self, project_id: int, stage: str | None = None) -> list[dict[str, Any]]:
+        where, args = "project_id=?", [project_id]
+        if stage:
+            where += " AND stage=?"
+            args.append(stage)
+        return [dict(r) for r in self.db.conn.execute(
+            f"SELECT id, stage, created_at FROM workflow_snapshots WHERE {where} ORDER BY created_at DESC",
+            args).fetchall()]
+
+    def restore_snapshot(self, project_id: int, snapshot_id: str) -> dict[str, Any]:
+        """Put the seasons and episodes of a snapshot back; returns how many rows were restored."""
+        row = self.db.conn.execute(
+            "SELECT payload FROM workflow_snapshots WHERE id=? AND project_id=?", (snapshot_id, project_id)
+        ).fetchone()
+        if row is None:
+            raise StoryNotFound(f"snapshot {snapshot_id}")
+        data = json.loads(row["payload"])
+        with self.db.transaction():
+            for s in data.get("seasons", []):
+                vals = {f: s[f] for f in self._SNAPSHOT_SEASON_FIELDS if f in s}
+                if vals:
+                    self.db.conn.execute(
+                        f"UPDATE seasons SET {', '.join(f'{k}=?' for k in vals)} WHERE id=?", [*vals.values(), s["id"]])
+            for e in data.get("episodes", []):
+                vals = {f: e[f] for f in self._SNAPSHOT_EPISODE_FIELDS if f in e}
+                if vals:
+                    self.db.conn.execute(
+                        f"UPDATE episodes SET {', '.join(f'{k}=?' for k in vals)} WHERE id=?", [*vals.values(), e["id"]])
+        return {"seasons": len(data.get("seasons", [])), "episodes": len(data.get("episodes", []))}
 
     def save_script(
         self, project_id: int, episode_no: int, *, title: str, synopsis: str, acts: list[dict[str, Any]],

@@ -221,6 +221,7 @@ OUTLINE_CHUNK = 15      # episodes planned per request; later chunks see what th
 
 def outline(ctx: Ctx) -> dict[str, Any]:
     """Plan a whole season: title/synopsis/hook/cliffhanger per episode, so the scripts that follow stay on one arc."""
+    ctx.store.snapshot_story(ctx.pid, "outline")
     plan = _plan(ctx)
     season_no = ctx.season_of(int(ctx.params.get("episode") or 1))
     ctx.store.ensure_season(ctx.pid, season_no)
