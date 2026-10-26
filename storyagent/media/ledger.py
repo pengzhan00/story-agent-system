@@ -590,3 +590,14 @@ class Ledger:
             "UPDATE media_assets SET trashed_at=?, is_current=0 WHERE id=?", (self._now(), asset_id)
         )
         return self.get_asset(asset_id)
+
+    def purge_asset(self, asset_id: str) -> AssetRecord:
+        """Hard delete: remove the row and its file from disk. Refuse to purge a current asset (trash it first)."""
+        a = self.get_asset(asset_id)
+        if a.is_current:
+            raise LedgerError("trash a current asset before purging it")
+        if a.path:
+            (self.settings.home / a.path).unlink(missing_ok=True)
+        self.db.conn.execute("DELETE FROM media_assets WHERE id=?", (asset_id,))
+        self.db.conn.commit()
+        return a
