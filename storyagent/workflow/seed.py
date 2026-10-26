@@ -190,7 +190,8 @@ def seed_specs(ctx: Ctx) -> dict[str, Any]:
         portraits[c["name"]] = seeder.sync(PORTRAIT, str(c["id"]), MediaKind.IMAGE_GENERATE, prompt=prompt,
                                            negative_prompt=neg, refs=list(c["ref_images"]), params=params,
                                            seed=keyframe.fixed_seed(ctx.pid, f"character:{c['name']}"))
-        sample = str(ctx.settings.workflow.get("voice_sample_text") or "")   # a neutral sample, from config
+        sample = str(extra.get("voice_sample_text") or ctx.settings.workflow.get("voice_sample_text") or "")
+        # ^ the character designer writes a neutral sample; the config value is only the fallback
         vp = {"voice_ref": _voice_param(c)} if _voice_param(c) else {}
         vp["emotion"] = False          # the voice_profile above is a description, not a speaking tone
         voices[c["name"]] = seeder.sync(VOICE, str(c["id"]), MediaKind.AUDIO_TTS, prompt=c["voice_profile"],

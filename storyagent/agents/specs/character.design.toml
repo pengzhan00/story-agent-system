@@ -25,4 +25,4 @@ and relatives must look related.
 `prompt_template`: the same description but WITHOUT the costume (appearance + style only), with the placeholders {action}
 and {setting} where a shot adds them; what the character is wearing is described per shot, never baked into this template.
 `voice_profile`: age, pitch, pace, timbre, accent, speaking habits (for casting a voice).
-`voice_sample_text`: one sentence, 15-30 characters in $language, that shows the character's speaking style."""
+`voice_sample_text`: one neutral sample sentence, 15-30 characters in $language, that shows the character's speaking style — something they could say to a stranger (a greeting, an introduction), NOT one of the drama's own lines and no moans, sighs or trailing ellipses."""
