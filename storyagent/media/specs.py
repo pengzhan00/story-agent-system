@@ -193,12 +193,14 @@ class SpecStore:
         )
 
     def prune_orphan_shots(self, project_id: int, *, dry_run: bool = False) -> dict[str, int]:
-        """Drop shot.keyframe/shot.video specs whose shot no longer exists (left behind by re-planning), and
-        hard-delete the assets made from them. Only specs of deleted shots are touched, so it is safe to run."""
+        """Drop shot.keyframe/shot.video/dialogue.line/shot.sfx specs whose shot no longer exists (left behind by
+        re-planning), and hard-delete the assets made from them. Only specs of deleted shots are touched."""
+        shot_of = ("CAST(CASE WHEN instr(subject_id,'#')>0 THEN substr(subject_id,1,instr(subject_id,'#')-1) "
+                   "ELSE subject_id END AS INTEGER)")
         orphans = self.db.conn.execute(
             "SELECT id, version FROM gen_specs WHERE project_id=? "
-            "AND subject_type IN ('shot.keyframe','shot.video') "
-            "AND CAST(subject_id AS INTEGER) NOT IN (SELECT id FROM shots WHERE project_id=?)",
+            "AND subject_type IN ('shot.keyframe','shot.video','dialogue.line','shot.sfx') "
+            f"AND {shot_of} NOT IN (SELECT id FROM shots WHERE project_id=?)",
             (project_id, project_id),
         ).fetchall()
         assets_freed = 0
