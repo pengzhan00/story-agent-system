@@ -67,7 +67,7 @@ export function useProjectBin() {
 export function useProjectSettings(id: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { target_sec?: number | null; default_voice?: string | null; video_share?: number | null; video_budget_hours?: number | null; video_with_sound?: boolean | null; edit?: Record<string, unknown> | null }) => patch<Project>(`/api/projects/${id}/settings`, body),
+    mutationFn: (body: { target_sec?: number | null; default_voice?: string | null; video_share?: number | null; video_budget_hours?: number | null; video_with_sound?: boolean | null; agents?: Record<string, Record<string, unknown>> | null; edit?: Record<string, unknown> | null }) => patch<Project>(`/api/projects/${id}/settings`, body),
     onSuccess: (p) => qc.setQueryData(["project", id], p),
   });
 }

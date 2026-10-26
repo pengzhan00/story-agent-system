@@ -4974,6 +4974,15 @@ export interface components {
          */
         ProjectSettingsPatch: {
             /**
+             * Agents
+             * @description this project's own edits to some agent prompts (name -> {system?, prompt?, temperature?, max_tokens?}); null = the shared prompts. Other projects are unaffected
+             */
+            agents?: {
+                [key: string]: {
+                    [key: string]: unknown;
+                };
+            } | null;
+            /**
              * Allow Remote
              * @description allow models that run in the cloud (prompts and reference files leave this machine)
              */

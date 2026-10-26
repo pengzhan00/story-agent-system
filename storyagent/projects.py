@@ -18,7 +18,7 @@ from storyagent.pipelines import check_choices
 _PATCHABLE = ("name", "description", "genre", "content_language", "delivery_profile", "aspect_ratio", "kind",
               "pipeline", "rating")
 _SETTINGS_KEYS = ("compliance", "models", "allow_restricted_licenses", "target_sec", "allow_remote", "default_voice",
-                  "video_share", "video_budget_hours", "edit", "pipeline_models", "video_with_sound")
+                  "video_share", "video_budget_hours", "edit", "pipeline_models", "video_with_sound", "agents")
 
 
 class ProjectNotFound(LookupError):

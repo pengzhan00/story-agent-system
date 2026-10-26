@@ -10,7 +10,8 @@ from __future__ import annotations
 import json
 import string
 import tomllib
-from dataclasses import dataclass, field
+from collections.abc import Mapping
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -154,3 +155,17 @@ def remove_override(settings: Settings, name: str) -> AgentSpec:
 
 def packaged_spec(name: str) -> AgentSpec:
     return load_specs(None)[name]
+
+
+def with_overrides(specs: Mapping[str, AgentSpec], overrides: Mapping[str, Any]) -> dict[str, AgentSpec]:
+    """A project's own edits to some agent prompts: ``name -> {system?, prompt?, temperature?, max_tokens?}``.
+    Anything else is ignored, and an unknown agent name is skipped (the packaged spec stays)."""
+    out = dict(specs)
+    for name, patch in overrides.items():
+        spec = out.get(str(name))
+        if spec is None or not isinstance(patch, Mapping):
+            continue
+        allowed = {k: v for k, v in patch.items() if k in ("system", "prompt", "temperature", "max_tokens")}
+        if allowed:
+            out[str(name)] = replace(spec, **allowed)
+    return out

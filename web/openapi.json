@@ -4876,6 +4876,22 @@
       "ProjectSettingsPatch": {
         "description": "Merged into ``projects.settings``; a key set to null is removed.",
         "properties": {
+          "agents": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "this project's own edits to some agent prompts (name -> {system?, prompt?, temperature?, max_tokens?}); null = the shared prompts. Other projects are unaffected",
+            "title": "Agents"
+          },
           "allow_remote": {
             "anyOf": [
               {

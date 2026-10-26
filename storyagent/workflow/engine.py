@@ -8,7 +8,7 @@ from typing import Any
 
 from storyagent import script_text
 from storyagent.agents import AgentRunner
-from storyagent.agents.registry import AgentSpecError
+from storyagent.agents.registry import AgentSpecError, load_specs, with_overrides
 from storyagent.agents.runner import language_name
 from storyagent.config import Settings
 from storyagent.db import Database
@@ -58,6 +58,14 @@ class WorkflowEngine:
         self.store, self.state, self.projects = StoryStore(db), WorkflowState(db), ProjectStore(db, settings)
         self.spec_store = spec_store or SpecStore(db, settings, Ledger(db, settings))
 
+    def agents_for(self, project: Any) -> AgentRunner:
+        """The project's own edits to some agent prompts (``settings['agents']``) layered over the shared specs;
+        without any, the shared runner is used unchanged."""
+        overrides = (getattr(project, "settings", None) or {}).get("agents") or {}
+        if not overrides:
+            return self.agents
+        return AgentRunner(self.settings, self.router, specs=with_overrides(load_specs(self.settings), overrides))
+
     def stages_to_run(self, project_id: int, requested: list[str] | None, episode: int = 1) -> list[str]:
         """``None`` = resume: every stage that is not completed (stale ones included), in pipeline order."""
         return self.state.pending_stages(project_id, requested, episode)
@@ -97,7 +105,7 @@ class WorkflowEngine:
         project = self.projects.get(project_id)
         ctx = Ctx(
             settings_for(self.settings, project.pipeline, project.settings.get("pipeline_models")), self.db, self.store,
-            self.state, self.agents, self.projects, project,
+            self.state, self.agents_for(project), self.projects, project,
             dict(params or {}), progress or (lambda *_: None), cancelled or (lambda: False), self.spec_store, stage,
         )
         self.state.set_stage(project_id, stage, "running", episode=episode)

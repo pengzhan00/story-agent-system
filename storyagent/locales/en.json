@@ -1057,6 +1057,7 @@
   "web.process.prompt": "What was asked",
   "web.process.response": "The answer",
   "web.prompts.intro": "The instructions behind every AI step, grouped by pipeline stage. Edited wording applies to the next call (also in a running worker).",
+  "web.prompts.project_only": "This project only (other projects keep the shared prompts)",
   "web.prompts.modified": "Edited by you",
   "web.prompts.packaged": "Built-in",
   "web.prompts.placeholders": "Insertable data (click to insert at the cursor; replaced with your story's data when it runs):",

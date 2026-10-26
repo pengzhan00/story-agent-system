@@ -1057,6 +1057,7 @@
   "web.process.prompt": "提问内容",
   "web.process.response": "回答",
   "web.prompts.intro": "每个 AI 步骤背后的指令,按制作流程分组。改了措辞,下一次调用就生效(已经在运行的 worker 也一样)。",
+  "web.prompts.project_only": "只改这个项目(其它项目不受影响)",
   "web.prompts.modified": "你已修改",
   "web.prompts.packaged": "内置",
   "web.prompts.placeholders": "可插入的内容(点一下插入到光标处,运行时会换成你的故事数据):",

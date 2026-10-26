@@ -161,6 +161,10 @@ class ProjectSettingsPatch(BaseModel):
         default=None,
         description="generate each shot clip with its own sound (LTX-2.5-av, the line is spoken in the clip) "
                     "instead of a silent clip plus a separate TTS pass; null = off")
+    agents: dict[str, dict[str, Any]] | None = Field(
+        default=None,
+        description="this project's own edits to some agent prompts (name -> {system?, prompt?, temperature?, "
+                    "max_tokens?}); null = the shared prompts. Other projects are unaffected")
 
 
 # -- jobs -------------------------------------------------------------------------------------------

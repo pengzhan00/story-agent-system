@@ -1,9 +1,10 @@
 import { PromptAssist } from "../components/PromptAssist";
 import { useEffect, useRef, useState } from "react";
-import { useAgentEdit, useAgents } from "../api/hooks";
+import { useAgentEdit, useAgents, useProjectSettings, useProjects } from "../api/hooks";
 import type { Agent } from "../api/types";
 import { ErrorNote } from "../components/ErrorNote";
 import { useT } from "../i18n";
+import { useQueryClient } from "@tanstack/react-query";
 
 /** Where each AI step sits in the film-making pipeline (the stage names come from the workflow catalog). */
 const STAGE_OF: Record<string, string> = {
@@ -27,12 +28,14 @@ const STAGE_ORDER = ["analyze", "cast", "script", "scenes", "music", "shotplan",
 const stageLabel = (stage: string) =>
   stage === "review" ? "web.prompts.stage_review" : stage === "workshop" ? "web.prompts.stage_workshop" : `workflow.stage.${stage}`;
 
-function Editor({ agent }: { agent: Agent }) {
+function Editor({ agent, projectId, projectOnly }: { agent: Agent; projectId: number | null; projectOnly: boolean }) {
   const t = useT();
   const system = useRef<HTMLTextAreaElement>(null);
   const promptBox = useRef<HTMLTextAreaElement>(null);
   const lastBox = useRef<"system" | "prompt">("prompt");
   const edit = useAgentEdit();
+  const project = useProjectSettings(projectId ?? 0);
+  const qc = useQueryClient();
   const [d, setD] = useState({
     system: agent.system, prompt: agent.prompt, model: agent.model, temperature: String(agent.temperature),
     max_tokens: String(agent.max_tokens), attempts: String(agent.attempts),
@@ -57,6 +60,15 @@ function Editor({ agent }: { agent: Agent }) {
       el?.setSelectionRange(start + token.length, start + token.length);
     });
   }
+  const saveProject = () => {
+    if (projectId === null) return;
+    project.mutate(
+      { agents: { [agent.name]: { system: d.system, prompt: d.prompt, temperature: Number(d.temperature), max_tokens: Number(d.max_tokens) } } },
+      { onSuccess: () => qc.invalidateQueries({ queryKey: ["project", projectId] }) },
+    );
+  };
+  const canSave = projectOnly ? projectId !== null : true;
+  const busy = projectOnly ? project.isPending : edit.save.isPending;
   return (
     <section className="card stack" id={agent.name}>
       <div className="row">
@@ -108,13 +120,17 @@ function Editor({ agent }: { agent: Agent }) {
       <div className="row">
         <button
           className="primary"
-          disabled={!dirty || edit.save.isPending}
-          onClick={() =>
+          disabled={!dirty || busy || !canSave}
+          onClick={() => {
+            if (projectOnly) {
+              saveProject();
+              return;
+            }
             edit.save.mutate({
               name: agent.name,
               body: { system: d.system, prompt: d.prompt, model: d.model, temperature: Number(d.temperature), max_tokens: Number(d.max_tokens), attempts: Number(d.attempts) },
-            })
-          }
+            });
+          }}
         >
           {t("web.save")}
         </button>
@@ -130,7 +146,7 @@ function Editor({ agent }: { agent: Agent }) {
         ) : null}
         <span className="muted small">{t("web.prompts.applies")}</span>
       </div>
-      <ErrorNote error={edit.save.error ?? edit.reset.error} />
+      <ErrorNote error={edit.save.error ?? edit.reset.error ?? project.error} />
     </section>
   );
 }
@@ -142,10 +158,30 @@ export function PromptsPage() {
   const hash = typeof window === "undefined" ? "" : window.location.hash.slice(1);
   const [pick, setPick] = useState(hash);
   const current = agents.data?.find((a) => a.name === pick) ?? agents.data?.[0];
+  const projects = useProjects();
+  const [pid, setPid] = useState<number | null>(null);
+  const [projectOnly, setProjectOnly] = useState(false);
+  const activePid = pid ?? projects.data?.[0]?.id ?? null;
   return (
     <div className="stack">
       <h1>{t("web.nav.prompts")}</h1>
       <p className="muted">{t("web.prompts.intro")}</p>
+      <div className="row">
+        <label className="field">
+          <span>{t("web.maintain.project")}</span>
+          <select value={activePid ?? ""} onChange={(e) => setPid(Number(e.target.value))}>
+            {(projects.data ?? []).map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="check">
+          <input type="checkbox" checked={projectOnly} onChange={(e) => setProjectOnly(e.target.checked)} />
+          <span>{t("web.prompts.project_only")}</span>
+        </label>
+      </div>
       <ErrorNote error={agents.error} />
       <div className="stack">
         {STAGE_ORDER.map((stage) => {
@@ -166,7 +202,7 @@ export function PromptsPage() {
           );
         })}
       </div>
-      {current ? <Editor key={current.name} agent={current} /> : null}
+      {current ? <Editor key={`${current.name}:${projectOnly ? activePid : "global"}`} agent={current} projectId={activePid} projectOnly={projectOnly} /> : null}
     </div>
   );
 }
