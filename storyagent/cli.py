@@ -397,7 +397,22 @@ def _cmd_media_trash(s: Settings, a: argparse.Namespace) -> int:
 
 
 def _cmd_media_purge(s: Settings, a: argparse.Namespace) -> int:
-    ledger = _ctx(s).ledger
+    c = _ctx(s)
+    ledger = c.ledger
+    if a.project is not None:
+        ProjectStore(c.db, s).get(a.project)
+        where = "project_id=? AND trashed_at IS NOT NULL"
+        args: list[Any] = [a.project]
+        if a.include_current:
+            where = "project_id=?"          # everything, current included (soft-deleted first below)
+            args = [a.project]
+        rows = ledger.db.conn.execute(f"SELECT id, is_current FROM media_assets WHERE {where}", args).fetchall()
+        for r in rows:
+            if r["is_current"]:
+                ledger.trash_asset(r["id"])     # a current asset must be trashed before it can be purged
+            ledger.purge_asset(r["id"])
+        print(t("cli.asset.purged_many", n=len(rows)))
+        return 0
     if a.all_trash:
         ids = [r["id"] for r in ledger.db.conn.execute(
             "SELECT id FROM media_assets WHERE trashed_at IS NOT NULL").fetchall()]
@@ -1427,6 +1442,10 @@ def build_parser() -> argparse.ArgumentParser:
     mpurge = add(me, "purge", _cmd_media_purge)
     mpurge.add_argument("id", nargs="?")
     mpurge.add_argument("--all-trash", action="store_true", help="hard-delete every trashed asset")
+    mpurge.add_argument("--project", type=int,
+                        help="hard-delete this project's assets (trashed ones, or all with --include-current)")
+    mpurge.add_argument("--include-current", action="store_true",
+                        help="with --project: also the current assets (trashed first)")
 
     asset = sub.add_parser("asset").add_subparsers(dest="cmd", required=True)
     ai = add(asset, "import", _cmd_asset_import)

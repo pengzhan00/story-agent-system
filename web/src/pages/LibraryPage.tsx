@@ -125,13 +125,15 @@ function FileAs({ asset, roles, onDone }: { asset: Asset; roles: string[]; onDon
 }
 
 function AssetCard({
-  asset, source, named, roles, modules,
+  asset, source, named, roles, modules, selected, onToggleSelect,
 }: {
   asset: Asset;
   source: string;
   named: string[];
   roles: string[];
   modules: ReturnType<typeof useWorkshop>["data"];
+  selected: boolean;
+  onToggleSelect: (id: string) => void;
 }) {
   const t = useT();
   const { trash, purge } = useLibraryActions();
@@ -142,6 +144,7 @@ function AssetCard({
   return (
     <li className="card stack">
       <div className="row">
+        <input type="checkbox" aria-label={t("web.library.select")} checked={selected} onChange={() => onToggleSelect(asset.id)} />
         <span className="chip">{t(`library.cat.${cat}`)}</span>
         <span className="muted small">{source}</span>
         <span className="spacer" />
@@ -272,6 +275,7 @@ export function LibraryPage() {
   const [tab, setTab] = useState<string>("all");
   const [scope, setScope] = useState<string>("");
   const [q, setQ] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const all = assets.data ?? [];
   // library copies are listed under "named"; their asset copies stay out of the kind tabs
   const copies = useMemo(() => new Set((items.data ?? []).map((i) => i.asset.id)), [items.data]);
@@ -288,6 +292,18 @@ export function LibraryPage() {
   const shown = scoped.filter((a) => (tab === "all" || categoryOf(a) === (tab as Category)) && (!needle || a.id.includes(needle) || a.kind.includes(needle) || a.slot.toLowerCase().includes(needle)));
   const namedBy = (assetId: string) => (items.data ?? []).filter((i) => i.source_asset_id === assetId).map((i) => i.ref);
   const namedItems = (items.data ?? []).filter((i) => !needle || i.ref.toLowerCase().includes(needle));
+  const toggleSelect = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const toggleAll = () => {
+    setSelected((prev) => (prev.size === shown.length ? new Set() : new Set(shown.map((a) => a.id))));
+  };
+  const selCount = shown.filter((a) => selected.has(a.id)).length;
+  const batch = useLibraryActions();
   return (
     <div className="stack">
       <h1>{t("web.library.title")}</h1>
@@ -324,6 +340,29 @@ export function LibraryPage() {
         ) : null}
         <input type="search" value={q} placeholder={t("web.library.search")} aria-label={t("web.library.search")} onChange={(e) => setQ(e.target.value)} />
       </div>
+      {shown.length > 0 ? (
+        <div className="row small">
+          <button className="link" onClick={toggleAll}>
+            {selCount === shown.length ? t("web.library.unselect_all") : t("web.library.select_all")}
+          </button>
+          {selCount > 0 ? (
+            <>
+              <span className="muted">{t("web.library.selected_n", { n: selCount })}</span>
+              <button className="link" disabled={batch.trashMany.isPending} onClick={() => {
+                if (window.confirm(t("web.library.trash_many_confirm", { n: selCount }))) batch.trashMany.mutate([...selected]);
+              }}>
+                {t("web.library.trash")}
+              </button>
+              <button className="link" disabled={batch.purgeMany.isPending} onClick={() => {
+                if (window.confirm(t("web.library.purge_many_confirm", { n: selCount }))) batch.purgeMany.mutate([...selected]);
+              }}>
+                {t("web.creative.purge")}
+              </button>
+            </>
+          ) : null}
+          <ErrorNote error={batch.trashMany.error ?? batch.purgeMany.error} />
+        </div>
+      ) : null}
       {tab === SCRIPTS ? (
         <ProjectScripts q={q} projectId={null} />
       ) : tab === NAMED ? (
@@ -341,7 +380,7 @@ export function LibraryPage() {
       ) : (
         <ul className="grid">
           {shown.map((a) => (
-            <AssetCard key={a.id} asset={a} source={projectName(a.project_id)} named={namedBy(a.id)} roles={roles.data ?? []} modules={shop.data} />
+            <AssetCard key={a.id} asset={a} source={projectName(a.project_id)} named={namedBy(a.id)} roles={roles.data ?? []} modules={shop.data} selected={selected.has(a.id)} onToggleSelect={toggleSelect} />
           ))}
         </ul>
       )}

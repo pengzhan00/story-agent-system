@@ -32,5 +32,21 @@ export function useLibraryActions() {
     remove: useMutation({ mutationFn: (id: string) => del(`/api/library/${id}`), onSuccess: refresh }),
     trash: useMutation({ mutationFn: (id: string) => post<Asset>(`/api/assets/${id}/trash`), onSuccess: refresh }),
     purge: useMutation({ mutationFn: (id: string) => post<Asset>(`/api/assets/${id}/purge`), onSuccess: refresh }),
+    // Batch: one call per id (the single-asset endpoints exercise the same guards). Each id is processed and the
+    // list refreshes once when done; results are collected so the caller can report how many actually went through.
+    trashMany: useMutation({
+      mutationFn: async (ids: string[]) => {
+        const res = await Promise.allSettled(ids.map((id) => post<Asset>(`/api/assets/${id}/trash`)));
+        return res.filter((r) => r.status === "fulfilled").length;
+      },
+      onSuccess: refresh,
+    }),
+    purgeMany: useMutation({
+      mutationFn: async (ids: string[]) => {
+        const res = await Promise.allSettled(ids.map((id) => post<Asset>(`/api/assets/${id}/purge`)));
+        return res.filter((r) => r.status === "fulfilled").length;
+      },
+      onSuccess: refresh,
+    }),
   };
 }
