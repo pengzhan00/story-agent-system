@@ -64,6 +64,7 @@ class ShotInput:
     label: str
     planned_sec: float
     video: AssetRef | None = None   # a clip
+    video_audio: bool = False       # the clip carries its own sound (video.av): it is mixed in, no TTS needed
     image: AssetRef | None = None   # the keyframe, used when there is no clip
     lines: list[tuple[str, AssetRef | None]] = field(default_factory=list)   # (text, speech asset or None)
     narration: str = ""
@@ -172,6 +173,10 @@ def build_timeline(inp: TimelineInput) -> Timeline:
             if ln["text"].strip():
                 end = round(start + ln["duration"], 3)
                 subtitles.append({"start": round(start, 3), "end": end, "text": ln["text"]})
+        if shot.video is not None and shot.video_audio:
+            # the clip carries its own sound: its audio track is the speech for this shot (no separate TTS line)
+            speech.append({"asset": shot.video.ref, "start": round(cursor, 3), "duration": round(duration, 3),
+                           "from_video": True})
         # The shot's own narration is a visual/action description for the prompter, not a spoken line: it must not
         # appear on screen as a subtitle (it made the finished film look like a wall of descriptive text).
         for asset, offset in shot.sfx:            # an effect ends with its shot (the mixer trims it to ``duration``)

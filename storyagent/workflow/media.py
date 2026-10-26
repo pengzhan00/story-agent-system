@@ -477,6 +477,8 @@ def build_episode_timeline(ctx: Ctx, episode: int) -> dict[str, Any]:
     for shot in shots:
         sid = str(shot["id"])
         vspec, kspec = store.current(ctx.pid, "shot.video", sid), store.current(ctx.pid, "shot.keyframe", sid)
+        clip = current_asset(ledger, vspec) if vspec else None
+        clip_kind = str(clip.kind) if clip is not None else "video.generate"
         lines = []
         for idx, line in enumerate(shot["dialogue"]):
             dspec = store.current(ctx.pid, "dialogue.line", f"{sid}#{idx}")
@@ -493,7 +495,8 @@ def build_episode_timeline(ctx: Ctx, episode: int) -> dict[str, Any]:
         inputs.append(ShotInput(
             shot_id=shot["id"], label=f"{shot['act_number']}.{shot['scene_number']}.{shot['shot_number']}",
             planned_sec=planned,
-            video=_asset_ref(current_asset(ledger, vspec) if vspec else None, "video.generate"),
+            video=_asset_ref(clip, clip_kind),
+            video_audio=clip_kind == "video.av",
             image=_asset_ref(current_asset(ledger, kspec) if kspec else None, "image.generate"),
             lines=lines, sfx=effects, narration=str(shot.get("narration", "")),
             scene=f"{shot['act_number']}.{shot['scene_number']}",
