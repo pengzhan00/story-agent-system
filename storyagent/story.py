@@ -383,7 +383,8 @@ class StoryStore:
         return sid
 
     def list_snapshots(self, project_id: int, stage: str | None = None) -> list[dict[str, Any]]:
-        where, args = "project_id=?", [project_id]
+        where = "project_id=?"
+        args: list[Any] = [project_id]
         if stage:
             where += " AND stage=?"
             args.append(stage)
@@ -409,7 +410,8 @@ class StoryStore:
                 vals = {f: e[f] for f in self._SNAPSHOT_EPISODE_FIELDS if f in e}
                 if vals:
                     self.db.conn.execute(
-                        f"UPDATE episodes SET {', '.join(f'{k}=?' for k in vals)} WHERE id=?", [*vals.values(), e["id"]])
+                        f"UPDATE episodes SET {', '.join(f'{k}=?' for k in vals)} WHERE id=?",
+                        [*vals.values(), e["id"]])
         return {"seasons": len(data.get("seasons", [])), "episodes": len(data.get("episodes", []))}
 
     def save_script(
@@ -478,7 +480,16 @@ class StoryStore:
     def delete_shot(self, shot_id: int, *, force: bool = False) -> None:
         if self.get_shot(shot_id)["locked"] and not force:
             raise ShotLocked(f"shot {shot_id} is locked")
+        self._trash_shot_assets(shot_id)
         self.db.conn.execute("DELETE FROM shots WHERE id=?", (shot_id,))
+
+    def _trash_shot_assets(self, shot_id: int) -> None:
+        """Soft-delete a shot's assets before the shot goes away. Their shot_id becomes NULL (FK SET NULL), so two
+        removed shots' current assets would otherwise collide on the unique current-asset index."""
+        self.db.conn.execute(
+            "UPDATE media_assets SET trashed_at=?, is_current=0 WHERE shot_id=? AND trashed_at IS NULL",
+            (now_iso(), shot_id),
+        )
 
     def replace_episode_shots(
         self, project_id: int, episode_id: int, shots: Iterable[Mapping[str, Any]]
@@ -509,6 +520,7 @@ class StoryStore:
                 else:
                     planned.append(self._insert("shots", project_id, shot, episode_id=episode_id))
             for leftover in reusable.values():
+                self._trash_shot_assets(leftover)
                 self.db.conn.execute("DELETE FROM shots WHERE id=?", (leftover,))
             return planned, [r["id"] for r in locked]
 
