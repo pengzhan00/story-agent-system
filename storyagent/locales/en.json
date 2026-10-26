@@ -728,6 +728,7 @@
   "web.field.title": "Title",
   "web.field.synopsis": "Synopsis",
   "web.jobs.empty": "No jobs yet.",
+  "web.jobs.load_more": "Load more ({shown} shown)",
   "web.queue.story": "Story steps of the projects",
   "web.queue.story_hint": "Planning, characters, script, scenes, music, shots and prompts that the language model writes. They are listed here and not among the media jobs below.",
   "web.queue.story_empty": "No story steps have been run yet.",

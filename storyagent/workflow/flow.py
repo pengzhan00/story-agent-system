@@ -16,6 +16,7 @@ from storyagent.domain import MediaKind, QualityTier
 from storyagent.media.params import resolve_params
 from storyagent.media.specs import SpecStore
 from storyagent.pipelines import project_settings_for
+from storyagent.projects import ProjectStore
 
 from .media import current_asset, up_to_date
 from .state import STAGES, WorkflowState
@@ -84,13 +85,16 @@ def _agents(settings: Settings, names: list[str], *, optional: bool) -> list[dic
 
 def _counts(db: Database, settings: Settings, ledger: Any, project_id: int, subject: str) -> dict[str, Any]:
     current = [x for x in SpecStore(db, settings, ledger).list_current(project_id) if x.subject_type == subject]
+    video_with_sound = bool((ProjectStore(db, settings).get(project_id).settings or {}).get("video_with_sound"))
     made = stale = 0
     models: dict[str, int] = {}
     for spec in current:
         models[spec.model_ref] = models.get(spec.model_ref, 0) + 1
         if current_asset(ledger, spec) is not None:
             made += 1
-            if not up_to_date(ledger, spec, settings):        # judged as the production plan judges it
+            # judged as the production plan judges it (the sound toggle flips a clip's model both ways)
+            flip = video_with_sound and spec.subject_type == "shot.video"
+            if not up_to_date(ledger, spec, settings, video_with_sound=flip):
                 stale += 1
     rows = current
     return {"specs": len(rows), "made": made, "stale": stale, "models": models}

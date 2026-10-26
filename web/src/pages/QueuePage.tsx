@@ -10,6 +10,7 @@ import { ProgressBar } from "../components/ProgressBar";
 import { StatusChip } from "../components/StatusChip";
 import { duration } from "../lib/format";
 import { jobError } from "../lib/jobError";
+import { progressText } from "../i18n";
 import { StoryRuns } from "../components/StoryRuns";
 import { useT } from "../i18n";
 
@@ -78,8 +79,8 @@ function JobRow({ job, siblings }: { job: Job; siblings: string[] }) {
       <td className="strong">{t(`media.kind.${job.kind}`)}</td>
       <td>{job.model_ref}</td>
       <td className="progress-cell">
-        <ProgressBar percent={job.status === "queued" ? 0 : job.status === "running" ? job.progress * 100 : job.status === "completed" ? 100 : job.progress * 100} tone={tone} label={job.progress_msg} />
-        <span className="muted small">{job.progress_msg}</span>
+        <ProgressBar percent={job.status === "queued" ? 0 : job.status === "running" ? job.progress * 100 : job.status === "completed" ? 100 : job.progress * 100} tone={tone} label={progressText(t, job.progress_msg)} />
+        <span className="muted small">{progressText(t, job.progress_msg)}</span>
       </td>
       <td>
         <StatusChip status={job.status} group="status" />
@@ -138,7 +139,9 @@ function JobRow({ job, siblings }: { job: Job; siblings: string[] }) {
 export function JobsPanel({ projectId }: { projectId?: number }) {
   const t = useT();
   const [filter, setFilter] = useState<Filter>("all");
-  const jobs = useJobs(projectId, [...FILTERS[filter]]);
+  const [limit, setLimit] = useState(100);
+  const jobs = useJobs(projectId, [...FILTERS[filter]], limit);
+  const more = (jobs.data?.length ?? 0) >= limit && limit < 500;
   const queue = useQueueState(projectId);
   const count = (f: Filter) => (f === "running" ? queue.data?.running : f === "waiting" ? queue.data?.queued : undefined);
   return (
@@ -178,6 +181,11 @@ export function JobsPanel({ projectId }: { projectId?: number }) {
             </tbody>
           </table>
         </div>
+      ) : null}
+      {more ? (
+        <button onClick={() => setLimit((l) => Math.min(l + 100, 500))}>
+          {t("web.jobs.load_more", { shown: jobs.data?.length ?? 0 })}
+        </button>
       ) : null}
     </div>
   );

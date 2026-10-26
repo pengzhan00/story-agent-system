@@ -27,9 +27,10 @@ def list_jobs(
     spec_id: str | None = None,
     status: Annotated[list[JobStatus] | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
+    offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[JobOut]:
     jobs = ctx_of(request).ledger.list_jobs(
-        project_id=project_id, shot_id=shot_id, spec_id=spec_id, status=status, limit=limit)
+        project_id=project_id, shot_id=shot_id, spec_id=spec_id, status=status, limit=limit, offset=offset)
     return [JobOut.model_validate(j) for j in jobs]
 
 

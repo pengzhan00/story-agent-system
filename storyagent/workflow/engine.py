@@ -84,7 +84,7 @@ class WorkflowEngine:
         except LocaleError:                 # a content language the interface has no texts for
             labels = get_catalog("en")
         text = script_text.render(script["title"], script["synopsis"], script["acts"], labels.t)
-        data = self.agents.run("reviewer.script", {
+        data = self.agents_for(project).run("reviewer.script", {
             "language": language_name(project.content_language), "script": text,
             "characters": json.dumps(chars, ensure_ascii=False)}, project_id=project_id).data
         return dict(data)
@@ -92,7 +92,7 @@ class WorkflowEngine:
     def translate_lines(self, project_id: int, lines: Sequence[str], target: str) -> list[str]:
         """Subtitle lines into ``target`` (a language code) by the translator agent; one text out per text in."""
         project = self.projects.get(project_id)
-        data = self.agents.run("subtitle.translate", {
+        data = self.agents_for(project).run("subtitle.translate", {
             "source": language_name(project.content_language), "target": language_name(target),
             "lines": json.dumps(list(lines), ensure_ascii=False)}, project_id=project_id).data
         return [str(x) for x in data.get("translations", [])]

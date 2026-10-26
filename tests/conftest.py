@@ -30,6 +30,15 @@ def _locale() -> None:
 
 # ---- media fixtures ---------------------------------------------------------------------------
 FAKE_MODELS = """
+[models."fake-image"]
+kind = "image.generate"
+provider = "fake"
+version = "t1"
+license_tag = "test"
+timeout_sec = 30
+[models."fake-image".params]
+width = 64
+
 [models."fake-video"]
 kind = "video.generate"
 provider = "fake"

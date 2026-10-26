@@ -41,7 +41,8 @@ LONGCAT_STUB = textwrap.dedent('''\
     a = sys.argv[1:]
     with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "calls.jsonl"), "a", encoding="utf-8") as fh:
         keep = ("LONGCAT_", "HF_", "TRANSFORMERS_", "PYTHONUNBUFFERED")
-        env = {k: v for k, v in os.environ.items() if k.startswith(keep)}
+        secret = ("TOKEN", "SECRET", "KEY", "PASSWORD")
+        env = {k: v for k, v in os.environ.items() if k.startswith(keep) and not any(s in k.upper() for s in secret)}
         fh.write(json.dumps({"argv": a, "env": env}) + "\\n")
     for i in range(1, 4):
         print(f"step {i}/3", flush=True)
@@ -230,10 +231,12 @@ def test_longcat_makes_a_talking_head_from_portrait_and_speech(tmp_path: Path) -
     assert (flag(call["argv"], "--width"), flag(call["argv"], "--height"), flag(call["argv"], "--num-frames")) == (
         "832", "480", "93")
     assert flag(call["argv"], "--seed") == "4"
-    assert call["env"] == {"LONGCAT_IMAGE": str(face), "LONGCAT_AUDIO": str(speech),
-                           "LONGCAT_PROMPT": "she greets the camera",
-                           "PYTHONUNBUFFERED": "1", "HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1",
-                           "HF_HUB_DISABLE_XET": "1"}   # no hub
+    expected_env = {"LONGCAT_IMAGE": str(face), "LONGCAT_AUDIO": str(speech),
+                    "LONGCAT_PROMPT": "she greets the camera",
+                    "PYTHONUNBUFFERED": "1", "HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1",
+                    "HF_HUB_DISABLE_XET": "1"}   # no hub
+    # the host also carries its own HF_* through clean_env; only the adapter's own keys are asserted
+    assert {k: call["env"].get(k) for k in expected_env} == expected_env
     assert a.kind == "video.avatar" and a.metadata["engine"] == "longcat-avatar-1.5"
 
 

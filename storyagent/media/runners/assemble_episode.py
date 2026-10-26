@@ -163,12 +163,17 @@ def audio_cmd(ffmpeg: str, tl: dict[str, Any], dest: Path) -> list[str]:
         nonlocal n
         cmd.extend(["-i", item["path"]])
         ms = int(round(float(item["start"]) * 1000))
-        cut = ""
+        parts = [f"aresample={rate}", "aformat=channel_layouts=stereo"]
         if trim and item.get("duration"):          # end with the shot: cut, with a short fade so it does not click
             length = float(item["duration"])
-            cut = f"atrim=0:{length},afade=t=out:st={max(length - 0.1, 0):.3f}:d=0.1,"
-        chains.append(f"[{n}:a]aresample={rate},aformat=channel_layouts=stereo,{cut}adelay={ms}|{ms},"
-                      f"volume={gain}[{label}]")
+            parts += [f"atrim=0:{length}", f"afade=t=out:st={max(length - 0.1, 0):.3f}:d=0.1"]
+        if item.get("speed") and float(item["speed"]) > 1.001:
+            # a clip whose picture is slowed must have its sound slowed the same amount, or the lip-sync drifts
+            parts.append(f"atempo={float(item['speed']):.4f}")
+        if item.get("trim"):                       # the clip's own picture cut also ends its sound
+            parts.append(f"atrim=0:{float(item['trim']):.3f}")
+        parts += [f"adelay={ms}|{ms}", f"volume={gain}"]
+        chains.append(f"[{n}:a]{','.join(parts)}[{label}]")
         n += 1
         return f"[{label}]"
 

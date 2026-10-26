@@ -409,7 +409,10 @@ def test_a_clip_made_by_hand_belongs_to_its_shot_and_starts_from_its_keyframe(
     pid = project(client)["id"]
     [shot] = make_shots(fsettings, pid, 1)
     base = f"/api/projects/{pid}/specs"
-    key = spec_body(subject_type="shot.keyframe", subject_id=str(shot), prompt="the opening frame")
+    # a keyframe is an image, not another video: sharing the shot's video.generate slot would make the two takes
+    # overwrite each other's current asset
+    key = spec_body(subject_type="shot.keyframe", subject_id=str(shot), kind="image.generate",
+                    model_ref="fake-image", prompt="the opening frame")
     client.post(base, json=key)
     client.post(base, json=spec_body(subject_type="shot.video", subject_id=str(shot), prompt="it moves"))
     [early] = client.post(f"{base}/shot.video/{shot}/regenerate", json={"tier": "draft"}).json()

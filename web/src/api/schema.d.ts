@@ -7924,6 +7924,7 @@ export interface operations {
                 spec_id?: string | null;
                 status?: components["schemas"]["JobStatus"][] | null;
                 limit?: number;
+                offset?: number;
             };
             header?: never;
             path?: never;

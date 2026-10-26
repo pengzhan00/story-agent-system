@@ -217,6 +217,7 @@ class Ledger:
         standalone: bool = False,
         pipeline_id: str | None = None,
         limit: int = 100,
+        offset: int = 0,
     ) -> list[JobRecord]:
         where: list[str] = ["1=1"]
         args: list[Any] = []
@@ -241,8 +242,9 @@ class Ledger:
             where.append(f"status IN ({','.join('?' * len(status))})")
             args.extend(JobStatus(st).value for st in status)
         rows = self.db.conn.execute(
-            f"SELECT * FROM media_jobs WHERE {' AND '.join(where)} ORDER BY created_at DESC, rowid DESC LIMIT ?",
-            (*args, limit),
+            f"SELECT * FROM media_jobs WHERE {' AND '.join(where)} "
+            "ORDER BY created_at DESC, rowid DESC LIMIT ? OFFSET ?",
+            (*args, limit, max(offset, 0)),
         ).fetchall()
         return self._with_retries([JobRecord.from_row(r) for r in rows])
 

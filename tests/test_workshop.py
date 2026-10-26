@@ -22,12 +22,6 @@ from storyagent.workshop import MODULES, WorkshopError, build_inputs, kind_spec,
 from .conftest import FAKE_MODELS, FAKE_SERVICES
 
 EXTRA = """
-[models."fake-image"]
-kind = "image.generate"
-provider = "fake"
-timeout_sec = 30
-[models."fake-image".params]
-width = 64
 [models."fake-avatar"]
 kind = "video.avatar"
 provider = "fake"

@@ -166,17 +166,21 @@ def build_timeline(inp: TimelineInput) -> Timeline:
                      "first": lines_out[0]["offset"] if lines_out else None,
                      "last_end": round(lines_out[-1]["offset"] + lines_out[-1]["duration"], 3) if lines_out else None})
 
+        # One source of speech per shot: a clip that carries its own sound (video.av) is the speech and the TTS line is
+        # left out, otherwise the separate TTS line is used. Mixing both would play the same dialogue twice.
+        clip_speaks = shot.video is not None and shot.video_audio
         for ln in lines_out:
             start = cursor + ln["offset"]
-            if ln["asset"]:
+            if ln["asset"] and not clip_speaks:
                 speech.append({"asset": ln["asset"], "start": round(start, 3), "duration": ln["duration"]})
             if ln["text"].strip():
                 end = round(start + ln["duration"], 3)
                 subtitles.append({"start": round(start, 3), "end": end, "text": ln["text"]})
         if shot.video is not None and shot.video_audio:
-            # the clip carries its own sound: its audio track is the speech for this shot (no separate TTS line)
+            # The clip's own audio follows the very same speed/trim the picture gets, or the lip-sync drifts and the
+            # sound runs past the shot. ``fit`` was computed for this shot just above.
             speech.append({"asset": shot.video.ref, "start": round(cursor, 3), "duration": round(duration, 3),
-                           "from_video": True})
+                           "from_video": True, "speed": fit["speed"], "trim": fit["trim"]})
         # The shot's own narration is a visual/action description for the prompter, not a spoken line: it must not
         # appear on screen as a subtitle (it made the finished film look like a wall of descriptive text).
         for asset, offset in shot.sfx:            # an effect ends with its shot (the mixer trims it to ``duration``)

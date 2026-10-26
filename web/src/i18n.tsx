@@ -16,6 +16,18 @@ export function makeT(catalog: Record<string, string>): T {
   return (key, params) => interpolate(catalog[key] ?? key, params);
 }
 
+/** A job's progress text. The workflow writes `workflow.progress.x|<detail>` and the ledger's wait states are bare
+ * keys (`wait.heavy_busy`); both are translated. Anything else is a tool's own message and is shown as-is. */
+export function progressText(t: T, msg: string | undefined | null): string {
+  const raw = (msg ?? "").trim();
+  if (!raw) return "";
+  const bar = raw.indexOf("|");
+  const key = bar >= 0 ? raw.slice(0, bar) : raw;
+  const detail = bar >= 0 ? raw.slice(bar + 1).trim() : "";
+  const text = key.includes(".") ? t(key) : key;
+  return detail ? `${text} ${detail}`.trim() : text;
+}
+
 function initialLocale(): string {
   try {
     const saved = localStorage.getItem(KEY);
