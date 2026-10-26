@@ -30,6 +30,7 @@ from ._subprocess import Command, SubprocessAdapter
 
 SCHEMA: dict[str, dict[str, Any]] = {
     "model": {"type": "str"},
+    "model_dir": {"type": "str", "description": "a local folder of Demucs weights (--repo); unset = the HF cache"},
     "device": {"type": "str", "choices": ["mps", "cpu"]},
 }
 AUDIO_EXT = {".wav", ".mp3", ".m4a", ".flac", ".aac", ".ogg", ".mp4", ".mov", ".mkv"}
@@ -65,6 +66,10 @@ class DemucsAdapter(SubprocessAdapter):
     def _python(ctx: JobContext) -> Path | None:
         return ctx.settings.tool_path("seedvc", "python") or ctx.settings.tool_path("demucs", "python")
 
+    @staticmethod
+    def _entry(job: JobRecord, ctx: JobContext) -> dict[str, Any]:
+        return dict(ctx.settings.models[job.model_ref].extra) if job.model_ref in ctx.settings.models else {}
+
     def health(self) -> HealthReport:
         return HealthReport(HealthState.OK, "Demucs")
 
@@ -85,9 +90,15 @@ class DemucsAdapter(SubprocessAdapter):
         p = job.params
         ctx.work_dir.mkdir(parents=True, exist_ok=True)
         out = ctx.work_dir / "sep"
-        return Command([str(python), "-m", "demucs.separate", "--two-stems=vocals",
-                        "-n", str(p.get("model") or DEFAULT_MODEL),
-                        "-d", str(p.get("device") or DEFAULT_DEVICE), "-o", str(out), str(src)])
+        argv = [str(python), "-m", "demucs.separate", "--two-stems=vocals",
+                "-n", str(p.get("model") or DEFAULT_MODEL),
+                "-d", str(p.get("device") or DEFAULT_DEVICE), "-o", str(out)]
+        repo = p.get("model_dir") or self._entry(job, ctx).get("model_dir")
+        if repo:                      # a local folder of weights instead of the HF cache (--repo)
+            rp = Path(str(repo)).expanduser()
+            argv += ["--repo", str(rp if rp.is_absolute() else ctx.settings.home / rp)]
+        argv.append(str(src))
+        return Command(argv)
 
     def collect(self, job: JobRecord, ctx: JobContext) -> list[ArtifactSpec]:
         stem = source_of(job, ctx)
