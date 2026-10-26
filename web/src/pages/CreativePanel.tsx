@@ -134,6 +134,7 @@ function SpecDetail({ pid, spec, review, label }: { pid: number; spec: Spec; rev
           adopting={act.adopt.isPending}
           onTrash={(a) => act.trash.mutate(a)}
           onPurge={(a) => act.purge.mutate(a)}
+          onPurgeVersion={(a) => act.purgeVersion.mutate(a)}
         />
       </div>
       <SpecEditor pid={pid} spec={spec} review={review} onAcknowledge={() => act.acknowledge.mutate()} />

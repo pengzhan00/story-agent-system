@@ -601,3 +601,20 @@ class Ledger:
         self.db.conn.execute("DELETE FROM media_assets WHERE id=?", (asset_id,))
         self.db.conn.commit()
         return a
+
+    def purge_version(self, spec_id: str, version: int) -> int:
+        """Hard-delete every asset of one spec version (rows and files). Refuse while any is current."""
+        rows = self.db.conn.execute(
+            "SELECT id, path, is_current FROM media_assets WHERE spec_id=? AND spec_version=?",
+            (spec_id, version)).fetchall()
+        for r in rows:
+            if r["is_current"]:
+                raise LedgerError("trash the current asset of this version before purging it")
+        n = 0
+        for r in rows:
+            if r["path"]:
+                (self.settings.home / r["path"]).unlink(missing_ok=True)
+            self.db.conn.execute("DELETE FROM media_assets WHERE id=?", (r["id"],))
+            n += 1
+        self.db.conn.commit()
+        return n

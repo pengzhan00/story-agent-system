@@ -128,6 +128,14 @@ def purge_asset(asset_id: str, request: Request) -> AssetOut:
     return AssetOut.model_validate(ledger.purge_asset(asset_id))
 
 
+@router.post("/assets/{asset_id}/purge-version")
+def purge_asset_version(asset_id: str, request: Request) -> dict[str, int]:
+    """Hard-delete every asset of the same spec version as this asset. Refused while any is current."""
+    ledger = ctx_of(request).ledger
+    a = ledger.get_asset(asset_id)
+    return {"purged": ledger.purge_version(a.spec_id, a.spec_version)}
+
+
 @router.get("/projects/{project_id}/stale", response_model=list[StaleAsset], tags=["specs"])
 def stale_assets(project_id: int, request: Request) -> list[StaleAsset]:
     """Current assets that were generated from an older spec version than the latest."""

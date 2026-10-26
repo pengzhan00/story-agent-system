@@ -123,10 +123,11 @@ interface Props {
   adopting: boolean;
   onTrash: (assetId: string) => void;
   onPurge: (assetId: string) => void;
+  onPurgeVersion: (assetId: string) => void;
 }
 
 /** Every take of one spec side by side: the one in use, the other candidates, and the ones still being made. */
-export function Candidates({ spec, assets, jobs, onAdopt, adopting, onTrash, onPurge }: Props) {
+export function Candidates({ spec, assets, jobs, onAdopt, adopting, onTrash, onPurge, onPurgeVersion }: Props) {
   const t = useT();
   const running = jobs.filter((j) => j.status === "queued" || j.status === "running");
   const failed = jobs.filter((j) => j.status !== "queued" && j.status !== "running" && j.status !== "completed").slice(0, 3);
@@ -173,6 +174,11 @@ export function Candidates({ spec, assets, jobs, onAdopt, adopting, onTrash, onP
                     <button className="link" onClick={() => window.confirm(t("web.creative.purge_confirm")) && onPurge(a.id)}>
                       {t("web.creative.purge")}
                     </button>
+                    {stale ? (
+                      <button className="link" onClick={() => window.confirm(t("web.creative.purge_version_confirm")) && onPurgeVersion(a.id)}>
+                        {t("web.creative.purge_version")}
+                      </button>
+                    ) : null}
                   </>
                 ) : null}
               </div>
