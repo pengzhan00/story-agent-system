@@ -409,6 +409,15 @@ def _cmd_media_purge(s: Settings, a: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_maintain_prune_orphans(s: Settings, a: argparse.Namespace) -> int:
+    c = _ctx(s)
+    ProjectStore(c.db, s).get(a.project)
+    result = c.specs.prune_orphan_shots(a.project, dry_run=a.dry_run)
+    print(t("cli.maintain.pruned", specs=result["specs"], assets=result["assets"],
+            mode=t("cli.maintain.dry_run") if a.dry_run else ""))
+    return 0
+
+
 # -- uploads and the library ------------------------------------------------------------------------
 def _cmd_asset_import(s: Settings, a: argparse.Namespace) -> int:
     from storyagent.media.library import LibraryError, import_file
@@ -1417,6 +1426,11 @@ def build_parser() -> argparse.ArgumentParser:
     pf.add_argument("--project", type=int, required=True)
     pf.add_argument("--on-conflict", choices=["skip", "new_version"], default="skip")
     pf.add_argument("--dry-run", action="store_true")
+
+    mt = sub.add_parser("maintain").add_subparsers(dest="cmd", required=True)
+    mo = add(mt, "prune-orphans", _cmd_maintain_prune_orphans)
+    mo.add_argument("--project", type=int, required=True)
+    mo.add_argument("--dry-run", action="store_true")
 
     gr = sub.add_parser("grammar").add_subparsers(dest="cmd", required=True)
     gc = add(gr, "check", _cmd_grammar_check)

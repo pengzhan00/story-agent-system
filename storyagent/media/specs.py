@@ -192,6 +192,23 @@ class SpecStore:
             (project_id, subject_type, subject_id, slot),
         )
 
+    def prune_orphan_shots(self, project_id: int, *, dry_run: bool = False) -> dict[str, int]:
+        """Drop shot.keyframe/shot.video specs whose shot no longer exists (left behind by re-planning), and
+        hard-delete the assets made from them. Only specs of deleted shots are touched, so it is safe to run."""
+        orphans = self.db.conn.execute(
+            "SELECT id, version FROM gen_specs WHERE project_id=? "
+            "AND subject_type IN ('shot.keyframe','shot.video') "
+            "AND CAST(subject_id AS INTEGER) NOT IN (SELECT id FROM shots WHERE project_id=?)",
+            (project_id, project_id),
+        ).fetchall()
+        assets_freed = 0
+        if not dry_run:
+            for row in orphans:
+                assets_freed += self.ledger.purge_version(row["id"], row["version"])
+                self.db.conn.execute("DELETE FROM gen_specs WHERE id=?", (row["id"],))
+            self.db.conn.commit()
+        return {"specs": len(orphans), "assets": assets_freed}
+
     def edit(
         self, project_id: int, subject_type: str, subject_id: str, slot: str = "main", *,
         author: str = "user", note: str = "", params_patch: Mapping[str, Any] | None = None, **changes: Any,

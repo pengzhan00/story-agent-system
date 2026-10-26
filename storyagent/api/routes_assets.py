@@ -133,6 +133,8 @@ def purge_asset_version(asset_id: str, request: Request) -> dict[str, int]:
     """Hard-delete every asset of the same spec version as this asset. Refused while any is current."""
     ledger = ctx_of(request).ledger
     a = ledger.get_asset(asset_id)
+    if a.spec_id is None or a.spec_version is None:
+        return {"purged": 0}
     return {"purged": ledger.purge_version(a.spec_id, a.spec_version)}
 
 

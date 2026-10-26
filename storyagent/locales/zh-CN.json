@@ -132,6 +132,8 @@
   "cli.asset.trashed": "已软删除资产 {id}（文件保留，可 purge 硬删）。",
   "cli.asset.purged": "已硬删除资产 {id}。",
   "cli.asset.purged_many": "已硬删除 {n} 个已软删除的资产。",
+  "cli.maintain.pruned": "已清理孤儿规格 {specs} 条、资产 {assets} 个{mode}。",
+  "cli.maintain.dry_run": "（演练，未实际删除）",
   "cli.spec.created": "规格已创建:{id}(v{version})",
   "cli.spec.edited": "规格已更新:v{version}",
   "cli.spec.unchanged": "内容无变化,未生成新版本(当前 v{version})",

@@ -132,6 +132,8 @@
   "cli.asset.trashed": "Soft-deleted asset {id} (file kept; purge to remove it).",
   "cli.asset.purged": "Hard-deleted asset {id}.",
   "cli.asset.purged_many": "Hard-deleted {n} trashed assets.",
+  "cli.maintain.pruned": "Pruned {specs} orphan spec(s) and {assets} asset(s){mode}.",
+  "cli.maintain.dry_run": " (dry run, nothing deleted)",
   "cli.spec.created": "Spec created: {id} (v{version})",
   "cli.spec.edited": "Spec updated: v{version}",
   "cli.spec.unchanged": "No change, no new version (current v{version})",
