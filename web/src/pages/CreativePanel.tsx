@@ -125,8 +125,16 @@ function SpecDetail({ pid, spec, review, label }: { pid: number; spec: Spec; rev
             {busy ? t("web.creative.make_more") : t("web.creative.generate")}
           </button>
         </div>
-        <ErrorNote error={act.regenerate.error ?? act.adopt.error} />
-        <Candidates spec={spec} assets={assets.data ?? []} jobs={jobs.data ?? []} onAdopt={(a) => act.adopt.mutate(a)} adopting={act.adopt.isPending} />
+        <ErrorNote error={act.regenerate.error ?? act.adopt.error ?? act.trash.error ?? act.purge.error} />
+        <Candidates
+          spec={spec}
+          assets={assets.data ?? []}
+          jobs={jobs.data ?? []}
+          onAdopt={(a) => act.adopt.mutate(a)}
+          adopting={act.adopt.isPending}
+          onTrash={(a) => act.trash.mutate(a)}
+          onPurge={(a) => act.purge.mutate(a)}
+        />
       </div>
       <SpecEditor pid={pid} spec={spec} review={review} onAcknowledge={() => act.acknowledge.mutate()} />
     </div>

@@ -120,6 +120,14 @@ def trash_asset(asset_id: str, request: Request) -> AssetOut:
     return AssetOut.model_validate(ledger.trash_asset(asset_id))
 
 
+@router.post("/assets/{asset_id}/purge", response_model=AssetOut)
+def purge_asset(asset_id: str, request: Request) -> AssetOut:
+    """Hard delete: remove the row and its file from disk. Refused while the asset is current."""
+    ledger = ctx_of(request).ledger
+    ledger.get_asset(asset_id)
+    return AssetOut.model_validate(ledger.purge_asset(asset_id))
+
+
 @router.get("/projects/{project_id}/stale", response_model=list[StaleAsset], tags=["specs"])
 def stale_assets(project_id: int, request: Request) -> list[StaleAsset]:
     """Current assets that were generated from an older spec version than the latest."""

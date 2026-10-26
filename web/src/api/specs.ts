@@ -65,5 +65,7 @@ export function useSpecActions(pid: number, s: Spec | null) {
       onSuccess: refresh,
     }),
     adopt: useMutation({ mutationFn: (assetId: string) => post<Asset>(`/api/assets/${assetId}/adopt`), onSuccess: refresh }),
+    trash: useMutation({ mutationFn: (assetId: string) => post<Asset>(`/api/assets/${assetId}/trash`), onSuccess: refresh }),
+    purge: useMutation({ mutationFn: (assetId: string) => post<Asset>(`/api/assets/${assetId}/purge`), onSuccess: refresh }),
   };
 }
