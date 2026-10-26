@@ -131,8 +131,24 @@ export function Candidates({ spec, assets, jobs, onAdopt, adopting, onTrash, onP
   const t = useT();
   const running = jobs.filter((j) => j.status === "queued" || j.status === "running");
   const failed = jobs.filter((j) => j.status !== "queued" && j.status !== "running" && j.status !== "completed").slice(0, 3);
+  const current = assets.find((a) => a.is_current);
   return (
     <div className="stack">
+      {assets.length > 0 ? (
+        <label className="field">
+          <span>{t("web.creative.version")}</span>
+          <select value={current?.id ?? ""} onChange={(e) => e.target.value && onAdopt(e.target.value)} disabled={adopting}>
+            {assets.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.is_current
+                  ? t("web.creative.current_version", { v: a.spec_version ?? spec.version })
+                  : t("web.creative.version_v", { v: a.spec_version ?? spec.version })}
+                {a.metadata?.["seed"] ? ` · ${t("web.creative.seed_n", { seed: String(a.metadata["seed"]) })}` : ""}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
       {running.map((j) => (
         <div key={j.id} className="job-live">
           <div className="row">
