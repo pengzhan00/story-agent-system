@@ -91,11 +91,13 @@ def allowed_models(settings: Settings, spec: SpecRecord) -> set[str]:
     return allowed
 
 
-def up_to_date(ledger: Ledger, spec: SpecRecord, settings: Settings | None = None) -> bool:
+def up_to_date(ledger: Ledger, spec: SpecRecord, settings: Settings | None = None,
+               *, video_with_sound: bool | None = None) -> bool:
     """Made from this version of the spec, and not older than what it was built on: a clip whose keyframe has been
     made again since is outdated even though its own spec did not change. With ``settings`` (the project's own, i.e.
     its pipeline plan) an asset made by a model the plan does not use - after the plan was changed - is outdated too;
-    an imported file (no job) is never judged by its model."""
+    an imported file (no job) is never judged by its model. ``video_with_sound`` (the project's toggle) makes a clip
+    built the other way - silent vs. carrying its own sound - outdated, so flipping the option re-makes the clips."""
     asset = current_asset(ledger, spec)
     if asset is None or (asset.spec_version or 0) < spec.version:
         return False
@@ -112,6 +114,14 @@ def up_to_date(ledger: Ledger, spec: SpecRecord, settings: Settings | None = Non
         allowed = allowed_models(settings, spec)
         if allowed and made_by and made_by not in allowed:
             return False
+        if spec.subject_type == "shot.video" and video_with_sound is not None:
+            try:
+                wanted = SOUND_VIDEO_MODEL if video_with_sound else (
+                    spec.model_ref or settings.default_model(spec.kind.value).ref)
+            except ConfigError:
+                wanted = ""
+            if wanted and made_by != wanted:
+                return False
     return True
 
 
@@ -160,7 +170,9 @@ def _plan_phase(
     for spec in specs:
         if spec.subject_type not in types or spec.subject_type in skip or (only and spec.id not in only):
             continue
-        if up_to_date(ledger, spec, ctx.settings) and not ctx.force():
+        if up_to_date(ledger, spec, ctx.settings,
+                       video_with_sound=bool(ctx.project.settings.get("video_with_sound"))) \
+                and not ctx.force():
             counts["reused"] += 1
             continue
         if spec.subject_type == "shot.video" and spec.subject_id not in picks and spec.id not in only:
@@ -350,7 +362,9 @@ def _expected_seconds(ctx: Ctx, ledger: Ledger, specs: list[SpecRecord], tier: Q
             continue
         if spec.subject_type == "shot.video" and spec.subject_id not in picks and spec.id not in only:
             continue
-        if up_to_date(ledger, spec, ctx.settings) and not ctx.force():
+        if up_to_date(ledger, spec, ctx.settings,
+                       video_with_sound=bool(ctx.project.settings.get("video_with_sound"))) \
+                and not ctx.force():
             continue
         kind = spec.kind.value
         edit_ref = keyframe_edit_model(ctx.settings, spec, modes)
