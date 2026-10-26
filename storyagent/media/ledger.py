@@ -593,6 +593,23 @@ class Ledger:
         )
         return self.get_asset(asset_id)
 
+    def restore_asset(self, asset_id: str) -> AssetRecord:
+        """Bring a trashed asset back. It becomes current again only when its slot has no current asset (an asset
+        trashed later is not displaced); otherwise it returns as a non-current take."""
+        a = self.get_asset(asset_id)
+        if not a.trashed_at:
+            return a
+        taken = self.db.conn.execute(
+            "SELECT 1 FROM media_assets WHERE project_id IS ? AND COALESCE(shot_id,0)=? AND kind=? AND slot=? "
+            "AND is_current=1 AND trashed_at IS NULL AND id != ?",
+            (a.project_id, a.shot_id or 0, a.kind, a.slot, asset_id),
+        ).fetchone()
+        self.db.conn.execute(
+            "UPDATE media_assets SET trashed_at=NULL, is_current=? WHERE id=?",
+            (int(taken is None), asset_id),
+        )
+        return self.get_asset(asset_id)
+
     def _library_names(self, asset_ids: list[str]) -> list[str]:
         """Library entries made from these assets: deleting an asset row would cascade to them (and the file they
         point to would be gone), so a published asset is never purged."""

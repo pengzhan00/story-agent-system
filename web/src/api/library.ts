@@ -12,6 +12,14 @@ export const useAllAssets = () =>
     refetchInterval: LIVE_MS,
   });
 
+/** Soft-deleted assets (the recycle bin), so they can be restored or permanently removed. */
+export const useTrashedAssets = () =>
+  useQuery({
+    queryKey: ["assets", "trashed"],
+    queryFn: () => api<Asset[]>("/api/assets?newest_first=true&include_trashed=true&limit=1000"),
+    refetchInterval: LIVE_MS,
+  });
+
 export const useLibraryItems = () =>
   useQuery({ queryKey: ["library"], queryFn: () => api<LibraryItem[]>("/api/library"), refetchInterval: LIVE_MS });
 
@@ -31,6 +39,7 @@ export function useLibraryActions() {
     }),
     remove: useMutation({ mutationFn: (id: string) => del(`/api/library/${id}`), onSuccess: refresh }),
     trash: useMutation({ mutationFn: (id: string) => post<Asset>(`/api/assets/${id}/trash`), onSuccess: refresh }),
+    restore: useMutation({ mutationFn: (id: string) => post<Asset>(`/api/assets/${id}/restore`), onSuccess: refresh }),
     purge: useMutation({ mutationFn: (id: string) => post<Asset>(`/api/assets/${id}/purge`), onSuccess: refresh }),
     // Batch: one call per id (the single-asset endpoints exercise the same guards). Each id is processed and the
     // list refreshes once when done; results are collected so the caller can report how many actually went through.

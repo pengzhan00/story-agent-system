@@ -10410,6 +10410,49 @@
         ]
       }
     },
+    "/api/assets/{asset_id}/restore": {
+      "post": {
+        "description": "Bring a trashed asset back (current again if its slot is free).",
+        "operationId": "restore_asset_api_assets__asset_id__restore_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "asset_id",
+            "required": true,
+            "schema": {
+              "title": "Asset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Restore Asset",
+        "tags": [
+          "assets"
+        ]
+      }
+    },
     "/api/assets/{asset_id}/text": {
       "put": {
         "description": "Save an edited story / script / transcript as a NEW version of the same slot (the one before stays as a\ncandidate, so the edit can be undone by adopting it again).",

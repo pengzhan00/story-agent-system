@@ -120,6 +120,14 @@ def trash_asset(asset_id: str, request: Request) -> AssetOut:
     return AssetOut.model_validate(ledger.trash_asset(asset_id))
 
 
+@router.post("/assets/{asset_id}/restore", response_model=AssetOut)
+def restore_asset(asset_id: str, request: Request) -> AssetOut:
+    """Bring a trashed asset back (current again if its slot is free)."""
+    ledger = ctx_of(request).ledger
+    ledger.get_asset(asset_id)
+    return AssetOut.model_validate(ledger.restore_asset(asset_id))
+
+
 @router.post("/assets/{asset_id}/purge", response_model=AssetOut)
 def purge_asset(asset_id: str, request: Request) -> AssetOut:
     """Hard delete: remove the row and its file from disk. Refused while the asset is current."""

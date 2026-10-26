@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useProjects } from "../api/hooks";
 import { useScripts } from "../api/scripts";
-import { useAllAssets, useLibraryActions, useLibraryItems, useLibraryRoles } from "../api/library";
+import { useAllAssets, useLibraryActions, useLibraryItems, useLibraryRoles, useTrashedAssets } from "../api/library";
 import type { Asset, LibraryItem } from "../api/types";
 import { useWorkshop } from "../api/workshop";
 import { AssetPreview } from "../components/Candidates";
@@ -16,6 +16,7 @@ import { CATEGORIES, type Category, categoryOf, mediaOfAsset, targetsFor } from 
 const NAMED = "named";
 const WORKSHOP = "workshop";
 const SCRIPTS = "project_scripts";
+const TRASHED = "trashed";
 
 function CopyButton({ text, label }: { text: string; label: string }) {
   const t = useT();
@@ -243,6 +244,40 @@ function NamedCard({ item }: { item: LibraryItem }) {
   );
 }
 
+function TrashedCard({ asset, source }: { asset: Asset; source: string }) {
+  const t = useT();
+  const { restore, purge } = useLibraryActions();
+  return (
+    <li className="card stack">
+      <div className="row">
+        <span className="chip">{t(`library.cat.${categoryOf(asset)}`)}</span>
+        <span className="muted small">{source}</span>
+        <span className="spacer" />
+        <span className="muted small">{asset.trashed_at?.replace("T", " ").slice(0, 16)}</span>
+      </div>
+      <AssetPreview asset={asset} />
+      <div className="row small">
+        <span className="muted">{asset.kind}</span>
+        <code className="small">{asset.id.slice(0, 8)}</code>
+        <span className="spacer" />
+        <button className="link" disabled={restore.isPending} onClick={() => restore.mutate(asset.id)}>
+          {t("web.library.restore")}
+        </button>
+        <button
+          className="link"
+          disabled={purge.isPending}
+          onClick={() => {
+            if (window.confirm(t("web.creative.purge_confirm"))) purge.mutate(asset.id);
+          }}
+        >
+          {t("web.creative.purge")}
+        </button>
+      </div>
+      <ErrorNote error={restore.error ?? purge.error} />
+    </li>
+  );
+}
+
 function HowTo() {
   const t = useT();
   const lines = ["input", "named", "pipeline", "lora", "cli", "api"] as const;
@@ -268,6 +303,7 @@ function HowTo() {
 export function LibraryPage() {
   const t = useT();
   const assets = useAllAssets();
+  const trashed = useTrashedAssets();
   const items = useLibraryItems();
   const roles = useLibraryRoles();
   const projects = useProjects();
@@ -321,6 +357,9 @@ export function LibraryPage() {
         </button>
         <button className={tab === NAMED ? "tab active" : "tab"} onClick={() => setTab(NAMED)}>
           {`${t("web.library.named")} (${items.data?.length ?? 0})`}
+        </button>
+        <button className={tab === TRASHED ? "tab active" : "tab"} onClick={() => setTab(TRASHED)}>
+          {`${t("web.library.trash_tab")} (${(trashed.data ?? []).filter((a) => a.trashed_at).length})`}
         </button>
       </nav>
       <div className="row">
@@ -382,6 +421,16 @@ export function LibraryPage() {
           <ul className="grid">
             {namedItems.map((i) => (
               <NamedCard key={i.id} item={i} />
+            ))}
+          </ul>
+        )
+      ) : tab === TRASHED ? (
+        (trashed.data ?? []).filter((a) => a.trashed_at).length === 0 ? (
+          <p className="empty">{t("web.library.empty_trash")}</p>
+        ) : (
+          <ul className="grid">
+            {(trashed.data ?? []).filter((a) => a.trashed_at).map((a) => (
+              <TrashedCard key={a.id} asset={a} source={projectName(a.project_id)} />
             ))}
           </ul>
         )
