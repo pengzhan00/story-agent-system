@@ -199,6 +199,8 @@ keyframe_from_references = true
 # Speaker labels that are not characters (narration): never added to the cast when a later episode uses them.
 non_character_speakers = ["narrator", "voice-over", "voiceover", "v.o.", "caption", "旁白", "画外音", "字幕"]
 video_share = 0.2
+# The sentence a voice sample speaks (the character's voice clone): a neutral line, never one of the drama's own lines.
+voice_sample_text = "你好，很高兴认识你。"
 video_min_per_episode = 2
 video_budget_hours = 0
 # The produce stage turns every spec into media. Quality tier for the first pass (draft | preview | final).
