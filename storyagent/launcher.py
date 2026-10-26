@@ -211,12 +211,25 @@ class Launcher:
 
     @staticmethod
     def _owned(pid: int) -> bool:
+        """True when the process belongs to this user (another user's process is never signalled). ``ps`` is not
+        available everywhere - a restricted sandbox denies /bin/ps - and ``lsof`` reports the uid as well, so it is
+        the fallback."""
         try:
             out = subprocess.run(["ps", "-p", str(pid), "-o", "uid="], capture_output=True, text=True, timeout=5,
                                  check=False).stdout.strip()
         except (OSError, subprocess.SubprocessError):
+            out = ""
+        if out.isdigit():
+            return int(out) == os.getuid()
+        if shutil.which("lsof") is None:
             return False
-        return out.isdigit() and int(out) == os.getuid()
+        try:
+            lines = subprocess.run(["lsof", "-nP", "-p", str(pid), "-F", "u"], capture_output=True, text=True,
+                                   timeout=5, check=False).stdout.splitlines()  # noqa: S603, S607
+        except (OSError, subprocess.SubprocessError):
+            return False
+        uid = next((line[1:] for line in lines if line.startswith("u")), "")
+        return uid.isdigit() and int(uid) == os.getuid()
 
     @staticmethod
     def _signal(pid: int, sig: int) -> None:
