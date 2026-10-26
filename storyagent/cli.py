@@ -391,6 +391,24 @@ def _cmd_media_adopt(s: Settings, a: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_media_trash(s: Settings, a: argparse.Namespace) -> int:
+    print(t("cli.asset.trashed", id=_ctx(s).ledger.trash_asset(a.id).id[:8]))
+    return 0
+
+
+def _cmd_media_purge(s: Settings, a: argparse.Namespace) -> int:
+    ledger = _ctx(s).ledger
+    if a.all_trash:
+        ids = [r["id"] for r in ledger.db.conn.execute(
+            "SELECT id FROM media_assets WHERE trashed_at IS NOT NULL").fetchall()]
+        for aid in ids:
+            ledger.purge_asset(aid)
+        print(t("cli.asset.purged_many", n=len(ids)))
+        return 0
+    print(t("cli.asset.purged", id=ledger.purge_asset(a.id).id[:8]))
+    return 0
+
+
 # -- uploads and the library ------------------------------------------------------------------------
 def _cmd_asset_import(s: Settings, a: argparse.Namespace) -> int:
     from storyagent.media.library import LibraryError, import_file
@@ -1139,6 +1157,29 @@ def _cmd_workflow_run(s: Settings, a: argparse.Namespace) -> int:
     return _finish_message(_show_run(state, run["id"], a.interval))
 
 
+def _cmd_workflow_rollback(s: Settings, a: argparse.Namespace) -> int:
+    from storyagent.story import StoryStore
+
+    c = _ctx(s)
+    store = StoryStore(c.db)
+    ProjectStore(c.db, s).get(a.project)
+    if a.snapshot:
+        snap_id = a.snapshot
+    else:
+        snaps = store.list_snapshots(a.project, "outline")
+        if not snaps:
+            raise CliError("cli.workflow.no_snapshot", 1)
+        snap_id = snaps[0]["id"]
+    result = store.restore_snapshot(a.project, snap_id)
+    c.db.conn.execute(
+        "UPDATE workflow_stages SET status='completed' WHERE project_id=? "
+        "AND stage IN ('script','scenes','music','shotplan','specs','produce','compose') AND status='stale'",
+        (a.project,))
+    c.db.conn.commit()
+    print(t("cli.workflow.rolled_back", snapshot=snap_id[:8], seasons=result["seasons"], episodes=result["episodes"]))
+    return 0
+
+
 def _cmd_workflow_status(s: Settings, a: argparse.Namespace) -> int:
     c = _ctx(s)
     state = WorkflowState(c.db)
@@ -1347,6 +1388,10 @@ def build_parser() -> argparse.ArgumentParser:
     mr.add_argument("id")
     mr.add_argument("--new-seed", action="store_true")
     add(me, "adopt", _cmd_media_adopt).add_argument("id")
+    add(me, "trash", _cmd_media_trash).add_argument("id")
+    mpurge = add(me, "purge", _cmd_media_purge)
+    mpurge.add_argument("id", nargs="?")
+    mpurge.add_argument("--all-trash", action="store_true", help="hard-delete every trashed asset")
 
     asset = sub.add_parser("asset").add_subparsers(dest="cmd", required=True)
     ai = add(asset, "import", _cmd_asset_import)
@@ -1500,6 +1545,9 @@ def build_parser() -> argparse.ArgumentParser:
     wp.add_argument("run", nargs="?")
     wp.add_argument("--project", type=int)
     wp.add_argument("--interval", type=float, default=1.0)
+    wp = add(wf, "rollback", _cmd_workflow_rollback)
+    wp.add_argument("--project", type=int, required=True)
+    wp.add_argument("--snapshot", help="snapshot id; default = the latest outline snapshot")
     ex = sub.add_parser("export").add_subparsers(dest="cmd", required=True)
     wp = add(ex, "episode", _cmd_export_episode)
     wp.add_argument("--project", type=int, required=True)
