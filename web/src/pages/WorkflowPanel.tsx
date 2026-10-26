@@ -215,12 +215,13 @@ export function WorkflowPanel({ id }: { id: number }) {
             <button
               className="primary"
               disabled={start.isPending || !text.trim() || dirty || (allDone && !force)}
-              onClick={() =>
+              onClick={() => {
+                if (force && !window.confirm(t("web.workflow.confirm_force"))) return;
                 start.mutate({
                   stages: force ? wf.data?.stages.map((s) => s.stage) : undefined,
                   params: { ...(force ? { force: true } : {}), ...(batch.trim() ? { episodes: batch.trim() } : { episode }) },
-                })
-              }
+                });
+              }}
             >
               {allDone ? t("web.workflow.rerun") : wf.data?.stages.some((s) => s.status !== "pending") ? t("web.workflow.resume") : t("web.workflow.start")}
             </button>
