@@ -375,6 +375,21 @@ ref_min_sec = 3     # reference voice length window (3-10 s works best)
 ref_max_sec = 20
 auto_transcribe = true
 
+# Plain text-to-speech through the macOS `say` command: no reference voice, no cloning, the same system voice for
+# every line. Use it when the cloned voices make too many lines unusable. Chinese voices: `say -v '?' | grep zh_CN`.
+[models."say-macos"]
+kind = "audio.tts"
+provider = "say"
+version = "macOS say"
+heavy = false
+license_tag = "apple-system"
+commercial_ok = true
+prompt_profile = "plain"
+timeout_sec = 120
+[models."say-macos".params]
+voice = "Tingting"   # any installed macOS Chinese voice (Tingting, Meijia, Binbin, Eddy, Flo ...)
+rate = 180           # words per minute
+
 # Voice conversion (Seed-VC): the performance (words, timing, emotion) of a source recording is re-voiced as the
 # reference speaker. Two engines, same adapter: v2 (speech, default; its AR/CFM checkpoints are passed explicitly
 # because its own hub lookup is not local) and v1 with f0_condition (singing; pitch-aware 44.1 kHz).
