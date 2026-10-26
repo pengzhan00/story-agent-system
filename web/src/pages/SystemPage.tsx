@@ -1,5 +1,6 @@
 import { useHealth } from "../api/hooks";
 import { ErrorNote } from "../components/ErrorNote";
+import { MaintenancePanel } from "../components/MaintenancePanel";
 import { UpdatePanel } from "../components/UpdatePanel";
 import { useT } from "../i18n";
 
@@ -39,6 +40,7 @@ export function SystemPage() {
         {t("web.system.recheck")}
       </button>
       <UpdatePanel />
+      <MaintenancePanel />
     </div>
   );
 }
