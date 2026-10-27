@@ -7,6 +7,7 @@ import { useSpecs } from "../api/specs";
 import type { Asset, Spec } from "../api/types";
 import { AssetPreview } from "../components/Candidates";
 import { ErrorNote } from "../components/ErrorNote";
+import { KeyframeStrip } from "../components/KeyframeStrip";
 import { useT } from "../i18n";
 import { labeler } from "../lib/labels";
 
@@ -198,6 +199,7 @@ export function ReviewPanel({ id }: { id: number }) {
   const t = useT();
   const board = useReviewBoard(id);
   const [shotId, setShotId] = useState<number | null>(null);
+  const [view, setView] = useState<"list" | "strip">("list");
   const shots = board.data ?? [];
   const shot = shots.find((s) => s.shot_id === shotId) ?? shots[0];
   return (
@@ -205,20 +207,36 @@ export function ReviewPanel({ id }: { id: number }) {
       <aside className="stack">
         <ErrorNote error={board.error} />
         {board.isLoading ? <p className="muted">{t("web.loading")}</p> : null}
-        {shots.length === 0 && !board.isLoading ? <p className="empty">{t("web.review.no_shots")}</p> : null}
-        <ul className="plain-list">
-          {shots.map((s) => (
-            <li key={s.shot_id}>
-              <button className={s.shot_id === shot?.shot_id ? "list-item active" : "list-item"} onClick={() => setShotId(s.shot_id)}>
-                <span>{shotLabel(s, t)}</span>
-                {s.open_notes > 0 ? <span className="chip chip-failed">{s.open_notes}</span> : null}
-                {s.redoing_notes > 0 ? <span className="chip chip-running">{s.redoing_notes}</span> : null}
-              </button>
-            </li>
-          ))}
-        </ul>
+        <nav className="tabs">
+          <button className={view === "list" ? "tab active" : "tab"} onClick={() => setView("list")}>
+            {t("web.review.list")}
+          </button>
+          <button className={view === "strip" ? "tab active" : "tab"} onClick={() => setView("strip")}>
+            {t("web.review.strip")}
+          </button>
+        </nav>
+        {view === "strip" ? (
+          shots.length === 0 && !board.isLoading ? <p className="empty">{t("web.review.no_shots")}</p> : (
+            <KeyframeStrip pid={id} shots={shots} />
+          )
+        ) : (
+          <>
+            {shots.length === 0 && !board.isLoading ? <p className="empty">{t("web.review.no_shots")}</p> : null}
+            <ul className="plain-list">
+              {shots.map((s) => (
+                <li key={s.shot_id}>
+                  <button className={s.shot_id === shot?.shot_id ? "list-item active" : "list-item"} onClick={() => setShotId(s.shot_id)}>
+                    <span>{shotLabel(s, t)}</span>
+                    {s.open_notes > 0 ? <span className="chip chip-failed">{s.open_notes}</span> : null}
+                    {s.redoing_notes > 0 ? <span className="chip chip-running">{s.redoing_notes}</span> : null}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
       </aside>
-      <section>{shot ? <ShotReview pid={id} shot={shot} /> : null}</section>
+      <section>{view === "list" && shot ? <ShotReview pid={id} shot={shot} /> : null}</section>
     </div>
   );
 }

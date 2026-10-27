@@ -5363,6 +5363,8 @@ export interface components {
             act: number;
             /** Assets */
             assets: components["schemas"]["AssetOut"][];
+            /** End Shot Id */
+            end_shot_id: number | null;
             /** Episode */
             episode: number;
             /** Location */

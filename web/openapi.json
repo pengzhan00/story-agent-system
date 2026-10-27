@@ -5521,6 +5521,17 @@
             "title": "Assets",
             "type": "array"
           },
+          "end_shot_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Shot Id"
+          },
           "episode": {
             "title": "Episode",
             "type": "integer"
@@ -5562,6 +5573,7 @@
           "shot",
           "location",
           "assets",
+          "end_shot_id",
           "open_notes",
           "redoing_notes",
           "resolved_notes"

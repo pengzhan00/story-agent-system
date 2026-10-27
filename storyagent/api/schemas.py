@@ -1272,6 +1272,7 @@ class ReviewShotOut(Strict):
     shot: int
     location: str
     assets: list[AssetOut]
+    end_shot_id: int | None
     open_notes: int
     redoing_notes: int
     resolved_notes: int

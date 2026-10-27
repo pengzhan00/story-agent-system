@@ -184,6 +184,7 @@ class ReviewStore:
                 "shot_id": shot["id"], "episode": episodes.get(shot.get("episode_id"), 0),
                 "act": shot["act_number"], "scene": shot["scene_number"], "shot": shot["shot_number"],
                 "location": shot["location"], "assets": by_shot.get(shot["id"], []),
+                "end_shot_id": shot.get("end_shot_id"),
                 "open_notes": c.get("open", 0), "redoing_notes": c.get("redoing", 0),
                 "resolved_notes": c.get("resolved", 0),
             })

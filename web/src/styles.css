@@ -248,3 +248,11 @@ dialog.lightbox img, dialog.lightbox video { display: block; max-width: 92vw; ma
 .wiki-sources { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 8px; }
 .wiki-snippet { display: block; }
 .wiki-ask input.grow { flex: 1; min-width: 0; }
+
+/* ---- keyframe continuity strip (review) ---- */
+.strip { display: flex; gap: 12px; overflow-x: auto; padding: 8px 0 16px; align-items: flex-start; }
+.strip-cell { flex: 0 0 220px; display: flex; flex-direction: column; gap: 6px; }
+.strip-pic { border: 1px solid var(--border, #ccc); border-radius: 8px; overflow: hidden; min-height: 120px; }
+.strip-pic img, .strip-pic video { width: 100%; display: block; }
+.strip-label { text-align: center; }
+.strip-link select { width: 100%; }

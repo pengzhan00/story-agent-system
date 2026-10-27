@@ -157,6 +157,29 @@ def default_voice_of(settings: Settings, project_settings: dict[str, Any] | None
     return own or str(settings.workflow.get("default_voice", "")).strip()
 
 
+def _end_frame(ctx: Ctx, ledger: Ledger, store: SpecStore, shot_id: int, first: AssetRecord) -> AssetRecord | None:
+    """What keyframe this clip ends on. The shot's ``end_shot_id``: ``0`` = cut free (first frame only),
+    ``>0`` = that shot's keyframe, ``None``/absent = automatic (the next shot in story order)."""
+    shots = ctx.store.list_shots(ctx.pid)
+    mine = next((s for s in shots if s["id"] == shot_id), None)
+    if mine is None:
+        return None
+    mode = mine.get("end_shot_id")
+    if mode == 0:
+        return None
+    if mode and mode > 0:
+        target = mode
+    else:
+        order = [s["id"] for s in shots]
+        idx = order.index(shot_id) if shot_id in order else -1
+        target = order[idx + 1] if 0 <= idx < len(order) - 1 else None
+    if target is None or target == shot_id:
+        return None
+    k = store.current(ctx.pid, "shot.keyframe", str(target))
+    end = current_asset(ledger, k) if k else None
+    return end if end is not None and end.id != first.id else None
+
+
 def _plan_phase(
     ctx: Ctx, ledger: Ledger, specs: list[SpecRecord], types: tuple[str, ...], skipped: list[dict[str, Any]],
     tier: QualityTier, counts: dict[str, int],
@@ -196,7 +219,20 @@ def _plan_phase(
             if frame is None:
                 skipped.append({"subject": spec.subject_type, "id": spec.subject_id, "reason": "no_keyframe"})
                 continue
-            extra["refs"] = [f"asset:{frame.id}"]
+            end = _end_frame(ctx, ledger, store, int(spec.subject_id), frame)
+            model = (ctx.settings.model(spec.model_ref) if spec.model_ref
+                     else ctx.settings.default_model(spec.kind.value))
+            if model.provider == "h3":
+                # h3 reads the first ref image as the first frame and inputs.last_frame as the end frame.
+                extra["refs"] = [f"asset:{frame.id}"]
+                if end:
+                    extra["last_frame"] = f"asset:{end.id}"
+            else:
+                # phosphene takes start_image / end_image (or the generic image role for i2v).
+                refs: list[Any] = [{"role": "image", "path": f"asset:{frame.id}"}]
+                if end:
+                    refs.append({"role": "end_image", "path": f"asset:{end.id}"})
+                extra["refs"] = refs
         job = store.build_job(spec, tier=tier, seed=spec.seed, shot_id=_shot_id(spec), extra_inputs=extra)
         if spec.subject_type == "shot.video" and ctx.project.settings.get("video_with_sound"):
             job = shot_with_sound(store, spec, job)
