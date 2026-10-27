@@ -253,6 +253,14 @@ class PriorityRequest(BaseModel):
     priority: int | None = Field(default=None, ge=-1000, le=1000)
 
 
+class JobHistoryRequest(BaseModel):
+    ids: list[str] = Field(min_length=1, max_length=200)
+
+
+class JobHistoryResult(Strict):
+    removed: int
+
+
 class CancelResult(BaseModel):
     status: JobStatus
 

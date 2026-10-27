@@ -183,3 +183,13 @@ Admin only (`/api/setup` is an admin prefix). Reading changes nothing; nothing i
 - `GET /api/setup/config?profile=&root=&llm_model=` - the configuration changes this machine needs, per file (`changes`, the whole file as `text`). Writes nothing.
 - `POST /api/setup/config {profile, root, extra, llm_model, write}` - with `write: true` the changed files are written to the config folder (the file replaced is kept as `<name>.bak-setup-<time>`), after the result has been loaded in a scratch copy; a configuration the loader refuses is `409 setup_config_invalid` and nothing is written. Audited as `setup.config`.
 - `POST /api/setup/verify?profile=&root=` - the healthcheck with everything the profile needs counted as required.
+
+## 批量移除媒体作业历史
+
+`POST /api/jobs/history/remove`，请求 `{"ids":["job-id", "..."]}`（1–200 项），返回 `{"removed":N}`。
+仅接受已结束任务；含运行中/排队中任务返回 409，未知编号返回 404，整批均不改动。
+重复编号去重，重复删除返回 0。需要既有写权限，记录操作人和编号审计。
+
+`GET /api/jobs` 在筛选和分页之前排除已移除历史。任务详情、事件、素材与 `job:` 引用仍保留，
+工作流内部查询不受影响；不会删文件、改变终态或破坏重试父子关系。数据库 schema 23 增加
+`media_jobs.history_removed_at`，迁移前沿用标准数据库备份。

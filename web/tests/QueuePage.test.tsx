@@ -14,27 +14,33 @@ const job = (id: string, over: Record<string, unknown>) => ({
   actual_seconds: 0, retried_by: null, retried_status: null, retries: 0, ...over,
 });
 let calls: string[] = [];
+let removed: string[] = [];
 
 beforeEach(() => {
   calls = [];
+  removed = [];
   localStorage.setItem("storyagent.locale", "en");
-  vi.stubGlobal("fetch", async (url: string, init?: { method?: string }) => {
+  vi.stubGlobal("fetch", async (url: string, init?: { method?: string; body?: string }) => {
     calls.push(`${init?.method ?? "GET"} ${url}`);
     let json: unknown = {};
     if (url.includes("/api/i18n")) json = en;
     else if (url.includes("/api/queue")) json = { running: 0, queued: 1, running_message: "", queued_reasons: {} };
-    else if (url.includes("/api/jobs"))
+    else if (url.includes("/api/jobs/history/remove")) {
+      removed = (JSON.parse(init?.body ?? "{}") as { ids: string[] }).ids;
+      json = { removed: removed.length };
+    } else if (url.includes("/api/jobs"))
       json = [
         job("aaaaaaaa11111111", { retried_by: "cccccccc33333333", retried_status: "queued", retries: 1 }),
         job("bbbbbbbb22222222", {}),
         job("cccccccc33333333", { status: "queued", error_code: null, parent_job_id: "aaaaaaaa11111111" }),
         job("dddddddd44444444", { status: "queued", error_code: null, kind: "audio.tts", priority: 5 }),
         job("eeeeeeee55555555", { status: "queued", error_code: null, kind: "audio.tts", priority: 5 }),
-      ];
+        job("ffffffff66666666", { status: "completed", error_code: null }),
+      ].filter((j) => !removed.includes(j.id));
     return { ok: true, status: 200, statusText: "", json: async () => json, text: async () => JSON.stringify(json) };
   });
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe("job list: ids and retries", () => {
   it("shows each job's number and marks the ones already retried, so only the rest can be retried", async () => {
@@ -70,4 +76,65 @@ describe("job list: ids and retries", () => {
     fireEvent.click(screen.getAllByRole("button", { name: en["web.jobs.top_kind"]! })[0]!);
     await waitFor(() => expect(calls).toContain("POST /api/jobs/priority"));
   });
+});
+
+
+describe("batch history removal", () => {
+  const mount = () => render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <I18nProvider><JobsPanel /></I18nProvider>
+    </QueryClientProvider>,
+  );
+
+  it("selects only finished jobs, confirms deletion and refreshes the list", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    mount();
+    await screen.findAllByText("#bbbbbbbb");
+    expect(screen.getByRole("checkbox", { name: "Select job #cccccccc" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("checkbox", { name: en["web.jobs.select_page"]! }));
+    expect(screen.getByText("3 selected")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: en["web.jobs.remove_selected"]! }));
+    await waitFor(() => expect(removed).toEqual(["aaaaaaaa11111111", "bbbbbbbb22222222", "ffffffff66666666"]));
+    expect(confirm).toHaveBeenCalledOnce();
+    await waitFor(() => expect(screen.queryByText("#bbbbbbbb")).toBeNull());
+    expect(screen.getByText("0 selected")).toBeTruthy();
+    expect(screen.getAllByText("#cccccccc").length).toBeGreaterThan(0);
+  });
+
+  it("supports individual selection and clears it on filter change; cancelling keeps history", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+    mount();
+    await screen.findAllByText("#bbbbbbbb");
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select job #bbbbbbbb" }));
+    expect(screen.getByText("1 selected")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: en["web.jobs.remove_selected"]! }));
+    expect(calls).not.toContain("POST /api/jobs/history/remove");
+    fireEvent.click(screen.getByRole("button", { name: en["web.jobs.filter.problems"]! }));
+    expect(await screen.findByText("0 selected")).toBeTruthy();
+    expect(screen.getByRole("button", { name: en["web.jobs.remove_selected"]! })).toBeDisabled();
+  });
+});
+
+it("returns to the previous page after deleting the last row of a later page", async () => {
+  let deleted = false;
+  vi.spyOn(window, "confirm").mockReturnValue(true);
+  vi.stubGlobal("fetch", async (url: string) => {
+    let json: unknown = {};
+    if (url.includes("/api/i18n")) json = en;
+    else if (url.includes("/api/queue")) json = { running: 0, queued: 0, waiting: {} };
+    else if (url.includes("/api/jobs/history/remove")) { deleted = true; json = { removed: 1 }; }
+    else if (url.includes("/api/jobs")) json = url.includes("offset=100")
+      ? deleted ? [] : [job("lastpage00000000", { status: "cancelled" })]
+      : Array.from({ length: 100 }, (_, i) => job(`firstpage${i}`, { status: "completed" }));
+    return { ok: true, status: 200, json: async () => json, text: async () => JSON.stringify(json) };
+  });
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <I18nProvider><JobsPanel /></I18nProvider>
+  </QueryClientProvider>);
+  fireEvent.click(await screen.findByRole("button", { name: en["web.jobs.next_page"]! }));
+  await screen.findByText("#lastpage");
+  fireEvent.click(screen.getByRole("checkbox", { name: en["web.jobs.select_page"]! }));
+  fireEvent.click(screen.getByRole("button", { name: en["web.jobs.remove_selected"]! }));
+  await waitFor(() => expect(screen.getByText("Page 1")).toBeTruthy());
+  expect(screen.getByRole("button", { name: en["web.jobs.prev_page"]! })).toBeDisabled();
 });

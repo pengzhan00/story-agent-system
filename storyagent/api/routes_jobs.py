@@ -8,7 +8,18 @@ from storyagent.domain import JobStatus
 from storyagent.media.contracts import MediaJob
 
 from .context import ctx_of
-from .schemas import CancelResult, JobCreate, JobCreated, JobEvent, JobOut, PriorityRequest, QueueState, RetryRequest
+from .schemas import (
+    CancelResult,
+    JobCreate,
+    JobCreated,
+    JobEvent,
+    JobHistoryRequest,
+    JobHistoryResult,
+    JobOut,
+    PriorityRequest,
+    QueueState,
+    RetryRequest,
+)
 
 router = APIRouter(prefix="/api", tags=["jobs"])
 
@@ -30,7 +41,8 @@ def list_jobs(
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[JobOut]:
     jobs = ctx_of(request).ledger.list_jobs(
-        project_id=project_id, shot_id=shot_id, spec_id=spec_id, status=status, limit=limit, offset=offset)
+        project_id=project_id, shot_id=shot_id, spec_id=spec_id, status=status, limit=limit, offset=offset,
+        include_removed=False)
     return [JobOut.model_validate(j) for j in jobs]
 
 
@@ -70,6 +82,16 @@ def prioritize_jobs(body: PriorityRequest, request: Request) -> list[JobOut]:
     """Move queued jobs ahead of / behind the rest of the queue (``move``) or give them a number (``priority``)."""
     jobs = ctx_of(request).ledger.reprioritize(body.ids, move=body.move, priority=body.priority)
     return [JobOut.model_validate(j) for j in jobs]
+
+
+@router.post("/jobs/history/remove", response_model=JobHistoryResult)
+def remove_history(body: JobHistoryRequest, request: Request) -> JobHistoryResult:
+    """Remove terminal jobs from history; their assets, audit trail and references stay intact."""
+    ctx = ctx_of(request)
+    removed = ctx.ledger.remove_job_history(body.ids)
+    ctx.auth.audit("jobs.history.remove", user=getattr(request.state, "user", None),
+                   detail={"ids": list(dict.fromkeys(body.ids)), "removed": removed})
+    return JobHistoryResult(removed=removed)
 
 
 @router.post("/jobs/{job_id}/retry", response_model=JobOut, status_code=201)

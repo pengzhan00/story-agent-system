@@ -218,9 +218,12 @@ class Ledger:
         pipeline_id: str | None = None,
         limit: int = 100,
         offset: int = 0,
+        include_removed: bool = True,
     ) -> list[JobRecord]:
         where: list[str] = ["1=1"]
         args: list[Any] = []
+        if not include_removed:
+            where.append("history_removed_at IS NULL")
         if standalone:
             where.append("project_id IS NULL")
         if pipeline_id is not None:
@@ -247,6 +250,24 @@ class Ledger:
             (*args, limit, max(offset, 0)),
         ).fetchall()
         return self._with_retries([JobRecord.from_row(r) for r in rows])
+
+    def remove_job_history(self, ids: Sequence[str]) -> int:
+        """Remove terminal jobs from the queue list, retaining assets and all job references. Atomic and idempotent."""
+        unique = list(dict.fromkeys(ids))
+        if not unique or len(unique) > 200:
+            raise LedgerError("history selection must contain 1 to 200 jobs")
+        with self.db.transaction() as conn:
+            marks = ",".join("?" for _ in unique)
+            rows = conn.execute(f"SELECT id, status FROM media_jobs WHERE id IN ({marks})", unique).fetchall()
+            if len(rows) != len(unique):
+                raise LedgerError("unknown job in history selection")
+            if any(not JobStatus(r["status"]).is_terminal for r in rows):
+                raise LedgerError("only terminal jobs can be removed from history")
+            changed = conn.execute(
+                f"UPDATE media_jobs SET history_removed_at=? WHERE id IN ({marks}) AND history_removed_at IS NULL",
+                (iso_at(self.clock()), *unique),
+            ).rowcount
+        return changed
 
     def queued(self, limit: int = 50) -> list[JobRecord]:
         rows = self.db.conn.execute(

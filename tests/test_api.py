@@ -63,7 +63,7 @@ def job_body(project_id: int, **over: Any) -> dict[str, Any]:
 
 # ---- basics ---------------------------------------------------------------------------------------
 def test_ready_and_meta(client: TestClient) -> None:
-    assert client.get("/api/ready").json() == {"ok": True, "schema_version": 22}
+    assert client.get("/api/ready").json() == {"ok": True, "schema_version": 23}
     m = client.get("/api/meta").json()
     assert {"value": "video.generate", "label": "Video"} in [
         {"value": k["value"], "label": k["label"]} for k in m["kinds"]
@@ -584,3 +584,34 @@ def test_a_project_can_acknowledge_restricted_licences(client: TestClient) -> No
     assert r.status_code == 200 and r.json()["settings"]["allow_restricted_licenses"] is True
     r = client.patch(f"/api/projects/{pid}/settings", json={"allow_restricted_licenses": None})
     assert "allow_restricted_licenses" not in r.json()["settings"]
+
+
+def test_remove_history_keeps_assets_references_and_is_idempotent(client: TestClient, run_worker: Any) -> None:
+    p = project(client)
+    first = client.post('/api/jobs', json=job_body(p['id'])).json()['job']
+    run_worker()
+    before = client.get('/api/assets', params={'project_id': p['id']}).json()
+    assert before
+    result = client.post('/api/jobs/history/remove', json={'ids': [first['id'], first['id']]})
+    assert result.status_code == 200 and result.json() == {'removed': 1}
+    assert client.get('/api/jobs', params={'project_id': p['id']}).json() == []
+    assert client.get(f"/api/jobs/{first['id']}").json()['status'] == 'completed'
+    assert client.get(f"/api/jobs/{first['id']}/events").status_code == 200
+    assert client.get('/api/assets', params={'project_id': p['id']}).json() == before
+    assert client.post('/api/jobs/history/remove', json={'ids': [first['id']]}).json() == {'removed': 0}
+
+
+def test_history_selection_is_atomic_and_rejects_active_or_unknown_jobs(client: TestClient) -> None:
+    p = project(client)
+    finished = client.post('/api/jobs', json=job_body(p['id'], seed=11)).json()['job']['id']
+    active = client.post('/api/jobs', json=job_body(p['id'], seed=12)).json()['job']['id']
+    client.post(f'/api/jobs/{finished}/cancel')
+    for ids, status in [([finished, active], 409), ([finished, 'missing'], 404)]:
+        result = client.post('/api/jobs/history/remove', json={'ids': ids})
+        assert result.status_code == status, result.text
+        assert {j['id'] for j in client.get('/api/jobs').json()} == {finished, active}
+    assert client.post('/api/jobs/history/remove', json={'ids': []}).status_code == 422
+    assert client.post('/api/jobs/history/remove', json={'ids': [finished] * 201}).status_code == 422
+    assert client.post('/api/jobs/history/remove', json={'ids': [finished]}).json() == {'removed': 1}
+    assert [j['id'] for j in client.get('/api/jobs', params={'status': 'queued'}).json()] == [active]
+    assert client.get('/api/queue').json()['queued'] == 1

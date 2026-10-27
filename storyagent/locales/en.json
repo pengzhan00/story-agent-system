@@ -2460,5 +2460,13 @@
   "agent.var.so_far": "Episodes planned so far",
   "workshop.module.post": "Post-production",
   "workshop.module.separate": "Vocal separation",
-  "workshop.field.video": "Video"
+  "workshop.field.video": "Video",
+  "web.jobs.select_job": "Select job #{id}",
+  "web.jobs.select_page": "Select finished jobs on this page",
+  "web.jobs.selected_n": "{n} selected",
+  "web.jobs.remove_selected": "Delete selected history",
+  "web.jobs.clear_selection": "Clear selection",
+  "web.jobs.remove_hint": "Finished jobs only. Generated files are kept.",
+  "web.jobs.remove_confirm": "Delete {n} selected jobs from history? Generated files and provenance will be kept.",
+  "audit.action.jobs.history.remove": "Delete job history"
 }

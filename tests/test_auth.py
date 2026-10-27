@@ -201,6 +201,8 @@ def test_roles_on_real_routes_and_the_error_envelope(api: tuple[TestClient, Auth
     pid = client.post("/api/projects", json={"name": "P"}, headers=h["pat"]).json()["id"]
     assert client.patch(f"/api/projects/{pid}", json={"description": "d"}, headers=h["ed"]).status_code == 200
     assert client.patch(f"/api/projects/{pid}", json={"description": "e"}, headers=h["vi"]).status_code == 403
+    assert client.post("/api/jobs/history/remove", json={"ids": ["missing"]}, headers=h["vi"]).status_code == 403
+    assert client.post("/api/jobs/history/remove", json={"ids": ["missing"]}).status_code == 401
     assert client.get(f"/api/projects/{pid}", headers=h["vi"]).status_code == 200
     assert client.delete(f"/api/projects/{pid}", headers=h["ed"]).status_code == 403
     assert client.get("/api/users", headers=h["pat"]).status_code == 403

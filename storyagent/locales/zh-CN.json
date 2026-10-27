@@ -2460,5 +2460,13 @@
   "agent.var.so_far": "已规划的前几集",
   "workshop.module.post": "后期处理",
   "workshop.module.separate": "人声分离",
-  "workshop.field.video": "视频"
+  "workshop.field.video": "视频",
+  "web.jobs.select_job": "选择作业 #{id}",
+  "web.jobs.select_page": "全选本页已结束作业",
+  "web.jobs.selected_n": "已选 {n} 项",
+  "web.jobs.remove_selected": "删除所选历史",
+  "web.jobs.clear_selection": "取消选择",
+  "web.jobs.remove_hint": "仅删除已结束记录，生成素材保留。",
+  "web.jobs.remove_confirm": "从历史列表删除选中的 {n} 项记录？生成素材与溯源信息保留。",
+  "audit.action.jobs.history.remove": "删除作业历史"
 }

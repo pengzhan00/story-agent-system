@@ -639,6 +639,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/jobs/history/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Remove History
+         * @description Remove terminal jobs from history; their assets, audit trail and references stay intact.
+         */
+        post: operations["remove_history_api_jobs_history_remove_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/jobs/priority": {
         parameters: {
             query?: never;
@@ -3904,6 +3924,16 @@ export interface components {
             level: string;
             /** Ts */
             ts: string;
+        };
+        /** JobHistoryRequest */
+        JobHistoryRequest: {
+            /** Ids */
+            ids: string[];
+        };
+        /** JobHistoryResult */
+        JobHistoryResult: {
+            /** Removed */
+            removed: number;
         };
         /** JobOut */
         JobOut: {
@@ -8120,6 +8150,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobCreated"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_history_api_jobs_history_remove_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JobHistoryRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobHistoryResult"];
                 };
             };
             /** @description Validation Error */

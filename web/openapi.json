@@ -1900,6 +1900,37 @@
         "title": "JobEvent",
         "type": "object"
       },
+      "JobHistoryRequest": {
+        "properties": {
+          "ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "JobHistoryRequest",
+        "type": "object"
+      },
+      "JobHistoryResult": {
+        "properties": {
+          "removed": {
+            "title": "Removed",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "removed"
+        ],
+        "title": "JobHistoryResult",
+        "type": "object"
+      },
       "JobOut": {
         "properties": {
           "actual_seconds": {
@@ -11417,6 +11448,48 @@
           }
         },
         "summary": "Create Job",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/history/remove": {
+      "post": {
+        "description": "Remove terminal jobs from history; their assets, audit trail and references stay intact.",
+        "operationId": "remove_history_api_jobs_history_remove_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobHistoryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobHistoryResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove History",
         "tags": [
           "jobs"
         ]

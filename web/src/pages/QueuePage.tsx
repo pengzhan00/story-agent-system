@@ -58,7 +58,9 @@ function JobDetail({ job }: { job: Job }) {
   );
 }
 
-function JobRow({ job, siblings }: { job: Job; siblings: string[] }) {
+function JobRow({ job, siblings, selected, onSelect, selectingDisabled }: {
+  job: Job; siblings: string[]; selected: boolean; onSelect: () => void; selectingDisabled: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const t = useT();
   const { cancel, retry, front } = useJobActions();
@@ -68,6 +70,10 @@ function JobRow({ job, siblings }: { job: Job; siblings: string[] }) {
   return (
     <Fragment>
     <tr>
+      <td>
+        <input type="checkbox" aria-label={t("web.jobs.select_job", { id: job.id.slice(0, 8) })}
+          checked={selected} disabled={active || selectingDisabled} onChange={onSelect} />
+      </td>
       <td>
         <JobId id={job.id} />
         {job.parent_job_id ? (
@@ -127,7 +133,7 @@ function JobRow({ job, siblings }: { job: Job; siblings: string[] }) {
     </tr>
     {open ? (
       <tr className="edit-row">
-        <td colSpan={7}>
+        <td colSpan={8}>
           <JobDetail job={job} />
         </td>
       </tr>
@@ -141,7 +147,18 @@ export function JobsPanel({ projectId }: { projectId?: number }) {
   const [filter, setFilter] = useState<Filter>("all");
   const PAGE = 100;
   const [page, setPage] = useState(0);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const { removeHistory } = useJobActions();
   const jobs = useJobs(projectId, [...FILTERS[filter]], PAGE, page * PAGE);
+  const eligible = (jobs.data ?? []).filter((j) => !ACTIVE.has(j.status));
+  const chosen = eligible.filter((j) => selected.has(j.id)).map((j) => j.id);
+  const allSelected = eligible.length > 0 && chosen.length === eligible.length;
+  const toggle = (id: string) => setSelected((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const changePage = (next: number) => { setPage(next); setSelected(new Set()); };
   const more = (jobs.data?.length ?? 0) >= PAGE;
   const queue = useQueueState(projectId);
   const count = (f: Filter) => (f === "running" ? queue.data?.running : f === "waiting" ? queue.data?.queued : undefined);
@@ -149,19 +166,42 @@ export function JobsPanel({ projectId }: { projectId?: number }) {
     <div className="stack">
       <nav className="tabs" aria-label={t("web.jobs.filter")}>
         {(Object.keys(FILTERS) as Filter[]).map((f) => (
-          <button key={f} className={f === filter ? "tab active" : "tab"} aria-pressed={f === filter} onClick={() => setFilter(f)}>
+          <button key={f} className={f === filter ? "tab active" : "tab"} aria-pressed={f === filter} disabled={removeHistory.isPending} onClick={() => { setFilter(f); changePage(0); }}>
             {t(`web.jobs.filter.${f}`)}
             {count(f) !== undefined ? ` (${count(f)})` : ""}
           </button>
         ))}
       </nav>
       <ErrorNote error={jobs.error} />
+      <ErrorNote error={removeHistory.error} />
+      {jobs.data && jobs.data.length > 0 ? (
+        <div className="row small">
+          <span>{t("web.jobs.selected_n", { n: chosen.length })}</span>
+          <button disabled={!chosen.length || removeHistory.isPending} onClick={() => {
+            if (window.confirm(t("web.jobs.remove_confirm", { n: chosen.length }))) {
+              const emptyPage = chosen.length === jobs.data?.length;
+              removeHistory.mutate(chosen, { onSuccess: () => {
+                setSelected(new Set());
+                if (emptyPage && page > 0) setPage((p) => p - 1);
+              } });
+            }
+          }}>{t("web.jobs.remove_selected")}</button>
+          <button disabled={!chosen.length || removeHistory.isPending} onClick={() => setSelected(new Set())}>
+            {t("web.jobs.clear_selection")}
+          </button>
+          <span className="muted">{t("web.jobs.remove_hint")}</span>
+        </div>
+      ) : null}
       {jobs.data && jobs.data.length === 0 ? <p className="empty">{t("web.jobs.empty")}</p> : null}
       {jobs.data && jobs.data.length > 0 ? (
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
+                <th><input type="checkbox" aria-label={t("web.jobs.select_page")} checked={allSelected}
+                  ref={(el) => { if (el) el.indeterminate = chosen.length > 0 && !allSelected; }}
+                  disabled={!eligible.length || removeHistory.isPending}
+                  onChange={() => setSelected(allSelected ? new Set() : new Set(eligible.map((j) => j.id)))} /></th>
                 <th>{t("web.jobs.id")}</th>
                 <th>{t("web.jobs.kind")}</th>
                 <th>{t("web.jobs.model")}</th>
@@ -176,6 +216,9 @@ export function JobsPanel({ projectId }: { projectId?: number }) {
                 <JobRow
                   key={j.id}
                   job={j}
+                  selected={chosen.includes(j.id)}
+                  onSelect={() => toggle(j.id)}
+                  selectingDisabled={removeHistory.isPending}
                   siblings={jobs.data.filter((o) => o.status === "queued" && o.kind === j.kind && o.project_id === j.project_id).map((o) => o.id)}
                 />
               ))}
@@ -185,11 +228,11 @@ export function JobsPanel({ projectId }: { projectId?: number }) {
       ) : null}
       {more || page > 0 ? (
         <div className="row small">
-          <button disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>
+          <button disabled={page === 0 || removeHistory.isPending} onClick={() => changePage(Math.max(0, page - 1))}>
             {t("web.jobs.prev_page")}
           </button>
           <span className="muted">{t("web.jobs.page_n", { n: page + 1 })}</span>
-          <button disabled={!more} onClick={() => setPage((p) => p + 1)}>
+          <button disabled={!more || removeHistory.isPending} onClick={() => changePage(page + 1)}>
             {t("web.jobs.next_page")}
           </button>
         </div>

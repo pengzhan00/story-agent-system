@@ -6,6 +6,11 @@ import { useT } from "../i18n";
 /** Who did what, when (administrators only): every write is recorded with the user, the path, the project and the result. */
 export function AuditPage() {
   const t = useT();
+  const actionLabel = (action: string) => {
+    const key = `audit.action.${action}`;
+    const label = t(key);
+    return label === key ? action : label;
+  };
   const [filter, setFilter] = useState({ user: "", action: "", project_id: "" });
   const rows = useAudit(filter);
   return (
@@ -46,7 +51,7 @@ export function AuditPage() {
                 <tr key={r.id}>
                   <td className="muted small">{r.at}</td>
                   <td className="strong">{r.actor || "-"}</td>
-                  <td>{r.action}</td>
+                  <td>{actionLabel(r.action)}</td>
                   <td className="small">{r.path || "-"}</td>
                   <td>{r.project_id ?? "-"}</td>
                   <td>
