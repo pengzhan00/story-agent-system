@@ -92,12 +92,13 @@ def allowed_models(settings: Settings, spec: SpecRecord) -> set[str]:
 
 
 def up_to_date(ledger: Ledger, spec: SpecRecord, settings: Settings | None = None,
-               *, video_with_sound: bool | None = None) -> bool:
+               *, video_with_sound: bool | None = None, end_keyframe: AssetRecord | None = None) -> bool:
     """Made from this version of the spec, and not older than what it was built on: a clip whose keyframe has been
     made again since is outdated even though its own spec did not change. With ``settings`` (the project's own, i.e.
     its pipeline plan) an asset made by a model the plan does not use - after the plan was changed - is outdated too;
     an imported file (no job) is never judged by its model. ``video_with_sound`` (the project's toggle) makes a clip
-    built the other way - silent vs. carrying its own sound - outdated, so flipping the option re-makes the clips."""
+    built the other way - silent vs. carrying its own sound - outdated, so flipping the option re-makes the clips.
+    ``end_keyframe`` is the keyframe a clip ends on (its tail join): if that was made again since, the clip is stale."""
     asset = current_asset(ledger, spec)
     if asset is None or (asset.spec_version or 0) < spec.version:
         return False
@@ -106,6 +107,8 @@ def up_to_date(ledger: Ledger, spec: SpecRecord, settings: Settings | None = Non
                           str(dep.get("slot", "main")))
         if base is not None and base.created_at > asset.created_at:
             return False
+    if end_keyframe is not None and end_keyframe.created_at > asset.created_at:
+        return False
     if settings is not None and asset.job_id:
         try:
             made_by = ledger.get_job(asset.job_id).model_ref
@@ -157,10 +160,11 @@ def default_voice_of(settings: Settings, project_settings: dict[str, Any] | None
     return own or str(settings.workflow.get("default_voice", "")).strip()
 
 
-def _end_frame(ctx: Ctx, ledger: Ledger, store: SpecStore, shot_id: int, first: AssetRecord) -> AssetRecord | None:
+def _end_frame(story: StoryStore, specs: SpecStore, ledger: Ledger, project_id: int, shot_id: int,
+               first: AssetRecord) -> AssetRecord | None:
     """What keyframe this clip ends on. The shot's ``end_shot_id``: ``0`` = cut free (first frame only),
     ``>0`` = that shot's keyframe, ``None``/absent = automatic (the next shot in story order)."""
-    shots = ctx.store.list_shots(ctx.pid)
+    shots = story.list_shots(project_id)
     mine = next((s for s in shots if s["id"] == shot_id), None)
     if mine is None:
         return None
@@ -175,7 +179,7 @@ def _end_frame(ctx: Ctx, ledger: Ledger, store: SpecStore, shot_id: int, first: 
         target = order[idx + 1] if 0 <= idx < len(order) - 1 else None
     if target is None or target == shot_id:
         return None
-    k = store.current(ctx.pid, "shot.keyframe", str(target))
+    k = specs.current(project_id, "shot.keyframe", str(target))
     end = current_asset(ledger, k) if k else None
     return end if end is not None and end.id != first.id else None
 
@@ -193,8 +197,16 @@ def _plan_phase(
     for spec in specs:
         if spec.subject_type not in types or spec.subject_type in skip or (only and spec.id not in only):
             continue
+        # a clip is also stale when the keyframe its tail joins has been re-made since
+        end_keyframe: AssetRecord | None = None
+        if spec.subject_type == "shot.video":
+            key = store.current(spec.project_id, "shot.keyframe", spec.subject_id)
+            first = current_asset(ledger, key) if key else None
+            if first is not None:
+                end_keyframe = _end_frame(ctx.store, store, ledger, ctx.pid, int(spec.subject_id), first)
         if up_to_date(ledger, spec, ctx.settings,
-                       video_with_sound=bool(ctx.project.settings.get("video_with_sound"))) \
+                       video_with_sound=bool(ctx.project.settings.get("video_with_sound")),
+                       end_keyframe=end_keyframe) \
                 and not ctx.force():
             counts["reused"] += 1
             continue
@@ -219,7 +231,7 @@ def _plan_phase(
             if frame is None:
                 skipped.append({"subject": spec.subject_type, "id": spec.subject_id, "reason": "no_keyframe"})
                 continue
-            end = _end_frame(ctx, ledger, store, int(spec.subject_id), frame)
+            end = _end_frame(ctx.store, store, ledger, ctx.pid, int(spec.subject_id), frame)
             model = (ctx.settings.model(spec.model_ref) if spec.model_ref
                      else ctx.settings.default_model(spec.kind.value))
             if model.provider == "h3":
@@ -398,8 +410,15 @@ def _expected_seconds(ctx: Ctx, ledger: Ledger, specs: list[SpecRecord], tier: Q
             continue
         if spec.subject_type == "shot.video" and spec.subject_id not in picks and spec.id not in only:
             continue
+        end_keyframe: AssetRecord | None = None
+        if spec.subject_type == "shot.video":
+            key = ctx.spec_store.current(ctx.pid, "shot.keyframe", spec.subject_id)
+            first = current_asset(ledger, key) if key else None
+            if first is not None:
+                end_keyframe = _end_frame(ctx.store, ctx.spec_store, ledger, ctx.pid, int(spec.subject_id), first)
         if up_to_date(ledger, spec, ctx.settings,
-                       video_with_sound=bool(ctx.project.settings.get("video_with_sound"))) \
+                       video_with_sound=bool(ctx.project.settings.get("video_with_sound")),
+                       end_keyframe=end_keyframe) \
                 and not ctx.force():
             continue
         kind = spec.kind.value

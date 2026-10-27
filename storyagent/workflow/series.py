@@ -12,21 +12,28 @@ from storyagent.media.ledger import Ledger
 from storyagent.media.specs import SpecStore
 from storyagent.story import StoryStore
 
-from .media import current_asset, up_to_date
+from .media import _end_frame, current_asset, up_to_date
 from .state import WorkflowState
 
 KEYFRAME, VIDEO = "shot.keyframe", "shot.video"
 
 
 def _made(
-    specs: SpecStore, ledger: Ledger, settings: Settings | None, project_id: int, subject_type: str,
+    story: StoryStore, specs: SpecStore, ledger: Ledger, settings: Settings | None, project_id: int,
+    subject_type: str,
 ) -> dict[str, bool]:
     """subject_id -> True when its current asset is up to date (False = outdated). Judged exactly as the production
     plan judges it (``up_to_date``), so the board's counts and the plan's list agree."""
     out: dict[str, bool] = {}
     for spec in specs.list_current(project_id):
         if spec.subject_type == subject_type and current_asset(ledger, spec) is not None:
-            out[spec.subject_id] = up_to_date(ledger, spec, settings)
+            end_keyframe = None
+            if spec.subject_type == "shot.video":
+                key = specs.current(project_id, "shot.keyframe", spec.subject_id)
+                first = current_asset(ledger, key) if key else None
+                if first is not None:
+                    end_keyframe = _end_frame(story, specs, ledger, project_id, int(spec.subject_id), first)
+            out[spec.subject_id] = up_to_date(ledger, spec, settings, end_keyframe=end_keyframe)
     return out
 
 
@@ -38,8 +45,8 @@ def series_board(
     shots: dict[int, list[dict[str, Any]]] = {}
     for sh in story.list_shots(project_id):
         shots.setdefault(sh["episode_id"], []).append(sh)
-    keyframes = _made(specs, ledger, settings, project_id, KEYFRAME)
-    videos = _made(specs, ledger, settings, project_id, VIDEO)
+    keyframes = _made(story, specs, ledger, settings, project_id, KEYFRAME)
+    videos = _made(story, specs, ledger, settings, project_id, VIDEO)
     films = {a.slot: a for a in ledger.list_assets(
         project_id=project_id, kind="compose.assemble", current_only=True, limit=1000)}
     out_seasons: list[dict[str, Any]] = []

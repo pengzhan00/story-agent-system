@@ -17,8 +17,9 @@ from storyagent.media.params import resolve_params
 from storyagent.media.specs import SpecStore
 from storyagent.pipelines import project_settings_for
 from storyagent.projects import ProjectStore
+from storyagent.story import StoryStore
 
-from .media import current_asset, up_to_date
+from .media import _end_frame, current_asset, up_to_date
 from .state import STAGES, WorkflowState
 
 # (stage, how it works, agents (always), agents (only on some runs), reads, writes)
@@ -84,17 +85,25 @@ def _agents(settings: Settings, names: list[str], *, optional: bool) -> list[dic
 
 
 def _counts(db: Database, settings: Settings, ledger: Any, project_id: int, subject: str) -> dict[str, Any]:
-    current = [x for x in SpecStore(db, settings, ledger).list_current(project_id) if x.subject_type == subject]
+    specs_store = SpecStore(db, settings, ledger)
+    current = [x for x in specs_store.list_current(project_id) if x.subject_type == subject]
     video_with_sound = bool((ProjectStore(db, settings).get(project_id).settings or {}).get("video_with_sound"))
+    story = StoryStore(db)
     made = stale = 0
     models: dict[str, int] = {}
     for spec in current:
         models[spec.model_ref] = models.get(spec.model_ref, 0) + 1
         if current_asset(ledger, spec) is not None:
             made += 1
+            end_keyframe = None
+            if spec.subject_type == "shot.video":
+                key = specs_store.current(project_id, "shot.keyframe", spec.subject_id)
+                first = current_asset(ledger, key) if key else None
+                if first is not None:
+                    end_keyframe = _end_frame(story, specs_store, ledger, project_id, int(spec.subject_id), first)
             # judged as the production plan judges it (the sound toggle flips a clip's model both ways)
             flip = video_with_sound and spec.subject_type == "shot.video"
-            if not up_to_date(ledger, spec, settings, video_with_sound=flip):
+            if not up_to_date(ledger, spec, settings, video_with_sound=flip, end_keyframe=end_keyframe):
                 stale += 1
     rows = current
     return {"specs": len(rows), "made": made, "stale": stale, "models": models}

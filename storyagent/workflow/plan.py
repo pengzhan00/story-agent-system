@@ -23,6 +23,7 @@ from storyagent.story import StoryStore
 from .media import (
     FALLBACK_SECONDS,
     PHASES,
+    _end_frame,
     current_asset,
     default_voice_of,
     fallback_seconds,
@@ -100,8 +101,15 @@ def produce_plan(
             if spec.subject_type not in types or _orphan(spec, names):
                 continue
             asset = current_asset(ledger, spec)
+            end_keyframe = None
+            if spec.subject_type == "shot.video" and asset is not None:
+                key = specs.current(project_id, "shot.keyframe", spec.subject_id)
+                first = current_asset(ledger, key) if key else None
+                if first is not None:
+                    end_keyframe = _end_frame(store, specs, ledger, project_id, int(spec.subject_id), first)
             state = "new" if asset is None else "done" if up_to_date(
-                ledger, spec, settings, video_with_sound=bool((project_settings or {}).get("video_with_sound"))
+                ledger, spec, settings, video_with_sound=bool((project_settings or {}).get("video_with_sound")),
+                end_keyframe=end_keyframe,
             ) and not force else "stale"
             reason, model_ref = "", spec.model_ref
             kind = spec.kind.value
