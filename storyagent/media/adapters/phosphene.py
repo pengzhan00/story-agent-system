@@ -54,7 +54,7 @@ IMAGE_EXT = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
 AUDIO_EXT = {".wav", ".mp3", ".m4a", ".flac", ".aac", ".ogg"}
 _FORM = (
     "width", "height", "frames", "frame_rate", "quality", "stage1_steps", "stage2_steps", "cfg_scale", "upscale",
-    "upscale_method", "enhance", "audio_start_time", "audio_conditioning_scale",
+    "upscale_method", "enhance", "audio_start_time", "audio_conditioning_scale", "audio_stem_auto",
 )
 SCHEMA: dict[str, dict[str, Any]] = {
     "width": {"type": "int", "min": 64, "max": 4096},
@@ -70,6 +70,7 @@ SCHEMA: dict[str, dict[str, Any]] = {
     "enhance": {"type": "bool"},
     "audio_start_time": {"type": "float", "min": 0},
     "audio_conditioning_scale": {"type": "float", "min": 0, "max": 5},
+    "audio_stem_auto": {"type": "bool"},
     "mode": {"type": "str"},
     "negative_prompt": {"type": "str"},
     "keep_audio": {"type": "bool"},
@@ -239,6 +240,9 @@ class PhospheneAdapter(AdapterBase):
         for role, path in self._files(job, ctx).items():
             form[role] = str(path)
         if job.kind is MediaKind.VIDEO_LIPSYNC:
+            # 面板自带 htdemucs：默认让人声分离后再驱动口型。不传这个字段 = 用整首混音驱动，
+            # 人声被伴奏盖住，模型只能猜节拍，口型必然飘（实测过的根因）。
+            form.setdefault("audio_stem_auto", True)
             form.setdefault("enhance", False)
         return {k: (str(v).lower() if isinstance(v, bool) else str(v)) for k, v in form.items() if v not in (None, "")}
 

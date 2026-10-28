@@ -217,10 +217,17 @@ def seed_specs(ctx: Ctx) -> dict[str, Any]:
     use_llm = bool(ctx.params.get("visual_prompts", True))
     previous = ""
 
+    narration_labels = {str(x).strip().lower() for x in
+                        (ctx.settings.workflow.get("non_character_speakers") or ()) if str(x).strip()}
+    # 旁白只做字幕的口径：workflow.narration_voiced = false 时，不为「旁白/narrator」这类说话人建 TTS spec。
+    narration_voiced = bool(ctx.settings.workflow.get("narration_voiced", True))
+
     def sync_dialogue(shot: dict[str, Any]) -> None:
         """Spoken lines follow the story every time (cheap, deterministic): an edited line reaches its spec."""
         sid = str(shot["id"])
         for idx, line in enumerate(shot["dialogue"]):
+            if not narration_voiced and str(line.get("character") or "").strip().lower() in narration_labels:
+                continue
             who = chars.get(line["character"])
             vparam = _voice_param(who) if who else None
             seeder.sync(DIALOGUE, f"{sid}#{idx}", MediaKind.AUDIO_TTS, prompt=line.get("emotion", ""),
