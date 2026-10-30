@@ -1,0 +1,10 @@
+{
+  "run_id": "bcb31bbbb5114c34aae16643b24aaccf",
+  "status": "succeeded",
+  "job_id": null,
+  "outputs": {
+    "accompaniment": "90282e2246be4475ad9963af220140e6",
+    "main": "744f16a929194028a3a7be929eeffbba"
+  },
+  "reused_real_stems": true
+}

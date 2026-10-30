@@ -13,6 +13,7 @@ from storyagent.media.specs import SpecLocked, SpecRecord, SpecStore
 
 from . import keyframe
 from .stages import Ctx
+from .video_mode import video_params
 
 PORTRAIT, VOICE, LOCATION = "character.portrait", "character.voice", "scene.keyframe"
 KEYFRAME, VIDEO, DIALOGUE = "shot.keyframe", "shot.video", "dialogue.line"
@@ -253,6 +254,10 @@ def seed_specs(ctx: Ctx) -> dict[str, Any]:
         sid = str(shot["id"])
         have = specs.current(ctx.pid, KEYFRAME, sid)
         if have is not None and not ctx.force():
+            video = specs.current(ctx.pid, VIDEO, sid)
+            if video is not None and video.author == "agent":
+                seeder.sync(VIDEO, sid, video.kind,
+                            params={**video.params, **video_params(shot["render_payload"])})
             sync_dialogue(shot)
             sync_sfx(shot)
             previous = shot["narration"]
@@ -283,7 +288,7 @@ def seed_specs(ctx: Ctx) -> dict[str, Any]:
                           negative_prompt=shot_neg, refs=refs, depends_on=deps,
                           seed=keyframe.fixed_seed(ctx.pid, lead))
         seeder.sync(VIDEO, sid, MediaKind.VIDEO_GENERATE, prompt=keyframe.clean(video_shown),
-                    negative_prompt=shot_neg, depends_on=seeder.dep(key))
+                    negative_prompt=shot_neg, depends_on=seeder.dep(key), params=video_params(shot["render_payload"]))
         sync_dialogue(shot)
         sync_sfx(shot)
         previous = shot["narration"]

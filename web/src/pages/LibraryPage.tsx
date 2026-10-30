@@ -7,6 +7,7 @@ import type { Asset, LibraryItem } from "../api/types";
 import { useWorkshop } from "../api/workshop";
 import { AssetPreview } from "../components/Candidates";
 import { ErrorNote } from "../components/ErrorNote";
+import { AdoptToShot } from "../components/AdoptToShot";
 import { MakeProject } from "../components/MakeProject";
 import { ProjectScripts } from "../components/ProjectScripts";
 import { useT } from "../i18n";
@@ -42,10 +43,12 @@ function CopyButton({ text, label }: { text: string; label: string }) {
 }
 
 /** The ways a result can be referred to: paste any of these into an input field, a pipeline, the CLI or the API. */
-function RefLine({ id, named }: { id: string; named: string[] }) {
+function RefLine({ id, named, media }: { id: string; named: string[]; media: string }) {
   const t = useT();
   return (
     <div className="stack small">
+      <Link to={`/publications?asset=${id}`}>{t("web.pub.asset_history")}</Link>
+      <AdoptToShot id={id} media={media} />
       <div className="row">
         <span className="muted">{t("web.library.id")}</span>
         <code>{id}</code>
@@ -158,7 +161,7 @@ function AssetCard({
         {asset.duration_sec ? <span>{duration(asset.duration_sec)}</span> : null}
         {asset.width && asset.height ? <span>{`${asset.width}×${asset.height}`}</span> : null}
       </div>
-      <RefLine id={asset.id} named={named} />
+      <RefLine id={asset.id} named={named} media={mediaOfAsset(asset)} />
       {targets.length > 0 ? (
         <div className="row small">
           <span className="muted">{t("web.workshop.use_as")}</span>

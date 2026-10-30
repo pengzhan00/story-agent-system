@@ -41,6 +41,7 @@ from . import (
     routes_auth,
     routes_config,
     routes_content,
+    routes_control,
     routes_delivery,
     routes_grammar,
     routes_interchange,
@@ -178,7 +179,7 @@ def create_app(settings: Settings | None = None, *, loader: Callable[[], Setting
                    routes_interchange,
                    routes_scripts, routes_specs, routes_story, routes_workflow, routes_system, routes_ai, routes_launch,
                    routes_workshop, routes_llm, routes_maintain, routes_wiki, routes_tools, routes_setup,
-                   routes_update):
+                   routes_update, routes_control):
         app.include_router(module.router)
     web = web_root(settings)
     if web is not None:

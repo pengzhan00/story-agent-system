@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { NavLink, Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
+import { Link, NavLink, Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { useProject, useProjectBin, useUpdateProject, useWorkflow } from "../api/hooks";
 import { ContentBar } from "../components/ContentBar";
 import { ErrorNote } from "../components/ErrorNote";
@@ -81,6 +81,8 @@ export function ProjectPage() {
       <ErrorNote error={rename.error ?? bin.trash.error} />
       {restricted ? <ContentBar /> : null}
       <nav className="tabs">
+        <Link className="tab" to={`/control?project=${id}`}>{t("web.control.title")}</Link>
+        <Link className="tab" to={`/publications?project=${id}`}>{t("web.pub.title")}</Link>
         <NavLink to="workflow" className={({ isActive }) => (isActive ? "tab active" : "tab")}>
           {t("web.tab.workflow")}
         </NavLink>

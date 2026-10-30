@@ -1,0 +1,247 @@
+{
+  "image": {
+    "bytes": 556426,
+    "probe": {
+      "duration_sec": null,
+      "width": 512,
+      "height": 768,
+      "fps": 25.0,
+      "has_audio": false,
+      "has_video": true,
+      "format_name": "png_pipe"
+    }
+  },
+  "speech": {
+    "bytes": 372524,
+    "probe": {
+      "duration_sec": 7.76,
+      "width": null,
+      "height": null,
+      "fps": null,
+      "has_audio": true,
+      "has_video": false,
+      "format_name": "wav"
+    },
+    "audio_decode_ok": true,
+    "audio_levels": [
+      "[Parsed_volumedetect_0 @ 0x7bf02e280] mean_volume: -18.2 dB",
+      "[Parsed_volumedetect_0 @ 0x7bf02e280] max_volume: -4.8 dB"
+    ]
+  },
+  "sfx": {
+    "bytes": 123941,
+    "probe": {
+      "duration_sec": 2.043356,
+      "width": null,
+      "height": null,
+      "fps": null,
+      "has_audio": true,
+      "has_video": false,
+      "format_name": "flac"
+    },
+    "audio_decode_ok": true,
+    "audio_levels": [
+      "[Parsed_volumedetect_0 @ 0x77ec58900] mean_volume: -24.6 dB",
+      "[Parsed_volumedetect_0 @ 0x77ec58900] max_volume: -0.0 dB"
+    ]
+  },
+  "t2v": {
+    "bytes": 96243,
+    "probe": {
+      "duration_sec": 1.041667,
+      "width": 384,
+      "height": 640,
+      "fps": 24.0,
+      "has_audio": false,
+      "has_video": true,
+      "format_name": "mov,mp4,m4a,3gp,3g2,mj2"
+    },
+    "video_decode_ok": true,
+    "unique_decoded_frames": 25
+  },
+  "i2v": {
+    "bytes": 78871,
+    "probe": {
+      "duration_sec": 1.041667,
+      "width": 384,
+      "height": 640,
+      "fps": 24.0,
+      "has_audio": false,
+      "has_video": true,
+      "format_name": "mov,mp4,m4a,3gp,3g2,mj2"
+    },
+    "video_decode_ok": true,
+    "unique_decoded_frames": 25
+  },
+  "a2v": {
+    "bytes": 105676,
+    "probe": {
+      "duration_sec": 2.0,
+      "width": 384,
+      "height": 640,
+      "fps": 24.0,
+      "has_audio": true,
+      "has_video": true,
+      "format_name": "mov,mp4,m4a,3gp,3g2,mj2"
+    },
+    "audio_decode_ok": true,
+    "audio_levels": [
+      "[Parsed_volumedetect_0 @ 0xa0b0315c0] mean_volume: -18.8 dB",
+      "[Parsed_volumedetect_0 @ 0xa0b0315c0] max_volume: -5.4 dB"
+    ],
+    "video_decode_ok": true,
+    "unique_decoded_frames": 48
+  },
+  "dtvideo": {
+    "bytes": 32473,
+    "probe": {
+      "duration_sec": 1.041667,
+      "width": 320,
+      "height": 576,
+      "fps": 24.0,
+      "has_audio": false,
+      "has_video": true,
+      "format_name": "mov,mp4,m4a,3gp,3g2,mj2"
+    },
+    "video_decode_ok": true,
+    "unique_decoded_frames": 25
+  },
+  "music": {
+    "bytes": 4319660,
+    "probe": {
+      "duration_sec": 14.998667,
+      "width": null,
+      "height": null,
+      "fps": null,
+      "has_audio": true,
+      "has_video": false,
+      "format_name": "wav"
+    },
+    "audio_decode_ok": true,
+    "audio_levels": [
+      "[Parsed_volumedetect_0 @ 0xc9d004f00] mean_volume: -21.7 dB",
+      "[Parsed_volumedetect_0 @ 0xc9d004f00] max_volume: -4.1 dB"
+    ]
+  },
+  "cover": {
+    "bytes": 4319660,
+    "probe": {
+      "duration_sec": 14.998667,
+      "width": null,
+      "height": null,
+      "fps": null,
+      "has_audio": true,
+      "has_video": false,
+      "format_name": "wav"
+    },
+    "audio_decode_ok": true,
+    "audio_levels": [
+      "[Parsed_volumedetect_0 @ 0xb1507c900] mean_volume: -23.3 dB",
+      "[Parsed_volumedetect_0 @ 0xb1507c900] max_volume: -5.7 dB"
+    ]
+  },
+  "ace": {
+    "bytes": 160748,
+    "probe": {
+      "duration_sec": 10.0,
+      "width": null,
+      "height": null,
+      "fps": null,
+      "has_audio": true,
+      "has_video": false,
+      "format_name": "mp3"
+    },
+    "audio_decode_ok": true,
+    "audio_levels": [
+      "[Parsed_volumedetect_0 @ 0x865004f00] mean_volume: -22.1 dB",
+      "[Parsed_volumedetect_0 @ 0x865004f00] max_volume: -1.4 dB"
+    ]
+  },
+  "acecover": {
+    "bytes": 160748,
+    "probe": {
+      "duration_sec": 10.0,
+      "width": null,
+      "height": null,
+      "fps": null,
+      "has_audio": true,
+      "has_video": false,
+      "format_name": "mp3"
+    },
+    "audio_decode_ok": true,
+    "audio_levels": [
+      "[Parsed_volumedetect_0 @ 0x9a1004fc0] mean_volume: -23.4 dB",
+      "[Parsed_volumedetect_0 @ 0x9a1004fc0] max_volume: -1.4 dB"
+    ]
+  },
+  "acerepaint": {
+    "bytes": 160748,
+    "probe": {
+      "duration_sec": 10.0,
+      "width": null,
+      "height": null,
+      "fps": null,
+      "has_audio": true,
+      "has_video": false,
+      "format_name": "mp3"
+    },
+    "audio_decode_ok": true,
+    "audio_levels": [
+      "[Parsed_volumedetect_0 @ 0x81cc54900] mean_volume: -21.5 dB",
+      "[Parsed_volumedetect_0 @ 0x81cc54900] max_volume: -1.5 dB"
+    ]
+  },
+  "stems": {
+    "bytes": 2645808,
+    "probe": {
+      "duration_sec": 14.998662,
+      "width": null,
+      "height": null,
+      "fps": null,
+      "has_audio": true,
+      "has_video": false,
+      "format_name": "wav"
+    },
+    "audio_decode_ok": true,
+    "audio_levels": [
+      "[Parsed_volumedetect_0 @ 0x73b035440] mean_volume: -25.9 dB",
+      "[Parsed_volumedetect_0 @ 0x73b035440] max_volume: -6.3 dB"
+    ]
+  },
+  "a2v_sequence": {
+    "bytes": 191752,
+    "probe": {
+      "duration_sec": 3.5,
+      "width": 384,
+      "height": 640,
+      "fps": 24.0,
+      "has_audio": true,
+      "has_video": true,
+      "format_name": "mov,mp4,m4a,3gp,3g2,mj2"
+    },
+    "audio_decode_ok": true,
+    "audio_levels": [
+      "[Parsed_volumedetect_0 @ 0xc5ec5ca80] mean_volume: -18.5 dB",
+      "[Parsed_volumedetect_0 @ 0xc5ec5ca80] max_volume: -5.4 dB"
+    ],
+    "video_decode_ok": true,
+    "unique_decoded_frames": 84
+  },
+  "stems_configured": {
+    "bytes": 2645808,
+    "probe": {
+      "duration_sec": 14.998662,
+      "width": null,
+      "height": null,
+      "fps": null,
+      "has_audio": true,
+      "has_video": false,
+      "format_name": "wav"
+    },
+    "audio_decode_ok": true,
+    "audio_levels": [
+      "[Parsed_volumedetect_0 @ 0xc67044900] mean_volume: -25.9 dB",
+      "[Parsed_volumedetect_0 @ 0xc67044900] max_volume: -6.6 dB"
+    ]
+  }
+}

@@ -1,0 +1,95 @@
+{
+  "date": "2026-10-29",
+  "baseline": "b5df9e3bca45b59bded773c54236072c1bccd2ce",
+  "worktree": "uncommitted, mixed ownership; no deployment",
+  "backend_full": {
+    "passed": 938,
+    "deselected": 2,
+    "seconds": 319.32,
+    "command": "python -m pytest",
+    "log": "/tmp/storyagent-control-full-frozen.log",
+    "scope": "Full run at collection time; final API visibility fix and two newly added tests subsequently covered by targeted runs."
+  },
+  "final_boundaries": {
+    "passed": 16,
+    "seconds": 3.18,
+    "command": "python -m pytest tests/test_control_center.py",
+    "log": "/tmp/storyagent-control-final-boundaries.log"
+  },
+  "api_auth_regression": {
+    "passed": 59,
+    "command": "python -m pytest tests/test_control_center.py tests/test_api.py tests/test_auth.py",
+    "log": "/tmp/storyagent-control-access-final.log",
+    "seconds": 12.52
+  },
+  "adapter_control_regression": {
+    "passed": 65,
+    "command": "python -m pytest tests/test_control_center.py tests/test_adapter_phosphene.py tests/test_adapter_acestep.py tests/test_adapter_comfy.py"
+  },
+  "frontend": {
+    "files": 33,
+    "passed": 108,
+    "typecheck": "pass",
+    "lint": "pass",
+    "build": "pass-with-warning: main JS >500kB"
+  },
+  "ruff": "pass",
+  "mypy": {
+    "source_files": 183,
+    "status": "pass"
+  },
+  "i18n": {
+    "locales": 2,
+    "status": "pass"
+  },
+  "migration": {
+    "home": "/var/folders/lc/2qq3p71j4kjb63jn1jt0rcc80000gn/T/storyagent-control-migration-gmoor0bb",
+    "import": "pass",
+    "fresh": "0->25",
+    "repeat": "25->25",
+    "upgrade": "24->25",
+    "backup_restore_version": 24,
+    "retained_projects": 1,
+    "foreign_keys": "pass",
+    "integrity": "ok"
+  },
+  "package": {
+    "status": "pass",
+    "verified_files": [
+      "025_control_center.sql",
+      "control/project.py",
+      "control/graph.py",
+      "api/routes_control.py",
+      "media/runners/control_tools.py"
+    ]
+  },
+  "browser": {
+    "engine": "local Playwright/Chromium; Browser plugin unavailable",
+    "isolated_port": 18769,
+    "page_errors": 0,
+    "flows": [
+      "preview and submit graph",
+      "manual publication record",
+      "adopt standalone asset to project shot",
+      "compile and preview explicit project script"
+    ],
+    "isolated_service_stopped": true
+  },
+  "real_models": {
+    "generated_this_task": false,
+    "human_quality_acceptance": false
+  },
+  "sha256": {
+    "storyagent/control/catalog.py": "762ba991366989465ab4bb2c9d30cb4db1f7046c33de65b44515c8d8da7c087c",
+    "storyagent/control/publications.py": "1062ed063866daf6596eb11be2caa707ae651ca0bd372e55ac3663b81c6e3ada",
+    "storyagent/control/sequence.py": "ef3e23df60a056a08e83ddb76773b508fff8825ecbf1cc3501d991568c769e10",
+    "storyagent/control/graph.py": "a9108dc04d3385307f47ee2acd1140b5944e423dc3388aac17c65983f7ed9230",
+    "storyagent/control/__init__.py": "9b9f61506326b0a4fcb884493cb21af61aeef21e96696651d05092e165acd86a",
+    "storyagent/control/project.py": "00ecbbffb008c5ba03ad83f120a86f70f0a29f29e49202586a938956f9bc7654",
+    "storyagent/api/routes_control.py": "950718d59b796a86b24422686247e4f6607572e916708a2b85f0c53045184805",
+    "storyagent/db/migrations/025_control_center.sql": "b0cecd885397ebd6b8673179efe2ef5a3a2ba1de4096fc52f992ec036eba90a4",
+    "web/src/pages/ControlPage.tsx": "3603550e0f90a49fd697f0f4fa78fafea936bd46d31099145cdfd4029e8e361c",
+    "web/src/pages/PublicationsPage.tsx": "badb5f58e8aaea324e2ac9d3a79088e0efede5ea02794cffc0cd6cdc32f73394",
+    "tests/test_control_center.py": "e3adbde296b95167930b888d4ecb8865478d6e6339cee7473a49ba613e756024"
+  }
+}

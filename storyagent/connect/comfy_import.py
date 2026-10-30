@@ -241,8 +241,13 @@ def import_workflow(data: Any, kind: str) -> ImportResult:
         bind("ref_image" if n == 0 else f"ref_image_{n + 1}", nid, "image")
     sounds = [i for i in ids if graph[i]["class_type"] == "LoadAudio"
               and isinstance(graph[i]["inputs"].get("audio"), str)]
-    if sounds:
-        bind("ref_audio", sounds[0], "audio")
+    for n, nid in enumerate(sounds):
+        bind("ref_audio" if n == 0 else f"ref_audio_{n + 1}", nid, "audio")
+    videos = [(nid, "file" if graph[nid]["class_type"] == "LoadVideo" else "video")
+              for nid in ids if graph[nid]["class_type"] in ("LoadVideo", "VHS_LoadVideo")]
+    for n, (nid, input_name) in enumerate(videos):
+        if isinstance(graph[nid]["inputs"].get(input_name), str):
+            bind("ref_video" if n == 0 else f"ref_video_{n + 1}", nid, input_name)
     if mkind is MediaKind.IMAGE_EDIT and not pictures:
         warnings.append(Warning_("edit_without_image"))
     if mkind is MediaKind.AUDIO_CONVERT and not sounds:

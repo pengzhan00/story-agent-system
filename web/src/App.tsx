@@ -17,6 +17,8 @@ import { WorkshopPage } from "./pages/WorkshopPage";
 import { QueuePage } from "./pages/QueuePage";
 import { SystemPage } from "./pages/SystemPage";
 import { WikiPage } from "./pages/WikiPage";
+import { ControlPage } from "./pages/ControlPage";
+import { PublicationsPage } from "./pages/PublicationsPage";
 
 /** The first visit of a browser session lands on the launch screen; later visits go straight to the projects. */
 function Home() {
@@ -53,6 +55,8 @@ export function App() {
           <NavLink to="/queue" className={link}>
             {t("web.nav.queue")}
           </NavLink>
+          <NavLink to="/control" className={link}>{t("web.control.title")}</NavLink>
+          <NavLink to="/publications" className={link}>{t("web.pub.title")}</NavLink>
           <NavLink to="/prompts" className={link}>
             {t("web.nav.prompts")}
           </NavLink>
@@ -95,6 +99,8 @@ export function App() {
           <Route path="/workshop" element={<WorkshopPage />} />
           <Route path="/library" element={<LibraryPage />} />
           <Route path="/queue" element={<QueuePage />} />
+          <Route path="/control" element={<ControlPage />} />
+          <Route path="/publications" element={<PublicationsPage />} />
           <Route path="/prompts" element={<PromptsPage />} />
           <Route path="/llm" element={<LlmPage />} />
           <Route path="/tools" element={<ToolsPage />} />

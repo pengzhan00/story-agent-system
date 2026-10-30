@@ -91,6 +91,8 @@ class Worker:
         self._claim_lock = threading.Lock()       # pause and registering an in-flight job are one boundary
         self._lease = float(settings.runtime.get("lease_seconds", 60))
         self._beat = float(settings.runtime.get("heartbeat_seconds", 15))
+        self._external_checked = 0.0
+        self._external_running: set[str] = set()
 
     # -- scheduling ---------------------------------------------------------------------------
     def tick(self) -> int:
@@ -99,6 +101,10 @@ class Worker:
         led.requeue_expired()
         self._futures = {j: f for j, f in self._futures.items() if not f.done()}
         self._wf_futures = {r: f for r, f in self._wf_futures.items() if not f.done()}
+        if not self._paused.is_set():
+            from storyagent.control.graph import GraphStore
+
+            GraphStore(self.settings, self.db, led).tick()
         started = 0
         while len(self._futures) < self._max_threads:
             allowed = self._restart_dependencies() if self._paused.is_set() else None
@@ -108,6 +114,22 @@ class Worker:
             policy = self.settings.llm_unload_policy
             resident = self._resident() if policy == "ask" and any(j.heavy for j in queued) else []
             available = system_available_gib() if self.settings.runtime.get("check_system_memory", True) else None
+            if self.settings.runtime.get("check_system_memory", True):
+                graph_jobs = {r[0] for r in self.db.conn.execute(
+                    "SELECT job_id FROM control_nodes WHERE status='running' AND job_id IS NOT NULL")}
+                accelerated = {"demucs", "seedvc", "cosyvoice", "acestep", "drawthings", "mflux",
+                               "comfy", "phosphene", "h3", "longcat"}
+                local_gpu = {j.id for j in queued if j.id in graph_jobs and
+                             (j.heavy or j.provider in accelerated) and j.provider != "fake"}
+                external = self._external_rendering() if local_gpu else set()
+                active_gpu = any(j.heavy or j.provider in accelerated for j in led.running())
+                blocked = {j.id for j in queued if j.id in local_gpu
+                           and (available is None or external or active_gpu)}
+                for jid in blocked:
+                    led.note_waiting(jid, "heavy_busy" if external or active_gpu else "system_memory")
+                queued = [j for j in queued if j.id not in blocked]
+                if not queued:
+                    break
             job, waiting = select_next(queued, led.running(), self.settings, resident_llms=resident,
                                        available_gib=available)
             for jid, reason in waiting.items():
@@ -124,6 +146,32 @@ class Worker:
                 self._futures[claimed.id] = self._pool.submit(self._run, claimed)
                 started += 1
         return started if self._paused.is_set() else started + self._tick_workflow()
+
+    def _external_rendering(self) -> set[str]:
+        """Observe external queues, never stop them. Cached to bound scheduler overhead."""
+        if time.monotonic() - self._external_checked < 3:
+            return self._external_running
+        from .adapters._http import ServiceClient
+
+        busy: set[str] = set()
+        own = {j.external_id for j in self.ledger.running() if j.external_id}
+        for name, path in (("phosphene", "/status"), ("comfy", "/queue")):
+            if name not in self.settings.services:
+                continue
+            try:
+                body = ServiceClient(self.settings.service(name)).json("GET", path, timeout=1)
+                if name == "phosphene":
+                    current = body.get("current")
+                    if current and (not isinstance(current, dict) or current.get("id") not in own):
+                        busy.add(name)
+                else:
+                    queue = body.get("queue_running") or []
+                    if any(not isinstance(row, list) or len(row) < 2 or str(row[1]) not in own for row in queue):
+                        busy.add(name)
+            except AdapterError:
+                continue  # adapter validation reports an unreachable target before GPU submission
+        self._external_checked, self._external_running = time.monotonic(), busy
+        return busy
 
     def _restart_dependencies(self) -> list[str]:
         waiting = self._workflow.pending_media_jobs() if self._workflow is not None else set()
@@ -230,7 +278,9 @@ class Worker:
     def _workflow_pending(self) -> bool:
         row = self.db.conn.execute(
             "SELECT 1 FROM workflow_runs WHERE status IN ('queued','running') LIMIT 1").fetchone()
-        return row is not None
+        graph = self.db.conn.execute(
+            "SELECT 1 FROM control_runs WHERE status IN ('queued','running') LIMIT 1").fetchone()
+        return row is not None or graph is not None
 
     def _resident(self) -> list[str]:
         out: list[str] = []
@@ -306,9 +356,25 @@ class Worker:
         slug, project_settings, project_rating = self._project(job.project_id)
         rating = content.job_rating(s, project_rating, job.model_ref)
         work_dir.mkdir(parents=True, exist_ok=True)
+        graph_node = self.db.conn.execute(
+            "SELECT n.node_id,r.plan FROM control_nodes n JOIN control_runs r ON r.id=n.run_id WHERE n.job_id=?",
+            (job.id,)).fetchone()
+        if graph_node:
+            from storyagent.control.catalog import descriptor
+
+            frozen = next(n for n in json.loads(graph_node["plan"])["nodes"] if n["id"] == graph_node["node_id"])
+            cap = descriptor(led.settings_for(job.project_id), job.kind.value)
+            binding = next((b for b in cap["bindings"] if b["id"] == job.model_ref), None)
+            if binding is None or binding["digest"] != frozen["binding_digest"]:
+                raise AdapterError(ErrorCode.INVALID_PARAMS, "binding_changed")
 
         def log_event(event: str, level: str = "info", **data: Any) -> None:
             led.add_event(job.id, event, level, **data)
+
+        if job.heavy and self.db.conn.execute("SELECT 1 FROM control_nodes WHERE job_id=?", (job.id,)).fetchone():
+            from .broker import memory_snapshot
+
+            log_event("resource_snapshot", snapshot=memory_snapshot())
 
         try:  # asset:/library: references become plain paths; adapters never see them
             inputs, params, resolved = self.resolver.resolve(job.inputs, job.params)
@@ -317,6 +383,8 @@ class Worker:
         if resolved:
             job = replace(job, inputs=inputs, params=params)
             log_event("refs_resolved", refs=resolved.assets, sha256=resolved.sha256)
+            for aid in resolved.assets.values():
+                rating = s.content.higher(rating, led.get_asset(aid).rating)
         ctx = JobContext(s, job, work_dir, log_event, project_settings)
         caps = adapter.capabilities()
 
@@ -343,11 +411,19 @@ class Worker:
 
         # 3) start or re-attach
         ext = job.external_id
+        graph_owned = self.db.conn.execute("SELECT 1 FROM control_nodes WHERE job_id=?", (job.id,)).fetchone()
+        uncertain = graph_owned and any(e["event"] == "submission_started" for e in led.events(job.id))
+        if graph_owned and ((not ext and uncertain) or (ext and not caps.supports_reattach)):
+            raise AdapterError(ErrorCode.WORKER_LOST, "reconciliation_required")
         if ext and caps.supports_reattach and adapter.reattach(ext, job, ctx):
             log_event("reattached", external_id=ext)
         else:
+            if graph_owned and ext:
+                raise AdapterError(ErrorCode.WORKER_LOST, "reconciliation_required")
             if ext:
                 log_event("resubmitting", "warning", previous=ext)
+            if graph_owned:
+                log_event("submission_started")
             ext = adapter.submit(job, ctx)
             led.set_external_id(job.id, self.owner, ext)
             log_event("submitted", external_id=ext)

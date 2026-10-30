@@ -54,7 +54,7 @@ IMAGE_EXT = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
 AUDIO_EXT = {".wav", ".mp3", ".m4a", ".flac", ".aac", ".ogg"}
 _FORM = (
     "width", "height", "frames", "frame_rate", "quality", "stage1_steps", "stage2_steps", "cfg_scale", "upscale",
-    "upscale_method", "enhance", "audio_start_time", "audio_conditioning_scale", "audio_stem_auto",
+    "upscale_method", "enhance", "audio_start_time", "audio_conditioning_scale", "audio_stem_auto", "audio_stem",
 )
 SCHEMA: dict[str, dict[str, Any]] = {
     "width": {"type": "int", "min": 64, "max": 4096},
@@ -71,6 +71,10 @@ SCHEMA: dict[str, dict[str, Any]] = {
     "audio_start_time": {"type": "float", "min": 0},
     "audio_conditioning_scale": {"type": "float", "min": 0, "max": 5},
     "audio_stem_auto": {"type": "bool"},
+    "audio_stem": {"type": "str"},
+    "music_task": {"type": "str", "choices": ["write", "cover"]},
+    "music_cover_task": {"type": "str", "choices": ["full", "melody-full", "melody-vocal"]},
+    "music_variation": {"type": "str", "choices": ["take", "sound", "restyle"]},
     "mode": {"type": "str"},
     "negative_prompt": {"type": "str"},
     "keep_audio": {"type": "bool"},
@@ -192,6 +196,10 @@ class PhospheneAdapter(AdapterBase):
 
     def _validate_music(self, job: JobRecord, bad: Any, issues: list[ValidationIssue]) -> list[ValidationIssue]:
         p = job.params
+        if p.get("music_task") == "cover" and not job.inputs.get("source_audio"):
+            bad(ErrorCode.INVALID_INPUT, "Cover requires source_audio")
+        if p.get("music_variation") and not job.inputs.get("parent_audio"):
+            bad(ErrorCode.INVALID_INPUT, "Variation requires parent_audio and retained generation artifacts")
         if not (job.inputs.get("prompt") or job.inputs.get("text")):
             bad(ErrorCode.INVALID_INPUT, "needs a style description or lyrics")
         if str(p.get("music_quality", "final")) not in _MUSIC_QUALITY:
@@ -202,6 +210,12 @@ class PhospheneAdapter(AdapterBase):
             music = (self.client.json("GET", "/status", timeout=10).get("music")) or {}
         except AdapterError as exc:
             return issues + [ValidationIssue(exc.code, exc.message, exc.params)]
+        if p.get("music_task") == "cover" and not (music.get("cover") or {}).get("ready"):
+            missing = "; ".join((music.get("cover") or {}).get("missing") or []) or "cover package unverified"
+            issues.append(ValidationIssue(
+                ErrorCode.MISSING_MODEL, f"YuE2 cover package is not ready: {missing}",
+                {"model": "yue2-cover", "detail": missing},
+            ))
         if not music.get("available"):
             why = "; ".join(music.get("missing") or []) or str(music.get("reason") or "not installed")
             issues.append(ValidationIssue(ErrorCode.MISSING_MODEL, f"the panel's music engine (YuE2) is not ready: "
@@ -221,9 +235,13 @@ class PhospheneAdapter(AdapterBase):
             "music_seed": min(job.seed, 2**32 - 1) if job.seed is not None else -1,
         }
         for key, field in (("precision", "music_precision"), ("cfg_scale", "music_cfg_scale"),
-                           ("title", "music_title")):
+                           ("title", "music_title"), ("music_task", "music_task"),
+                           ("music_cover_task", "music_cover_task"), ("music_variation", "music_variation")):
             if key in p:
                 form[field] = p[key]
+        for key, field in (("source_audio", "music_source_audio"), ("parent_audio", "music_parent")):
+            if job.inputs.get(key):
+                form[field] = str(job.inputs[key])
         return form
 
     def _form(self, job: JobRecord, ctx: JobContext) -> dict[str, str]:

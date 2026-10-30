@@ -1,5 +1,7 @@
 # 交接手册:真相源、数据结构、架构、如何接着做
 
+> 2026-10-30 最新接手入口：[Claude 交接：多模态控制中心](CLAUDE_HANDOFF_2026-10-30.md)。当前有未提交实现，a2v 技术执行通过但口型人工质量未通过；用户要求暂停重测。下方历史状态须按最新证据核对。
+
 > 给"换一个人(或换一个 AI 会话)接着做"用。读完这一份,加上 `CLAUDE.md`,就能继续。
 > 最后更新:2026-10-22,P0 收口(分支 `claude/init-127186`,见 `docs/reviews/2026-10-22_baseline-review.md`)。数值/行为以代码为准;这里写的是**在哪里找真相**。
 
@@ -219,3 +221,11 @@ git status && git log --oneline -5 && git fetch && git status -sb
 - 仓库里只留 v2:`storyagent/ web/ tests/ docs/ scripts/` + 根文档;v1 在 tag `v1-final`,旧文档在 `docs/archive/`(含 4 月的"红果短剧工业化"改造方案 `docs/archive/hermes-plans-2026-04-29/`:当时的目标是 80 集、每集 4-6 幕、800+ 镜头,Wan2 5B 约 7 分钟/镜头——和现在的算力约束同一个问题)。
 - 已**删除**(用户确认不要;v2 不引用):v1 遗留的 ChatTTS 权重 `asset/`(579M;v2 的配音是 CosyVoice)、v1 数据库残留、`output/`、旧的空代码目录、v1 的 `.env`(只有 v1 的模型名/ComfyUI/Gradio 端口)、v1 的 `.venv`(844M)、本地分支 `worktree-agent-a38072bfa0deeba37`(v1 ComfyUI 的过时提交)和已合并的旧分支。
 - 现在本地只有 `main` 与工作树分支 `claude/init-127186`(都等于 `origin/main`)。主检出目录里没有虚拟环境:要在那里跑,先 `uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python -e '.[dev]'`;日常开发用工作树里的 `.venv`。
+
+
+<!-- control-center-implementation-20261029 -->
+## 多模态控制中心接手入口（2026-10-29）
+
+已在工作树实现统一管线、项目编译、资产采用与人工发布台账；尚未提交/部署，不能按生产已具备理解。以 [本次实施核验](reviews/2026-10-29-multimodal-implementation.md) 和 [设计](MULTIMODAL_CONTROL_CENTER_DESIGN.md) 为入口。
+
+新增 schema 025，只在隔离库完成新建/升级/备份恢复验证。生产升级前停止接单并排空自己的任务、备份数据库与运行配置；不改已应用迁移校验和。回滚为完整升级前备份恢复，不删除新表来假装兼容旧程序。生产启动继续使用原 scripts/start.sh；新图由已有 worker tick 推进，不另起派发 worker。

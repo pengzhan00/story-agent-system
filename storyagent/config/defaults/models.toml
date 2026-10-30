@@ -626,3 +626,30 @@ rank = 16
 module_path = "transformer_blocks.{block}.attn.to_v"
 blocks = { start = 0, end = 5 }
 rank = 16
+
+# Internal CPU/I/O nodes used by the persisted a2v subflow, not creative defaults.
+[models."control-anchor"]
+kind = "image.generate"
+provider = "control-tools"
+version = "1"
+family = "control"
+heavy = false
+est_memory_gib = 1
+commercial_ok = true
+license_tag = "local-processing"
+timeout_sec = 120
+[models."control-anchor".params]
+operation = "anchor"
+
+[models."control-stitch"]
+kind = "compose.assemble"
+provider = "control-tools"
+version = "1"
+family = "control"
+heavy = false
+est_memory_gib = 2
+commercial_ok = true
+license_tag = "local-processing"
+timeout_sec = 3600
+[models."control-stitch".params]
+operation = "stitch"

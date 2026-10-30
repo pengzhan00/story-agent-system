@@ -36,6 +36,7 @@ from storyagent.story import StoryStore
 
 from .stages import Ctx, StageError, WorkflowCancelled
 from .tiering import policy_from, video_shots
+from .video_mode import prepare_video, shot_mode
 
 PHASES: tuple[tuple[str, ...], ...] = (
     ("character.portrait", "scene.keyframe", "music.bgm", "music.theme_song", "shot.sfx",
@@ -64,6 +65,14 @@ def current_asset(ledger: Ledger, spec: SpecRecord) -> AssetRecord | None:
 def slot_asset(
     ledger: Ledger, project_id: int, subject_type: str, subject_id: str, slot: str, spec_id: str | None = None,
 ) -> AssetRecord | None:
+    if subject_type in {"shot.keyframe", "shot.video"}:
+        selected = ledger.db.conn.execute(
+            "SELECT asset_id FROM asset_selections WHERE owner_type='shot' AND owner_id=? AND slot=?",
+            (subject_id, subject_type)).fetchone()
+        if selected:
+            asset = ledger.get_asset(selected[0])
+            if not asset.trashed_at:
+                return asset
     if spec_id:
         rows = ledger.list_assets(project_id=project_id, spec_id=spec_id, current_only=True, limit=5)
         if rows:
@@ -88,6 +97,8 @@ def allowed_models(settings: Settings, spec: SpecRecord) -> set[str]:
         pass
     if spec.subject_type == "shot.video" and not spec.model_ref:
         allowed.add(SOUND_VIDEO_MODEL)      # a clip that carries its own sound (project option video_with_sound)
+        if spec.params.get("mode") == "a2v":
+            allowed.add(settings.default_model(MediaKind.VIDEO_LIPSYNC.value).ref)
     return allowed
 
 
@@ -100,6 +111,10 @@ def up_to_date(ledger: Ledger, spec: SpecRecord, settings: Settings | None = Non
     built the other way - silent vs. carrying its own sound - outdated, so flipping the option re-makes the clips.
     ``end_keyframe`` is the keyframe a clip ends on (its tail join): if that was made again since, the clip is stale."""
     asset = current_asset(ledger, spec)
+    if asset is not None and ledger.db.conn.execute(
+        "SELECT 1 FROM asset_selections WHERE owner_type='shot' AND owner_id=? AND slot=? AND asset_id=?",
+        (spec.subject_id, spec.subject_type, asset.id)).fetchone():
+        return True
     if asset is None or (asset.spec_version or 0) < spec.version:
         return False
     for dep in spec.depends_on:
@@ -119,7 +134,8 @@ def up_to_date(ledger: Ledger, spec: SpecRecord, settings: Settings | None = Non
             return False
         if spec.subject_type == "shot.video" and video_with_sound is not None:
             try:
-                wanted = SOUND_VIDEO_MODEL if video_with_sound else (
+                wanted = settings.default_model(MediaKind.VIDEO_LIPSYNC.value).ref if spec.params.get("mode") == "a2v" \
+                    else SOUND_VIDEO_MODEL if video_with_sound else (
                     spec.model_ref or settings.default_model(spec.kind.value).ref)
             except ConfigError:
                 wanted = ""
@@ -198,6 +214,15 @@ def _plan_phase(
     for spec in specs:
         if spec.subject_type not in types or spec.subject_type in skip or (only and spec.id not in only):
             continue
+        if spec.subject_type == "dialogue.line" and not ctx.settings.workflow.get("narration_voiced", True):
+            shot_id, _, line_index = spec.subject_id.partition("#")
+            shot = ctx.store.get_shot(int(shot_id))
+            lines = shot.get("dialogue") or []
+            labels = {str(x).lower() for x in ctx.settings.workflow.get("non_character_speakers", [])}
+            if line_index.isdigit() and int(line_index) < len(lines) \
+                    and str(lines[int(line_index)].get("character", "")).lower() in labels:
+                skipped.append({"subject": spec.subject_type, "id": spec.subject_id, "reason": "not_voiced"})
+                continue
         # a clip is also stale when the keyframe its tail joins has been re-made since
         end_keyframe: AssetRecord | None = None
         if spec.subject_type == "shot.video":
@@ -211,7 +236,8 @@ def _plan_phase(
                 and not ctx.force():
             counts["reused"] += 1
             continue
-        if spec.subject_type == "shot.video" and spec.subject_id not in picks and spec.id not in only:
+        if spec.subject_type == "shot.video" and spec.subject_id not in picks and spec.id not in only \
+                and spec.params.get("mode") not in {"t2v", "i2v", "a2v"}:
             skipped.append({"subject": spec.subject_type, "id": spec.subject_id, "reason": "still"})
             continue
         try:
@@ -227,6 +253,13 @@ def _plan_phase(
                 continue
             extra["voice_ref"] = default_voice
         if spec.subject_type == "shot.video":
+            shot = ctx.store.get_shot(int(spec.subject_id))
+            mode = shot_mode(shot["render_payload"], spec.params)
+            if mode == "t2v":
+                job = store.build_job(spec, tier=tier, seed=spec.seed, shot_id=_shot_id(spec),
+                                      extra_inputs={"refs": []})
+                out.append((spec, prepare_video(ctx.settings, job, shot["render_payload"], None, ctx.project.settings)))
+                continue
             key = store.current(spec.project_id, "shot.keyframe", spec.subject_id)
             frame = current_asset(ledger, key) if key else None
             if frame is None:
@@ -247,8 +280,13 @@ def _plan_phase(
                     refs.append({"role": "end_image", "path": f"asset:{end.id}"})
                 extra["refs"] = refs
         job = store.build_job(spec, tier=tier, seed=spec.seed, shot_id=_shot_id(spec), extra_inputs=extra)
-        if spec.subject_type == "shot.video" and ctx.project.settings.get("video_with_sound"):
-            job = shot_with_sound(store, spec, job)
+        if spec.subject_type == "shot.video":
+            shot = ctx.store.get_shot(int(spec.subject_id))
+            key = store.current(spec.project_id, "shot.keyframe", spec.subject_id)
+            frame = current_asset(ledger, key) if key else None
+            job = prepare_video(ctx.settings, job, shot["render_payload"], frame, ctx.project.settings)
+            if job.kind is not MediaKind.VIDEO_LIPSYNC and ctx.project.settings.get("video_with_sound"):
+                job = shot_with_sound(store, spec, job)
         if spec.subject_type == "shot.keyframe":
             job = keyframe_from_references(ctx, ledger, spec, job)
         out.append((spec, job))
@@ -321,8 +359,15 @@ def job_preparer(
         if spec.subject_type == "shot.keyframe":
             return compose_keyframe(settings, story, spec_store, ledger, spec, job)
         if spec.subject_type == "shot.video":
+            # Imported/standalone specs may use a semantic subject (e.g. a pack's stable key).
+            # A real shot association is authoritative; an unassociated spec remains standalone.
+            shot_id = job.shot_id or (int(spec.subject_id) if spec.subject_id.isdecimal() else None)
+            shot = story.get_shot(shot_id) if shot_id is not None else {"render_payload": {}}
             key = spec_store.current(spec.project_id, "shot.keyframe", spec.subject_id)
             frame = current_asset(ledger, key) if key else None
+            mode = shot_mode(shot["render_payload"], spec.params)
+            if mode in {"t2v", "a2v"}:
+                return prepare_video(settings, job, shot["render_payload"], frame, project_settings or {})
             if frame is None:
                 return job
             job = MediaJob(**{**job.__dict__, "inputs": {**job.inputs, "refs": [f"asset:{frame.id}"]}})
@@ -569,7 +614,7 @@ def build_episode_timeline(ctx: Ctx, episode: int) -> dict[str, Any]:
             shot_id=shot["id"], label=f"{shot['act_number']}.{shot['scene_number']}.{shot['shot_number']}",
             planned_sec=planned,
             video=_asset_ref(clip, clip_kind),
-            video_audio=clip_kind == "video.av",
+            video_audio=clip_kind in {"video.av", "video.lipsync"},
             image=_asset_ref(current_asset(ledger, kspec) if kspec else None, "image.generate"),
             lines=lines, sfx=effects, narration=str(shot.get("narration", "")),
             scene=f"{shot['act_number']}.{shot['scene_number']}",

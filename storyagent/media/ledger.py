@@ -473,6 +473,11 @@ class Ledger:
             f"SELECT 1 FROM media_assets WHERE {where} AND is_current=1 AND trashed_at IS NULL", group
         ).fetchone()
         adopt = auto_adopt or not has_current
+        if has_current and conn.execute(
+            "SELECT 1 FROM asset_selections s JOIN media_assets a ON a.id=s.asset_id WHERE "
+            "a.project_id IS ? AND COALESCE(a.shot_id,0)=? AND a.kind=? AND a.slot=? LIMIT 1", group
+        ).fetchone():
+            adopt = False
         if adopt and has_current:
             conn.execute(f"UPDATE media_assets SET is_current=0 WHERE {where} AND is_current=1", group)
         aid = new_id()
@@ -622,6 +627,12 @@ class Ledger:
                 (a.project_id, a.shot_id or 0, a.kind, a.slot),
             )
             conn.execute("UPDATE media_assets SET is_current=1 WHERE id=?", (asset_id,))
+            if a.shot_id is not None:
+                selection_slot = "shot.keyframe" if a.kind.startswith("image.") else "shot.video"
+                conn.execute(
+                    "UPDATE asset_selections SET asset_id=?,revision=revision+1,updated_at=? "
+                    "WHERE owner_type='shot' AND owner_id=? AND slot=? AND asset_id!=?",
+                    (asset_id, self._now(), str(a.shot_id), selection_slot, asset_id))
         return self.get_asset(asset_id)
 
     def trash_asset(self, asset_id: str) -> AssetRecord:

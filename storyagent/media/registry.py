@@ -155,9 +155,15 @@ def _http(settings: Settings) -> Adapter:
     return HttpAdapter(settings)
 
 
+def _control_tools(settings: Settings) -> Adapter:
+    from .adapters.control_tools import ControlToolsAdapter
+
+    return ControlToolsAdapter()
+
+
 _BUILTIN: list[Callable[[Settings], Adapter]] = [
     _acestep, _comfy, _drawthings, _phosphene, _cosyvoice, _say, _whisper, _llm, _remote_video, _mflux, _lora_train,
-    _seedvc, _demucs, _ffmpeg, _delivery, _h3, _longcat, _cli, _http,
+    _seedvc, _demucs, _ffmpeg, _delivery, _h3, _longcat, _cli, _http, _control_tools,
 ]
 
 

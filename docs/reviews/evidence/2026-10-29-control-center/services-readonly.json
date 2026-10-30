@@ -1,0 +1,20 @@
+[
+  {
+    "provider": "phosphene",
+    "reachable": true,
+    "running": false,
+    "music_available": true,
+    "cover_ready": true,
+    "cover_missing": []
+  },
+  {
+    "provider": "comfy",
+    "reachable": true,
+    "http_status": 200
+  },
+  {
+    "provider": "acestep",
+    "reachable": false,
+    "reason": "ConnectionError"
+  }
+]

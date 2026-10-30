@@ -193,3 +193,34 @@ def test_an_edit_without_a_reference_image_is_refused_before_anything_is_queued(
     rec, _ = make_rig(s, adapter).run(job(MediaKind.IMAGE_EDIT, "klein-comfy", {"prompt": "x"}))
     assert rec.error_code == ErrorCode.INVALID_INPUT.value
     assert not any(q.path == "/prompt" for q in edit_server.requests)
+
+
+def test_multimodal_graph_maps_all_audio_and_video_inputs(tmp_path: Path, server: FakeServer) -> None:
+    from dataclasses import replace
+
+    r, adapter = rig(tmp_path, server)
+    record, _ = r.run(job(MediaKind.AUDIO_SFX, "sa-test", {"prompt": "test"}))
+    record = replace(record, inputs={"prompt": "test", "refs": [
+        {"role": "audio", "path": "voice.wav"}, {"role": "video", "path": "clip.mp4"}]})
+    tpl = {"graph": {"1": {"class_type": "LoadAudio", "inputs": {"audio": ""}},
+                     "2": {"class_type": "LoadAudio", "inputs": {"audio": ""}},
+                     "3": {"class_type": "LoadVideo", "inputs": {"file": ""}}},
+           "bindings": {"ref_audio": ["1", "audio"], "ref_audio_2": ["2", "audio"], "ref_video": ["3", "file"]}}
+    graph = adapter._graph(record, tpl, [], ["source.wav", "reference.wav"], ["source.mp4"])
+    assert graph["1"]["inputs"]["audio"] == "source.wav"
+    assert graph["2"]["inputs"]["audio"] == "reference.wav"
+    assert graph["3"]["inputs"]["file"] == "source.mp4"
+
+
+@pytest.mark.parametrize("outputs", [{"../escape": {"node": "1"}},
+                                     {"main": {"node": "1", "index": -1}},
+                                     {"main": {"node": "1", "type": "unknown"}}])
+def test_declared_outputs_reject_unsafe_ports(tmp_path, outputs):
+    import json
+
+    from storyagent.media.adapters.comfy import load_template
+    from storyagent.media.contracts import AdapterError
+
+    (tmp_path / "bad.json").write_text(json.dumps({"outputs": outputs}))
+    with pytest.raises(AdapterError):
+        load_template("bad", tmp_path)

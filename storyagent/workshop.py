@@ -105,11 +105,16 @@ MODULES: tuple[Module, ...] = (
             Field("likeness_consent", "consent", "bool"),
         )),
     )),
+    Module("sound", (
+        KindSpec(MediaKind.AUDIO_SFX, (_P,)),
+    )),
     Module("song", (
         KindSpec(MediaKind.AUDIO_MUSIC, (
             Field("prompt", "prompt", "longtext", required=True),
             Field("lyrics", "text", "longtext"),
             Field("reference", "refs[]", "media", "audio"),
+            Field("source", "source_audio", "media", "audio"),
+            Field("parent", "parent_audio", "media", "audio"),
         )),
     )),
     Module("voice", (

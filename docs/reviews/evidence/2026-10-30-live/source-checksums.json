@@ -1,0 +1,11 @@
+{
+  "storyagent/workshop.py": "bda326144228b812ab3cdbc4abd4767c5c513d3ce08a8da54b11016d9e56e898",
+  "storyagent/media/adapters/acestep.py": "a20fdec9dc83df1e33e62678d99ffe310f01dca2d8c4c794a8a83ccb1cbc6ce6",
+  "storyagent/media/adapters/drawthings.py": "fb6b34e4f8e9041d06ae75a32492a1a32aeda0ab304c6b99c1c4fc7c2f774b8e",
+  "storyagent/media/adapters/demucs.py": "1e411e0dabc8fd0c23a78ca7cd9834802198a2d2e7e51cb73f7763c694223587",
+  "scripts/live_control_smoke.py": "6459d7353b936d8c5b2e8e49b1c34a7fa277ba4e53f8466175a359c248e0f977",
+  "storyagent/media/lipsync.py": "f8d5f5d9e20c13842c5d2f43fee2235d8cea978162e85cbc188aed1e2563a395",
+  "storyagent/media/adapters/control_tools.py": "d9422dbb1d3321401951721eb3fee811bf1706acf46242acbe53f19de73a8044",
+  "storyagent/media/runners/control_tools.py": "e8d107cf1494cc5310c904c4bf0d1d55b03dc0b6ebcc477bfb4e1a635770b88f",
+  "tests/test_lipsync.py": "668a4121d41bf0f975d665523b83a249f1ce023cba3ff0e790f79407cc918408"
+}

@@ -88,7 +88,7 @@ Who can see what: with `[auth] mode = "off"` the unlock is only a guard against 
 
 1. 网页「系统」页最下面的「更新与重启」卡片:显示当前版本(提交号 + 标题)、落后几个提交(附标题)、正在跑的任务;点「检查更新」会 `git fetch`。
 2. 点「更新并重启」:依次做(与 `scripts/deploy.sh` 是同一套代码) —— 获取远端 → 比较 → `git merge --ff-only` → `uv pip install -e .` → `pnpm install --frozen-lockfile` → `pnpm build` → `db migrate`(先自动快照)→ `i18n check`。每一步的成败、输出的最后几行都在卡片里;完整日志在 `<home>/logs/update-<时间>.log`。**任何一步失败就停在那里**:不重启,旧代码继续跑(合并之后才失败的话,检出已经在新提交上,卡片里有起点提交,必要时 `git reset --hard <起点>` 手动回退)。
-3. 全部成功后请求重启:worker 立刻**停止领取新作业**,默认**等正在跑的任务做完**再退出;勾选「立即中断并重启」(会二次确认)则马上把运行中的作业放回队列(重任务会重做,或用适配器的续接),工作流在约一分钟内被新 worker 重新接手。等待期间卡片上有「立即中断并重启」和「取消重启」。
+3. 全部成功后请求重启:worker 立刻**停止领取新工作流和无关作业**，只继续执行在途工作流明确等待的媒体任务及其依赖，默认**等在途工作完成**再退出;勾选「立即中断并重启」(会二次确认)则马上把运行中的作业放回队列(重任务会重做,或用适配器的续接),工作流在约一分钟内被新 worker 重新接手。等待期间卡片上有「立即中断并重启」和「取消重启」。
 4. worker 和 server 各自以**退出码 75** 干净退出(没有任何杀进程/发信号的代码),`scripts/start.sh` 发现 75 就先做 `db migrate`、再把两个都重新拉起(并重新执行自己,start.sh 本身改了也会生效)。网页自动重连,恢复后提示「已更新并重启」并给出「重新载入页面」。
 5. 没有守护(不是用 start.sh 起的,或另开终端跑的 `storyagent serve`):只更新、不重启,卡片和 `storyagent update run` 都会明确提示手动重启。
 6. 守护标记:`start.sh` 启动时写 `<home>/update/supervisor.json`(含它的 pid),退出时删除;API 只在这个 pid 就是自己父进程时才认为有守护。请求/应答也是同目录的小文件(`restart.json`、`restart-worker.json`),状态在 `state.json`。
@@ -118,3 +118,20 @@ scripts/deploy.sh                 # = storyagent update run:获取 → 比较 �
 回滚:`git checkout <上一个提交>`,再 `.venv/bin/python -m storyagent update run` 的安装/构建步骤(或手动 `uv pip install -e .` 与 `pnpm build`);数据库迁移前的快照在 `data/storyagent.db.bak-vN`。
 
 首次升级到带这个功能的版本时,正在跑的旧 start.sh / worker / server 不认识重启请求:先用上面的手动方式更新并重启一次,之后才有热重启。
+
+### 重启等待的边界（2026-10-28）
+
+wait 模式保留在途媒体与工作流，只领取这些工作流明确等待的 job ID 及其 depends_on 链；
+无关排队任务和新工作流留待重启后处理。不会为更新而排空所有用户队列。若在途工作本身很长，
+等待可能持续较久；需要快速恢复时使用已有的立即重启选项，由租约恢复。取消重启恢复正常调度。
+
+`[api] shutdown_timeout_seconds = 5` 限制 API 等待流式连接/请求关闭的时长，不改变媒体任务的运行超时。
+超期后由 Uvicorn 取消本 API 的剩余连接任务，无需用外部进程信号清理。修改此参数或 Python 代码仍需正常部署重启。
+
+
+<!-- control-center-implementation-20261029 -->
+## 多模态控制中心运行与回滚（2026-10-29）
+
+已在工作树实现统一管线、项目编译、资产采用与人工发布台账；尚未提交/部署，不能按生产已具备理解。以 [本次实施核验](reviews/2026-10-29-multimodal-implementation.md) 和 [设计](MULTIMODAL_CONTROL_CENTER_DESIGN.md) 为入口。
+
+新增 schema 025，只在隔离库完成新建/升级/备份恢复验证。生产升级前停止接单并排空自己的任务、备份数据库与运行配置；不改已应用迁移校验和。回滚为完整升级前备份恢复，不删除新表来假装兼容旧程序。生产启动继续使用原 scripts/start.sh；新图由已有 worker tick 推进，不另起派发 worker。

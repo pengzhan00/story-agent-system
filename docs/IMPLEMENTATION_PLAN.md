@@ -90,5 +90,28 @@
 
 ## 2026-10-27 运行问题待办
 
-- P1 / queued：重启 wait 与在途工作流依赖互等、API 关闭无界。规格：[重启收敛与恢复](specs/restart-recovery.md)。
-  本机已通过既有恢复协议恢复，生成队列继续；持久修复应在下一次发布验收前完成，与可选能力配置分开评审。
+- P1 / implemented-verified（2026-10-28，待提交/部署）：重启 wait 与在途工作流依赖互等、API 关闭无界。
+  只执行在途依赖并限制 API 关闭期限；后端 918 项 + 独立并发回归 1 项、前端 98 项通过。
+  规格：[重启收敛与恢复](specs/restart-recovery.md)；[验证报告](reviews/2026-10-28-restart-drain.md)。
+
+## 2026-10-29 多模态控制中心设计与实施入口
+
+状态：design-reviewed / implementation-pending。设计已补齐 MECE 契约，完整系统审查仍 partial，未作发布验收、未派发 Claude。
+
+- 设计：[多模态控制中心](MULTIMODAL_CONTROL_CENTER_DESIGN.md)，§13 为本轮冻结约束。
+- 实施：[Claude V1 任务包](specs/multimodal-control-center-implementation.md)，P0–P3 按 W0–W5 连续实施、G01–G14 验收；包含人工发布分类台账。
+- 审查：[MECE 记录](reviews/2026-10-29-multimodal-design-mece.md)。
+- 开始前保护现有 restart/预览/H3/a2v 未提交改动；不更改既有任务排队和生产运行。P4 定时/自动发布及未安装专项模型另行扩展。
+
+
+<!-- control-center-implementation-20261029 -->
+## 多模态控制中心本地实施状态（2026-10-29）
+
+已在工作树实现统一管线、项目编译、资产采用与人工发布台账；尚未提交/部署，不能按生产已具备理解。以 [本次实施核验](reviews/2026-10-29-multimodal-implementation.md) 和 [设计](MULTIMODAL_CONTROL_CENTER_DESIGN.md) 为入口。
+
+新增 schema 025，只在隔离库完成新建/升级/备份恢复验证。生产升级前停止接单并排空自己的任务、备份数据库与运行配置；不改已应用迁移校验和。回滚为完整升级前备份恢复，不删除新表来假装兼容旧程序。生产启动继续使用原 scripts/start.sh；新图由已有 worker tick 推进，不另起派发 worker。
+
+<!-- capability-runtime-verification-20261030 -->
+## P1：能力运行时验收治理
+
+真实测试揭示目录覆盖、参考媒体传输、权重格式三类契约缺口；局部修复与回归已补。后续范围排在完整资源绑定治理 UI 前，见 [能力运行时验收约束](specs/capability-runtime-verification.md)。仅入库排期，未向外部代理发消息。实际测试状态以 2026-10-30 live 报告为准；此前“真实模型未运行”的描述是实施阶段历史快照。

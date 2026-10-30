@@ -128,7 +128,7 @@ class DrawThingsAdapter(AdapterBase):
         return issues
 
     # -- the request ----------------------------------------------------------------------------
-    def _body(self, job: JobRecord) -> tuple[str, dict[str, Any]]:
+    def _body(self, job: JobRecord, ctx: JobContext) -> tuple[str, dict[str, Any]]:
         body: dict[str, Any] = clean(job.params, _RENAME, _ALLOWED)
         body.update(
             prompt=str(job.inputs.get("prompt", "")), negative_prompt=str(job.inputs.get("negative_prompt", "")),
@@ -141,7 +141,6 @@ class DrawThingsAdapter(AdapterBase):
         refs = [Path(r).expanduser() for r in job.inputs.get("refs", []) if isinstance(r, str)]
         if refs:
             route = "/sdapi/v1/img2img"
-            body["init_images"] = [base64.b64encode(refs[0].read_bytes()).decode("ascii")]
         extra = job.params.get("request")
         if isinstance(extra, dict):
             body.update(extra)
@@ -150,11 +149,31 @@ class DrawThingsAdapter(AdapterBase):
         if job.kind is _VIDEO:
             body.update(num_frames=job.params.get("frames", 121), fps=job.params.get("fps", 24),
                         batch_size=1, model=self._api_models[job.model_ref])
+        if refs:
+            data = refs[0].read_bytes()
+            if body.get("width") and body.get("height"):
+                ffmpeg = find_tool(ctx.settings, "ffmpeg")
+                if ffmpeg is None:
+                    raise AdapterError(ErrorCode.MISSING_TOOL, "ffmpeg is required to fit the reference image")
+                width, height = int(body["width"]), int(body["height"])
+                if not 64 <= width <= 4096 or not 64 <= height <= 4096:
+                    raise AdapterError(ErrorCode.INVALID_PARAMS, "Reference dimensions must be within 64..4096")
+                fitted = subprocess.run(
+                    [str(ffmpeg), "-v", "error", "-nostdin", "-i", str(refs[0]),
+                     "-vf", f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
+                     f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2", "-frames:v", "1",
+                     "-f", "image2pipe", "-vcodec", "png", "pipe:1"],
+                    capture_output=True, timeout=30, check=False,
+                )
+                if fitted.returncode or not fitted.stdout:
+                    raise AdapterError(ErrorCode.INVALID_INPUT, "Cannot fit the reference image")
+                data = fitted.stdout
+            body["init_images"] = [base64.b64encode(data).decode("ascii")]
         return route, body
 
-    def _work(self, run: _Run, job: JobRecord, timeout: float) -> None:
+    def _work(self, run: _Run, job: JobRecord, timeout: float, ctx: JobContext) -> None:
         try:
-            route, body = self._body(job)
+            route, body = self._body(job, ctx)
             reply = self.client.json("POST", route, json=body, timeout=timeout)
             images = (reply or {}).get("images") if isinstance(reply, dict) else None
             if not images:
@@ -194,7 +213,7 @@ class DrawThingsAdapter(AdapterBase):
         ext = new_id()
         run = _Run()
         run.thread = threading.Thread(
-            target=self._work, args=(run, job, float(ctx.settings.models[job.model_ref].timeout_sec)),
+            target=self._work, args=(run, job, float(ctx.settings.models[job.model_ref].timeout_sec), ctx),
             daemon=True, name=f"drawthings-{job.id[:8]}")
         self._runs[ext] = run
         run.thread.start()

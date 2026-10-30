@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 import re
+import sqlite3
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -21,6 +22,7 @@ from storyagent.config import ConfigError
 from storyagent.connect.comfy_import import ImportFailed
 from storyagent.connect.store import ConnectError
 from storyagent.content import ContentError
+from storyagent.control.catalog import ControlError
 from storyagent.launcher import LaunchError
 from storyagent.media.ledger import LedgerError
 from storyagent.media.library import LibraryError
@@ -62,6 +64,14 @@ def respond(request: Request, status: int, code: str, detail: object = None) -> 
 
 
 def install(app: FastAPI) -> None:
+    @app.exception_handler(sqlite3.IntegrityError)
+    async def _constraint(request: Request, exc: sqlite3.IntegrityError) -> JSONResponse:
+        return respond(request, 409, "control_conflict", "A referenced object or unique value is invalid")
+
+    @app.exception_handler(ControlError)
+    async def _control(request: Request, exc: ControlError) -> JSONResponse:
+        return respond(request, exc.status, exc.code, str(exc))
+
     @app.exception_handler(ApiError)
     async def _api(request: Request, exc: ApiError) -> JSONResponse:
         return respond(request, exc.status, exc.code, exc.detail)

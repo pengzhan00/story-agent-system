@@ -1,0 +1,1768 @@
+{
+  "cases": {
+    "image": {
+      "run_id": "df96896a477f4d74a0665b3c434b28dd",
+      "status": "succeeded",
+      "definition": {
+        "name": "Live smoke: image",
+        "nodes": [
+          {
+            "id": "sample",
+            "kind": "image.generate",
+            "model_ref": "flux2-klein-4b-drawthings",
+            "inputs": {
+              "prompt": "A photorealistic head and shoulders portrait of an adult woman in a plain blue shirt, facing the camera, closed mouth, neutral expression, soft studio lighting, simple gray background, no text."
+            },
+            "params": {
+              "width": 512,
+              "height": 768,
+              "steps": 4
+            },
+            "seed": 72819,
+            "tier": "draft"
+          }
+        ]
+      },
+      "elapsed_sec": 15.43,
+      "jobs": [
+        {
+          "id": "87f6fc2253c34db69ac1aa28a25c9963",
+          "status": "completed",
+          "progress": 1.0,
+          "error_code": null,
+          "error": null
+        }
+      ],
+      "artifact": {
+        "id": "ee266625e15e44c1892feaf3d8fc1c3c",
+        "path": "projects/_unassigned/media/image.generate/87f6fc2253c34db69ac1aa28a25c9963.png",
+        "probe": {
+          "duration_sec": null,
+          "width": 512,
+          "height": 768,
+          "fps": 25.0,
+          "has_audio": false,
+          "has_video": true,
+          "format_name": "png_pipe"
+        }
+      },
+      "nodes": [
+        {
+          "run_id": "df96896a477f4d74a0665b3c434b28dd",
+          "node_id": "sample",
+          "status": "succeeded",
+          "attempt": 1,
+          "job_id": "87f6fc2253c34db69ac1aa28a25c9963",
+          "outputs": {
+            "main": "ee266625e15e44c1892feaf3d8fc1c3c"
+          },
+          "reason": "",
+          "revision": 3
+        }
+      ]
+    },
+    "speech": {
+      "run_id": "d6ddd0672fe74f7e8711e95757ce65c7",
+      "status": "succeeded",
+      "definition": {
+        "name": "Live smoke: speech",
+        "nodes": [
+          {
+            "id": "sample",
+            "kind": "audio.tts",
+            "model_ref": "cosyvoice3-0.5b",
+            "inputs": {
+              "text": "你好，欢迎来到故事工坊。让声音带动画面，让创意成为故事。",
+              "voice": "asset:aa1351ac7c164b279d4d4c83de0f89be",
+              "voice_text": "这是一段系统合成的测试语音。今天阳光明媚，我们一起测试声音和画面的同步效果。",
+              "consent": true
+            },
+            "params": {},
+            "seed": 72819,
+            "tier": "draft"
+          }
+        ]
+      },
+      "elapsed_sec": 38.78,
+      "jobs": [
+        {
+          "id": "ca015348bd4343fe88122de24cfd0d37",
+          "status": "completed",
+          "progress": 1.0,
+          "error_code": null,
+          "error": null
+        }
+      ],
+      "artifact": {
+        "id": "b5a5a939cfbe42b59585838a5800ffbc",
+        "path": "projects/_unassigned/media/audio.tts/ca015348bd4343fe88122de24cfd0d37.wav",
+        "probe": {
+          "duration_sec": 7.76,
+          "width": null,
+          "height": null,
+          "fps": null,
+          "has_audio": true,
+          "has_video": false,
+          "format_name": "wav"
+        }
+      },
+      "nodes": [
+        {
+          "run_id": "d6ddd0672fe74f7e8711e95757ce65c7",
+          "node_id": "sample",
+          "status": "succeeded",
+          "attempt": 1,
+          "job_id": "ca015348bd4343fe88122de24cfd0d37",
+          "outputs": {
+            "main": "b5a5a939cfbe42b59585838a5800ffbc"
+          },
+          "reason": "",
+          "revision": 3
+        }
+      ]
+    },
+    "sfx": {
+      "run_id": "bc9f251479e34e819839c08357f780ca",
+      "status": "succeeded",
+      "definition": {
+        "name": "Live smoke: sfx",
+        "nodes": [
+          {
+            "id": "sample",
+            "kind": "audio.sfx",
+            "model_ref": "stable-audio-3-medium",
+            "inputs": {
+              "prompt": "A single small wooden door knocking twice, dry close recording, no music."
+            },
+            "params": {
+              "duration": 2
+            },
+            "seed": 72819,
+            "tier": "draft"
+          }
+        ]
+      },
+      "elapsed_sec": 14.18,
+      "jobs": [
+        {
+          "id": "62cca713d2c7473198a32c18a118d18b",
+          "status": "completed",
+          "progress": 1.0,
+          "error_code": null,
+          "error": null
+        }
+      ],
+      "artifact": {
+        "id": "50a05058a03c472d8b2a451ed9f83d8d",
+        "path": "projects/_unassigned/media/audio.sfx/62cca713d2c7473198a32c18a118d18b.flac",
+        "probe": {
+          "duration_sec": 2.043356,
+          "width": null,
+          "height": null,
+          "fps": null,
+          "has_audio": true,
+          "has_video": false,
+          "format_name": "flac"
+        }
+      },
+      "nodes": [
+        {
+          "run_id": "bc9f251479e34e819839c08357f780ca",
+          "node_id": "sample",
+          "status": "succeeded",
+          "attempt": 1,
+          "job_id": "62cca713d2c7473198a32c18a118d18b",
+          "outputs": {
+            "main": "50a05058a03c472d8b2a451ed9f83d8d"
+          },
+          "reason": "",
+          "revision": 3
+        }
+      ]
+    },
+    "t2v": {
+      "run_id": "b68b5675430943a8b68d26bd8910720a",
+      "status": "succeeded",
+      "definition": {
+        "name": "Live smoke: t2v",
+        "nodes": [
+          {
+            "id": "sample",
+            "kind": "video.generate",
+            "model_ref": "ltx-2.5-video",
+            "inputs": {
+              "prompt": "A red ceramic teapot on a wooden table, a very slow camera push in, warm studio lighting."
+            },
+            "params": {
+              "mode": "t2v",
+              "width": 384,
+              "height": 640,
+              "frames": 25,
+              "upscale": "off",
+              "quality": "balanced"
+            },
+            "seed": 72819,
+            "tier": "draft"
+          }
+        ]
+      },
+      "elapsed_sec": 21.32,
+      "jobs": [
+        {
+          "id": "92c3798062924f2a99b1b4be9470f390",
+          "status": "completed",
+          "progress": 1.0,
+          "error_code": null,
+          "error": null
+        }
+      ],
+      "artifact": {
+        "id": "92c6bc05fd67493f91c239340e120c67",
+        "path": "projects/_unassigned/media/video.generate/92c3798062924f2a99b1b4be9470f390.mp4",
+        "probe": {
+          "duration_sec": 1.041667,
+          "width": 384,
+          "height": 640,
+          "fps": 24.0,
+          "has_audio": false,
+          "has_video": true,
+          "format_name": "mov,mp4,m4a,3gp,3g2,mj2"
+        }
+      },
+      "nodes": [
+        {
+          "run_id": "b68b5675430943a8b68d26bd8910720a",
+          "node_id": "sample",
+          "status": "succeeded",
+          "attempt": 1,
+          "job_id": "92c3798062924f2a99b1b4be9470f390",
+          "outputs": {
+            "main": "92c6bc05fd67493f91c239340e120c67"
+          },
+          "reason": "",
+          "revision": 3
+        }
+      ]
+    },
+    "i2v": {
+      "run_id": "961f9956a2d74222bedecdad664903ca",
+      "status": "succeeded",
+      "definition": {
+        "name": "Live smoke: i2v",
+        "nodes": [
+          {
+            "id": "sample",
+            "kind": "video.generate",
+            "model_ref": "ltx-2.5-video",
+            "inputs": {
+              "prompt": "A woman faces the camera and blinks gently, her head stays still.",
+              "image": "asset:ee266625e15e44c1892feaf3d8fc1c3c"
+            },
+            "params": {
+              "mode": "i2v",
+              "width": 384,
+              "height": 640,
+              "frames": 25,
+              "upscale": "off",
+              "quality": "balanced"
+            },
+            "seed": 72819,
+            "tier": "draft"
+          }
+        ]
+      },
+      "elapsed_sec": 21.23,
+      "jobs": [
+        {
+          "id": "fdb51341349c46f9b87f4850200a1e90",
+          "status": "completed",
+          "progress": 1.0,
+          "error_code": null,
+          "error": null
+        }
+      ],
+      "artifact": {
+        "id": "4f3709253d19427eadc28b7e47dd787f",
+        "path": "projects/_unassigned/media/video.generate/fdb51341349c46f9b87f4850200a1e90.mp4",
+        "probe": {
+          "duration_sec": 1.041667,
+          "width": 384,
+          "height": 640,
+          "fps": 24.0,
+          "has_audio": false,
+          "has_video": true,
+          "format_name": "mov,mp4,m4a,3gp,3g2,mj2"
+        }
+      },
+      "nodes": [
+        {
+          "run_id": "961f9956a2d74222bedecdad664903ca",
+          "node_id": "sample",
+          "status": "succeeded",
+          "attempt": 1,
+          "job_id": "fdb51341349c46f9b87f4850200a1e90",
+          "outputs": {
+            "main": "4f3709253d19427eadc28b7e47dd787f"
+          },
+          "reason": "",
+          "revision": 3
+        }
+      ]
+    },
+    "a2v": {
+      "run_id": "18f4ebe311d84e0fb960ee63bdc7e9b3",
+      "status": "succeeded",
+      "definition": {
+        "name": "Live smoke: a2v",
+        "nodes": [
+          {
+            "id": "sample",
+            "kind": "video.lipsync",
+            "model_ref": "ltx-2.5-lipsync",
+            "inputs": {
+              "prompt": "The woman speaks naturally to the camera with small lip movements and a stable head.",
+              "image": "asset:ee266625e15e44c1892feaf3d8fc1c3c",
+              "audio": "asset:b5a5a939cfbe42b59585838a5800ffbc"
+            },
+            "params": {
+              "duration": 2,
+              "audio_start_time": 0,
+              "audio_stem_auto": false,
+              "width": 384,
+              "height": 640,
+              "quality": "balanced"
+            },
+            "seed": 72819,
+            "tier": "draft"
+          }
+        ]
+      },
+      "elapsed_sec": 128.12,
+      "jobs": [
+        {
+          "id": "ca88488988e84cf993e38f207cc56e96",
+          "status": "completed",
+          "progress": 1.0,
+          "error_code": null,
+          "error": null
+        },
+        {
+          "id": "a0b357a22ba74e7bb5bd75c15fb7f232",
+          "status": "completed",
+          "progress": 1.0,
+          "error_code": null,
+          "error": null
+        }
+      ],
+      "artifact": {
+        "id": "2a35d1ffb6d349b8aed131abd48d22b2",
+        "path": "projects/_unassigned/media/compose.assemble/a0b357a22ba74e7bb5bd75c15fb7f232.mp4",
+        "probe": {
+          "duration_sec": 2.0,
+          "width": 384,
+          "height": 640,
+          "fps": 24.0,
+          "has_audio": true,
+          "has_video": true,
+          "format_name": "mov,mp4,m4a,3gp,3g2,mj2"
+        }
+      },
+      "nodes": [
+        {
+          "run_id": "18f4ebe311d84e0fb960ee63bdc7e9b3",
+          "node_id": "sample",
+          "status": "succeeded",
+          "attempt": 1,
+          "job_id": null,
+          "outputs": {
+            "main": "2a35d1ffb6d349b8aed131abd48d22b2"
+          },
+          "reason": "",
+          "revision": 3
+        },
+        {
+          "run_id": "18f4ebe311d84e0fb960ee63bdc7e9b3",
+          "node_id": "sample__render_0",
+          "status": "succeeded",
+          "attempt": 1,
+          "job_id": "ca88488988e84cf993e38f207cc56e96",
+          "outputs": {
+            "main": "a1d77d0bdc964ee9a0d9e11167f0225d"
+          },
+          "reason": "",
+          "revision": 3
+        },
+        {
+          "run_id": "18f4ebe311d84e0fb960ee63bdc7e9b3",
+          "node_id": "sample__stitch_1",
+          "status": "succeeded",
+          "attempt": 1,
+          "job_id": "a0b357a22ba74e7bb5bd75c15fb7f232",
+          "outputs": {
+            "main": "2a35d1ffb6d349b8aed131abd48d22b2"
+          },
+          "reason": "",
+          "revision": 3
+        }
+      ]
+    },
+    "dtvideo": {
+      "run_id": "47e3f4f7f2d74c099ead8a0840813058",
+      "status": "succeeded",
+      "definition": {
+        "name": "Live smoke: dtvideo",
+        "nodes": [
+          {
+            "id": "sample",
+            "kind": "video.generate",
+            "model_ref": "ltx-2.3-drawthings",
+            "inputs": {
+              "prompt": "A woman looks into the camera and blinks slowly, stable camera.",
+              "image": "asset:ee266625e15e44c1892feaf3d8fc1c3c"
+            },
+            "params": {
+              "width": 320,
+              "height": 576,
+              "frames": 25,
+              "fps": 24,
+              "steps": 8
+            },
+            "seed": 72819,
+            "tier": "draft"
+          }
+        ]
+      },
+      "elapsed_sec": 58.62,
+      "jobs": [
+        {
+          "id": "12628e4276b949e1a830c895e833ddc3",
+          "status": "completed",
+          "progress": 1.0,
+          "error_code": null,
+          "error": null
+        }
+      ],
+      "artifact": {
+        "id": "2aafd1d7e7a8458c8e08c397888a11cc",
+        "path": "projects/_unassigned/media/video.generate/12628e4276b949e1a830c895e833ddc3.mp4",
+        "probe": {
+          "duration_sec": 1.041667,
+          "width": 320,
+          "height": 576,
+          "fps": 24.0,
+          "has_audio": false,
+          "has_video": true,
+          "format_name": "mov,mp4,m4a,3gp,3g2,mj2"
+        }
+      },
+      "nodes": [
+        {
+          "run_id": "47e3f4f7f2d74c099ead8a0840813058",
+          "node_id": "sample",
+          "status": "succeeded",
+          "attempt": 1,
+          "job_id": "12628e4276b949e1a830c895e833ddc3",
+          "outputs": {
+            "main": "2aafd1d7e7a8458c8e08c397888a11cc"
+          },
+          "reason": "",
+          "revision": 3
+        }
+      ]
+    },
+    "music": {
+      "run_id": "5039fb32f0444bcfb0afb2b4f976e68c",
+      "status": "succeeded",
+      "definition": {
+        "name": "Live smoke: music",
+        "nodes": [
+          {
+            "id": "sample",
+            "kind": "audio.music",
+            "model_ref": "yue2-3b",
+            "inputs": {
+              "prompt": "Gentle acoustic pop, warm female singer, piano and light guitar, clear Mandarin vocals.",
+              "lyrics": "[Verse]\n清风吹过窗边\n故事在眼前"
+            },
+            "params": {
+              "duration": 15,
+              "music_quality": "draft"
+            },
+            "seed": 72819,
+            "tier": "draft"
+          }
+        ]
+      },
+      "elapsed_sec": 21.24,
+      "jobs": [
+        {
+          "id": "a2e69ffbc2f64c238386be39f4f7697d",
+          "status": "completed",
+          "progress": 1.0,
+          "error_code": null,
+          "error": null
+        }
+      ],
+      "artifact": {
+        "id": "f0345320d99d400ea88a540a791776b9",
+        "path": "projects/_unassigned/media/audio.music/a2e69ffbc2f64c238386be39f4f7697d.wav",
+        "probe": {
+          "duration_sec": 14.998667,
+          "width": null,
+          "height": null,
+          "fps": null,
+          "has_audio": true,
+          "has_video": false,
+          "format_name": "wav"
+        }
+      },
+      "nodes": [
+        {
+          "run_id": "5039fb32f0444bcfb0afb2b4f976e68c",
+          "node_id": "sample",
+          "status": "succeeded",
+          "attempt": 1,
+          "job_id": "a2e69ffbc2f64c238386be39f4f7697d",
+          "outputs": {
+            "main": "f0345320d99d400ea88a540a791776b9"
+          },
+          "reason": "",
+          "revision": 3
+        }
+      ]
+    },
+    "cover": {
+      "run_id": "c4b73656967c45e08a5cb1188572a2c5",
+      "status": "succeeded",
+      "definition": {
+        "name": "Live smoke: cover",
+        "nodes": [
+          {
+            "id": "sample",
+            "kind": "audio.music",
+            "model_ref": "yue2-3b",
+            "inputs": {
+              "prompt": "Soft piano pop cover with warm female vocals.",
+              "source": "asset:f0345320d99d400ea88a540a791776b9",
+              "lyrics": "[Verse]\n清风吹过窗边\n故事在眼前"
+            },
+            "params": {
+              "duration": 15,
+              "music_quality": "draft",
+              "music_task": "cover",
+              "music_cover_task": "full"
+            },
+            "seed": 72819,
+            "tier": "draft"
+          }
+        ]
+      },
+      "elapsed_sec": 76.66,
+      "jobs": [
+        {
+          "id": "429dd74ca3af43a2a432587f712e316d",
+          "status": "completed",
+          "progress": 1.0,
+          "error_code": null,
+          "error": null
+        }
+      ],
+      "artifact": {
+        "id": "c6748022131f4a1580b8122ad3162c19",
+        "path": "projects/_unassigned/media/audio.music/429dd74ca3af43a2a432587f712e316d.wav",
+        "probe": {
+          "duration_sec": 14.998667,
+          "width": null,
+          "height": null,
+          "fps": null,
+          "has_audio": true,
+          "has_video": false,
+          "format_name": "wav"
+        }
+      },
+      "nodes": [
+        {
+          "run_id": "c4b73656967c45e08a5cb1188572a2c5",
+          "node_id": "sample",
+          "status": "succeeded",
+          "attempt": 1,
+          "job_id": "429dd74ca3af43a2a432587f712e316d",
+          "outputs": {
+            "main": "c6748022131f4a1580b8122ad3162c19"
+          },
+          "reason": "",
+          "revision": 3
+        }
+      ]
+    },
+    "ace": {
+      "run_id": "fd00137749894399a695f626944de410",
+      "status": "succeeded",
+      "definition": {
+        "name": "Live smoke: ace",
+        "nodes": [
+          {
+            "id": "sample",
+            "kind": "audio.music",
+            "model_ref": "acestep-1.5-turbo",
+            "inputs": {
+              "prompt": "gentle piano, acoustic pop, instrumental"
+            },
+            "params": {
+              "duration": 10,
+              "instrumental": true,
+              "steps": 8
+            },
+            "seed": 72819,
+            "tier": "draft"
+          }
+        ]
+      },
+      "elapsed_sec": 7.11,
+      "jobs": [
+        {
+          "id": "4aed37d9a4294147ad4514e4f0614b69",
+          "status": "completed",
+          "progress": 1.0,
+          "error_code": null,
+          "error": null
+        }
+      ],
+      "artifact": {
+        "id": "c7f8604ef5914c9d8b0db4bc24e9f445",
+        "path": "projects/_unassigned/media/audio.music/4aed37d9a4294147ad4514e4f0614b69.mp3",
+        "probe": {
+          "duration_sec": 10.0,
+          "width": null,
+          "height": null,
+          "fps": null,
+          "has_audio": true,
+          "has_video": false,
+          "format_name": "mp3"
+        }
+      },
+      "nodes": [
+        {
+          "run_id": "fd00137749894399a695f626944de410",
+          "node_id": "sample",
+          "status": "succeeded",
+          "attempt": 1,
+          "job_id": "4aed37d9a4294147ad4514e4f0614b69",
+          "outputs": {
+            "main": "c7f8604ef5914c9d8b0db4bc24e9f445"
+          },
+          "reason": "",
+          "revision": 3
+        }
+      ]
+    },
+    "acecover": {
+      "run_id": "6adc2ee62e50417b94444fd7a359eb58",
+      "status": "succeeded",
+      "definition": {
+        "name": "Live smoke: acecover",
+        "nodes": [
+          {
+            "id": "sample",
+            "kind": "audio.music",
+            "model_ref": "acestep-1.5-turbo",
+            "inputs": {
+              "prompt": "gentle piano, acoustic pop, instrumental",
+              "source": "asset:c7f8604ef5914c9d8b0db4bc24e9f445"
+            },
+            "params": {
+              "task_type": "cover",
+              "duration": 10,
+              "instrumental": true,
+              "steps": 8
+            },
+            "seed": 72819,
+            "tier": "draft"
+          }
+        ]
+      },
+      "elapsed_sec": 19.31,
+      "jobs": [
+        {
+          "id": "3dfb06c78b3b49af8f28d0c6d03c5aed",
+          "status": "completed",
+          "progress": 1.0,
+          "error_code": null,
+          "error": null
+        }
+      ],
+      "artifact": {
+        "id": "7f79fc7b808441bcac71720e348418e5",
+        "path": "projects/_unassigned/media/audio.music/3dfb06c78b3b49af8f28d0c6d03c5aed.mp3",
+        "probe": {
+          "duration_sec": 10.0,
+          "width": null,
+          "height": null,
+          "fps": null,
+          "has_audio": true,
+          "has_video": false,
+          "format_name": "mp3"
+        }
+      },
+      "nodes": [
+        {
+          "run_id": "6adc2ee62e50417b94444fd7a359eb58",
+          "node_id": "sample",
+          "status": "succeeded",
+          "attempt": 1,
+          "job_id": "3dfb06c78b3b49af8f28d0c6d03c5aed",
+          "outputs": {
+            "main": "7f79fc7b808441bcac71720e348418e5"
+          },
+          "reason": "",
+          "revision": 3
+        }
+      ]
+    },
+    "acerepaint": {
+      "run_id": "493fb63d67cc4108bc8dcea95bc57f28",
+      "status": "succeeded",
+      "definition": {
+        "name": "Live smoke: acerepaint",
+        "nodes": [
+          {
+            "id": "sample",
+            "kind": "audio.music",
+            "model_ref": "acestep-1.5-turbo",
+            "inputs": {
+              "prompt": "gentle piano, acoustic pop, instrumental",
+              "source": "asset:c7f8604ef5914c9d8b0db4bc24e9f445"
+            },
+            "params": {
+              "task_type": "repaint",
+              "duration": 10,
+              "instrumental": true,
+              "steps": 8,
+              "repainting_start": 2,
+              "repainting_end": 4
+            },
+            "seed": 72819,
+            "tier": "draft"
+          }
+        ]
+      },
+      "elapsed_sec": 4.09,
+      "jobs": [
+        {
+          "id": "33dfce96ff8c49f1b6c6bbec08862120",
+          "status": "completed",
+          "progress": 1.0,
+          "error_code": null,
+          "error": null
+        }
+      ],
+      "artifact": {
+        "id": "57589c1f8f674894aa67af4089b376a6",
+        "path": "projects/_unassigned/media/audio.music/33dfce96ff8c49f1b6c6bbec08862120.mp3",
+        "probe": {
+          "duration_sec": 10.0,
+          "width": null,
+          "height": null,
+          "fps": null,
+          "has_audio": true,
+          "has_video": false,
+          "format_name": "mp3"
+        }
+      },
+      "nodes": [
+        {
+          "run_id": "493fb63d67cc4108bc8dcea95bc57f28",
+          "node_id": "sample",
+          "status": "succeeded",
+          "attempt": 1,
+          "job_id": "33dfce96ff8c49f1b6c6bbec08862120",
+          "outputs": {
+            "main": "57589c1f8f674894aa67af4089b376a6"
+          },
+          "reason": "",
+          "revision": 3
+        }
+      ]
+    },
+    "stems": {
+      "run_id": "e4d5df8244464079bdef6372d543d79c",
+      "status": "succeeded",
+      "definition": {
+        "name": "Live smoke: stems",
+        "nodes": [
+          {
+            "id": "sample",
+            "kind": "audio.separate",
+            "model_ref": "demucs-htdemucs",
+            "inputs": {
+              "audio": "asset:f0345320d99d400ea88a540a791776b9"
+            },
+            "params": {
+              "model_dir": "/Users/pengzhan/myworkspace/projects/story-agent-system/data/run/live-control-20261029/local-demucs",
+              "device": "cpu"
+            },
+            "seed": 72819,
+            "tier": "draft"
+          }
+        ]
+      },
+      "elapsed_sec": 7.12,
+      "jobs": [
+        {
+          "id": "e791d15aeb8147efb2a07c70e183d801",
+          "status": "completed",
+          "progress": 1.0,
+          "error_code": null,
+          "error": null
+        }
+      ],
+      "artifact": {
+        "id": "0fd25b9075464537a2c3c9297235d39d",
+        "path": "projects/_unassigned/media/audio.separate/e791d15aeb8147efb2a07c70e183d801.wav",
+        "probe": {
+          "duration_sec": 14.998662,
+          "width": null,
+          "height": null,
+          "fps": null,
+          "has_audio": true,
+          "has_video": false,
+          "format_name": "wav"
+        }
+      },
+      "nodes": [
+        {
+          "run_id": "e4d5df8244464079bdef6372d543d79c",
+          "node_id": "sample",
+          "status": "succeeded",
+          "attempt": 1,
+          "job_id": "e791d15aeb8147efb2a07c70e183d801",
+          "outputs": {
+            "accompaniment": "dc397b852866456c8ddd6300bf8cb781",
+            "main": "0fd25b9075464537a2c3c9297235d39d"
+          },
+          "reason": "",
+          "revision": 3
+        }
+      ]
+    },
+    "a2v_sequence": {
+      "run_id": "049adf2fc8c842a0bf59a4f59d29daf6",
+      "status": "succeeded",
+      "definition": {
+        "name": "Live smoke: a2v_sequence",
+        "nodes": [
+          {
+            "id": "sample",
+            "kind": "video.lipsync",
+            "model_ref": "ltx-2.5-lipsync",
+            "inputs": {
+              "prompt": "The woman speaks naturally to the camera with small lip movements and a stable head.",
+              "image": "asset:ee266625e15e44c1892feaf3d8fc1c3c",
+              "audio": "asset:b5a5a939cfbe42b59585838a5800ffbc"
+            },
+            "params": {
+              "duration": 3.5,
+              "audio_start_time": 0,
+              "audio_stem_auto": false,
+              "width": 384,
+              "height": 640,
+              "quality": "balanced",
+              "max_part_seconds": 3
+            },
+            "seed": 72819,
+            "tier": "draft"
+          }
+        ]
+      },
+      "elapsed_sec": 208.54,
+      "jobs": [
+        {
+          "id": "e418869892ab462fa01f1e27fde53e83",
+          "status": "completed",
+          "progress": 1.0,
+          "message": "done",
+          "error_code": null,
+          "error": null
+        },
+        {
+          "id": "47e95bcb7bd249599d73eaa681179a22",
+          "status": "completed",
+          "progress": 1.0,
+          "message": "done",
+          "error_code": null,
+          "error": null
+        },
+        {
+          "id": "cce78f84caac4c71998005157a7b7810",
+          "status": "completed",
+          "progress": 1.0,
+          "message": "done",
+          "error_code": null,
+          "error": null
+        },
+        {
+          "id": "ab2d4516ea3d4e6e9aac8c0052651a84",
+          "status": "completed",
+          "progress": 1.0,
+          "message": "done",
+          "error_code": null,
+          "error": null
+        }
+      ],
+      "artifact": {
+        "id": "cd14b399ee6a4dec97f6e1e8478782b9",
+        "path": "projects/_unassigned/media/compose.assemble/ab2d4516ea3d4e6e9aac8c0052651a84.mp4",
+        "probe": {
+          "duration_sec": 3.5,
+          "width": 384,
+          "height": 640,
+          "fps": 24.0,
+          "has_audio": true,
+          "has_video": true,
+          "format_name": "mov,mp4,m4a,3gp,3g2,mj2"
+        }
+      },
+      "nodes": [
+        {
+          "run_id": "049adf2fc8c842a0bf59a4f59d29daf6",
+          "node_id": "sample",
+          "status": "succeeded",
+          "attempt": 1,
+          "job_id": null,
+          "outputs": {
+            "main": "cd14b399ee6a4dec97f6e1e8478782b9"
+          },
+          "reason": "",
+          "revision": 3
+        },
+        {
+          "run_id": "049adf2fc8c842a0bf59a4f59d29daf6",
+          "node_id": "sample__render_0",
+          "status": "succeeded",
+          "attempt": 1,
+          "job_id": "e418869892ab462fa01f1e27fde53e83",
+          "outputs": {
+            "main": "64fb8960c89c4bde9a7954252125ff64"
+          },
+          "reason": "",
+          "revision": 3
+        },
+        {
+          "run_id": "049adf2fc8c842a0bf59a4f59d29daf6",
+          "node_id": "sample__anchor_1",
+          "status": "succeeded",
+          "attempt": 1,
+          "job_id": "47e95bcb7bd249599d73eaa681179a22",
+          "outputs": {
+            "main": "9b44b32b65314686b8dfe18dd6754a70"
+          },
+          "reason": "",
+          "revision": 3
+        },
+        {
+          "run_id": "049adf2fc8c842a0bf59a4f59d29daf6",
+          "node_id": "sample__render_1",
+          "status": "succeeded",
+          "attempt": 1,
+          "job_id": "cce78f84caac4c71998005157a7b7810",
+          "outputs": {
+            "main": "aea9b39bd15646549de8eddc3e992a6f"
+          },
+          "reason": "",
+          "revision": 3
+        },
+        {
+          "run_id": "049adf2fc8c842a0bf59a4f59d29daf6",
+          "node_id": "sample__stitch_2",
+          "status": "succeeded",
+          "attempt": 1,
+          "job_id": "ab2d4516ea3d4e6e9aac8c0052651a84",
+          "outputs": {
+            "main": "cd14b399ee6a4dec97f6e1e8478782b9"
+          },
+          "reason": "",
+          "revision": 3
+        }
+      ]
+    },
+    "stems_configured": {
+      "run_id": "633eaa65426d49cbb481490c84caaf42",
+      "status": "succeeded",
+      "definition": {
+        "name": "Live smoke: stems_configured",
+        "nodes": [
+          {
+            "id": "sample",
+            "kind": "audio.separate",
+            "model_ref": "demucs-htdemucs",
+            "inputs": {
+              "audio": "asset:f0345320d99d400ea88a540a791776b9"
+            },
+            "params": {
+              "device": "cpu"
+            },
+            "seed": 72819,
+            "tier": "draft"
+          }
+        ]
+      },
+      "elapsed_sec": 6.16,
+      "jobs": [
+        {
+          "id": "f98cb63c13f745f5b1a94c742819b5fd",
+          "status": "completed",
+          "progress": 1.0,
+          "error_code": null,
+          "error": null
+        }
+      ],
+      "artifact": {
+        "id": "744f16a929194028a3a7be929eeffbba",
+        "path": "projects/_unassigned/media/audio.separate/f98cb63c13f745f5b1a94c742819b5fd.wav",
+        "probe": {
+          "duration_sec": 14.998662,
+          "width": null,
+          "height": null,
+          "fps": null,
+          "has_audio": true,
+          "has_video": false,
+          "format_name": "wav"
+        }
+      },
+      "nodes": [
+        {
+          "run_id": "633eaa65426d49cbb481490c84caaf42",
+          "node_id": "sample",
+          "status": "succeeded",
+          "attempt": 1,
+          "job_id": "f98cb63c13f745f5b1a94c742819b5fd",
+          "outputs": {
+            "accompaniment": "90282e2246be4475ad9963af220140e6",
+            "main": "744f16a929194028a3a7be929eeffbba"
+          },
+          "reason": "",
+          "revision": 3
+        }
+      ]
+    }
+  },
+  "assets": {
+    "reference": "aa1351ac7c164b279d4d4c83de0f89be",
+    "image": "ee266625e15e44c1892feaf3d8fc1c3c",
+    "speech": "b5a5a939cfbe42b59585838a5800ffbc",
+    "ace": "c7f8604ef5914c9d8b0db4bc24e9f445",
+    "sfx": "50a05058a03c472d8b2a451ed9f83d8d",
+    "t2v": "92c6bc05fd67493f91c239340e120c67",
+    "i2v": "4f3709253d19427eadc28b7e47dd787f",
+    "a2v": "2a35d1ffb6d349b8aed131abd48d22b2",
+    "music": "f0345320d99d400ea88a540a791776b9",
+    "cover": "c6748022131f4a1580b8122ad3162c19",
+    "dtvideo": "2aafd1d7e7a8458c8e08c397888a11cc",
+    "acecover": "7f79fc7b808441bcac71720e348418e5",
+    "acerepaint": "57589c1f8f674894aa67af4089b376a6",
+    "stems": "0fd25b9075464537a2c3c9297235d39d",
+    "stems_configured": "744f16a929194028a3a7be929eeffbba",
+    "a2v_sequence": "cd14b399ee6a4dec97f6e1e8478782b9"
+  },
+  "memory_at_start": {
+    "total_gib": 128.0,
+    "free_gib": 83.54490661621094,
+    "swap_total_gib": 6.0,
+    "swap_used_gib": 4.396484375
+  },
+  "history": [
+    {
+      "case": "t2v",
+      "run_id": "a58dc6b970e5433db6f94c7939f89b1b",
+      "status": "blocked",
+      "definition": {
+        "name": "Live smoke: t2v",
+        "nodes": [
+          {
+            "id": "sample",
+            "kind": "video.generate",
+            "model_ref": "ltx-2.5-video",
+            "inputs": {
+              "prompt": "A red ceramic teapot on a wooden table, a very slow camera push in, warm studio lighting."
+            },
+            "params": {
+              "mode": "t2v",
+              "width": 384,
+              "height": 640,
+              "frames": 25,
+              "upscale": "off",
+              "quality": "balanced"
+            },
+            "seed": 72819,
+            "tier": "draft"
+          }
+        ]
+      },
+      "elapsed_sec": 31.0,
+      "jobs": [
+        {
+          "id": "879597f325dd4addb6257c4e703fa110",
+          "status": "queued",
+          "progress": 0.0,
+          "error_code": null,
+          "error": null
+        }
+      ],
+      "memory": {
+        "total_gib": 128.0,
+        "free_gib": 30.415802001953125,
+        "swap_total_gib": 56.0,
+        "swap_used_gib": 55.590703125
+      },
+      "nodes": [
+        {
+          "run_id": "a58dc6b970e5433db6f94c7939f89b1b",
+          "node_id": "sample",
+          "status": "cancelled",
+          "attempt": 1,
+          "job_id": "879597f325dd4addb6257c4e703fa110",
+          "outputs": {},
+          "reason": "",
+          "revision": 3
+        }
+      ]
+    },
+    {
+      "case": "i2v",
+      "run_id": "3919bcb4ab53433e9a98a203e5ee0640",
+      "status": "blocked",
+      "definition": {
+        "name": "Live smoke: i2v",
+        "nodes": [
+          {
+            "id": "sample",
+            "kind": "video.generate",
+            "model_ref": "ltx-2.5-video",
+            "inputs": {
+              "prompt": "A woman faces the camera and blinks gently, her head stays still.",
+              "image": "asset:ee266625e15e44c1892feaf3d8fc1c3c"
+            },
+            "params": {
+              "mode": "i2v",
+              "width": 384,
+              "height": 640,
+              "frames": 25,
+              "upscale": "off",
+              "quality": "balanced"
+            },
+            "seed": 72819,
+            "tier": "draft"
+          }
+        ]
+      },
+      "elapsed_sec": 30.87,
+      "jobs": [
+        {
+          "id": "dae4e4f316054e619c0b2c7b1056982f",
+          "status": "queued",
+          "progress": 0.0,
+          "error_code": null,
+          "error": null
+        }
+      ],
+      "memory": {
+        "total_gib": 128.0,
+        "free_gib": 30.289306640625,
+        "swap_total_gib": 56.0,
+        "swap_used_gib": 55.575078125
+      },
+      "nodes": [
+        {
+          "run_id": "3919bcb4ab53433e9a98a203e5ee0640",
+          "node_id": "sample",
+          "status": "cancelled",
+          "attempt": 1,
+          "job_id": "dae4e4f316054e619c0b2c7b1056982f",
+          "outputs": {},
+          "reason": "",
+          "revision": 3
+        }
+      ]
+    },
+    {
+      "case": "a2v",
+      "run_id": "6b3248fa97144adbba4a41d9a5dcd65a",
+      "status": "blocked",
+      "definition": {
+        "name": "Live smoke: a2v",
+        "nodes": [
+          {
+            "id": "sample",
+            "kind": "video.lipsync",
+            "model_ref": "ltx-2.5-lipsync",
+            "inputs": {
+              "prompt": "The woman speaks naturally to the camera with small lip movements and a stable head.",
+              "image": "asset:ee266625e15e44c1892feaf3d8fc1c3c",
+              "audio": "asset:b5a5a939cfbe42b59585838a5800ffbc"
+            },
+            "params": {
+              "duration": 2,
+              "audio_start_time": 0,
+              "audio_stem_auto": false,
+              "width": 384,
+              "height": 640,
+              "quality": "balanced"
+            },
+            "seed": 72819,
+            "tier": "draft"
+          }
+        ]
+      },
+      "elapsed_sec": 30.9,
+      "jobs": [
+        {
+          "id": "e470c5bcdd0c4345804fd0b2fe234527",
+          "status": "queued",
+          "progress": 0.0,
+          "error_code": null,
+          "error": null
+        }
+      ],
+      "memory": {
+        "total_gib": 128.0,
+        "free_gib": 30.217376708984375,
+        "swap_total_gib": 56.0,
+        "swap_used_gib": 55.559453125
+      },
+      "nodes": [
+        {
+          "run_id": "6b3248fa97144adbba4a41d9a5dcd65a",
+          "node_id": "sample",
+          "status": "cancelled",
+          "attempt": 1,
+          "job_id": null,
+          "outputs": {},
+          "reason": "",
+          "revision": 3
+        },
+        {
+          "run_id": "6b3248fa97144adbba4a41d9a5dcd65a",
+          "node_id": "sample__render_0",
+          "status": "cancelled",
+          "attempt": 1,
+          "job_id": "e470c5bcdd0c4345804fd0b2fe234527",
+          "outputs": {},
+          "reason": "",
+          "revision": 3
+        }
+      ]
+    },
+    {
+      "case": "dtvideo",
+      "run_id": "a379f8765d4d463fbbbd31c4c0a31f5d",
+      "status": "blocked",
+      "definition": {
+        "name": "Live smoke: dtvideo",
+        "nodes": [
+          {
+            "id": "sample",
+            "kind": "video.generate",
+            "model_ref": "ltx-2.3-drawthings",
+            "inputs": {
+              "prompt": "A woman looks into the camera and blinks slowly, stable camera.",
+              "image": "asset:ee266625e15e44c1892feaf3d8fc1c3c"
+            },
+            "params": {
+              "width": 320,
+              "height": 576,
+              "frames": 25,
+              "fps": 24,
+              "steps": 8
+            },
+            "seed": 72819,
+            "tier": "draft"
+          }
+        ]
+      },
+      "elapsed_sec": 30.91,
+      "jobs": [
+        {
+          "id": "1a744648061d4aa299b70443918ca59b",
+          "status": "queued",
+          "progress": 0.0,
+          "error_code": null,
+          "error": null
+        }
+      ],
+      "memory": {
+        "total_gib": 128.0,
+        "free_gib": 30.284194946289062,
+        "swap_total_gib": 56.0,
+        "swap_used_gib": 55.551640625
+      },
+      "nodes": [
+        {
+          "run_id": "a379f8765d4d463fbbbd31c4c0a31f5d",
+          "node_id": "sample",
+          "status": "cancelled",
+          "attempt": 1,
+          "job_id": "1a744648061d4aa299b70443918ca59b",
+          "outputs": {},
+          "reason": "",
+          "revision": 3
+        }
+      ]
+    },
+    {
+      "case": "music",
+      "run_id": "3eb98075f52a4e54b4d33a8114b4e7d0",
+      "status": "failed",
+      "definition": {
+        "name": "Live smoke: music",
+        "nodes": [
+          {
+            "id": "sample",
+            "kind": "audio.music",
+            "model_ref": "yue2-3b",
+            "inputs": {
+              "prompt": "Gentle acoustic pop, warm female singer, piano and light guitar, clear Mandarin vocals.",
+              "lyrics": "[Verse]\n清风吹过窗边\n故事在眼前"
+            },
+            "params": {
+              "duration": 15,
+              "music_quality": "draft"
+            },
+            "seed": 72819,
+            "tier": "draft"
+          }
+        ]
+      },
+      "elapsed_sec": 11.09,
+      "jobs": [
+        {
+          "id": "d3ca08b88b544f9a8a0185be54d938a0",
+          "status": "workflow_error",
+          "progress": 0.02,
+          "error_code": "workflow_failed",
+          "error": "YuE2 exited with code 3: [music] stage planning · [music] plan 1 · [music] plan 43 · [music] error memory guard: Stopping: the system is swapping (1300 MiB out, 1300 MiB swap growth)"
+        }
+      ],
+      "nodes": [
+        {
+          "run_id": "3eb98075f52a4e54b4d33a8114b4e7d0",
+          "node_id": "sample",
+          "status": "failed",
+          "attempt": 1,
+          "job_id": "d3ca08b88b544f9a8a0185be54d938a0",
+          "outputs": {},
+          "reason": "workflow_failed",
+          "revision": 3
+        }
+      ]
+    },
+    {
+      "case": "cover",
+      "status": "error",
+      "error": "'music'",
+      "type": "KeyError"
+    },
+    {
+      "case": "dtvideo",
+      "run_id": "adc72ded58a24454a69a7a8b73ab97f3",
+      "status": "failed",
+      "definition": {
+        "name": "Live smoke: dtvideo",
+        "nodes": [
+          {
+            "id": "sample",
+            "kind": "video.generate",
+            "model_ref": "ltx-2.3-drawthings",
+            "inputs": {
+              "prompt": "A woman looks into the camera and blinks slowly, stable camera.",
+              "image": "asset:ee266625e15e44c1892feaf3d8fc1c3c"
+            },
+            "params": {
+              "width": 320,
+              "height": 576,
+              "frames": 25,
+              "fps": 24,
+              "steps": 8
+            },
+            "seed": 72819,
+            "tier": "draft"
+          }
+        ]
+      },
+      "elapsed_sec": 3.08,
+      "jobs": [
+        {
+          "id": "07fdf8d56d5742309453dcb1daa00749",
+          "status": "transport_error",
+          "progress": 0.0,
+          "error_code": "service_rejected",
+          "error": "drawthings HTTP 422: {\"body\":\"\",\"error\":\"HTTPException\",\"detail\":\"init_images height doesn't match 768 from the parameter 576\",\"errors\":\"\"}"
+        }
+      ],
+      "nodes": [
+        {
+          "run_id": "adc72ded58a24454a69a7a8b73ab97f3",
+          "node_id": "sample",
+          "status": "failed",
+          "attempt": 1,
+          "job_id": "07fdf8d56d5742309453dcb1daa00749",
+          "outputs": {},
+          "reason": "service_rejected",
+          "revision": 3
+        }
+      ]
+    },
+    {
+      "case": "acecover",
+      "run_id": "0d8ea010171f477aac9351ebbfbf6b64",
+      "status": "failed",
+      "definition": {
+        "name": "Live smoke: acecover",
+        "nodes": [
+          {
+            "id": "sample",
+            "kind": "audio.music",
+            "model_ref": "acestep-1.5-turbo",
+            "inputs": {
+              "prompt": "gentle piano, acoustic pop, instrumental",
+              "source": "asset:c7f8604ef5914c9d8b0db4bc24e9f445"
+            },
+            "params": {
+              "task_type": "cover",
+              "duration": 10,
+              "instrumental": true,
+              "steps": 8
+            },
+            "seed": 72819,
+            "tier": "draft"
+          }
+        ]
+      },
+      "elapsed_sec": 1.07,
+      "jobs": [
+        {
+          "id": "e28932a48fd2480a89492b8a4d9c1700",
+          "status": "transport_error",
+          "progress": 0.0,
+          "error_code": "service_rejected",
+          "error": "acestep HTTP 400: {\"detail\":\"absolute audio file paths are not allowed\"}"
+        }
+      ],
+      "nodes": [
+        {
+          "run_id": "0d8ea010171f477aac9351ebbfbf6b64",
+          "node_id": "sample",
+          "status": "failed",
+          "attempt": 1,
+          "job_id": "e28932a48fd2480a89492b8a4d9c1700",
+          "outputs": {},
+          "reason": "service_rejected",
+          "revision": 3
+        }
+      ]
+    },
+    {
+      "case": "acerepaint",
+      "run_id": "2e85fe1dd56f4d86b9eee6d5c90670f8",
+      "status": "failed",
+      "definition": {
+        "name": "Live smoke: acerepaint",
+        "nodes": [
+          {
+            "id": "sample",
+            "kind": "audio.music",
+            "model_ref": "acestep-1.5-turbo",
+            "inputs": {
+              "prompt": "gentle piano, acoustic pop, instrumental",
+              "source": "asset:c7f8604ef5914c9d8b0db4bc24e9f445"
+            },
+            "params": {
+              "task_type": "repaint",
+              "duration": 10,
+              "instrumental": true,
+              "steps": 8,
+              "repainting_start": 2,
+              "repainting_end": 4
+            },
+            "seed": 72819,
+            "tier": "draft"
+          }
+        ]
+      },
+      "elapsed_sec": 1.01,
+      "jobs": [
+        {
+          "id": "59bcf795da1a4a3daf98751a1202a87b",
+          "status": "transport_error",
+          "progress": 0.0,
+          "error_code": "service_rejected",
+          "error": "acestep HTTP 400: {\"detail\":\"absolute audio file paths are not allowed\"}"
+        }
+      ],
+      "nodes": [
+        {
+          "run_id": "2e85fe1dd56f4d86b9eee6d5c90670f8",
+          "node_id": "sample",
+          "status": "failed",
+          "attempt": 1,
+          "job_id": "59bcf795da1a4a3daf98751a1202a87b",
+          "outputs": {},
+          "reason": "service_rejected",
+          "revision": 3
+        }
+      ]
+    },
+    {
+      "case": "stems",
+      "run_id": "e030d5ce4aef42469137147cc87fdeba",
+      "status": "failed",
+      "definition": {
+        "name": "Live smoke: stems",
+        "nodes": [
+          {
+            "id": "sample",
+            "kind": "audio.separate",
+            "model_ref": "demucs-htdemucs",
+            "inputs": {
+              "audio": "asset:f0345320d99d400ea88a540a791776b9"
+            },
+            "params": {
+              "model_dir": "/Users/pengzhan/models/demucs",
+              "device": "cpu"
+            },
+            "seed": 72819,
+            "tier": "draft"
+          }
+        ]
+      },
+      "elapsed_sec": 2.08,
+      "jobs": [
+        {
+          "id": "9671c8161d5f4373ad82c216d62332b3",
+          "status": "workflow_error",
+          "progress": 0.0,
+          "error_code": "tool_failed",
+          "error": "Could not find pre-trained model with signature 955717e8.\n"
+        }
+      ],
+      "nodes": [
+        {
+          "run_id": "e030d5ce4aef42469137147cc87fdeba",
+          "node_id": "sample",
+          "status": "failed",
+          "attempt": 1,
+          "job_id": "9671c8161d5f4373ad82c216d62332b3",
+          "outputs": {},
+          "reason": "tool_failed",
+          "revision": 3
+        }
+      ]
+    },
+    {
+      "case": "a2v_sequence",
+      "run_id": "65db80f79a0b44229117a84eb22478db",
+      "status": "blocked",
+      "definition": {
+        "name": "Live smoke: a2v_sequence",
+        "nodes": [
+          {
+            "id": "sample",
+            "kind": "video.lipsync",
+            "model_ref": "ltx-2.5-lipsync",
+            "inputs": {
+              "prompt": "The woman speaks naturally to the camera with small lip movements and a stable head.",
+              "image": "asset:ee266625e15e44c1892feaf3d8fc1c3c",
+              "audio": "asset:b5a5a939cfbe42b59585838a5800ffbc"
+            },
+            "params": {
+              "duration": 3.5,
+              "audio_start_time": 0,
+              "audio_stem_auto": false,
+              "width": 384,
+              "height": 640,
+              "quality": "balanced",
+              "max_part_seconds": 3
+            },
+            "seed": 72819,
+            "tier": "draft"
+          }
+        ]
+      },
+      "elapsed_sec": 30.96,
+      "jobs": [
+        {
+          "id": "5b55f378dba04bd4a0bf796c2a0609fe",
+          "status": "queued",
+          "progress": 0.0,
+          "error_code": null,
+          "error": null
+        }
+      ],
+      "memory": {
+        "total_gib": 128.0,
+        "free_gib": 56.55043029785156,
+        "swap_total_gib": 36.0,
+        "swap_used_gib": 35.26427734375
+      },
+      "nodes": [
+        {
+          "run_id": "65db80f79a0b44229117a84eb22478db",
+          "node_id": "sample",
+          "status": "cancelled",
+          "attempt": 1,
+          "job_id": null,
+          "outputs": {},
+          "reason": "",
+          "revision": 3
+        },
+        {
+          "run_id": "65db80f79a0b44229117a84eb22478db",
+          "node_id": "sample__render_0",
+          "status": "cancelled",
+          "attempt": 1,
+          "job_id": "5b55f378dba04bd4a0bf796c2a0609fe",
+          "outputs": {},
+          "reason": "",
+          "revision": 3
+        }
+      ]
+    },
+    {
+      "case": "a2v_sequence",
+      "run_id": "82492ddc03c246a8a9361e32902f21a1",
+      "status": "qc_failed",
+      "definition": {
+        "name": "Live smoke: a2v_sequence",
+        "nodes": [
+          {
+            "id": "sample",
+            "kind": "video.lipsync",
+            "model_ref": "ltx-2.5-lipsync",
+            "inputs": {
+              "prompt": "The woman speaks naturally to the camera with small lip movements and a stable head.",
+              "image": "asset:ee266625e15e44c1892feaf3d8fc1c3c",
+              "audio": "asset:b5a5a939cfbe42b59585838a5800ffbc"
+            },
+            "params": {
+              "duration": 3.5,
+              "audio_start_time": 0,
+              "audio_stem_auto": false,
+              "width": 384,
+              "height": 640,
+              "quality": "balanced",
+              "max_part_seconds": 3
+            },
+            "seed": 72819,
+            "tier": "draft"
+          }
+        ]
+      },
+      "elapsed_sec": 214.14,
+      "jobs": [
+        {
+          "id": "102bf5540da245a0840e2e9c0c9738bf",
+          "status": "completed",
+          "progress": 1.0,
+          "error_code": null,
+          "error": null
+        },
+        {
+          "id": "afb9f126554a4d2886ae63ab3491551e",
+          "status": "completed",
+          "progress": 1.0,
+          "error_code": null,
+          "error": null
+        },
+        {
+          "id": "2d5259d8b30c4bcdbbd08cabb393f73b",
+          "status": "completed",
+          "progress": 1.0,
+          "error_code": null,
+          "error": null
+        },
+        {
+          "id": "beebed41379341308152ff4e36ceb3ef",
+          "status": "completed",
+          "progress": 1.0,
+          "error_code": null,
+          "error": null
+        }
+      ],
+      "artifact": {
+        "id": "68b3c8c4fc4047e8b82320186552477b",
+        "path": "projects/_unassigned/media/compose.assemble/beebed41379341308152ff4e36ceb3ef.mp4",
+        "probe": {
+          "duration_sec": 3.5,
+          "width": 384,
+          "height": 640,
+          "fps": 24.0,
+          "has_audio": true,
+          "has_video": true,
+          "format_name": "mov,mp4,m4a,3gp,3g2,mj2"
+        }
+      },
+      "nodes": [
+        {
+          "run_id": "82492ddc03c246a8a9361e32902f21a1",
+          "node_id": "sample",
+          "status": "succeeded",
+          "attempt": 1,
+          "job_id": null,
+          "outputs": {
+            "main": "68b3c8c4fc4047e8b82320186552477b"
+          },
+          "reason": "",
+          "revision": 3
+        },
+        {
+          "run_id": "82492ddc03c246a8a9361e32902f21a1",
+          "node_id": "sample__render_0",
+          "status": "succeeded",
+          "attempt": 1,
+          "job_id": "102bf5540da245a0840e2e9c0c9738bf",
+          "outputs": {
+            "main": "3cc9656582a74ca2a775ee283b88d0c6"
+          },
+          "reason": "",
+          "revision": 3
+        },
+        {
+          "run_id": "82492ddc03c246a8a9361e32902f21a1",
+          "node_id": "sample__anchor_1",
+          "status": "succeeded",
+          "attempt": 1,
+          "job_id": "afb9f126554a4d2886ae63ab3491551e",
+          "outputs": {
+            "main": "cf480c78f4274ddf85964f60e531ae7f"
+          },
+          "reason": "",
+          "revision": 3
+        },
+        {
+          "run_id": "82492ddc03c246a8a9361e32902f21a1",
+          "node_id": "sample__render_1",
+          "status": "succeeded",
+          "attempt": 1,
+          "job_id": "2d5259d8b30c4bcdbbd08cabb393f73b",
+          "outputs": {
+            "main": "60061d0a857f436ba78ce93a69254c38"
+          },
+          "reason": "",
+          "revision": 3
+        },
+        {
+          "run_id": "82492ddc03c246a8a9361e32902f21a1",
+          "node_id": "sample__stitch_2",
+          "status": "succeeded",
+          "attempt": 1,
+          "job_id": "beebed41379341308152ff4e36ceb3ef",
+          "outputs": {
+            "main": "68b3c8c4fc4047e8b82320186552477b"
+          },
+          "reason": "",
+          "revision": 3
+        }
+      ],
+      "qc_error": "video stream 3.375 seconds shorter than audio/container 3.5 seconds"
+    }
+  ]
+}

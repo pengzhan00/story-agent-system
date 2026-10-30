@@ -1,0 +1,30 @@
+{
+  "a2v": {
+    "samples_compared": 32000,
+    "audio_correlation": 0.9991872949149155,
+    "rms_gain_ratio": 0.9973257916318974,
+    "final_duration": 2.0,
+    "original_audio_verified": true
+  },
+  "a2v_sequence": {
+    "samples_compared": 56000,
+    "audio_correlation": 0.999352483873887,
+    "rms_gain_ratio": 0.9973097116045169,
+    "final_duration": 3.5,
+    "original_audio_verified": true
+  },
+  "sequence_renders": [
+    {
+      "node_id": "sample__render_0",
+      "job_id": "e418869892ab462fa01f1e27fde53e83",
+      "audio_start_time": 0.0,
+      "frames": 73
+    },
+    {
+      "node_id": "sample__render_1",
+      "job_id": "cce78f84caac4c71998005157a7b7810",
+      "audio_start_time": 3.0,
+      "frames": 17
+    }
+  ]
+}

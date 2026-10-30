@@ -21,11 +21,13 @@ Params:  duration (seconds), steps, cfg, sampler_name, scheduler, checkpoint, te
          ref_megapixels (size the references are scaled to; smaller = faster)
 The template name is ``workflow`` of the model entry; the job seed becomes the sampler seed.
 """
+
 from __future__ import annotations
 
 import copy
 import json
 import random
+import re
 import urllib.parse
 from pathlib import Path
 from typing import Any
@@ -48,9 +50,19 @@ from ..contracts import (
 from ._http import ServiceClient
 
 KINDS = (
-    MediaKind.IMAGE_GENERATE, MediaKind.IMAGE_EDIT, MediaKind.VIDEO_GENERATE, MediaKind.VIDEO_AV,
-    MediaKind.VIDEO_ENHANCE, MediaKind.AUDIO_MUSIC, MediaKind.AUDIO_SFX, MediaKind.AUDIO_TTS,
-    MediaKind.AUDIO_CONVERT, MediaKind.AUDIO_ENHANCE,
+    MediaKind.IMAGE_GENERATE,
+    MediaKind.IMAGE_EDIT,
+    MediaKind.VIDEO_GENERATE,
+    MediaKind.VIDEO_AV,
+    MediaKind.VIDEO_ENHANCE,
+    MediaKind.AUDIO_MUSIC,
+    MediaKind.AUDIO_SFX,
+    MediaKind.AUDIO_TTS,
+    MediaKind.AUDIO_CONVERT,
+    MediaKind.AUDIO_ENHANCE,
+    MediaKind.VIDEO_LIPSYNC,
+    MediaKind.VIDEO_AVATAR,
+    MediaKind.AUDIO_SEPARATE,
 )
 IMAGE_EXT = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
 AUDIO_EXT = {".wav", ".mp3", ".flac", ".ogg", ".m4a"}
@@ -76,8 +88,12 @@ SCHEMA: dict[str, dict[str, Any]] = {
     "denoise": {"type": "float", "min": 0, "max": 1},
 }
 _FILE_NODES = {
-    "CheckpointLoaderSimple": "ckpt_name", "CLIPLoader": "clip_name", "VAELoader": "vae_name",
-    "UNETLoader": "unet_name", "LoraLoader": "lora_name", "CLIPVisionLoader": "clip_name",
+    "CheckpointLoaderSimple": "ckpt_name",
+    "CLIPLoader": "clip_name",
+    "VAELoader": "vae_name",
+    "UNETLoader": "unet_name",
+    "LoraLoader": "lora_name",
+    "CLIPVisionLoader": "clip_name",
 }
 _PLACEHOLDER = "reference-not-uploaded-yet.png"
 
@@ -91,24 +107,51 @@ def load_template(name: str, user_dir: Path | None = None) -> dict[str, Any]:
     try:
         data: dict[str, Any] = json.loads(path.read_text("utf-8"))
     except ValueError as exc:
-        raise AdapterError(ErrorCode.INVALID_INPUT, f"workflow template {name!r} is not valid JSON",
-                           detail=str(exc)[:200]) from exc
+        raise AdapterError(
+            ErrorCode.INVALID_INPUT, f"workflow template {name!r} is not valid JSON", detail=str(exc)[:200]
+        ) from exc
+    if "outputs" in data:
+        outputs = data["outputs"]
+        if not isinstance(outputs, dict) or "main" not in outputs:
+            raise AdapterError(ErrorCode.INVALID_INPUT, "Declared outputs require a main port")
+        for port, spec in outputs.items():
+            if (
+                not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", port)
+                or not isinstance(spec, dict)
+                or "node" not in spec
+                or spec.get("type", "images") not in OUTPUT_KEYS
+                or not isinstance(spec.get("index", 0), int)
+                or spec.get("index", 0) < 0
+                or (spec.get("kind") and spec["kind"] not in {k.value for k in MediaKind})
+            ):
+                raise AdapterError(ErrorCode.INVALID_INPUT, "Invalid declared output port")
     return data
 
 
 class ComfyAdapter(AdapterBase):
     provider = "comfy"
 
-    def __init__(self, client: ServiceClient, workflows: dict[str, str] | None = None,
-                 poll_interval_sec: float = 2.0, user_dir: Path | None = None) -> None:
+    def __init__(
+        self,
+        client: ServiceClient,
+        workflows: dict[str, str] | None = None,
+        poll_interval_sec: float = 2.0,
+        user_dir: Path | None = None,
+    ) -> None:
         self.client = client
         self.poll_interval_sec = poll_interval_sec
         self.user_dir = user_dir
-        self._workflows = workflows or {}        # model_ref -> template name
+        self._workflows = workflows or {}  # model_ref -> template name
 
     def capabilities(self) -> Capabilities:
-        return Capabilities(kinds=KINDS, heavy=False, supports_cancel=False, supports_reattach=True,
-                            param_schema=SCHEMA, poll_interval_sec=self.poll_interval_sec)
+        return Capabilities(
+            kinds=KINDS,
+            heavy=False,
+            supports_cancel=False,
+            supports_reattach=True,
+            param_schema=SCHEMA,
+            poll_interval_sec=self.poll_interval_sec,
+        )
 
     def template(self, job: JobRecord) -> dict[str, Any]:
         return load_template(self._workflows.get(job.model_ref) or "", self.user_dir)
@@ -139,36 +182,66 @@ class ComfyAdapter(AdapterBase):
         if "prompt" in bindings and not str(job.inputs.get("prompt", "")).strip():
             return [ValidationIssue(ErrorCode.INVALID_INPUT, "needs a prompt", {"detail": "prompt empty"})]
         issues: list[ValidationIssue] = []
-        images, audios = self._refs(job, ctx), self._audio_refs(job, ctx)
-        for ref in (*images, *audios):
+        images, audios, videos = self._refs(job, ctx), self._audio_refs(job, ctx), self._video_refs(job, ctx)
+        for ref in (*images, *audios, *videos):
             if not ref.is_file():
-                issues.append(ValidationIssue(ErrorCode.INVALID_INPUT, f"reference file not found: {ref}",
-                                              {"detail": str(ref)}))
+                issues.append(
+                    ValidationIssue(ErrorCode.INVALID_INPUT, f"reference file not found: {ref}", {"detail": str(ref)})
+                )
         if (job.kind is MediaKind.IMAGE_EDIT or "ref_image" in bindings) and not images:
-            issues.append(ValidationIssue(ErrorCode.INVALID_INPUT, f"{job.kind.value} needs at least one image in refs",
-                                          {"detail": "refs empty"}))
+            issues.append(
+                ValidationIssue(
+                    ErrorCode.INVALID_INPUT,
+                    f"{job.kind.value} needs at least one image in refs",
+                    {"detail": "refs empty"},
+                )
+            )
         if "ref_audio" in bindings and not audios:
-            issues.append(ValidationIssue(ErrorCode.INVALID_INPUT, "this workflow needs an audio file in refs",
-                                          {"detail": "audio refs empty"}))
+            issues.append(
+                ValidationIssue(
+                    ErrorCode.INVALID_INPUT, "this workflow needs an audio file in refs", {"detail": "audio refs empty"}
+                )
+            )
+        if "ref_video" in bindings and not videos:
+            issues.append(
+                ValidationIssue(
+                    ErrorCode.INVALID_INPUT, "this workflow needs a video reference", {"detail": "video refs empty"}
+                )
+            )
+        for prefix, files in (("ref_image", images), ("ref_audio", audios), ("ref_video", videos)):
+            for key in bindings:
+                if (
+                    key.startswith(prefix + "_")
+                    and key[len(prefix) + 1 :].isdigit()
+                    and int(key[len(prefix) + 1 :]) > len(files)
+                ):
+                    issues.append(ValidationIssue(ErrorCode.INVALID_INPUT, f"Missing workflow input {key}"))
         for dim in ("width", "height"):
             if dim in job.params and int(job.params[dim]) % 16:
-                issues.append(ValidationIssue(ErrorCode.INVALID_PARAMS, f"{dim} must be a multiple of 16",
-                                              {"detail": f"{dim}={job.params[dim]}"}))
+                issues.append(
+                    ValidationIssue(
+                        ErrorCode.INVALID_PARAMS,
+                        f"{dim} must be a multiple of 16",
+                        {"detail": f"{dim}={job.params[dim]}"},
+                    )
+                )
         if issues:
             return issues
         try:
-            graph = self._graph(job, tpl, [_PLACEHOLDER] * len(images), [_PLACEHOLDER] * len(audios))
+            graph = self._graph(
+                job, tpl, [_PLACEHOLDER] * len(images), [_PLACEHOLDER] * len(audios), [_PLACEHOLDER] * len(videos)
+            )
             for node in graph.values():
                 cls = node["class_type"]
                 field = _FILE_NODES.get(cls, "")
                 avail = self._available(cls, field)
                 have = node["inputs"].get(field) if field else None
                 if avail is None:
-                    issues.append(ValidationIssue(ErrorCode.MISSING_TOOL, f"ComfyUI has no node {cls}",
-                                                  {"tool": cls}))
+                    issues.append(ValidationIssue(ErrorCode.MISSING_TOOL, f"ComfyUI has no node {cls}", {"tool": cls}))
                 elif isinstance(have, str) and have not in avail:
-                    issues.append(ValidationIssue(ErrorCode.MISSING_MODEL, f"{have} is not in ComfyUI",
-                                                  {"model": have}))
+                    issues.append(
+                        ValidationIssue(ErrorCode.MISSING_MODEL, f"{have} is not in ComfyUI", {"model": have})
+                    )
             return issues
         except AdapterError as exc:
             return [ValidationIssue(exc.code, exc.message, exc.params)]
@@ -176,10 +249,20 @@ class ComfyAdapter(AdapterBase):
     @staticmethod
     def _files(job: JobRecord, ctx: JobContext, extensions: set[str]) -> list[Path]:
         out: list[Path] = []
-        for raw in job.inputs.get("refs", []):
+        candidates = list(job.inputs.get("refs", []))
+        candidates += [
+            job.inputs[k]
+            for k in ("image", "audio", "video", "source_audio", "parent_audio", "source_video")
+            if job.inputs.get(k)
+        ]
+        for raw in candidates:
+            if isinstance(raw, dict):
+                raw = raw.get("path")
             if isinstance(raw, str) and Path(raw).suffix.lower() in extensions:
                 p = Path(raw).expanduser()
-                out.append(p if p.is_absolute() else ctx.settings.home / p)
+                path = p if p.is_absolute() else ctx.settings.home / p
+                if path not in out:
+                    out.append(path)
         return out
 
     def _refs(self, job: JobRecord, ctx: JobContext) -> list[Path]:
@@ -188,43 +271,65 @@ class ComfyAdapter(AdapterBase):
     def _audio_refs(self, job: JobRecord, ctx: JobContext) -> list[Path]:
         return self._files(job, ctx, AUDIO_EXT)
 
+    def _video_refs(self, job: JobRecord, ctx: JobContext) -> list[Path]:
+        return self._files(job, ctx, VIDEO_EXT)
+
     @staticmethod
     def _chain_references(graph: dict[str, Any], block: dict[str, Any], uploaded: list[str], megapixels: float) -> None:
         """Append one LoadImage -> scale -> VAEEncode -> ReferenceLatent link per reference to the conditioning."""
         prev: list[Any] = [block["conditioning"], 0]
         for i, name in enumerate(uploaded):
             graph[f"ref{i}_load"] = {"class_type": "LoadImage", "inputs": {"image": name}}
-            graph[f"ref{i}_scale"] = {"class_type": "ImageScaleToTotalPixels",
-                                      "inputs": {"image": [f"ref{i}_load", 0], "upscale_method": "lanczos",
-                                                 "megapixels": megapixels, "resolution_steps": 16}}
-            graph[f"ref{i}_vae"] = {"class_type": "VAEEncode",
-                                    "inputs": {"pixels": [f"ref{i}_scale", 0], "vae": list(block["vae"])}}
-            graph[f"ref{i}_ref"] = {"class_type": "ReferenceLatent",
-                                    "inputs": {"conditioning": prev, "latent": [f"ref{i}_vae", 0]}}
+            graph[f"ref{i}_scale"] = {
+                "class_type": "ImageScaleToTotalPixels",
+                "inputs": {
+                    "image": [f"ref{i}_load", 0],
+                    "upscale_method": "lanczos",
+                    "megapixels": megapixels,
+                    "resolution_steps": 16,
+                },
+            }
+            graph[f"ref{i}_vae"] = {
+                "class_type": "VAEEncode",
+                "inputs": {"pixels": [f"ref{i}_scale", 0], "vae": list(block["vae"])},
+            }
+            graph[f"ref{i}_ref"] = {
+                "class_type": "ReferenceLatent",
+                "inputs": {"conditioning": prev, "latent": [f"ref{i}_vae", 0]},
+            }
             prev = [f"ref{i}_ref", 0]
         node, field = block["consumer"]
         graph[node]["inputs"][field] = prev
 
-    def _graph(self, job: JobRecord, tpl: dict[str, Any], uploaded: list[str] | None = None,
-               uploaded_audio: list[str] | None = None) -> dict[str, Any]:
+    def _graph(
+        self,
+        job: JobRecord,
+        tpl: dict[str, Any],
+        uploaded: list[str] | None = None,
+        uploaded_audio: list[str] | None = None,
+        uploaded_video: list[str] | None = None,
+    ) -> dict[str, Any]:
         graph = copy.deepcopy(tpl["graph"])
         bindings: dict[str, list[str]] = tpl["bindings"]
-        values: dict[str, Any] = {"prompt": str(job.inputs.get("prompt", "")),
-                                  "seed": job.seed if job.seed is not None else random.randint(0, 2**32 - 1)}
-        if str(job.inputs.get("negative_prompt", "")).strip():       # else the template's own default stays
+        values: dict[str, Any] = {
+            "prompt": str(job.inputs.get("prompt", "")),
+            "seed": job.seed if job.seed is not None else random.randint(0, 2**32 - 1),
+        }
+        if str(job.inputs.get("negative_prompt", "")).strip():  # else the template's own default stays
             values["negative_prompt"] = str(job.inputs["negative_prompt"])
-        if str(job.inputs.get("text", "")).strip():                  # lyrics / the words to speak
+        if str(job.inputs.get("text", "")).strip():  # lyrics / the words to speak
             values["text"] = str(job.inputs["text"])
         for i, name in enumerate(uploaded or []):
             values["ref_image" if i == 0 else f"ref_image_{i + 1}"] = name
-        if uploaded_audio:
-            values["ref_audio"] = uploaded_audio[0]
+        for prefix, names in (("ref_audio", uploaded_audio), ("ref_video", uploaded_video)):
+            for i, name in enumerate(names or []):
+                values[prefix if i == 0 else f"{prefix}_{i + 1}"] = name
         for key, value in job.params.items():
             values[_RENAME.get(key, key)] = value
         for name, value in values.items():
             if name in bindings:
                 targets = bindings[name]
-                for node, field in (targets if isinstance(targets[0], list) else [targets]):
+                for node, field in targets if isinstance(targets[0], list) else [targets]:
                     graph[node]["inputs"][field] = value
         if uploaded and tpl.get("references"):
             self._chain_references(graph, tpl["references"], uploaded, float(values.get("ref_megapixels", 1.0)))
@@ -233,20 +338,33 @@ class ComfyAdapter(AdapterBase):
     def submit(self, job: JobRecord, ctx: JobContext) -> str:
         uploaded = [self._upload(job, i, path) for i, path in enumerate(self._refs(job, ctx))]
         uploaded_audio = [self._upload(job, i, path, "a") for i, path in enumerate(self._audio_refs(job, ctx))]
-        body = self.client.json("POST", "/prompt", json={
-            "prompt": self._graph(job, self.template(job), uploaded, uploaded_audio)})
+        uploaded_video = [self._upload(job, i, path, "v") for i, path in enumerate(self._video_refs(job, ctx))]
+        body = self.client.json(
+            "POST",
+            "/prompt",
+            json={"prompt": self._graph(job, self.template(job), uploaded, uploaded_audio, uploaded_video)},
+        )
         prompt_id = (body or {}).get("prompt_id")
         if not prompt_id:
-            raise AdapterError(ErrorCode.SERVICE_REJECTED, f"no prompt_id in {str(body)[:200]}",
-                               service=self.client.service.name, detail="no prompt_id")
+            raise AdapterError(
+                ErrorCode.SERVICE_REJECTED,
+                f"no prompt_id in {str(body)[:200]}",
+                service=self.client.service.name,
+                detail="no prompt_id",
+            )
         return str(prompt_id)
 
     def _upload(self, job: JobRecord, index: int, path: Path, tag: str = "") -> str:
         """Put a reference file into ComfyUI's input folder (a name unique to the job) and return its name."""
         name = f"storyagent_{job.id[:12]}_{tag}{index}{path.suffix.lower()}"
         with path.open("rb") as fh:
-            body = self.client.json("POST", "/upload/image", files={"image": (name, fh)},
-                                    data={"type": "input", "overwrite": "true"}, timeout=60)
+            body = self.client.json(
+                "POST",
+                "/upload/image",
+                files={"image": (name, fh)},
+                data={"type": "input", "overwrite": "true"},
+                timeout=60,
+            )
         return str((body or {}).get("name") or name)
 
     def _history(self, external_id: str) -> dict[str, Any] | None:
@@ -281,11 +399,41 @@ class ComfyAdapter(AdapterBase):
         try:
             self.client.request("POST", "/free", json={"unload_models": True, "free_memory": True}, timeout=15)
         except AdapterError:
-            pass          # best effort: the clip is made; a server without /free just keeps its cache
+            pass  # best effort: the clip is made; a server without /free just keeps its cache
 
     def fetch(self, external_id: str, job: JobRecord, ctx: JobContext) -> list[ArtifactSpec]:
         entry = self._history(external_id) or {}
         tpl = self.template(job)
+        if isinstance(tpl.get("outputs"), dict):
+            artifacts: list[ArtifactSpec] = []
+            for port, spec in tpl["outputs"].items():
+                key = str(spec.get("type", "images"))
+                items = entry.get("outputs", {}).get(str(spec["node"]), {}).get(key, [])
+                index = int(spec.get("index", 0))
+                if key not in OUTPUT_KEYS or index < 0 or index >= len(items):
+                    raise AdapterError(ErrorCode.OUTPUT_MISSING, f"Missing declared output {port}")
+                item = items[index]
+                suffix = Path(item["filename"]).suffix.lower()
+                query = urllib.parse.urlencode(
+                    {
+                        "filename": item["filename"],
+                        "subfolder": item.get("subfolder", ""),
+                        "type": item.get("type", "output"),
+                    }
+                )
+                dest = self.client.download(f"/view?{query}", ctx.work_dir / f"output-{len(artifacts)}{suffix}")
+                artifacts.append(
+                    ArtifactSpec(
+                        dest,
+                        slot=None if port == "main" else port,
+                        kind=MediaKind(spec["kind"]) if spec.get("kind") else None,
+                        metadata={"prompt_id": external_id, "port": port},
+                    )
+                )
+            if not artifacts:
+                raise AdapterError(ErrorCode.OUTPUT_MISSING, "No declared workflow outputs")
+            self._release()
+            return artifacts
         out_node = str(tpl.get("output", ""))
         wanted = tpl.get("output_type", "audio")
         keys = [wanted] if isinstance(wanted, str) else [str(k) for k in wanted]
@@ -305,9 +453,22 @@ class ComfyAdapter(AdapterBase):
             stem = "sfx" if job.kind is MediaKind.AUDIO_SFX else "audio"
         else:
             stem = "video" if suffix in VIDEO_EXT else "image"
-        query = urllib.parse.urlencode({"filename": first["filename"], "subfolder": first.get("subfolder", ""),
-                                        "type": first.get("type", "output")})
+        query = urllib.parse.urlencode(
+            {
+                "filename": first["filename"],
+                "subfolder": first.get("subfolder", ""),
+                "type": first.get("type", "output"),
+            }
+        )
         dest = self.client.download(f"/view?{query}", ctx.work_dir / f"{stem}{suffix}")
         self._release()
-        return [ArtifactSpec(dest, metadata={"prompt_id": external_id, "workflow": self._workflows.get(job.model_ref),
-                                             "prompt": str(job.inputs.get("prompt", ""))[:500]})]
+        return [
+            ArtifactSpec(
+                dest,
+                metadata={
+                    "prompt_id": external_id,
+                    "workflow": self._workflows.get(job.model_ref),
+                    "prompt": str(job.inputs.get("prompt", ""))[:500],
+                },
+            )
+        ]

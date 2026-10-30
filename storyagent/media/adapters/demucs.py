@@ -8,6 +8,7 @@ Inputs: ``audio`` (a file path; falls back to the first audio entry of ``refs``)
 Params: ``model`` (``htdemucs`` by default, also ``htdemucs_ft`` / ``mdx_extra`` ...), ``device`` (``mps`` | ``cpu``).
 Outputs: ``main`` = the vocals, ``accompaniment`` = everything else (Demucs' ``no_vocals.wav``).
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -58,8 +59,12 @@ class DemucsAdapter(SubprocessAdapter):
 
     def capabilities(self) -> Capabilities:
         return Capabilities(
-            kinds=(MediaKind.AUDIO_SEPARATE,), heavy=False, supports_cancel=True, supports_reattach=False,
-            param_schema=SCHEMA, poll_interval_sec=self.poll_interval_sec,
+            kinds=(MediaKind.AUDIO_SEPARATE,),
+            heavy=False,
+            supports_cancel=True,
+            supports_reattach=False,
+            param_schema=SCHEMA,
+            poll_interval_sec=self.poll_interval_sec,
         )
 
     @staticmethod
@@ -68,18 +73,39 @@ class DemucsAdapter(SubprocessAdapter):
 
     @staticmethod
     def _entry(job: JobRecord, ctx: JobContext) -> dict[str, Any]:
-        return dict(ctx.settings.models[job.model_ref].extra) if job.model_ref in ctx.settings.models else {}
+        entry = dict(ctx.settings.models[job.model_ref].extra) if job.model_ref in ctx.settings.models else {}
+        nested = entry.pop("extra", {})
+        return {**(nested if isinstance(nested, dict) else {}), **entry}
+
+    def _repo(self, job: JobRecord, ctx: JobContext) -> Path | None:
+        raw = job.params.get("model_dir") or self._entry(job, ctx).get("model_dir")
+        if not raw:
+            return None
+        path = Path(str(raw)).expanduser()
+        return path if path.is_absolute() else ctx.settings.home / path
 
     def health(self) -> HealthReport:
         return HealthReport(HealthState.OK, "Demucs")
 
     def validate(self, job: JobRecord, ctx: JobContext) -> list[ValidationIssue]:
         if self._python(ctx) is None:
-            return [ValidationIssue(ErrorCode.MISSING_TOOL, "Demucs runtime not found (the Seed-VC venv carries it)",
-                                    {"tool": "demucs"})]
+            return [
+                ValidationIssue(
+                    ErrorCode.MISSING_TOOL, "Demucs runtime not found (the Seed-VC venv carries it)", {"tool": "demucs"}
+                )
+            ]
         src = source_of(job, ctx)
         if src is None or not src.is_file():
             return [ValidationIssue(ErrorCode.INVALID_INPUT, f"source audio not found: {src}", {"detail": "audio"})]
+        repo = self._repo(job, ctx)
+        if repo is not None and (not repo.is_dir() or not any(repo.glob("*.th"))):
+            return [
+                ValidationIssue(
+                    ErrorCode.MISSING_MODEL,
+                    "Local Demucs repository needs PyTorch .th checkpoints",
+                    {"model": "htdemucs"},
+                )
+            ]
         return []
 
     def command(self, job: JobRecord, ctx: JobContext) -> Command:
@@ -90,13 +116,21 @@ class DemucsAdapter(SubprocessAdapter):
         p = job.params
         ctx.work_dir.mkdir(parents=True, exist_ok=True)
         out = ctx.work_dir / "sep"
-        argv = [str(python), "-m", "demucs.separate", "--two-stems=vocals",
-                "-n", str(p.get("model") or DEFAULT_MODEL),
-                "-d", str(p.get("device") or DEFAULT_DEVICE), "-o", str(out)]
-        repo = p.get("model_dir") or self._entry(job, ctx).get("model_dir")
-        if repo:                      # a local folder of weights instead of the HF cache (--repo)
-            rp = Path(str(repo)).expanduser()
-            argv += ["--repo", str(rp if rp.is_absolute() else ctx.settings.home / rp)]
+        argv = [
+            str(python),
+            "-m",
+            "demucs.separate",
+            "--two-stems=vocals",
+            "-n",
+            str(p.get("model") or DEFAULT_MODEL),
+            "-d",
+            str(p.get("device") or DEFAULT_DEVICE),
+            "-o",
+            str(out),
+        ]
+        repo = self._repo(job, ctx)
+        if repo is not None:  # a local folder of weights instead of the HF cache (--repo)
+            argv += ["--repo", str(repo)]
         argv.append(str(src))
         return Command(argv)
 
@@ -108,5 +142,7 @@ class DemucsAdapter(SubprocessAdapter):
         if not vocals or not rest:
             raise AdapterError(ErrorCode.OUTPUT_MISSING, "Demucs wrote no vocals/no_vocals stems")
         model = str(job.params.get("model") or DEFAULT_MODEL)
-        return [ArtifactSpec(vocals[0], metadata={"stem": "vocals", "model": model}),
-                ArtifactSpec(rest[0], slot="accompaniment", metadata={"stem": "no_vocals", "model": model})]
+        return [
+            ArtifactSpec(vocals[0], metadata={"stem": "vocals", "model": model}),
+            ArtifactSpec(rest[0], slot="accompaniment", metadata={"stem": "no_vocals", "model": model}),
+        ]

@@ -82,7 +82,7 @@ def test_every_module_kind_has_a_default_model_and_an_output() -> None:
 def test_modules_describe_models_params_and_inputs(api: TestClient) -> None:
     mods = {m["id"]: m for m in api.get("/api/workshop").json()}
     assert set(mods) == {"story", "script", "image", "lora", "song", "voice", "separate", "video", "episode",
-                        "transcript", "post"}
+                        "transcript", "post", "sound"}
     gen = next(k for k in mods["image"]["kinds"] if k["kind"] == "image.generate")
     assert any(m["ref"] == "fake-image" for m in gen["models"])
     assert [f["name"] for f in gen["inputs"]][:2] == ["prompt", "negative_prompt"] and gen["output"] == "image"
@@ -330,3 +330,11 @@ def test_an_episode_is_assembled_from_rows_of_picture_line_and_voice(api: TestCl
     bad = {"kind": "compose.assemble", "inputs": {"shots": [{"video": "asset:nope"}]}}
     unknown = api.post("/api/workshop/run", json=bad)
     assert unknown.status_code == 422 and unknown.json()["error"]["code"] == "workshop_bad_value"
+
+
+def test_packaged_creative_models_all_have_workshop_input_contracts():
+    """Delivery is an export action; every creative model must have a callable descriptor."""
+    settings = load_settings({"STORY_AGENT_HOME": "/nonexistent-home"})
+    creative_kinds = {m.kind for m in settings.models.values()} - {MediaKind.COMPOSE_DELIVER.value}
+    for kind in creative_kinds:
+        assert kind_spec(kind).kind.value == kind

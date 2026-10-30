@@ -1,0 +1,16 @@
+{
+  "job_id": "3f9a0bbec5ad46c6b18a30351d0d0a24",
+  "status": "completed",
+  "error": null,
+  "artifacts": [
+    {
+      "id": "38a5f51646034c589c178cab7e95a4ce",
+      "path": "projects/_unassigned/media/image.generate/3f9a0bbec5ad46c6b18a30351d0d0a24.png",
+      "metadata": {
+        "anchor_time_s": 1.625,
+        "audio_start_time": 1.625,
+        "panel_anchor": "/Users/pengzhan/pinokio/api/phosphene/panel_uploads/1793311468655_continue_anchor.png"
+      }
+    }
+  ]
+}

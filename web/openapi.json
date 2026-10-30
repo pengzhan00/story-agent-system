@@ -1,6 +1,53 @@
 {
   "components": {
     "schemas": {
+      "ActionIn": {
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "evidence": {
+            "default": "",
+            "maxLength": 10000,
+            "title": "Evidence",
+            "type": "string"
+          },
+          "external_id": {
+            "default": "",
+            "maxLength": 500,
+            "title": "External Id",
+            "type": "string"
+          },
+          "node_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node Id"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "title": "ActionIn",
+        "type": "object"
+      },
       "AgeClaimBody": {
         "properties": {
           "birth_date": {
@@ -765,6 +812,44 @@
         "title": "CancelResult",
         "type": "object"
       },
+      "CategoryIn": {
+        "properties": {
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "CategoryIn",
+        "type": "object"
+      },
+      "CategoryOut": {
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "enabled"
+        ],
+        "title": "CategoryOut",
+        "type": "object"
+      },
       "CliBuildRequest": {
         "properties": {
           "cwd": {
@@ -1124,6 +1209,234 @@
           "ratings"
         ],
         "title": "ContentStatusOut",
+        "type": "object"
+      },
+      "ControlEventOut": {
+        "properties": {
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "data": {
+            "title": "Data",
+            "type": "string"
+          },
+          "event": {
+            "title": "Event",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "node_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node Id"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "run_id",
+          "node_id",
+          "event",
+          "data",
+          "actor",
+          "created_at"
+        ],
+        "title": "ControlEventOut",
+        "type": "object"
+      },
+      "ControlNodeOut": {
+        "properties": {
+          "attempt": {
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "node_id": {
+            "title": "Node Id",
+            "type": "string"
+          },
+          "outputs": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Outputs",
+            "type": "object"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "node_id",
+          "status",
+          "attempt",
+          "job_id",
+          "outputs",
+          "reason",
+          "revision"
+        ],
+        "title": "ControlNodeOut",
+        "type": "object"
+      },
+      "ControlRunListOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ControlRunOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "items"
+        ],
+        "title": "ControlRunListOut",
+        "type": "object"
+      },
+      "ControlRunOut": {
+        "properties": {
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "cancel_requested": {
+            "title": "Cancel Requested",
+            "type": "boolean"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "digest": {
+            "title": "Digest",
+            "type": "string"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/ControlEventOut"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/ControlNodeOut"
+            },
+            "title": "Nodes",
+            "type": "array"
+          },
+          "plan": {
+            "additionalProperties": true,
+            "title": "Plan",
+            "type": "object"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "request_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Key"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "name",
+          "plan",
+          "digest",
+          "request_key",
+          "status",
+          "cancel_requested",
+          "actor",
+          "revision",
+          "created_at",
+          "updated_at",
+          "nodes",
+          "events"
+        ],
+        "title": "ControlRunOut",
         "type": "object"
       },
       "DeliveryBody": {
@@ -1681,6 +1994,148 @@
           "fix"
         ],
         "title": "GrammarViolationOut",
+        "type": "object"
+      },
+      "GraphNodeIn-Input": {
+        "properties": {
+          "depends_on": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Depends On",
+            "type": "array"
+          },
+          "id": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "inputs": {
+            "additionalProperties": true,
+            "title": "Inputs",
+            "type": "object"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "model_ref": {
+            "default": "",
+            "title": "Model Ref",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": true,
+            "title": "Params",
+            "type": "object"
+          },
+          "review": {
+            "default": false,
+            "title": "Review",
+            "type": "boolean"
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seed"
+          },
+          "skip": {
+            "default": false,
+            "title": "Skip",
+            "type": "boolean"
+          },
+          "tier": {
+            "$ref": "#/components/schemas/QualityTier",
+            "default": "final"
+          }
+        },
+        "required": [
+          "id",
+          "kind"
+        ],
+        "title": "GraphNodeIn",
+        "type": "object"
+      },
+      "GraphNodeIn-Output": {
+        "properties": {
+          "depends_on": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Depends On",
+            "type": "array"
+          },
+          "id": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "inputs": {
+            "additionalProperties": true,
+            "title": "Inputs",
+            "type": "object"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "model_ref": {
+            "default": "",
+            "title": "Model Ref",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": true,
+            "title": "Params",
+            "type": "object"
+          },
+          "review": {
+            "default": false,
+            "title": "Review",
+            "type": "boolean"
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seed"
+          },
+          "skip": {
+            "default": false,
+            "title": "Skip",
+            "type": "boolean"
+          },
+          "tier": {
+            "$ref": "#/components/schemas/QualityTier",
+            "default": "final"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "model_ref",
+          "tier",
+          "inputs",
+          "params",
+          "seed",
+          "review",
+          "skip",
+          "depends_on"
+        ],
+        "title": "GraphNodeIn",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -4075,6 +4530,153 @@
         "title": "PlanGate",
         "type": "object"
       },
+      "PlanIn-Input": {
+        "properties": {
+          "expected_digest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Digest"
+          },
+          "name": {
+            "default": "",
+            "maxLength": 200,
+            "title": "Name",
+            "type": "string"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/GraphNodeIn-Input"
+            },
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Nodes",
+            "type": "array"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "request_key": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Key"
+          },
+          "template_version": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Version"
+          }
+        },
+        "required": [
+          "nodes"
+        ],
+        "title": "PlanIn",
+        "type": "object"
+      },
+      "PlanIn-Output": {
+        "properties": {
+          "expected_digest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Digest"
+          },
+          "name": {
+            "default": "",
+            "maxLength": 200,
+            "title": "Name",
+            "type": "string"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/GraphNodeIn-Output"
+            },
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Nodes",
+            "type": "array"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "request_key": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Key"
+          },
+          "template_version": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Version"
+          }
+        },
+        "required": [
+          "name",
+          "project_id",
+          "nodes",
+          "request_key",
+          "expected_digest",
+          "template_version"
+        ],
+        "title": "PlanIn",
+        "type": "object"
+      },
       "PlanOut": {
         "properties": {
           "delivery_profile": {
@@ -4905,6 +5507,40 @@
         "title": "ProjectPatch",
         "type": "object"
       },
+      "ProjectPlanIn": {
+        "properties": {
+          "assemble": {
+            "default": false,
+            "title": "Assemble",
+            "type": "boolean"
+          },
+          "script_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Script Id",
+            "type": "integer"
+          },
+          "separate_vocals": {
+            "default": true,
+            "title": "Separate Vocals",
+            "type": "boolean"
+          },
+          "source_audio": {
+            "default": "",
+            "title": "Source Audio",
+            "type": "string"
+          },
+          "tail_policy": {
+            "default": "reject",
+            "title": "Tail Policy",
+            "type": "string"
+          }
+        },
+        "required": [
+          "script_id"
+        ],
+        "title": "ProjectPlanIn",
+        "type": "object"
+      },
       "ProjectSettingsPatch": {
         "description": "Merged into ``projects.settings``; a key set to null is removed.",
         "properties": {
@@ -5146,6 +5782,590 @@
           "model"
         ],
         "title": "PromptAssistOut",
+        "type": "object"
+      },
+      "PublicationClassification-Input": {
+        "properties": {
+          "content_type": {
+            "default": "",
+            "maxLength": 100,
+            "title": "Content Type",
+            "type": "string"
+          },
+          "episode": {
+            "default": "",
+            "maxLength": 100,
+            "title": "Episode",
+            "type": "string"
+          },
+          "purpose": {
+            "default": "",
+            "maxLength": 100,
+            "title": "Purpose",
+            "type": "string"
+          },
+          "series": {
+            "default": "",
+            "maxLength": 200,
+            "title": "Series",
+            "type": "string"
+          }
+        },
+        "title": "PublicationClassification",
+        "type": "object"
+      },
+      "PublicationClassification-Output": {
+        "properties": {
+          "content_type": {
+            "default": "",
+            "maxLength": 100,
+            "title": "Content Type",
+            "type": "string"
+          },
+          "episode": {
+            "default": "",
+            "maxLength": 100,
+            "title": "Episode",
+            "type": "string"
+          },
+          "purpose": {
+            "default": "",
+            "maxLength": 100,
+            "title": "Purpose",
+            "type": "string"
+          },
+          "series": {
+            "default": "",
+            "maxLength": 200,
+            "title": "Series",
+            "type": "string"
+          }
+        },
+        "required": [
+          "content_type",
+          "purpose",
+          "series",
+          "episode"
+        ],
+        "title": "PublicationClassification",
+        "type": "object"
+      },
+      "PublicationContentOut": {
+        "properties": {
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "classification": {
+            "$ref": "#/components/schemas/PublicationClassification-Output"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PublicationItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "publication_id": {
+            "title": "Publication Id",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "publication_id",
+          "revision",
+          "title",
+          "body",
+          "tags",
+          "items",
+          "actor",
+          "created_at",
+          "classification"
+        ],
+        "title": "PublicationContentOut",
+        "type": "object"
+      },
+      "PublicationEventOut": {
+        "properties": {
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "event": {
+            "title": "Event",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "publication_id": {
+            "title": "Publication Id",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "publication_id",
+          "revision",
+          "event",
+          "detail",
+          "actor",
+          "created_at"
+        ],
+        "title": "PublicationEventOut",
+        "type": "object"
+      },
+      "PublicationIn": {
+        "properties": {
+          "body": {
+            "default": "",
+            "maxLength": 50000,
+            "title": "Body",
+            "type": "string"
+          },
+          "category_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category Id"
+          },
+          "classification": {
+            "$ref": "#/components/schemas/PublicationClassification-Input"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PublicationItemIn"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "request_key": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Key"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision"
+          },
+          "scheduled_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scheduled At"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Tags",
+            "type": "array"
+          },
+          "target_id": {
+            "title": "Target Id",
+            "type": "string"
+          },
+          "timezone": {
+            "default": "UTC",
+            "title": "Timezone",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "target_id",
+          "title",
+          "items"
+        ],
+        "title": "PublicationIn",
+        "type": "object"
+      },
+      "PublicationItemIn": {
+        "properties": {
+          "asset_id": {
+            "maxLength": 32,
+            "minLength": 32,
+            "title": "Asset Id",
+            "type": "string"
+          },
+          "role": {
+            "default": "main",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "asset_id"
+        ],
+        "title": "PublicationItemIn",
+        "type": "object"
+      },
+      "PublicationItemOut": {
+        "properties": {
+          "asset_id": {
+            "title": "Asset Id",
+            "type": "string"
+          },
+          "duration_sec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Sec"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          }
+        },
+        "required": [
+          "asset_id",
+          "role",
+          "position",
+          "sha256",
+          "kind",
+          "duration_sec",
+          "width",
+          "height"
+        ],
+        "title": "PublicationItemOut",
+        "type": "object"
+      },
+      "PublicationListOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PublicationOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "items"
+        ],
+        "title": "PublicationListOut",
+        "type": "object"
+      },
+      "PublicationOut": {
+        "properties": {
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "actual_published_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Published At"
+          },
+          "category_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category Id"
+          },
+          "confirmation": {
+            "title": "Confirmation",
+            "type": "string"
+          },
+          "content": {
+            "$ref": "#/components/schemas/PublicationContentOut"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/PublicationEventOut"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "external_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Id"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "request_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Key"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "revisions": {
+            "items": {
+              "$ref": "#/components/schemas/PublicationContentOut"
+            },
+            "title": "Revisions",
+            "type": "array"
+          },
+          "scheduled_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scheduled At"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "target_id": {
+            "title": "Target Id",
+            "type": "string"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "target_id",
+          "project_id",
+          "category_id",
+          "status",
+          "revision",
+          "external_id",
+          "url",
+          "actual_published_at",
+          "scheduled_at",
+          "timezone",
+          "confirmation",
+          "actor",
+          "request_key",
+          "created_at",
+          "updated_at",
+          "revisions",
+          "content",
+          "events"
+        ],
+        "title": "PublicationOut",
+        "type": "object"
+      },
+      "PublicationStateIn": {
+        "properties": {
+          "actual_published_at": {
+            "default": "",
+            "title": "Actual Published At",
+            "type": "string"
+          },
+          "evidence": {
+            "default": "",
+            "maxLength": 10000,
+            "title": "Evidence",
+            "type": "string"
+          },
+          "external_id": {
+            "default": "",
+            "maxLength": 500,
+            "title": "External Id",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "scheduled_at": {
+            "default": "",
+            "title": "Scheduled At",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "url": {
+            "default": "",
+            "maxLength": 4000,
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "revision"
+        ],
+        "title": "PublicationStateIn",
         "type": "object"
       },
       "QualityTier": {
@@ -5947,6 +7167,47 @@
           "issues"
         ],
         "title": "ScriptReviewOut",
+        "type": "object"
+      },
+      "SelectionIn": {
+        "properties": {
+          "asset_id": {
+            "title": "Asset Id",
+            "type": "string"
+          },
+          "owner_id": {
+            "maxLength": 100,
+            "minLength": 1,
+            "pattern": "^[0-9]+$",
+            "title": "Owner Id",
+            "type": "string"
+          },
+          "owner_type": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Owner Type",
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 0.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "slot": {
+            "default": "main",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Slot",
+            "type": "string"
+          }
+        },
+        "required": [
+          "owner_type",
+          "owner_id",
+          "asset_id",
+          "revision"
+        ],
+        "title": "SelectionIn",
         "type": "object"
       },
       "SeriesBoardOut": {
@@ -7258,6 +8519,78 @@
           }
         },
         "title": "StopBody",
+        "type": "object"
+      },
+      "TargetIn": {
+        "properties": {
+          "account": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Account",
+            "type": "string"
+          },
+          "channel": {
+            "default": "",
+            "maxLength": 200,
+            "title": "Channel",
+            "type": "string"
+          },
+          "name": {
+            "default": "",
+            "maxLength": 200,
+            "title": "Name",
+            "type": "string"
+          },
+          "platform": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Platform",
+            "type": "string"
+          }
+        },
+        "required": [
+          "platform",
+          "account"
+        ],
+        "title": "TargetIn",
+        "type": "object"
+      },
+      "TargetOut": {
+        "properties": {
+          "account": {
+            "title": "Account",
+            "type": "string"
+          },
+          "channel": {
+            "title": "Channel",
+            "type": "string"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "platform": {
+            "title": "Platform",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "platform",
+          "account",
+          "channel",
+          "name",
+          "enabled"
+        ],
+        "title": "TargetOut",
         "type": "object"
       },
       "TextEdit": {
@@ -10232,6 +11565,50 @@
         ]
       }
     },
+    "/api/assets/{aid}/relations": {
+      "get": {
+        "operationId": "relations_api_assets__aid__relations_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "aid",
+            "required": true,
+            "schema": {
+              "title": "Aid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Relations Api Assets  Aid  Relations Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Relations",
+        "tags": [
+          "control-center"
+        ]
+      }
+    },
     "/api/assets/{asset_id}": {
       "get": {
         "operationId": "get_asset_api_assets__asset_id__get",
@@ -10970,6 +12347,60 @@
         ]
       }
     },
+    "/api/capabilities": {
+      "get": {
+        "operationId": "capabilities_api_capabilities_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "project_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Capabilities Api Capabilities Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Capabilities",
+        "tags": [
+          "control-center"
+        ]
+      }
+    },
     "/api/config/reload": {
       "post": {
         "description": "Read ``<config>/*.toml``, workflows and plugins afresh and use them from the next request on. The worker\nnotices the same change on its own and swaps it in when it is between jobs.",
@@ -11070,6 +12501,462 @@
         "summary": "Unlock",
         "tags": [
           "content"
+        ]
+      }
+    },
+    "/api/control/plans": {
+      "post": {
+        "operationId": "preview_api_control_plans_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanIn-Input"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Preview Api Control Plans Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview",
+        "tags": [
+          "control-center"
+        ]
+      }
+    },
+    "/api/control/runs": {
+      "get": {
+        "operationId": "runs_api_control_runs_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ControlRunListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Runs",
+        "tags": [
+          "control-center"
+        ]
+      },
+      "post": {
+        "operationId": "submit_api_control_runs_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanIn-Input"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ControlRunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Submit",
+        "tags": [
+          "control-center"
+        ]
+      }
+    },
+    "/api/control/runs/{rid}": {
+      "get": {
+        "operationId": "run_api_control_runs__rid__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rid",
+            "required": true,
+            "schema": {
+              "title": "Rid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ControlRunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run",
+        "tags": [
+          "control-center"
+        ]
+      }
+    },
+    "/api/control/runs/{rid}/actions": {
+      "post": {
+        "operationId": "run_action_api_control_runs__rid__actions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rid",
+            "required": true,
+            "schema": {
+              "title": "Rid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ControlRunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run Action",
+        "tags": [
+          "control-center"
+        ]
+      }
+    },
+    "/api/control/selections": {
+      "get": {
+        "operationId": "get_selection_api_control_selections_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "owner_type",
+            "required": true,
+            "schema": {
+              "title": "Owner Type",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "owner_id",
+            "required": true,
+            "schema": {
+              "title": "Owner Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "slot",
+            "required": true,
+            "schema": {
+              "title": "Slot",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Selection Api Control Selections Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Selection",
+        "tags": [
+          "control-center"
+        ]
+      },
+      "put": {
+        "operationId": "selection_api_control_selections_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SelectionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Selection Api Control Selections Put",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Selection",
+        "tags": [
+          "control-center"
+        ]
+      }
+    },
+    "/api/control/templates": {
+      "get": {
+        "operationId": "templates_api_control_templates_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Templates Api Control Templates Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Templates",
+        "tags": [
+          "control-center"
+        ]
+      },
+      "post": {
+        "operationId": "save_template_api_control_templates_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanIn-Input"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Save Template Api Control Templates Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Template",
+        "tags": [
+          "control-center"
+        ]
+      }
+    },
+    "/api/control/templates/{ident}": {
+      "put": {
+        "operationId": "revise_template_api_control_templates__ident__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ident",
+            "required": true,
+            "schema": {
+              "title": "Ident",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanIn-Input"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Revise Template Api Control Templates  Ident  Put",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revise Template",
+        "tags": [
+          "control-center"
         ]
       }
     },
@@ -13584,6 +15471,58 @@
         "summary": "Update Character",
         "tags": [
           "story"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/control/plan": {
+      "post": {
+        "operationId": "compile_project_api_projects__project_id__control_plan_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectPlanIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanIn-Output"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Compile Project",
+        "tags": [
+          "control-center"
         ]
       }
     },
@@ -18320,6 +20259,489 @@
         "summary": "Start Run",
         "tags": [
           "workflow"
+        ]
+      }
+    },
+    "/api/publications": {
+      "get": {
+        "operationId": "publications_api_publications_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "target_id",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Target Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Status",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "category_id",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Category Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "project_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "asset_id",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Asset Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "platform",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Platform",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "account",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Account",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "content_type",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Content Type",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "purpose",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Purpose",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "series",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Series",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "episode",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Episode",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicationListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Publications",
+        "tags": [
+          "control-center"
+        ]
+      },
+      "post": {
+        "operationId": "create_publication_api_publications_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicationIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Publication",
+        "tags": [
+          "control-center"
+        ]
+      }
+    },
+    "/api/publications/categories": {
+      "get": {
+        "operationId": "categories_api_publications_categories_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CategoryOut"
+                  },
+                  "title": "Response Categories Api Publications Categories Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Categories",
+        "tags": [
+          "control-center"
+        ]
+      },
+      "post": {
+        "operationId": "category_api_publications_categories_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CategoryIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Category",
+        "tags": [
+          "control-center"
+        ]
+      }
+    },
+    "/api/publications/targets": {
+      "get": {
+        "operationId": "targets_api_publications_targets_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TargetOut"
+                  },
+                  "title": "Response Targets Api Publications Targets Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Targets",
+        "tags": [
+          "control-center"
+        ]
+      },
+      "post": {
+        "operationId": "target_api_publications_targets_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TargetIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TargetOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Target",
+        "tags": [
+          "control-center"
+        ]
+      }
+    },
+    "/api/publications/{ident}": {
+      "get": {
+        "operationId": "publication_api_publications__ident__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ident",
+            "required": true,
+            "schema": {
+              "title": "Ident",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Publication",
+        "tags": [
+          "control-center"
+        ]
+      },
+      "put": {
+        "operationId": "edit_publication_api_publications__ident__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ident",
+            "required": true,
+            "schema": {
+              "title": "Ident",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicationIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Edit Publication",
+        "tags": [
+          "control-center"
+        ]
+      }
+    },
+    "/api/publications/{ident}/state": {
+      "post": {
+        "operationId": "publication_state_api_publications__ident__state_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ident",
+            "required": true,
+            "schema": {
+              "title": "Ident",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicationStateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Publication State",
+        "tags": [
+          "control-center"
         ]
       }
     },

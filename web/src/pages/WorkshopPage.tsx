@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useJobActions, useMeta } from "../api/hooks";
 import type { Asset, Job, WorkshopField, WorkshopHistoryItem, WorkshopKind, WorkshopModule } from "../api/types";
 import { type Step, useWorkshop, useWorkshopActions, useWorkshopHistory, useWorkshopParams } from "../api/workshop";
@@ -632,6 +632,7 @@ export function WorkshopPage() {
   return (
     <div className="stack">
       <h1>{t("web.workshop.title")}</h1>
+      <Link to="/control">{t("web.control.title")}</Link>
       <p className="muted">{t("web.workshop.intro")}</p>
       <label className="field">
         <span>{t("web.plan.pipeline")}</span>

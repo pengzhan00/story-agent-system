@@ -355,3 +355,16 @@ def test_a_song_is_refused_early_when_the_music_engine_is_not_installed(tmp_path
         assert not assets and not [q for q in srv.requests if q.path == "/queue/add"]
         rec2, _ = r.run(job(MediaKind.AUDIO_MUSIC, "yue2-test", {"prompt": ""}))
         assert rec2.status is JobStatus.FAILED_VALIDATION
+
+
+def test_music_cover_requires_separate_cover_package(tmp_path, panel):
+    panel.route("GET", "/status", {"music": {"available": True,
+                                             "cover": {"ready": False, "missing": ["transcriber"]}}})
+    r = rig(tmp_path, panel)
+    record, _ = r.run(job(MediaKind.AUDIO_MUSIC, "yue2-test",
+                         {"prompt": "piano ballad", "source_audio": "/tmp/recording.wav"},
+                         params={"music_task": "cover"}))
+    assert record.status is JobStatus.FAILED_VALIDATION
+    assert record.error_code == ErrorCode.MISSING_MODEL.value
+    assert "cover" in record.error_message.lower()
+    assert not [req for req in panel.requests if req.method == "POST" and req.path == "/queue/add"]

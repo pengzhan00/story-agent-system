@@ -50,9 +50,15 @@ def server() -> Any:
     with FakeServer() as srv:
         srv.route("GET", "/v1/model_inventory", inventory())
         srv.route("POST", "/release_task", {"data": {"task_id": "t-1"}})
-        srv.route("POST", "/query_result",
-                  [result("running", 0.3), result("running", 0.8),
-                   result("succeeded", 1.0, "/v1/audio?path=%2Ftmp%2Fout.wav")])
+        srv.route(
+            "POST",
+            "/query_result",
+            [
+                result("running", 0.3),
+                result("running", 0.8),
+                result("succeeded", 1.0, "/v1/audio?path=%2Ftmp%2Fout.wav"),
+            ],
+        )
         srv.route("GET", "/v1/audio", wav_bytes())
         yield srv
 
@@ -65,8 +71,15 @@ def rig(tmp_path: Path, server: FakeServer):  # noqa: ANN201
 
 def test_generates_music_and_registers_the_asset(tmp_path: Path, server: FakeServer) -> None:
     r, _ = rig(tmp_path, server)
-    rec, assets = r.run(job(MediaKind.AUDIO_MUSIC, "ace-test", {"prompt": "guzheng, slow", "text": "[verse]\nla la"},
-                            seed=7, params={"duration": 20}))
+    rec, assets = r.run(
+        job(
+            MediaKind.AUDIO_MUSIC,
+            "ace-test",
+            {"prompt": "guzheng, slow", "text": "[verse]\nla la"},
+            seed=7,
+            params={"duration": 20},
+        )
+    )
     assert rec.status is JobStatus.COMPLETED, (rec.error_code, rec.error_message)
     [a] = assets
     assert a.kind == "audio.music" and a.path.endswith(".wav") and a.has_audio and a.duration_sec
@@ -231,3 +244,26 @@ def test_newer_server_failure(tmp_path: Path, server: FakeServer) -> None:
     r, _ = rig(tmp_path, server)
     rec, _ = r.run(job(MediaKind.AUDIO_MUSIC, "ace-test", {"prompt": "x"}))
     assert rec.status is JobStatus.WORKFLOW_ERROR
+
+
+def test_source_and_reference_are_uploaded_as_distinct_files(tmp_path, server):
+    source = tmp_path / "source.wav"
+    reference = tmp_path / "reference.wav"
+    source.write_bytes(wav_bytes())
+    reference.write_bytes(wav_bytes())
+    runner, _ = rig(tmp_path, server)
+    record, _ = runner.run(
+        job(
+            MediaKind.AUDIO_MUSIC,
+            "ace-test",
+            {"prompt": "piano", "source_audio": str(source), "refs": [str(reference)]},
+            params={"task_type": "cover"},
+        )
+    )
+    assert record.status is JobStatus.COMPLETED, record.error_message
+    request = next(r for r in server.requests if r.path == "/release_task")
+    assert request.headers["content-type"].startswith("multipart/form-data;")
+    assert b'name="src_audio"; filename="source.wav"' in request.body
+    assert b'name="ref_audio"; filename="reference.wav"' in request.body
+    assert wav_bytes() in request.body
+    assert str(tmp_path).encode() not in request.body

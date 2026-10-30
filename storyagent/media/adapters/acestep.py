@@ -12,10 +12,12 @@ Inputs: ``prompt`` = style tags / caption, ``text`` = lyrics, ``refs`` = optiona
 (first one becomes the reference-audio for style transfer).
 The server model name is ``extra.api_model`` of the model entry (falls back to ``acestep-<version>``).
 """
+
 from __future__ import annotations
 
 import json
 import urllib.parse
+from contextlib import ExitStack
 from pathlib import Path
 from typing import Any
 
@@ -38,10 +40,34 @@ from ._http import ServiceClient, clean
 
 _RENAME = {"duration": "audio_duration", "steps": "inference_steps"}
 _ALLOWED = {
-    "audio_duration", "inference_steps", "guidance_scale", "shift", "infer_method", "bpm", "key_scale",
-    "time_signature", "vocal_language", "audio_format", "thinking", "use_cot_caption", "use_cot_language",
-    "constrained_decoding", "lm_temperature", "lm_cfg_scale", "lm_top_k", "lm_top_p", "lm_repetition_penalty",
-    "lm_backend", "lm_model_path", "batch_size", "task_type", "sample_mode",
+    "audio_duration",
+    "inference_steps",
+    "guidance_scale",
+    "shift",
+    "infer_method",
+    "bpm",
+    "key_scale",
+    "time_signature",
+    "vocal_language",
+    "audio_format",
+    "thinking",
+    "use_cot_caption",
+    "use_cot_language",
+    "constrained_decoding",
+    "lm_temperature",
+    "lm_cfg_scale",
+    "lm_top_k",
+    "lm_top_p",
+    "lm_repetition_penalty",
+    "lm_backend",
+    "lm_model_path",
+    "batch_size",
+    "task_type",
+    "sample_mode",
+    "repainting_start",
+    "repainting_end",
+    "audio_cover_strength",
+    "cover_noise_strength",
 }
 SCHEMA: dict[str, dict[str, Any]] = {
     "duration": {"type": "float", "min": 1, "max": 600},
@@ -67,6 +93,10 @@ SCHEMA: dict[str, dict[str, Any]] = {
     "lm_model_path": {"type": "str"},
     "batch_size": {"type": "int", "min": 1, "max": 8},
     "task_type": {"type": "str"},
+    "repainting_start": {"type": "float", "min": 0},
+    "repainting_end": {"type": "float", "min": 0},
+    "audio_cover_strength": {"type": "float", "min": 0, "max": 1},
+    "cover_noise_strength": {"type": "float", "min": 0, "max": 1},
     "sample_mode": {"type": "bool"},
 }
 
@@ -84,8 +114,12 @@ class AceStepAdapter(AdapterBase):
     # -- contract -----------------------------------------------------------------------------
     def capabilities(self) -> Capabilities:
         return Capabilities(
-            kinds=(MediaKind.AUDIO_MUSIC,), heavy=False, supports_cancel=False, supports_reattach=True,
-            param_schema=SCHEMA, poll_interval_sec=self.poll_interval_sec,
+            kinds=(MediaKind.AUDIO_MUSIC,),
+            heavy=False,
+            supports_cancel=False,
+            supports_reattach=True,
+            param_schema=SCHEMA,
+            poll_interval_sec=self.poll_interval_sec,
         )
 
     def api_model(self, job: JobRecord) -> str:
@@ -108,9 +142,21 @@ class AceStepAdapter(AdapterBase):
 
     def validate(self, job: JobRecord, ctx: JobContext) -> list[ValidationIssue]:
         issues: list[ValidationIssue] = []
+        task = str(job.params.get("task_type", "text2music"))
+        allowed = {"text2music", "repaint", "cover"}
+        if "turbo" not in (self.api_model(job) or job.model_ref).lower():
+            allowed |= {"extract", "lego", "complete"}
+        if task not in allowed:
+            issues.append(ValidationIssue(ErrorCode.INVALID_PARAMS, f"Task {task} is not supported by this variant"))
+        if task != "text2music" and not job.inputs.get("source_audio"):
+            issues.append(ValidationIssue(ErrorCode.INVALID_INPUT, f"Task {task} requires source_audio"))
+        start, end = job.params.get("repainting_start", 0), job.params.get("repainting_end")
+        if task == "repaint" and (end is None or float(end) <= float(start)):
+            issues.append(ValidationIssue(ErrorCode.INVALID_PARAMS, "Repaint requires a positive source interval"))
         if not (job.inputs.get("prompt") or job.inputs.get("text")):
-            issues.append(ValidationIssue(ErrorCode.INVALID_INPUT, "needs style tags or lyrics",
-                                          {"detail": "prompt/text empty"}))
+            issues.append(
+                ValidationIssue(ErrorCode.INVALID_INPUT, "needs style tags or lyrics", {"detail": "prompt/text empty"})
+            )
         want = self.api_model(job)
         try:
             data = (self.client.json("GET", "/v1/model_inventory", timeout=10).get("data")) or {}
@@ -120,9 +166,13 @@ class AceStepAdapter(AdapterBase):
         if want and want not in have:
             issues.append(ValidationIssue(ErrorCode.MISSING_MODEL, f"{want} is not served", {"model": want}))
         if job.inputs.get("text") and not data.get("llm_initialized"):
-            issues.append(ValidationIssue(
-                ErrorCode.MISSING_MODEL, "vocals need the 5Hz LM, which the server has not loaded",
-                {"model": "acestep-5Hz-lm"}))
+            issues.append(
+                ValidationIssue(
+                    ErrorCode.MISSING_MODEL,
+                    "vocals need the 5Hz LM, which the server has not loaded",
+                    {"model": "acestep-5Hz-lm"},
+                )
+            )
         return issues
 
     def _body(self, job: JobRecord) -> dict[str, Any]:
@@ -130,8 +180,10 @@ class AceStepAdapter(AdapterBase):
         body.setdefault("audio_format", "mp3")
         body.setdefault("batch_size", 1)  # the server's default renders several variants; candidates are our job
         body.update(
-            prompt=str(job.inputs.get("prompt", "")), lyrics=str(job.inputs.get("text", "")),
-            use_random_seed=job.seed is None, seed=job.seed if job.seed is not None else -1,
+            prompt=str(job.inputs.get("prompt", "")),
+            lyrics=str(job.inputs.get("text", "")),
+            use_random_seed=job.seed is None,
+            seed=job.seed if job.seed is not None else -1,
         )
         model = self.api_model(job)
         if model:
@@ -139,14 +191,42 @@ class AceStepAdapter(AdapterBase):
         refs = [r for r in job.inputs.get("refs", []) if isinstance(r, str)]
         if refs:
             body["reference_audio_path"] = refs[0]
+        if job.inputs.get("source_audio"):
+            body["src_audio_path"] = str(job.inputs["source_audio"])
         return body
 
     def submit(self, job: JobRecord, ctx: JobContext) -> str:
-        body = self.client.json("POST", "/release_task", json=self._body(job))
+        payload = self._body(job)
+        uploads = {
+            name: payload.pop(key)
+            for name, key in (("ref_audio", "reference_audio_path"), ("src_audio", "src_audio_path"))
+            if key in payload
+        }
+        if uploads:
+            # The server rejects client absolute paths. Transfer bytes, also for a remote ACE-Step service.
+            with ExitStack() as stack:
+                files = {}
+                for name, raw in uploads.items():
+                    path = Path(raw)
+                    if not path.is_file():
+                        raise AdapterError(ErrorCode.INVALID_INPUT, "Audio upload file is missing")
+                    files[name] = (path.name, stack.enter_context(path.open("rb")), "application/octet-stream")
+                fields = {
+                    k: json.dumps(v) if isinstance(v, (bool, dict, list)) else str(v)
+                    for k, v in payload.items()
+                    if v is not None
+                }
+                body = self.client.json("POST", "/release_task", data=fields, files=files)
+        else:
+            body = self.client.json("POST", "/release_task", json=payload)
         task_id = ((body or {}).get("data") or {}).get("task_id")
         if not task_id:
-            raise AdapterError(ErrorCode.SERVICE_REJECTED, f"no task_id in {str(body)[:200]}",
-                               service=self.client.service.name, detail="no task_id")
+            raise AdapterError(
+                ErrorCode.SERVICE_REJECTED,
+                f"no task_id in {str(body)[:200]}",
+                service=self.client.service.name,
+                detail="no task_id",
+            )
         return str(task_id)
 
     # -- polling ------------------------------------------------------------------------------
@@ -154,8 +234,13 @@ class AceStepAdapter(AdapterBase):
         body = self.client.json("POST", "/query_result", json={"task_id_list": json.dumps([task_id])}, timeout=15)
         items = (body or {}).get("data") or []
         if not items:
-            raise AdapterError(ErrorCode.SERVICE_REJECTED, f"server does not know task {task_id}",
-                               retryable=True, service=self.client.service.name, detail="unknown task")
+            raise AdapterError(
+                ErrorCode.SERVICE_REJECTED,
+                f"server does not know task {task_id}",
+                retryable=True,
+                service=self.client.service.name,
+                detail="unknown task",
+            )
         item = items[0]
         raw = item.get("result", "[]")
         try:
@@ -205,6 +290,7 @@ class AceStepAdapter(AdapterBase):
         meta: dict[str, Any] = {k: v for k, v in (metas if isinstance(metas, dict) else {}).items() if v != "N/A"}
         if files[0].get("prompt"):
             meta["server_caption"] = str(files[0]["prompt"])[:500]  # the LM-expanded caption actually used
-        meta.update(task_id=external_id, api_model=self.api_model(job),
-                    vocals=bool(str(job.inputs.get("text", "")).strip()))   # a song (lyrics) or an accompaniment
+        meta.update(
+            task_id=external_id, api_model=self.api_model(job), vocals=bool(str(job.inputs.get("text", "")).strip())
+        )  # a song (lyrics) or an accompaniment
         return [ArtifactSpec(dest, metadata=meta)]

@@ -1,0 +1,47 @@
+{
+  "t2v": [
+    {
+      "codec_type": "video",
+      "duration": "1.041667",
+      "nb_frames": "25"
+    }
+  ],
+  "i2v": [
+    {
+      "codec_type": "video",
+      "duration": "1.041667",
+      "nb_frames": "25"
+    }
+  ],
+  "a2v": [
+    {
+      "codec_type": "video",
+      "duration": "2.000000",
+      "nb_frames": "48"
+    },
+    {
+      "codec_type": "audio",
+      "duration": "2.000000",
+      "nb_frames": "48"
+    }
+  ],
+  "dtvideo": [
+    {
+      "codec_type": "video",
+      "duration": "1.041667",
+      "nb_frames": "25"
+    }
+  ],
+  "a2v_sequence": [
+    {
+      "codec_type": "video",
+      "duration": "3.500000",
+      "nb_frames": "84"
+    },
+    {
+      "codec_type": "audio",
+      "duration": "3.500000",
+      "nb_frames": "84"
+    }
+  ]
+}

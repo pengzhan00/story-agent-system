@@ -1,0 +1,8 @@
+{
+  "open_exit_code": 0,
+  "api_restored": true,
+  "http_status": 200,
+  "selected_model": "lustifynsfwcheckpoint_v10krea2_fp8_f16.ckpt",
+  "binding": "127.0.0.1:7860",
+  "restored_via_ui": true
+}
