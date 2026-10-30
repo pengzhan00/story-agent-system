@@ -44,7 +44,7 @@ Release readiness: 本机生产部署 = ready（先备份数据库）；作为"�
 - 重启排空修复（`docs/reviews/2026-10-28-restart-drain.md`）需要在生产上部署后才生效。
 
 ### P3
-- 测试不够封闭：`test_longcat_makes_a_talking_head_from_portrait_and_speech` 在环境里设了 `HF_TOKEN` 时会失败，并把令牌打印进失败输出。应在测试里清掉该环境变量并对输出脱敏。若该输出被分享过，请轮换该令牌。
+- 测试封闭性：较早一版 `test_longcat_makes_a_talking_head_from_portrait_and_speech` 在环境里设了 `HF_TOKEN` 时会失败并打印令牌；HEAD 上的版本只断言适配器自己的键，已不再出现（用户确认该令牌无需处理）。
 - JS 大包提示（前端未分包）。
 - 本地 main（主检出）落后 `origin/main` 一个提交，见下。
 
