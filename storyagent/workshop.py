@@ -42,7 +42,7 @@ class WorkshopError(ValueError):
 class Field:
     name: str                 # id in the UI and in a run request
     target: str               # where it lands in the job inputs: "prompt", "voice_ref.audio", "refs[]"
-    type: str = "text"        # text | longtext | media | medialist | shots | bool
+    type: str = "text"        # text | longtext | media | medialist | shots | bool | workkind
     media: str = ""           # for type == "media": image | audio | video
     required: bool = False
 
@@ -68,6 +68,7 @@ MODULES: tuple[Module, ...] = (
     Module("story", (
         KindSpec(MediaKind.TEXT_STORY, (
             Field("idea", "idea", "longtext", required=True),
+            Field("kind", "kind", "workkind"),
             Field("genre", "genre", "text"),
             Field("tone", "tone", "text"),
             Field("language", "language", "text"),
@@ -79,6 +80,7 @@ MODULES: tuple[Module, ...] = (
         KindSpec(MediaKind.TEXT_SCRIPT, (
             Field("story", "story", "media", "text"),
             Field("story_text", "story_text", "longtext"),
+            Field("kind", "kind", "workkind"),
             Field("format", "format", "text"),
             Field("scenes", "scenes", "text"),
             Field("language", "language", "text"),

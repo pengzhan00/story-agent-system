@@ -1639,6 +1639,8 @@
   "workshop.module.story": "Story",
   "workshop.module.script": "Script",
   "workshop.field.idea": "Idea",
+  "workshop.field.kind": "Kind of work (optional)",
+  "workshop.kind.none": "Not set (no form rules)",
   "workshop.field.genre": "Genre (optional)",
   "workshop.field.tone": "Tone (optional)",
   "workshop.field.language": "Language of the text (empty = interface language)",

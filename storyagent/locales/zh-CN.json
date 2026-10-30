@@ -1639,6 +1639,8 @@
   "workshop.module.story": "故事",
   "workshop.module.script": "剧本",
   "workshop.field.idea": "创意",
+  "workshop.field.kind": "作品类型(可选)",
+  "workshop.kind.none": "不指定(不加形式规则)",
   "workshop.field.genre": "题材(可选)",
   "workshop.field.tone": "基调(可选)",
   "workshop.field.language": "文本语言(留空 = 界面语言)",

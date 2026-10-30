@@ -242,11 +242,24 @@ function Inputs({
   prevOutput?: string;
 }) {
   const t = useT();
+  const workKinds = useMeta().data?.work_kinds ?? [];
   return (
     <div className="form-grid">
       {kind.inputs.map((f) => {
         const label = `${t(`workshop.field.${f.name}`)}${f.required ? " *" : ""}`;
         const v = values[f.name];
+        if (f.type === "workkind")
+          return (
+            <label key={f.name} className="field">
+              <span>{label}</span>
+              <select value={String(v ?? "")} onChange={(e) => set(f.name, e.target.value)}>
+                <option value="">{t("workshop.kind.none")}</option>
+                {workKinds.map((k) => (
+                  <option key={k.name} value={k.name}>{k.label}</option>
+                ))}
+              </select>
+            </label>
+          );
         if (f.type === "bool")
           return (
             <label key={f.name} className="field check">
