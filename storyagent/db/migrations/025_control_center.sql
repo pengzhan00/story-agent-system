@@ -30,9 +30,6 @@ CREATE TABLE control_events (
     node_id TEXT, event TEXT NOT NULL, data TEXT NOT NULL DEFAULT '{}',
     actor TEXT NOT NULL, created_at TEXT NOT NULL
 );
-CREATE TABLE control_cache (
-    cache_key TEXT PRIMARY KEY, outputs TEXT NOT NULL, created_at TEXT NOT NULL
-);
 CREATE TABLE asset_relations (
     parent_id TEXT NOT NULL REFERENCES media_assets(id),
     child_id TEXT NOT NULL REFERENCES media_assets(id), role TEXT NOT NULL,
@@ -69,7 +66,6 @@ CREATE TABLE publication_revisions (
     publication_id TEXT NOT NULL REFERENCES publications(id), revision INTEGER NOT NULL,
     title TEXT NOT NULL, body TEXT NOT NULL, tags TEXT NOT NULL DEFAULT '[]',
     items TEXT NOT NULL, actor TEXT NOT NULL, created_at TEXT NOT NULL,
-    classification TEXT NOT NULL DEFAULT '{}',
     PRIMARY KEY(publication_id,revision)
 );
 CREATE TABLE publication_items (

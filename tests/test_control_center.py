@@ -526,11 +526,12 @@ def test_control_migration_upgrades_old_database_and_preserves_restore_copy(tmp_
     migrations = migrator.discover()
     db = Database(tmp_path / "upgrade.db")
     with monkeypatch.context() as ctx:
-        ctx.setattr(migrator, "discover", lambda: migrations[:-1])
+        ctx.setattr(migrator, "discover", lambda: migrations[:24])
         assert migrate(db) == (0, 24)
     db.conn.execute("INSERT INTO projects(slug,name) VALUES ('kept','Existing project')")
-    assert migrate(db) == (24, 25)
-    assert migrate(db) == (25, 25)
+    latest = len(migrations)
+    assert migrate(db) == (24, latest)
+    assert migrate(db) == (latest, latest)
     assert db.conn.execute("SELECT name FROM projects").fetchone()[0] == "Existing project"
     assert list(db.conn.execute("PRAGMA foreign_key_check")) == []
     backup = Database(tmp_path / "upgrade.db.bak-v24")

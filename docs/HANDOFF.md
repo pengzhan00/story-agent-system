@@ -228,4 +228,4 @@ git status && git log --oneline -5 && git fetch && git status -sb
 
 已在工作树实现统一管线、项目编译、资产采用与人工发布台账；尚未提交/部署，不能按生产已具备理解。以 [本次实施核验](reviews/2026-10-29-multimodal-implementation.md) 和 [设计](MULTIMODAL_CONTROL_CENTER_DESIGN.md) 为入口。
 
-新增 schema 025，只在隔离库完成新建/升级/备份恢复验证。生产升级前停止接单并排空自己的任务、备份数据库与运行配置；不改已应用迁移校验和。回滚为完整升级前备份恢复，不删除新表来假装兼容旧程序。生产启动继续使用原 scripts/start.sh；新图由已有 worker tick 推进，不另起派发 worker。
+新增 schema 025（**生产库已应用其早期草稿**，后续新增内容在 026，见 `docs/CLAUDE_HANDOFF_2026-10-30.md` 的更正；已应用的迁移只能新增、不能改），在隔离库完成新建/升级/备份恢复验证。生产升级前停止接单并排空自己的任务、备份数据库与运行配置；不改已应用迁移校验和。回滚为完整升级前备份恢复，不删除新表来假装兼容旧程序。生产启动继续使用原 scripts/start.sh；新图由已有 worker tick 推进，不另起派发 worker。

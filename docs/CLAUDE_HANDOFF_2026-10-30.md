@@ -28,7 +28,8 @@
 - 本次交接已核对：分支 `main`，HEAD `b5df9e3`；**工作树有大量未提交和部分已暂存改动**。
 - `b5df9e3` 是 Hermes 的三文件提交：`media/adapters/phosphene.py`、`media/lipsync.py`、`workflow/seed.py`。后来 Codex 又修改了相关文件，不能用 HEAD 代替最终实现状态。
 - 开工前已有约35项他人改动。原始基线：`data/run/control-center-implementation-20261029/baseline.diff`、`baseline-files.json`。必须逐项区分所有权，禁止直接 `git add .`、reset、stash 或混合提交。
-- 本轮控制中心和真实测试修复**尚未提交、推送、部署**。没有在生产库应用 schema025，没有重启生产8765，没有往生产库写测试资产。
+- 本轮控制中心和真实测试修复**尚未提交、推送、部署**。没有重启生产8765，没有往生产库写测试资产。
+- **更正（2026-10-30 发布审查）**：生产库其实**已在 schema 25**（`schema_migrations` 里 025 记录于 2026-10-28 23:55，是未提交的早期草稿，校验和 `ccb83b52…`）。之后 `025_control_center.sql` 被修改并提交，直接部署会因 `migration 025_control_center was modified after being applied` 迁移失败、`scripts/start.sh` 起不来。已修复：025 还原为生产已应用的原文，后加的 `control_cache` 表与 `publication_revisions.classification` 列放进 `026_control_cache_classification.sql`；在生产库副本上 25→26 迁移通过且与全新库结构一致，`tests/test_migration_applied.py` 锁定已应用迁移的校验和。仍请在部署前备份生产库。
 - `data/config/services.toml` 是被忽略的本机运行配置；不能假设会随 Git 发布。
 - 旧 `docs/HANDOFF.md` 含早期工作树、服务和“未实测”描述；请优先用本交接及10月30日实测报告核对，不照搬旧状态。
 
