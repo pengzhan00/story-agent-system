@@ -421,3 +421,47 @@ def test_project_param_override_is_frozen_into_the_job(fsettings: Settings, fdb:
     assert rec.params["width"] == 321
     assert led.get_job(rec.id).tier is QualityTier.FINAL
     w.shutdown()
+
+
+def test_pause_does_not_hide_a_claim_that_is_becoming_inflight(
+    fsettings: Settings, fdb: Database, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    worker, ledger, _ = make(fsettings, fdb)
+    rec = submit(ledger, fake_hang=True)
+    claimed, release, pausing, paused = (threading.Event() for _ in range(4))
+    original = ledger.claim
+
+    def blocked_claim(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202
+        result = original(*args, **kwargs)
+        claimed.set()
+        assert release.wait(5)
+        return result
+
+    def pause() -> None:
+        pausing.set()
+        worker.pause()
+        paused.set()
+
+    monkeypatch.setattr(ledger, "claim", blocked_claim)
+    scheduler = threading.Thread(target=worker.tick)
+    watcher = threading.Thread(target=pause)
+    try:
+        scheduler.start()
+        assert claimed.wait(5)
+        watcher.start()
+        assert pausing.wait(5)
+        assert not paused.wait(0.05), "pause returned while a claimed job was invisible to busy()"
+        release.set()
+        assert paused.wait(5)
+        scheduler.join(5)
+        assert not scheduler.is_alive()
+        assert worker.busy() == 1
+    finally:
+        release.set()
+        scheduler.join(5)
+        if watcher.ident is not None:
+            watcher.join(5)
+        ledger.request_cancel(rec.id)
+        worker.resume()
+        worker.drain(5)
+        worker.shutdown()

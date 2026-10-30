@@ -87,7 +87,8 @@ class Worker:
         self._wf_pool = ThreadPoolExecutor(max_workers=max(self._wf_max, 1), thread_name_prefix="workflow-run")
         self._wf_futures: dict[str, Future[None]] = {}
         self._stop = threading.Event()
-        self._paused = threading.Event()          # no new work is claimed (a restart is waiting for the running work)
+        self._paused = threading.Event()          # only in-flight workflow dependencies may be claimed during restart
+        self._claim_lock = threading.Lock()       # pause and registering an in-flight job are one boundary
         self._lease = float(settings.runtime.get("lease_seconds", 60))
         self._beat = float(settings.runtime.get("heartbeat_seconds", 15))
 
@@ -97,12 +98,11 @@ class Worker:
         led = self.ledger
         led.requeue_expired()
         self._futures = {j: f for j, f in self._futures.items() if not f.done()}
-        if self._paused.is_set():
-            self._wf_futures = {r: f for r, f in self._wf_futures.items() if not f.done()}
-            return 0
+        self._wf_futures = {r: f for r, f in self._wf_futures.items() if not f.done()}
         started = 0
         while len(self._futures) < self._max_threads:
-            queued = led.queued()
+            allowed = self._restart_dependencies() if self._paused.is_set() else None
+            queued = led.queued(ids=allowed)
             if not queued:
                 break
             policy = self.settings.llm_unload_policy
@@ -114,12 +114,20 @@ class Worker:
                 led.note_waiting(jid, reason.value)
             if job is None:
                 break
-            claimed = led.claim(job.id, self.owner, self._lease)
-            if claimed is None:
-                continue
-            self._futures[claimed.id] = self._pool.submit(self._run, claimed)
-            started += 1
-        return started + self._tick_workflow()
+            # pause() is called from the restart watcher, possibly while resource probes were running.
+            with self._claim_lock:
+                if self._paused.is_set() and job.id not in self._restart_dependencies():
+                    continue
+                claimed = led.claim(job.id, self.owner, self._lease)
+                if claimed is None:
+                    continue
+                self._futures[claimed.id] = self._pool.submit(self._run, claimed)
+                started += 1
+        return started if self._paused.is_set() else started + self._tick_workflow()
+
+    def _restart_dependencies(self) -> list[str]:
+        waiting = self._workflow.pending_media_jobs() if self._workflow is not None else set()
+        return sorted(self.ledger.job_dependencies(sorted(waiting)))
 
     def _engine(self) -> WorkflowEngine:
         if self._workflow is None:
@@ -138,12 +146,15 @@ class Worker:
         self._wf_futures = {r: f for r, f in self._wf_futures.items() if not f.done()}
         started = 0
         while len(self._wf_futures) < self._wf_max:
-            run = state.claim_next(self.owner, self._lease)
-            if run is None:
-                break
-            self._wf_futures[run["id"]] = self._wf_pool.submit(
-                self._engine().execute_run, run, self.owner, self._lease, self._beat)
-            started += 1
+            with self._claim_lock:
+                if self._paused.is_set():
+                    break
+                run = state.claim_next(self.owner, self._lease)
+                if run is None:
+                    break
+                self._wf_futures[run["id"]] = self._wf_pool.submit(
+                    self._engine().execute_run, run, self.owner, self._lease, self._beat)
+                started += 1
         return started
 
     def reload_config(self, settings: Settings, registry: AdapterRegistry) -> None:
@@ -156,15 +167,19 @@ class Worker:
             self.probes = build_probes(settings)
 
     def pause(self) -> None:
-        """Stop claiming media jobs and workflow runs; what is running carries on (``storyagent.restart``)."""
-        self._paused.set()
+        """Stop new work; allow only dependencies of in-flight workflows so wait-restart can drain."""
+        with self._claim_lock:
+            self._paused.set()
 
     def resume(self) -> None:
-        self._paused.clear()
+        with self._claim_lock:
+            self._paused.clear()
 
     def busy(self) -> int:
         """How many media jobs and workflow runs this worker is running right now."""
-        return sum(not f.done() for f in self._futures.values()) + sum(not f.done() for f in self._wf_futures.values())
+        with self._claim_lock:
+            media = sum(not f.done() for f in self._futures.values())
+            return media + sum(not f.done() for f in self._wf_futures.values())
 
     def _idle(self) -> bool:
         return all(f.done() for f in self._futures.values()) and all(f.done() for f in self._wf_futures.values())

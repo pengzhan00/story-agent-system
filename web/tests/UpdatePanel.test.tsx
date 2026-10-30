@@ -102,7 +102,7 @@ describe("UpdatePanel", () => {
     state.restart = { supervised: true, phase: "draining", phase_label: "", mode: "wait", requested_at: 990, running: 1 };
     state.work = { jobs: [{ id: "j1", kind: "video.generate", model: "ltx", heavy: true, project_id: 1, progress: 0.5, started_at: null }], runs: [], queued: 0, heavy: 1 };
     mount();
-    expect(await screen.findByText("Waiting for 1 running jobs to finish; no new work is taken meanwhile...")).toBeTruthy();
+    expect(await screen.findByText("Waiting for 1 in-flight tasks and their dependencies to finish...")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: en["web.update.interrupt_now"]! }));
     await waitFor(() => expect(calls.some((c) => c.url === "POST /api/update/restart")).toBe(true));
     expect(JSON.parse(calls.find((c) => c.url === "POST /api/update/restart")!.body)).toEqual({ interrupt: true });

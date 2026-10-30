@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
+from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -66,6 +67,7 @@ class Ctx:
     spec_store: Any = None
     stage: str = ""
     extra: dict[str, Any] = field(default_factory=dict)
+    media_wait: Callable[[set[str]], AbstractContextManager[None]] = lambda _: nullcontext()
 
     @property
     def pid(self) -> int:

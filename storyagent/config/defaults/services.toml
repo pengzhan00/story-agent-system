@@ -187,6 +187,8 @@ cors_origins = ["http://localhost:5173"]
 web_dir = ""
 sse_poll_seconds = 0.5
 sse_keepalive_seconds = 15
+# Bound long-lived connections/tasks when the API exits for an update or shutdown.
+shutdown_timeout_seconds = 5
 
 [workflow]
 # A shot keyframe is composed from the approved portraits and the scene image (reference images of an image-edit job)

@@ -136,17 +136,18 @@ def wait_for_jobs(
     pending = {j.id for j in jobs}
     final: dict[str, JobRecord] = {}
     try:
-        while pending:
-            if ctx.cancelled():
-                raise WorkflowCancelled()
-            for jid in list(pending):
-                rec = ledger.get_job(jid)
-                if rec.status.is_terminal:
-                    final[jid] = rec
-                    pending.discard(jid)
-            on_progress(len(final), len(jobs), sum(1 for j in final.values() if j.status in FAILED))
-            if pending:
-                time.sleep(poll)
+        with ctx.media_wait(pending):
+            while pending:
+                if ctx.cancelled():
+                    raise WorkflowCancelled()
+                for jid in list(pending):
+                    rec = ledger.get_job(jid)
+                    if rec.status.is_terminal:
+                        final[jid] = rec
+                        pending.discard(jid)
+                on_progress(len(final), len(jobs), sum(1 for j in final.values() if j.status in FAILED))
+                if pending:
+                    time.sleep(poll)
     except WorkflowCancelled:
         for jid in pending:
             ledger.request_cancel(jid)

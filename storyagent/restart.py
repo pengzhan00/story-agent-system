@@ -7,7 +7,8 @@ another process.
 * ``<home>/update/supervisor.json``: written by ``start.sh`` (``storyagent update marker``) with its pid. A process is
   *supervised* when that pid is its parent: only then is a restart offered, because only then something starts it again.
 * ``restart.json`` (the server's request) and ``restart-worker.json`` (the worker's answer) are small files in the same
-  folder. The worker stops claiming work, finishes what it is doing (``wait``) or hands it back at once (``now``), says
+  folder. The worker stops new work, drains in-flight workflows and their media dependencies (``wait``) or hands
+  work back at once (``now``), says
   ``stopped`` and exits 75; the server sees that, lets the browser notice, and exits 75 too. Nothing here ends another
   process: each one leaves by itself.
 """
@@ -201,7 +202,7 @@ class WorkerGate:
         if not self._paused:
             self.worker.pause()
             self._paused = True
-            log.info("restart requested (%s): no new work is claimed", request.mode)
+            log.info("restart requested (%s): only in-flight workflow dependencies may start", request.mode)
         running = self.worker.busy()
         self.mode = request.mode
         if request.mode == "wait" and running:

@@ -193,7 +193,8 @@ def serve(settings: Settings, host: str | None = None, port: int | None = None) 
 
     app = create_app(settings, loader=lambda: get_settings(reload=True))    # a changed config folder is read again
     server = uvicorn.Server(uvicorn.Config(
-        app, host=host or str(settings.api["host"]), port=port or int(settings.api["port"]), log_level="info"))
+        app, host=host or str(settings.api["host"]), port=port or int(settings.api["port"]), log_level="info",
+        timeout_graceful_shutdown=max(0, int(settings.api.get("shutdown_timeout_seconds", 5)))))
 
     def leave(code: int) -> None:
         app.state.exit_code = code

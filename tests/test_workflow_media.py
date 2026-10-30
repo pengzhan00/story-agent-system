@@ -498,3 +498,45 @@ def test_the_episode_timeline_uses_one_music_bed_per_scene_cue_in_story_order(tm
     act2 = next(s for s in tl["segments"] if s["label"].startswith("2.1."))
     assert tl["music"][1]["start"] < act2["start"] < tl["music"][1]["start"] + 1.5 + 1e-6
     assert tl["room_tone"] is not None and tl["room_tone"]["db"] == -50.0
+
+
+def test_waiting_restart_drains_only_media_required_by_the_running_workflow(tmp_path: Path) -> None:
+    from storyagent.domain import MediaKind
+    from storyagent.media.contracts import MediaJob
+    from storyagent.restart import RestartRequest, WorkerGate, write_request
+
+    engine, worker, _ = story(tmp_path, [FakeAdapter()])
+    ledger = engine.spec_store.ledger
+    run = engine.state.enqueue(1, ["produce"])
+    worker.tick()  # the workflow submits a phase then waits for the media scheduler
+    deadline = time.monotonic() + 5
+    while not ledger.queued() and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert ledger.queued()
+    next_pid = new_project(engine)
+    next_run = engine.state.enqueue(next_pid, ["analyze"])
+    # Higher-priority unrelated work exceeds the scheduler page size. It must not starve the in-flight dependencies.
+    unrelated = [ledger.enqueue(MediaJob(MediaKind.IMAGE_GENERATE, {"prompt": f"unrelated {i}"},
+                                        project_id=1, model_ref="f-img", priority=-100, seed=i))[0].id
+                 for i in range(60)]
+    gate = WorkerGate(engine.settings, worker, clock=lambda: 0)
+    write_request(engine.settings, RestartRequest("drain", "wait", 1))
+    try:
+        assert not gate.poll()
+        deadline = time.monotonic() + 15
+        while not gate.leaving and time.monotonic() < deadline:
+            worker.tick()
+            gate.poll()
+            time.sleep(0.01)
+        assert gate.leaving, "restart deadlocked while workflow waits for queued media"
+        assert engine.state.get_run(run["id"])["status"] == "completed"
+        assert engine.state.get_run(next_run["id"])["status"] == "queued"
+        assert engine.pending_media_jobs() == set()
+        assert all(ledger.get_job(j).status.value == "queued" for j in unrelated)
+    finally:
+        engine.state.request_cancel(next_run["id"])
+        for jid in unrelated:
+            ledger.request_cancel(jid)
+        worker.resume()
+        worker.drain(30)
+        worker.shutdown()

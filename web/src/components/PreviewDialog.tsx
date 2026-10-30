@@ -18,7 +18,9 @@ export function PreviewDialog(props: { assetId: string; title: string; seconds: 
       ref={ref}
       className="preview"
       aria-label={props.title}
-      onClose={props.onClose}
+      onClose={(e) => {
+        if (!e.currentTarget.open) props.onClose();
+      }}
       onClick={(e) => {
         if (e.target === ref.current) props.onClose();
       }}

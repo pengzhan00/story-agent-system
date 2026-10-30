@@ -15,7 +15,10 @@ export function MediaLightbox(props: { src: string; kind: "image" | "video"; tit
       ref={ref}
       className="lightbox"
       aria-label={props.title}
-      onClose={props.onClose}
+      onClose={(e) => {
+        // StrictMode can close then reopen this node before its queued close event is dispatched.
+        if (!e.currentTarget.open) props.onClose();
+      }}
       onClick={(e) => {
         if (e.target === ref.current) props.onClose();
       }}

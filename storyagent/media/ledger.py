@@ -269,11 +269,28 @@ class Ledger:
             ).rowcount
         return changed
 
-    def queued(self, limit: int = 50) -> list[JobRecord]:
+    def job_dependencies(self, ids: Sequence[str]) -> set[str]:
+        """The named jobs and their transitive depends_on chain, including cycles only once."""
+        selected = list(dict.fromkeys(ids))
+        if not selected:
+            return set()
+        marks = ",".join("?" * len(selected))
+        rows = self.db.conn.execute(
+            f"WITH RECURSIVE needed(id) AS (SELECT id FROM media_jobs WHERE id IN ({marks}) UNION "
+            "SELECT j.depends_on FROM media_jobs j JOIN needed n ON j.id=n.id WHERE j.depends_on IS NOT NULL) "
+            "SELECT id FROM needed", selected).fetchall()
+        return {r["id"] for r in rows}
+
+    def queued(self, limit: int = 50, *, ids: Sequence[str] | None = None) -> list[JobRecord]:
+        if ids is not None and not ids:
+            return []
+        selected = list(dict.fromkeys(ids)) if ids is not None else []
+        where = f" AND id IN ({','.join('?' * len(selected))})" if ids is not None else ""
         rows = self.db.conn.execute(
             "SELECT * FROM media_jobs WHERE status='queued' AND (depends_on IS NULL OR depends_on IN "
-            "(SELECT id FROM media_jobs WHERE status='completed')) ORDER BY priority, created_at, rowid LIMIT ?",
-            (limit,),
+            "(SELECT id FROM media_jobs WHERE status='completed'))" + where
+            + " ORDER BY priority, created_at, rowid LIMIT ?",
+            (*selected, limit),
         ).fetchall()
         return [JobRecord.from_row(r) for r in rows]
 

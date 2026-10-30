@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { Asset, Job, Spec } from "../api/types";
 import { put } from "../api/client";
 import { duration } from "../lib/format";
+import { mediaOfAsset } from "../lib/assets";
 import { useT } from "../i18n";
 import { jobError } from "../lib/jobError";
 import { ErrorNote } from "./ErrorNote";
@@ -107,11 +108,12 @@ function Zoomable({ asset, src, kind }: { asset: Asset; src: string; kind: "imag
 
 export function AssetPreview({ asset, onSaved }: { asset: Asset; onSaved?: (a: Asset) => void }) {
   const src = `/api/assets/${asset.id}/file`;
+  const media = mediaOfAsset(asset);
   if (asset.locked) return <MaskedPreview asset={asset} />;
-  if (asset.kind.startsWith("image")) return <Zoomable asset={asset} src={src} kind="image" />;
-  if (asset.kind.startsWith("video")) return <Zoomable asset={asset} src={src} kind="video" />;
-  if (asset.kind.startsWith("audio") || asset.kind.startsWith("upload.audio")) return <audio className="audio" src={src} controls preload="none" />;
-  if (asset.kind.startsWith("text") || asset.kind === "upload.text") return <TextPreview asset={asset} src={src} onSaved={onSaved} />;
+  if (media === "image") return <Zoomable asset={asset} src={src} kind="image" />;
+  if (media === "video") return <Zoomable asset={asset} src={src} kind="video" />;
+  if (media === "audio") return <audio className="audio" src={src} controls preload="none" />;
+  if (media === "text") return <TextPreview asset={asset} src={src} onSaved={onSaved} />;
   return <a href={src}>{asset.path}</a>;
 }
 

@@ -306,3 +306,17 @@ def test_chinese_in_the_prompt_of_an_english_only_model_warns_but_still_queues(
     assert created and rec.status is JobStatus.QUEUED
     warn = [e for e in led.events(rec.id) if e["event"] == "prompt_language"]
     assert len(warn) == 1 and warn[0]["level"] == "warning"
+
+
+def test_restart_dependency_closure_filters_before_queue_limit_and_bounds_cycles(led: Ledger) -> None:
+    root, _ = led.enqueue(job(seed=100))
+    child, _ = led.enqueue(job(seed=101, depends_on=root.id))
+    for seed in range(200, 260):
+        led.enqueue(job(seed=seed, priority=-100))
+    needed = led.job_dependencies([child.id, child.id])
+    assert needed == {root.id, child.id}
+    assert [r.id for r in led.queued(ids=sorted(needed))] == [root.id]
+    assert led.queued(ids=[]) == []
+    led.db.conn.execute("UPDATE media_jobs SET depends_on=? WHERE id=?", (child.id, root.id))
+    assert led.job_dependencies([child.id]) == needed
+    assert led.queued(ids=sorted(needed)) == []

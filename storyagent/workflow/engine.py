@@ -3,7 +3,8 @@ from __future__ import annotations
 import json
 import logging
 import threading
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Sequence
+from contextlib import contextmanager
 from typing import Any
 
 from storyagent import script_text
@@ -57,6 +58,24 @@ class WorkflowEngine:
         self.agents = agents or AgentRunner(settings, self.router)
         self.store, self.state, self.projects = StoryStore(db), WorkflowState(db), ProjectStore(db, settings)
         self.spec_store = spec_store or SpecStore(db, settings, Ledger(db, settings))
+        self._media_waiters: dict[object, set[str]] = {}
+        self._media_wait_lock = threading.Lock()
+
+    @contextmanager
+    def waiting_on_media(self, ids: set[str]) -> Iterator[None]:
+        """Expose only the concrete dependencies of in-flight runs to a draining worker."""
+        token = object()
+        with self._media_wait_lock:
+            self._media_waiters[token] = set(ids)
+        try:
+            yield
+        finally:
+            with self._media_wait_lock:
+                self._media_waiters.pop(token, None)
+
+    def pending_media_jobs(self) -> set[str]:
+        with self._media_wait_lock:
+            return {jid for ids in self._media_waiters.values() for jid in ids}
 
     def agents_for(self, project: Any) -> AgentRunner:
         """The project's own edits to some agent prompts (``settings['agents']``) layered over the shared specs;
@@ -107,6 +126,7 @@ class WorkflowEngine:
             settings_for(self.settings, project.pipeline, project.settings.get("pipeline_models")), self.db, self.store,
             self.state, self.agents_for(project), self.projects, project,
             dict(params or {}), progress or (lambda *_: None), cancelled or (lambda: False), self.spec_store, stage,
+            media_wait=self.waiting_on_media,
         )
         self.state.set_stage(project_id, stage, "running", episode=episode)
         if progress:
