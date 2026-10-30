@@ -8,6 +8,14 @@
 #   episode_sec: min / default / max length of one episode in seconds (the default becomes the project's target)
 #   ask        : questions the creation wizard shows; subset of seasons, episodes, episode_sec, audience, platform
 #   guidance   : English paragraph handed to the story analysis (what this kind of work needs)
+#   writing    : English paragraph handed to every writing agent (season outline, outline, shots, workshop story and
+#                script, the script editor): the rhythm and structure of this form and how people talk in it. The genre
+#                (genres.toml) is added on top. Empty = the writers get no form rules, only the brief.
+#   dialogue_chars : the longest spoken line, in characters (the voice-over has to fit the shot: about 4.5 characters
+#                a second)
+#   shot_sec   : min / default / max length of one shot in seconds; the writers are asked for it and the shot plan
+#                holds every shot to min..max (a run can override with min_shot_sec / max_shot_sec). Keep max within
+#                what the plan's video model renders in one clip or that a still image with camera movement can carry.
 
 [default]
 kind = "drama_series"
@@ -19,6 +27,12 @@ pipeline = "vertical_drama"
 seasons = true
 ask = ["seasons", "episodes", "episode_sec", "audience", "platform"]
 guidance = "A continuing vertical short-drama series. Every episode opens with a hook in the first seconds, turns at least once, and ends on a cliffhanger that makes the viewer want the next episode. Characters and the look stay the same across episodes."
+writing = "Serialised short-form drama made for the phone. Pace is the product: open on the hook in the first beat, change something in every scene (a secret out, a stake raised, an alliance broken), keep scenes to one beat in one place, and turn the story at least once per act. Dialogue is brief and carries conflict; no speeches, no exposition that the picture can show. Each episode ends on a cliffhanger or an open question that pays off in the next one."
+dialogue_chars = 25
+[kinds.drama_series.shot_sec]
+min = 2
+default = 4
+max = 8
 [kinds.drama_series.episodes]
 min = 2
 default = 12
@@ -35,6 +49,12 @@ pipeline = "vertical_drama"
 seasons = false
 ask = ["episode_sec", "audience", "platform"]
 guidance = "A self-contained short drama told in one piece: a hook at the start, a clear conflict, a reversal, and a resolution at the end."
+writing = "A self-contained short piece, told once and finished. Open on a hook, build one conflict that escalates, turn it once, and land the resolution in the closing beats; nothing is left dangling for a next episode. Economy matters: every scene must do two jobs (move the plot and reveal a character). Dialogue is short and in character, with room for one quiet moment before the turn."
+dialogue_chars = 30
+[kinds.drama_single.shot_sec]
+min = 2
+default = 4
+max = 8
 [kinds.drama_single.episodes]
 min = 1
 default = 1
@@ -51,6 +71,12 @@ pipeline = "tv_series"
 seasons = true
 ask = ["seasons", "episodes", "episode_sec", "audience", "platform"]
 guidance = "A television series with long episodes: an A story and a B story per episode, an arc that runs through the season, a recap of the story so far and a closing beat that points to the next episode."
+writing = "A television episode, written to be watched on a screen at a sitting. Run an A story and a B story and cut between them; a cold open raises the episode's question, the midpoint complicates it, and the end answers it while leaving the season arc moving. Scenes may run two to four minutes and breathe: let characters talk around what they want, use subtext and silence, and let a scene turn on a single shift in power. A cliffhanger is welcome but not required every time. Recap the story so far only through action and a line or two."
+dialogue_chars = 45
+[kinds.tv_series.shot_sec]
+min = 3
+default = 6
+max = 12
 [kinds.tv_series.episodes]
 min = 2
 default = 8
@@ -67,6 +93,12 @@ pipeline = "advert"
 seasons = false
 ask = ["episode_sec", "audience", "platform"]
 guidance = "An advert: one product or message, one clear promise, a memorable image in the first seconds, a short story or demonstration, and a closing call to action with the name of the brand. No subplots; every shot earns its place."
+writing = "An advert: one message, told in seconds. Open with the memorable image or the problem, show the product doing its job inside a tiny story or demonstration, and close on the brand name and the call to action. No subplots and no more than two speaking characters; the copy is voice-over or a few short lines, and the pictures carry the rest. Every shot has a purpose, and the last shot is the one the viewer remembers."
+dialogue_chars = 20
+[kinds.advert.shot_sec]
+min = 1
+default = 3
+max = 6
 [kinds.advert.episodes]
 min = 1
 default = 1
@@ -83,6 +115,12 @@ pipeline = "feature_film"
 seasons = false
 ask = ["episode_sec", "audience", "platform"]
 guidance = "A feature film in three acts: setup, confrontation, resolution, with an inciting incident, a midpoint turn, a low point and a climax. Themes and characters develop over the whole length; scenes are long enough to breathe."
+writing = "A feature film in three acts. Spend the first act on the ordinary world and the inciting incident, the second on rising confrontation with a midpoint turn and a low point, the third on the climax and its aftermath. Scenes are long enough to breathe: dialogue is natural and may overlap or trail off, subtext does most of the work, and silence and image are allowed to tell the story. Let a theme recur in small ways. Set pieces and quiet scenes alternate; characters change because of what the story costs them, not because they announce it."
+dialogue_chars = 60
+[kinds.feature_film.shot_sec]
+min = 3
+default = 8
+max = 15
 [kinds.feature_film.episodes]
 min = 1
 default = 1
@@ -99,6 +137,12 @@ pipeline = "vertical_drama"
 seasons = true
 ask = ["seasons", "episodes", "episode_sec", "audience", "platform"]
 guidance = ""
+writing = "Follow the idea, the genre and the brief exactly; do not impose a house style. Choose the pace and structure the material calls for, keep scenes filmable (one place, one time, a clear beat) and keep dialogue natural and in character."
+dialogue_chars = 40
+[kinds.custom.shot_sec]
+min = 2
+default = 5
+max = 10
 [kinds.custom.episodes]
 min = 1
 default = 1

@@ -51,7 +51,9 @@ storyagent workflow status --project 1                 # stage states (+ per-sta
 storyagent workflow watch [RUN_ID] [--project 1]       # follow a queued/running run
 ```
 
-Params: `premise`, `acts`, `episode`, `source_text`, `visual_prompts` (false = deterministic prompts, no extra LLM call per shot), `min_shot_sec`, `max_shot_sec`, `force`.
+Params: `premise`, `acts`, `episode`, `source_text`, `visual_prompts` (false = deterministic prompts, no extra LLM call per shot), `min_shot_sec`, `max_shot_sec` (default: the project kind's `shot_sec`, see [WRITING.md](WRITING.md)), `force`.
+
+The writing agents (`screenwriter.*`, `reviewer.script`, `workshop.story|script`) are not tuned to one kind of work: the form of the work (`kinds.toml` `writing`), the genre notes (`genres.toml`), the picture frame, the longest spoken line and the shot length reach them as the variables `form_guidance`, `genre_guidance`, `frame_note`, `dialogue_chars`, `shot_sec`.
 
 **Revising with feedback**: `--stage script --param feedback="..."` (optionally `revise_scenes=["1.3","2.1"]`, as `act.scene`) keeps the outline and writes again the shots of the named scenes (every scene when none is named) from the feedback and their current shots (`screenwriter.shots` inputs `feedback`, `current`). The Web "工作流" page offers it under the script review: tick the review issues to apply, add own notes.
 

@@ -3,10 +3,15 @@ role = "writer"
 temperature = 0.8
 max_tokens = 4000
 description = "Workshop: an idea becomes a story (free text, no fixed structure)."
-inputs = ["idea", "language", "genre", "tone", "length", "notes"]
-system = """You are a professional writer of short vertical drama series. Fast pacing, strong reversals, dense conflict,
-a hook in the first lines and a payoff at the end. Write all story content in $language. Plain prose, no markdown
-tables, no commentary about what you are doing."""
+inputs = ["idea", "language", "genre", "tone", "length", "notes", "form_guidance", "genre_guidance"]
+system = """You are a professional writer for the screen. You write for the form and genre described below. Write all
+story content in $language. Plain prose, no markdown tables, no commentary about what you are doing.
+
+How this form is written ("(none)" means: follow the idea and the author's notes, no house style):
+$form_guidance
+
+Craft notes for the genre:
+$genre_guidance"""
 prompt = """Write a story from this idea.
 
 Idea: $idea

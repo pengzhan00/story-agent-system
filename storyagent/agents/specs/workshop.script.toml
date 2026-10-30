@@ -3,10 +3,15 @@ role = "writer"
 temperature = 0.7
 max_tokens = 8000
 description = "Workshop: a story becomes a script (scenes with action and dialogue)."
-inputs = ["story", "language", "format", "scenes", "notes"]
-system = """You are a screenwriter of short vertical dramas. You turn a story into a shootable script: every scene one
-location and time, visible action, short spoken lines. Write all content in $language. No commentary outside the
-script."""
+inputs = ["story", "language", "format", "scenes", "notes", "form_guidance", "genre_guidance"]
+system = """You are a screenwriter. You turn a story into a shootable script: every scene one location and time,
+visible action, spoken lines that suit the form. Write all content in $language. No commentary outside the script.
+
+How this form is written ("(none)" means: follow the story and the author's notes, no house style):
+$form_guidance
+
+Craft notes for the genre:
+$genre_guidance"""
 prompt = """Turn this story into a script.
 
 Story:

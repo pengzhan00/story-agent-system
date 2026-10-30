@@ -1,0 +1,56 @@
+# Genre craft notes. The genre of a project is free text (the creator's, or what the story analysis names); every entry
+# below whose `aliases` occur in that text (any language, case ignored) hands its `guidance` to the writing agents
+# (season outline, outline, shots, workshop story and script, the script editor), at most `max_matches` of them, in
+# file order. Add or change entries in $STORY_AGENT_HOME/config/genres.toml - nothing here is fixed in code.
+#
+#   aliases  : words that select the genre (substring match on the lower-cased genre text)
+#   guidance : English craft note, a few sentences: what drives the story, how reversals and endings work, how people
+#              talk, what to avoid. It describes the genre only; the rhythm of the form (series, film, advert) comes
+#              from kinds.toml `writing`.
+
+[default]
+max_matches = 2
+
+[genres.romance]
+aliases = ["romance", "love story", "romantic", "言情", "爱情", "情感", "恋爱", "甜宠", "虐恋"]
+guidance = "Romance: two people who want each other and stand in their own way. Give each lead a want and a wound; every scene moves their closeness (nearer, further, a misunderstanding, a confession held back). Feeling lives in subtext: let looks, objects and interruptions carry what is not said. Reversals are emotional (a truth comes out, a rival, a hard choice), not stunts. Avoid instant declarations and villains who exist only to block."
+
+[genres.mystery]
+aliases = ["mystery", "detective", "whodunit", "悬疑", "推理", "侦探", "破案"]
+guidance = "Mystery: plant a question early and answer it late. Play fair: show each clue before the reveal, inside a scene that seems to be about something else. Every scene adds a clue, removes a suspect or raises the cost of knowing. Misdirect through what characters believe, never by hiding facts from the viewer. The solution must follow from what was shown."
+
+[genres.thriller]
+aliases = ["thriller", "crime", "heist", "action", "惊悚", "犯罪", "追逐", "动作", "谍战"]
+guidance = "Thriller: a protagonist under pressure with a clock and shrinking options. Dread comes from anticipation: show the danger before it arrives, then make the plan fail in a way that is the hero's own doing. Keep scenes short and causal (because of this, therefore that). Reveal the antagonist's competence early. Avoid coincidences that save the hero."
+
+[genres.historical]
+aliases = ["historical", "period", "palace", "wuxia", "xianxia", "古装", "古代", "历史", "宫廷", "宫斗", "武侠", "仙侠", "民国"]
+guidance = "Period piece: rank, etiquette and family duty create the pressure. People speak in a restrained formal register and power moves are indirect (a gift, a seat, a greeting kept waiting). Honour, loyalty and obligation are the stakes. Keep customs, forms of address, props and places consistent with the era; avoid modern idioms and anachronisms."
+
+[genres.comedy]
+aliases = ["comedy", "humor", "humour", "sitcom", "funny", "喜剧", "搞笑", "幽默", "轻喜", "沙雕"]
+guidance = "Comedy: a character with a flaw under pressure. Set up a rule, then break it; escalate the absurdity logically and keep the straight person's reactions. Jokes land on action and contrast: short lines with the turn last. Never let a gag stall the plot, and keep warmth under the mockery."
+
+[genres.workplace]
+aliases = ["workplace", "office", "business", "corporate", "职场", "商战", "创业", "公司", "办公室"]
+guidance = "Workplace: the stakes are position, money and reputation, fought through meetings, deadlines, favours and who is copied on an email. Conflict is polite on the surface and sharp underneath. Competence is shown by decisions under constraint, not by speeches. Keep jargon light and let the visuals (screens, documents, who sits where) carry the power map."
+
+[genres.campus]
+aliases = ["campus", "school", "youth", "coming-of-age", "high school", "校园", "青春", "学生", "高中", "大学"]
+guidance = "Campus and youth: small events feel enormous (an exam, a seat, a message left unread). Anchor each scene in a concrete place and ritual of school life. Friendship and first feeling matter as much as plot; keep adults at the edges. Humour and awkwardness are honest, cruelty is specific, and growth shows as a changed small habit."
+
+[genres.scifi_fantasy]
+aliases = ["sci-fi", "scifi", "science fiction", "fantasy", "cyberpunk", "科幻", "未来", "奇幻", "玄幻", "穿越", "末世", "魔法"]
+guidance = "Science fiction and fantasy: one speculative premise, explored through human consequences. Show the rules of the world through action rather than lectures, and keep them consistent; the premise itself creates the conflict. Ground the strange in one familiar emotion. Limit invented terms to what a viewer can follow once."
+
+[genres.family]
+aliases = ["family", "domestic", "ethics", "家庭", "伦理", "亲情", "婆媳", "婚姻", "家长里短"]
+guidance = "Family drama: stakes are money, care, inheritance and the old arguments between generations. Conflicts are quiet and personal and truth comes out at the table, in the kitchen, at the hospital. Everyone has a reason. Earn every raised voice; let silence and small acts of care carry the reconciliation. Avoid melodrama beyond what the situation earns."
+
+[genres.revenge]
+aliases = ["revenge", "payback", "underdog", "rags to riches", "复仇", "逆袭", "爽文", "打脸", "重生", "虐渣", "反转"]
+guidance = "Revenge and rise-up: an injustice the viewer feels, a hidden strength, and a payoff that arrives in steps. Escalate the humiliation, then the exposure, then the cost to the one who did it. The satisfying reveal is staged in front of the people who doubted the hero. Give the hero a visible price or limit so the win is earned, and keep the villain intelligent."
+
+[genres.horror]
+aliases = ["horror", "ghost", "supernatural", "haunted", "恐怖", "灵异", "鬼", "诡异", "惊魂"]
+guidance = "Horror: dread over gore. Withhold: the unseen, the sound from the next room, an ordinary place turned wrong. Establish the rule of the haunting early and break it at the worst time. Slow, quiet beats before every scare; the protagonist's choices (not stupidity) lead into danger. End on an image that stays."

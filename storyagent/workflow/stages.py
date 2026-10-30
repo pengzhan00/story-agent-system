@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from storyagent.agents import AgentRunner
+from storyagent.agents.craft import resolve_kind, shot_bounds, writing_vars
 from storyagent.agents.runner import language_name
 from storyagent.compose.pacing import PacingError, fit_durations, structure_for, target_for
 from storyagent.config import Settings
@@ -111,10 +112,23 @@ class Ctx:
             raise WorkflowCancelled()
         self.progress(self.stage, done, total, msg)
 
+    def writing_vars(self) -> dict[str, str]:
+        """The form rules (kind of work) and genre notes every writing agent is given; see ``agents.craft``."""
+        plan = self.state.get_data(self.pid, "plan") or {}
+        genre = str(plan.get("genre") or self.project.genre or "")
+        return writing_vars(self.settings, self.project.kind, genre, vertical=self.frame_vertical())
+
+    def shot_range(self) -> tuple[float, float]:
+        """Shortest and longest planned shot: the kind's ``shot_sec``; run parameters ``min_shot_sec`` and
+        ``max_shot_sec`` win."""
+        low, high = shot_bounds(self.settings, self.project.kind)
+        return float(self.params.get("min_shot_sec", low)), float(self.params.get("max_shot_sec", high))
+
     def run_agent(self, name: str, variables: dict[str, Any]) -> dict[str, Any]:
         if self.cancelled():
             raise WorkflowCancelled()
-        return self.agents.run(name, {"language": self.language, **variables}, project_id=self.pid).data
+        return self.agents.run(name, {"language": self.language, **self.writing_vars(), **variables},
+                               project_id=self.pid).data
 
 
 # ---------------------------------------------------------------------------------------------------------
@@ -316,7 +330,8 @@ def script(ctx: Ctx) -> dict[str, Any]:
     if not chars:
         raise StageError("needs_stage", "run the cast stage first", stage="cast")
     target = ctx.target_sec()
-    sized = structure_for(target, float(ctx.settings.delivery["pacing"]["avg_shot_sec"])) if target else (None,) * 3
+    avg_shot = resolve_kind(ctx.settings, ctx.project.kind).shot_sec.default   # the form's usual shot length
+    sized = structure_for(target, avg_shot) if target else (None,) * 3
     acts_n = int(ctx.params.get("acts") or sized[0] or plan.get("act_count") or 4)
     per_act = int(ctx.params.get("scenes_per_act") or sized[1] or 3)
     shots_n = int(ctx.params.get("shots_per_scene") or sized[2] or 3)
@@ -487,16 +502,16 @@ def shotplan(ctx: Ctx) -> dict[str, Any]:
         raise StageError("needs_stage", "run the script stage first", stage="script")
     profile = ctx.settings.delivery_profile(ctx.project.delivery_profile)
     ep = ctx.store.ensure_episode(ctx.pid, episode, season=ctx.season_of(episode))
+    min_shot, max_shot = ctx.shot_range()
     rows = build_shot_rows(
         script_row, characters=ctx.store.list_characters(ctx.pid), locations=ctx.store.list_locations(ctx.pid),
         style=_style(ctx), profile=profile, looks=ctx.store.list_looks(ctx.pid), props=ctx.store.list_props(ctx.pid),
-        episode=episode, min_shot_sec=float(ctx.params.get("min_shot_sec", 2.0)),
-        max_shot_sec=float(ctx.params.get("max_shot_sec", 8.0)),
+        episode=episode, min_shot_sec=min_shot, max_shot_sec=max_shot,
     )
     target = ctx.target_sec()
     if target and rows:           # planned lengths add up to the wanted length (speech may still extend a shot)
         fitted = fit_durations([float(r["render_payload"]["camera"]["duration_sec"]) for r in rows], target,
-                               float(ctx.params.get("min_shot_sec", 2.0)), float(ctx.params.get("max_shot_sec", 8.0)))
+                               min_shot, max_shot)
         for row, seconds in zip(rows, fitted, strict=True):
             row["render_payload"]["camera"]["duration_sec"] = seconds
     created, kept = ctx.store.replace_episode_shots(ctx.pid, ep["id"], rows)

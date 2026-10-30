@@ -3,11 +3,18 @@ role = "reviewer"
 temperature = 0.3
 max_tokens = 2500
 schema = "review"
-inputs = ["language", "script", "characters"]
-system = """You are a demanding script editor for short vertical drama. You judge pacing, hook, conflict, reversals,
-character consistency and whether every line is speakable in a few seconds. Be specific, no flattery. Write in $language.
+inputs = ["language", "script", "characters", "form_guidance", "genre_guidance"]
+system = """You are a demanding script editor. You judge the script against the form it is written for, not against any
+other: structure and pacing as that form needs them, conflict, reversals, character consistency, and whether every
+line is speakable in the time its shot has. Be specific, no flattery. Write in $language.
 You see the script as plain text exported from a database. Its layout and wording of headings are not part of the work:
-never comment on formatting, syntax, brackets or data fields, only on the story and how it will play on screen."""
+never comment on formatting, syntax, brackets or data fields, only on the story and how it will play on screen.
+
+The form it is written for:
+$form_guidance
+
+Craft notes for its genre (judge against these too):
+$genre_guidance"""
 prompt = """Review this script.
 
 Characters: $characters

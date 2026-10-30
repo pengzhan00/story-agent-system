@@ -7,6 +7,8 @@ backend and model are the ones configured there unless ``params.model`` pins one
 Inputs  story: ``idea``, ``language``, ``genre``, ``tone``, ``length``, ``notes``
         script: ``story`` (a text file, e.g. ``job:<id>`` of a story) or ``story_text``, ``language``, ``format``,
         ``scenes``, ``notes``
+        both: ``kind`` (optional, a kind of work from kinds.toml: its writing rules apply; none = no form rules); the
+        genre text selects the genre notes of genres.toml
 Params  ``agent`` (prompt name), ``role`` (llm.toml role), ``model`` (pin), ``temperature``, ``max_tokens``
 """
 from __future__ import annotations
@@ -15,6 +17,7 @@ import threading
 from pathlib import Path
 from typing import Any
 
+from storyagent.agents.craft import writing_vars
 from storyagent.agents.registry import AgentSpecError
 from storyagent.agents.runner import AgentRunner, language_name
 from storyagent.config import Settings
@@ -101,6 +104,11 @@ class LlmAdapter(AdapterBase):
             values["story"] = read_text_input(ctx.settings, job.inputs.get("story") or job.inputs.get("story_text"))
         else:
             values["idea"] = read_text_input(ctx.settings, job.inputs.get("idea"))
+        # form and genre notes: a `kind` input (a name from kinds.toml) selects the form, a genre text its craft notes;
+        # without a kind the writers get no form rules
+        kind = str(job.inputs.get("kind") or "").strip() or None
+        for key, text in writing_vars(ctx.settings, kind, str(values.get("genre", ""))).items():
+            values.setdefault(key, text)
         for key in spec.inputs:
             values.setdefault(key, "")
         system, prompt = runner.render(name, values)

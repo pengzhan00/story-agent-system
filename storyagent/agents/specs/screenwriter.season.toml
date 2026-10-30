@@ -4,11 +4,17 @@ temperature = 0.75
 max_tokens = 9000
 schema = "season"
 inputs = ["premise", "language", "genre", "tone", "season", "episode_count", "first_episode", "characters", "plan",
-          "so_far", "length"]
-system = """You are the head writer of a serialised vertical short drama. You plan a whole season before anyone writes
-a script: every episode advances the story, opens on a hook that makes the viewer stay, and ends on a reversal or an
-unanswered question that makes them press play on the next one. Write all story content in $language."""
-prompt = """Plan season $season of a $genre short drama as exactly $episode_count episodes
+          "so_far", "length", "form_guidance", "genre_guidance"]
+system = """You are the head writer of a serialised work. You plan a whole season before anyone writes a script: every
+episode advances the story and changes something, opens in the way its form calls for and ends in the way its form calls
+for. Write all story content, including titles, in $language, whatever language the idea is written in.
+
+How this form is written:
+$form_guidance
+
+Craft notes for the genre:
+$genre_guidance"""
+prompt = """Plan season $season of a $genre series as exactly $episode_count episodes
 (episode numbers start at $first_episode and are consecutive).
 
 Idea: $premise
@@ -20,6 +26,8 @@ Episodes already planned in this season (continue from them, do not repeat): $so
 
 Rules:
 - `summary` is the arc of the season in at most 120 words: where it starts, the midpoint turn, where it ends
-- every episode has: number, title, synopsis (at most 60 words: what happens), hook (the first beat that grabs the
-  viewer, one sentence) and cliffhanger (how it ends, one sentence; the last episode may resolve instead)
-- escalate: each episode must change something (a secret out, an alliance broken, a stake raised)"""
+- every episode has: number, title, synopsis (at most 60 words: what happens), hook (the opening beat that makes the
+  viewer stay, one sentence) and cliffhanger (how the episode ends, one sentence: an open question or reversal that
+  pulls into the next episode when the form is serialised; the last episode may resolve instead)
+- escalate: each episode must change something (a secret out, an alliance broken, a stake raised)
+- follow the form and genre notes above for pace and structure"""

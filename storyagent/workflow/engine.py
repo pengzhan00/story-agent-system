@@ -9,6 +9,7 @@ from typing import Any
 
 from storyagent import script_text
 from storyagent.agents import AgentRunner
+from storyagent.agents.craft import writing_vars
 from storyagent.agents.registry import AgentSpecError, load_specs, with_overrides
 from storyagent.agents.runner import language_name
 from storyagent.config import Settings
@@ -103,9 +104,13 @@ class WorkflowEngine:
         except LocaleError:                 # a content language the interface has no texts for
             labels = get_catalog("en")
         text = script_text.render(script["title"], script["synopsis"], script["acts"], labels.t)
+        plan = self.state.get_data(project_id, "plan") or {}
+        profile = self.settings.delivery_profile(project.delivery_profile)
+        craft = writing_vars(self.settings, project.kind, str(plan.get("genre") or project.genre or ""),
+                             vertical=int(profile["height"]) > int(profile["width"]))
         data = self.agents_for(project).run("reviewer.script", {
             "language": language_name(project.content_language), "script": text,
-            "characters": json.dumps(chars, ensure_ascii=False)}, project_id=project_id).data
+            "characters": json.dumps(chars, ensure_ascii=False), **craft}, project_id=project_id).data
         return dict(data)
 
     def translate_lines(self, project_id: int, lines: Sequence[str], target: str) -> list[str]:

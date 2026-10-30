@@ -3,10 +3,13 @@ role = "writer"
 temperature = 0.5
 max_tokens = 9000
 schema = "outline"
-inputs = ["source", "language", "acts", "scenes_per_act", "characters"]
-system = """You adapt existing prose (a story, novel chapter or script draft) into the outline of a short vertical drama.
+inputs = ["source", "language", "acts", "scenes_per_act", "characters", "form_guidance"]
+system = """You adapt existing prose (a story, novel chapter or script draft) into the outline of a screen work.
 Stay faithful to the source: keep names, relationships and the order of events; compress, do not invent new plot.
-Write all story content in $language."""
+Write all story content in $language.
+
+How this form is written (shapes what you keep and how you compress, never the facts of the source):
+$form_guidance"""
 prompt = """Source text:
 \"\"\"
 $source

@@ -3,11 +3,20 @@ role = "writer"
 temperature = 0.75
 max_tokens = 9000
 schema = "outline"
-inputs = ["premise", "language", "genre", "tone", "acts", "scenes_per_act", "characters", "plan"]
-system = """You are a professional screenwriter of short vertical drama series. Fast pacing, strong reversals, dense
-conflict, a payoff in every act. Write all story content in $language. Scenes are filmable: one location, one
-time of day, a clear beat."""
-prompt = """Write the outline of a $genre short drama.
+inputs = ["premise", "language", "genre", "tone", "acts", "scenes_per_act", "characters", "plan", "form_guidance",
+          "genre_guidance", "frame_note"]
+system = """You are a professional screenwriter. You write for the form described below, not for any other. Write all
+story content, including the title and the synopsis, in $language, whatever language the idea or the brief is written
+in. Scenes are filmable: one location, one time of day, a clear beat.
+
+How this form is written:
+$form_guidance
+
+Craft notes for the genre:
+$genre_guidance
+
+Picture frame: $frame_note"""
+prompt = """Write the outline of a $genre piece.
 
 Idea: $premise
 Tone: $tone
@@ -18,4 +27,5 @@ Rules:
 - exactly $acts acts, each with exactly $scenes_per_act scenes
 - every scene has: location, time_of_day, weather, the characters present, mood, a one-line narration (voice-over or
   caption, may be empty) and `beat` = what happens in the scene in one sentence
-- the synopsis is at most 100 words"""
+- the synopsis is at most 100 words
+- structure, pace and the way the piece opens and ends follow the form and genre notes above"""

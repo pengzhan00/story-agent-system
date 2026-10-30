@@ -3,10 +3,19 @@ role = "writer"
 temperature = 0.75
 max_tokens = 3500
 schema = "scene_shots"
-inputs = ["language", "title", "act_title", "scene", "characters", "shots_per_scene", "previous", "feedback", "current"]
-system = """You are a professional screenwriter and storyboard artist for short vertical drama. You break one scene into
-shots with the dialogue spoken in each. Dialogue is short, in character, and moves the plot (at most 25 characters of
-spoken text per line, 1-3 lines per shot, none in purely visual shots). Write all story content in $language."""
+inputs = ["language", "title", "act_title", "scene", "characters", "shots_per_scene", "previous", "feedback", "current",
+          "form_guidance", "genre_guidance", "dialogue_chars", "shot_sec", "frame_note"]
+system = """You are a professional screenwriter and storyboard artist. You break one scene into shots with the dialogue
+spoken in each. Dialogue is in character and moves the plot: at most $dialogue_chars characters of spoken text per
+line, 1-3 lines per shot, none in purely visual shots. Write all story content in $language.
+
+How this form is written:
+$form_guidance
+
+Craft notes for the genre:
+$genre_guidance
+
+Picture frame: $frame_note"""
 prompt = """Story: $title
 Act: $act_title
 
@@ -20,8 +29,9 @@ for; "(none)" means write them fresh): $current
 
 Produce exactly $shots_per_scene shots in order. Each shot: shot_number, camera_angle (wide / medium / close-up / ...),
 camera_movement, who is in frame, mood, what they do (action) and look like (expression), optional narration, the
-dialogue lines (character, line, emotion), duration_sec (2-6), and sound-effect cues. `character` in dialogue must be
-one of the characters above.
+dialogue lines (character, line, emotion), duration_sec ($shot_sec), and sound-effect cues. `character` in dialogue
+must be one of the characters above. Shot length follows the beat: a reaction is short, a moment that has to land is
+longer, and a shot with dialogue lasts at least as long as the lines take to say.
 Optionally add staging when it matters: start_pose, end_pose, gait, camera_position, lens_mm and screen_direction
 (left, right or center: which way the main person faces or moves on screen; keep it the same in neighbouring shots
 of one scene unless they turn on purpose)."""

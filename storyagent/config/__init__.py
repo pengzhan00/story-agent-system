@@ -1,4 +1,5 @@
 from .content import ContentConfig, RatingPolicy
+from .genres import Genre, Genres
 from .grammar import Grammar, GrammarRule
 from .platforms import Platform, Platforms
 from .settings import (
@@ -30,6 +31,8 @@ __all__ = [
     "ContentConfig",
     "ConfigError",
     "deep_merge",
+    "Genre",
+    "Genres",
     "Grammar",
     "GrammarRule",
     "Platform",

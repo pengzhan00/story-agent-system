@@ -23,6 +23,7 @@ from typing import Any
 from storyagent.domain import MediaKind, QualityTier
 
 from .content import ContentConfig, build_content
+from .genres import Genres, build_genres
 from .grammar import Grammar, build_grammar
 from .platforms import Platforms, build_platforms
 from .setup import SetupConfig, build_setup
@@ -40,8 +41,8 @@ DEFAULT_LOCALE = "zh-CN"
 UNLOAD_POLICIES = ("never", "ask", "auto")
 EXPLICIT_LABEL_MODES = ("off", "overlay", "both")
 LLM_BACKEND_KINDS = ("ollama", "llamacpp", "openai_compat")
-_CONFIG_FILES = ("services", "models", "delivery", "compliance", "recipes", "llm", "pipelines", "kinds", "auth",
-                 "grammar", "platforms", "content", "wiki", "setup")
+_CONFIG_FILES = ("services", "models", "delivery", "compliance", "recipes", "llm", "pipelines", "kinds", "genres",
+                 "auth", "grammar", "platforms", "content", "wiki", "setup")
 AUTH_MODES = ("off", "token")
 CORE_KINDS = ("image.generate", "video.generate", "audio.tts", "audio.music", "compose.assemble")
 BRIEF_QUESTIONS = ("seasons", "episodes", "episode_sec", "audience", "platform")
@@ -162,6 +163,11 @@ class WorkKind:
     episode_sec: Range
     ask: tuple[str, ...]
     guidance: str = ""
+    # how the writing agents write this kind of work (rhythm, structure, dialogue density) and the limits that follow
+    # from it; shot_sec is also the range a planned shot's length is held to (see workflow.stages.shot_bounds)
+    writing: str = ""
+    dialogue_chars: int = 25
+    shot_sec: Range = Range(2.0, 4.0, 6.0)
 
 
 @dataclass(frozen=True)
@@ -250,6 +256,7 @@ class Settings:
     default_pipeline: str = ""
     kinds: Mapping[str, WorkKind] = field(default_factory=dict)
     default_kind: str = ""
+    genres: Genres = field(default_factory=Genres)          # genres.toml: craft notes per genre for the writers
     auth: AuthConfig = field(default_factory=AuthConfig)
     grammar: Grammar = field(default_factory=Grammar)     # grammar.toml: the shot grammar check
     wiki: WikiConfig = field(default_factory=WikiConfig)  # wiki.toml: where the wiki pages come from
@@ -657,9 +664,18 @@ def _build_kinds(raw: Mapping[str, Any], pipelines: Mapping[str, Pipeline]) -> d
             note_key=str(spec.get("note_key", "")),
             pipeline=str(spec["pipeline"]), seasons=bool(spec.get("seasons", False)), episodes=episodes,
             episode_sec=_build_range(f"{where}.episode_sec", spec.get("episode_sec", {})), ask=ask,
-            guidance=str(spec.get("guidance", "")),
+            guidance=str(spec.get("guidance", "")), writing=str(spec.get("writing", "")),
+            dialogue_chars=_dialogue_chars(where, spec.get("dialogue_chars", 25)),
+            shot_sec=(_build_range(f"{where}.shot_sec", spec["shot_sec"]) if "shot_sec" in spec
+                      else Range(2.0, 4.0, 6.0)),
         )
     return out
+
+
+def _dialogue_chars(where: str, raw: Any) -> int:
+    if isinstance(raw, bool) or not isinstance(raw, int) or raw < 4:
+        raise ConfigError(f"{where}: dialogue_chars must be a whole number of at least 4")
+    return raw
 
 
 def _build_llm(
@@ -850,6 +866,7 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         default_pipeline=default_pipeline,
         kinds=kinds,
         default_kind=default_kind,
+        genres=build_genres(merged["genres"], ConfigError),
         auth=_build_auth(merged["auth"], env.get(ENV_AUTH)),
         grammar=build_grammar(merged["grammar"], ConfigError),
         wiki=build_wiki(merged["wiki"], ConfigError),
