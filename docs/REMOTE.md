@@ -13,7 +13,7 @@
 | Tailscale | Tailscale.app,tailnet `tailbc7386.ts.net`;设备:MacBook Pro、iPad、iPhone、Mac mini |
 | HTTPS 入口 | 已设:`https://pengzhanmacbook-pro.tailbc7386.ts.net/`,仅 tailnet 内可见 |
 | 在本机验证 | 页面、JS/CSS、翻译目录返回 200;不登录访问 `/api/projects` 返回 401;`/api/auth/mode` 返回 `token` |
-| **未验证** | 手机/iPad 实际登录(2026-10-30 手机上出现「意外中止」,原因待查,见「排障」) |
+| 手机登录 | 2026-10-30 用户确认手机可以登录使用(首次出现过「意外中止」,按「排障」处理后恢复) |
 | 未做 | 关闭自助注册(`allow_registration`,默认开,见「收紧」) |
 
 ## 从零配置(新机器或重来)
