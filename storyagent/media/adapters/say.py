@@ -74,7 +74,9 @@ class SayAdapter(SubprocessAdapter):
         rate = int(job.params.get("rate") or DEFAULT_RATE)
         ctx.work_dir.mkdir(parents=True, exist_ok=True)
         out = ctx.work_dir / "out.wav"
-        return Command([binary, "-v", voice, "-r", str(rate), "-o", str(out), f"--data-format={DATA_FORMAT}", text])
+        # "--": a line that starts with "-" is the text to speak, never an option of say.
+        return Command([binary, "-v", voice, "-r", str(rate), "-o", str(out), f"--data-format={DATA_FORMAT}", "--",
+                        text])
 
     def collect(self, job: JobRecord, ctx: JobContext) -> list[ArtifactSpec]:
         out = ctx.work_dir / "out.wav"
