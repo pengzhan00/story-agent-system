@@ -64,7 +64,7 @@ storyagent user set NAME --role editor | --inactive | --reset-password
 storyagent audit [--user U] [--action A] [--project N] [--limit N]
 ```
 
-Forgot the only admin's password: `storyagent user set NAME --reset-password` on the server. A locked account (too many wrong passwords) opens again after `lockout_minutes`, or reset its password. Listening beyond loopback (`[api] host`) also needs HTTPS in front (a reverse proxy): the session cookie is marked `Secure` only when the request arrives over https. Every write and every sign-in event is in `audit_log` (Team > Audit in the web client); the table is append-only and holds no request bodies. Jobs keep their own full event history (`media show <id>`).
+Forgot the only admin's password: `storyagent user set NAME --reset-password` on the server. A locked account (too many wrong passwords) opens again after `lockout_minutes`, or reset its password. Remote use from a phone or another computer (Tailscale + `tailscale serve`, hardening, troubleshooting): `docs/REMOTE.md`. Listening beyond loopback (`[api] host`) also needs HTTPS in front (a reverse proxy): the session cookie is marked `Secure` only when the request arrives over https. Every write and every sign-in event is in `audit_log` (Team > Audit in the web client); the table is append-only and holds no request bodies. Jobs keep their own full event history (`media show <id>`).
 
 ## Restricted content (vault on an encrypted volume)
 
