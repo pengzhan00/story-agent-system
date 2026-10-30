@@ -6,6 +6,10 @@ Inputs:  ``prompt``; ``refs`` = files whose role follows from the extension and 
 Params:  width, height, frames (rounded to 5 + 17n unless ``snap_frames`` is false) or seconds (24 fps), steps,
          reuse (1 close .. 3 aggressive), layers (50 exact .. 40 aggressive), core_reuse (1|4|6), token_reduction,
          ssd_streaming, int8_row_fc2 (faster FC2 on M5), ref_image_size (match | max), render_width, render_height.
+         Size rules (h3.c refuses otherwise): width/height must be multiples of 32 and width*height <= 768*1344 =
+         1,032,192 px, so native 1080p is impossible - 1080 comes from upscaling. Portrait projects get the same
+         pixel budget reshaped by ``orient_size`` (1024x576 -> 576x1024). Defaults are the anatomy-first quality set:
+         steps 50 / layers 50 / reuse 1 / core_reuse 1; the ``draft`` tier drops to 4 steps for composition checks.
 Licence: the model's licence excludes EU/UK/South Korea/USA and requires the attribution text; both are carried by the
          model entry (``commercial_ok = false``) so the compliance gate asks for an explicit acknowledgement.
 """

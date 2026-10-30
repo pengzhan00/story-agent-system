@@ -526,14 +526,27 @@ attribution = "MiniMax H3"
 prompt_profile = "h3_structured"
 timeout_sec = 7200
 [models."minimax-h3".params]
-width = 480
-height = 864
+# 尺寸硬约束（h3.c 违反即秒退，适配器不做自动缩放）：
+#   宽高必须是 32 的倍数；画布 ≤ 768x1344 = 1,032,192 像素 → 出不了原生 1080p，1080 走后期超分
+#   可用档：1024x576（16:9 基座）/ 1152x640 / 1280x768 / 1344x768
+#           竖屏 576x1024 / 768x1344（满载画布会摊薄每 token 算力，解剖更易崩，务必配质量档）
+#   帧数：5+17n（5/22/39/56/73…362），24fps
+# 质量档（默认，解剖/细节优先）：steps 50 + layers 50 + reuse 1 + core_reuse 1
+#   layers<50 或 reuse>1 会砍 DiT 精度；裸露、双人交叠、大幅动作场景的解剖结构最先崩
+width = 1024
+height = 576
 frames = 56
-steps = 20
+steps = 50
+layers = 50
+reuse = 1
+core_reuse = 1
+# 草稿档：只用于看构图，不要用来验收解剖
 [models."minimax-h3".tiers.draft]
 frames = 22
-layers = 40
-reuse = 3
+steps = 4
+layers = 50
+reuse = 1
+core_reuse = 1
 
 
 [models."longcat-avatar-1.5-q4"]
