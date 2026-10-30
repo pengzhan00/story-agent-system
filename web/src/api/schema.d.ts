@@ -3303,6 +3303,53 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/workshop/assist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Assist
+         * @description The AI assistant of a module designs the form: prompt, lyrics, text and parameters, from the standing
+         *     requirements, this request and the wiki. It only proposes; the page applies the proposal to the form. Only wiki
+         *     pages the caller may see are read; a restricted page that was read is audited like opening it and the call is
+         *     then made under that rating (a model that never leaves this computer).
+         */
+        post: operations["assist_api_workshop_assist_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workshop/assist/{module}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Assist Requirements
+         * @description The standing requirements the author wrote for the AI assistant of this module.
+         */
+        get: operations["assist_requirements_api_workshop_assist__module__get"];
+        /**
+         * Save Assist Requirements
+         * @description Replace them (an empty text removes them). The assistant reads them on every call for this module.
+         */
+        put: operations["save_assist_requirements_api_workshop_assist__module__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/workshop/history": {
         parameters: {
             query?: never;
@@ -3627,6 +3674,137 @@ export interface components {
             version: number;
             /** Width */
             width: number | null;
+        };
+        /** AssistDropped */
+        AssistDropped: {
+            /** Detail */
+            detail: string;
+            /** Name */
+            name: string;
+            /**
+             * Part
+             * @enum {string}
+             */
+            part: "input" | "param";
+            /** Reason */
+            reason: string;
+        };
+        /** AssistIn */
+        AssistIn: {
+            /**
+             * Inputs
+             * @description the form's current values
+             */
+            inputs?: {
+                [key: string]: unknown;
+            };
+            kind: components["schemas"]["MediaKind"];
+            /**
+             * Language
+             * @description language code the notes are written in
+             * @default zh-CN
+             */
+            language: string;
+            /** Model Ref */
+            model_ref: string;
+            /** Module */
+            module: string;
+            /**
+             * Params
+             * @description the form's current parameters
+             */
+            params?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Request
+             * @description what the author asks this time
+             * @default
+             */
+            request: string;
+            /**
+             * Tier
+             * @default
+             */
+            tier: string;
+            /**
+             * Use Wiki
+             * @default true
+             */
+            use_wiki: boolean;
+        };
+        /** AssistInputChange */
+        AssistInputChange: {
+            /** Current */
+            current: string;
+            /** Name */
+            name: string;
+            /** Value */
+            value: string;
+        };
+        /** AssistOut */
+        AssistOut: {
+            /** Backend */
+            backend: string;
+            /** Dropped */
+            dropped: components["schemas"]["AssistDropped"][];
+            /** Inputs */
+            inputs: components["schemas"]["AssistInputChange"][];
+            /** Model */
+            model: string;
+            /** Notes */
+            notes: string;
+            /** Params */
+            params: components["schemas"]["AssistParamChange"][];
+            /** Seconds */
+            seconds: number;
+            /** Sources */
+            sources: components["schemas"]["AssistSource"][];
+        };
+        /** AssistParamChange */
+        AssistParamChange: {
+            /** Current */
+            current: unknown;
+            /** Name */
+            name: string;
+            /** Value */
+            value: unknown;
+        };
+        /** AssistRequirementsBody */
+        AssistRequirementsBody: {
+            /**
+             * Requirements
+             * @default
+             */
+            requirements: string;
+        };
+        /** AssistRequirementsOut */
+        AssistRequirementsOut: {
+            /** Module */
+            module: string;
+            /** Requirements */
+            requirements: string;
+            /** Updated At */
+            updated_at: string;
+            /** Updated By */
+            updated_by: string;
+        };
+        /** AssistSource */
+        AssistSource: {
+            /** Cited */
+            cited: boolean;
+            /** Heading */
+            heading: string;
+            /** N */
+            n: number;
+            /** Rating */
+            rating: string;
+            /** Slug */
+            slug: string;
+            /** Source */
+            source: string;
+            /** Title */
+            title: string;
         };
         /** AuditOut */
         AuditOut: {
@@ -14926,6 +15104,105 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkshopModuleOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assist_api_workshop_assist_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssistIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssistOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assist_requirements_api_workshop_assist__module__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                module: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssistRequirementsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_assist_requirements_api_workshop_assist__module__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                module: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssistRequirementsBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssistRequirementsOut"];
                 };
             };
             /** @description Validation Error */

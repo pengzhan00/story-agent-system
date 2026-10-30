@@ -1065,6 +1065,69 @@ class PresetBody(BaseModel):
     params: dict[str, Any] = Field(default_factory=dict)
 
 
+class AssistRequirementsBody(BaseModel):
+    requirements: str = Field(default="", max_length=4000)
+
+
+class AssistRequirementsOut(Strict):
+    module: str
+    requirements: str
+    updated_at: str
+    updated_by: str
+
+
+class AssistIn(BaseModel):
+    module: str
+    kind: MediaKind
+    model_ref: str
+    tier: str = ""
+    inputs: dict[str, Any] = Field(default_factory=dict, description="the form's current values")
+    params: dict[str, Any] = Field(default_factory=dict, description="the form's current parameters")
+    request: str = Field(default="", max_length=2000, description="what the author asks this time")
+    use_wiki: bool = True
+    language: str = Field(default="zh-CN", description="language code the notes are written in")
+
+
+class AssistInputChange(Strict):
+    name: str
+    value: str
+    current: str
+
+
+class AssistParamChange(Strict):
+    name: str
+    value: Any
+    current: Any
+
+
+class AssistDropped(Strict):
+    name: str
+    part: Literal["input", "param"]
+    reason: str
+    detail: str
+
+
+class AssistSource(Strict):
+    n: int
+    slug: str
+    title: str
+    source: str
+    rating: str
+    heading: str
+    cited: bool
+
+
+class AssistOut(Strict):
+    inputs: list[AssistInputChange]
+    params: list[AssistParamChange]
+    dropped: list[AssistDropped]
+    notes: str
+    sources: list[AssistSource]
+    backend: str
+    model: str
+    seconds: float
+
+
 class RunBody(BaseModel):
     kind: MediaKind
     inputs: dict[str, Any] = Field(default_factory=dict)

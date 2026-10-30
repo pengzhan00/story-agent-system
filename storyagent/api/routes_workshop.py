@@ -6,15 +6,32 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Query, Request
 
+from storyagent.agents.runner import language_name
+from storyagent.llm import LLMError, LLMRouter
 from storyagent.media.library import import_file
 from storyagent.media.registry import default_registry
+from storyagent.wiki import ask
+from storyagent.wiki.ask import Passage
+from storyagent.wiki.store import WikiStore
 from storyagent.workshop import Workshop, WorkshopError
+from storyagent.workshop_assist import Assist
 
 from .context import ctx_of
 from .errors import ApiError
 from .routes_library import _receive
+from .routes_llm import _llm_error as llm_error
+from .routes_review import actor_of
+from .routes_wiki import _visible
 from .schemas import (
     AssetOut,
+    AssistDropped,
+    AssistIn,
+    AssistInputChange,
+    AssistOut,
+    AssistParamChange,
+    AssistRequirementsBody,
+    AssistRequirementsOut,
+    AssistSource,
     JobOut,
     ParamsOut,
     PipelineBody,
@@ -24,6 +41,7 @@ from .schemas import (
     WorkshopHistoryItem,
     WorkshopModuleOut,
 )
+from .visibility import require_viewable
 
 router = APIRouter(prefix="/api/workshop", tags=["workshop"])
 
@@ -31,6 +49,11 @@ router = APIRouter(prefix="/api/workshop", tags=["workshop"])
 def shop(request: Request) -> Workshop:
     ctx = ctx_of(request)
     return Workshop(ctx.settings, ctx.db, ctx.ledger, default_registry(ctx.settings))
+
+
+def assist_of(request: Request) -> Assist:
+    ctx = ctx_of(request)
+    return Assist(ctx.settings, ctx.db, shop(request))
 
 
 @router.get("", response_model=list[WorkshopModuleOut])
@@ -56,6 +79,54 @@ def save_preset(kind: str, body: PresetBody, request: Request) -> dict[str, Any]
 @router.delete("/presets/{kind}", status_code=204)
 def reset_preset(kind: str, request: Request) -> None:
     shop(request).reset_preset(kind)
+
+
+@router.get("/assist/{module}", response_model=AssistRequirementsOut)
+def assist_requirements(module: str, request: Request) -> dict[str, str]:
+    """The standing requirements the author wrote for the AI assistant of this module."""
+    return assist_of(request).requirements(module)
+
+
+@router.put("/assist/{module}", response_model=AssistRequirementsOut)
+def save_assist_requirements(module: str, body: AssistRequirementsBody, request: Request) -> dict[str, str]:
+    """Replace them (an empty text removes them). The assistant reads them on every call for this module."""
+    return assist_of(request).save_requirements(module, body.requirements, actor_of(request))
+
+
+@router.post("/assist", response_model=AssistOut)
+def assist(body: AssistIn, request: Request) -> AssistOut:
+    """The AI assistant of a module designs the form: prompt, lyrics, text and parameters, from the standing
+    requirements, this request and the wiki. It only proposes; the page applies the proposal to the form. Only wiki
+    pages the caller may see are read; a restricted page that was read is audited like opening it and the call is
+    then made under that rating (a model that never leaves this computer)."""
+    ctx = ctx_of(request)
+    found: list[Passage] = []
+    rating = ""
+    if body.use_wiki:
+        reqs = assist_of(request).requirements(body.module)["requirements"]
+        text = " ".join([body.model_ref, body.kind.value, body.module, body.request, reqs[:300]])
+        pool = [p for p in WikiStore(ctx.db, ctx.settings).all() if _visible(p)]
+        found = ask.passages(pool, ask.terms_of(text), limit=6)
+        for p in found:
+            if p.page.rating != "general":
+                require_viewable(request, p.page.rating, None, what=f"wiki:{p.page.slug}")
+                rating = ctx.settings.content.higher(rating, p.page.rating)
+    router_ = LLMRouter(ctx.settings, ctx.db)
+    try:
+        out = assist_of(request).design(
+            module=body.module, kind=body.kind.value, model_ref=body.model_ref, tier=body.tier, values=body.inputs,
+            current_params=body.params, request=body.request, language=language_name(body.language), found=found,
+            rating=rating, router=router_)
+    except LLMError as exc:
+        raise llm_error(exc) from exc
+    backend, model, _ = router_.resolve("prompter", rating=rating)
+    return AssistOut(
+        inputs=[AssistInputChange(**i) for i in out["inputs"]],
+        params=[AssistParamChange(**p) for p in out["params"]],
+        dropped=[AssistDropped(**d) for d in out["dropped"]], notes=out["notes"],
+        sources=[AssistSource(n=p.n, slug=p.page.slug, title=p.page.title, source=p.page.source,
+                              rating=p.page.rating, heading=p.heading, cited=p.n in out["cited"]) for p in found],
+        backend=backend, model=model, seconds=out["seconds"])
 
 
 @router.post("/run", response_model=list[JobOut], status_code=201)

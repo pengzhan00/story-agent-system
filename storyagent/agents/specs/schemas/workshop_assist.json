@@ -1,0 +1,30 @@
+{
+ "type": "object",
+ "properties": {
+  "inputs": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "name": {"type": "string"},
+     "value": {"type": "string"}
+    },
+    "required": ["name", "value"]
+   }
+  },
+  "params": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "name": {"type": "string"},
+     "value": {"type": "string"}
+    },
+    "required": ["name", "value"]
+   }
+  },
+  "notes": {"type": "string"},
+  "cited": {"type": "array", "items": {"type": "integer"}}
+ },
+ "required": ["inputs", "params", "notes", "cited"]
+}

@@ -11,6 +11,7 @@ import { ProgressBar } from "../components/ProgressBar";
 import { StatusChip } from "../components/StatusChip";
 import { ValueEditor } from "../components/ValueEditor";
 import { ValueView } from "../components/ValueView";
+import { WorkshopAssist } from "../components/WorkshopAssist";
 import { useT } from "../i18n";
 import { LicenseAlert } from "../components/LicenseAlert";
 import { PromptAssist } from "../components/PromptAssist";
@@ -308,8 +309,9 @@ function Inputs({
 
 /** One media kind: its model and parameters (visible, editable, savable) and its inputs. */
 function KindPanel({
-  kind, recents, prefill, onPrefillDone, onRan,
+  module, kind, recents, prefill, onPrefillDone, onRan,
 }: {
+  module: string;
   kind: WorkshopKind;
   recents: Asset[];
   prefill: { values: Values } | null;
@@ -411,6 +413,18 @@ function KindPanel({
           </div>
         </details>
       </section>
+      <WorkshopAssist
+        module={module}
+        kind={kind.kind}
+        model={model}
+        tier={tier}
+        values={values}
+        params={params}
+        onApply={(inputs, next) => {
+          setValues({ ...values, ...inputs });
+          setParams({ ...params, ...next });
+        }}
+      />
       <section className="card stack">
         <Inputs kind={kind} values={values} set={(n, v) => setValues({ ...values, [n]: v })} recents={recents} />
         <div className="row">
@@ -684,6 +698,7 @@ export function WorkshopPage() {
           ) : null}
           <KindPanel
             key={kind.kind}
+            module={current.id}
             kind={kind}
             recents={recents}
             prefill={prefill && prefill.kind === kind.kind ? prefill : null}

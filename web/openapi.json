@@ -602,6 +602,282 @@
         "title": "AssetOut",
         "type": "object"
       },
+      "AssistDropped": {
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "part": {
+            "enum": [
+              "input",
+              "param"
+            ],
+            "title": "Part",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "part",
+          "reason",
+          "detail"
+        ],
+        "title": "AssistDropped",
+        "type": "object"
+      },
+      "AssistIn": {
+        "properties": {
+          "inputs": {
+            "additionalProperties": true,
+            "description": "the form's current values",
+            "title": "Inputs",
+            "type": "object"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/MediaKind"
+          },
+          "language": {
+            "default": "zh-CN",
+            "description": "language code the notes are written in",
+            "title": "Language",
+            "type": "string"
+          },
+          "model_ref": {
+            "title": "Model Ref",
+            "type": "string"
+          },
+          "module": {
+            "title": "Module",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": true,
+            "description": "the form's current parameters",
+            "title": "Params",
+            "type": "object"
+          },
+          "request": {
+            "default": "",
+            "description": "what the author asks this time",
+            "maxLength": 2000,
+            "title": "Request",
+            "type": "string"
+          },
+          "tier": {
+            "default": "",
+            "title": "Tier",
+            "type": "string"
+          },
+          "use_wiki": {
+            "default": true,
+            "title": "Use Wiki",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "module",
+          "kind",
+          "model_ref"
+        ],
+        "title": "AssistIn",
+        "type": "object"
+      },
+      "AssistInputChange": {
+        "properties": {
+          "current": {
+            "title": "Current",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "value",
+          "current"
+        ],
+        "title": "AssistInputChange",
+        "type": "object"
+      },
+      "AssistOut": {
+        "properties": {
+          "backend": {
+            "title": "Backend",
+            "type": "string"
+          },
+          "dropped": {
+            "items": {
+              "$ref": "#/components/schemas/AssistDropped"
+            },
+            "title": "Dropped",
+            "type": "array"
+          },
+          "inputs": {
+            "items": {
+              "$ref": "#/components/schemas/AssistInputChange"
+            },
+            "title": "Inputs",
+            "type": "array"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "notes": {
+            "title": "Notes",
+            "type": "string"
+          },
+          "params": {
+            "items": {
+              "$ref": "#/components/schemas/AssistParamChange"
+            },
+            "title": "Params",
+            "type": "array"
+          },
+          "seconds": {
+            "title": "Seconds",
+            "type": "number"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/AssistSource"
+            },
+            "title": "Sources",
+            "type": "array"
+          }
+        },
+        "required": [
+          "inputs",
+          "params",
+          "dropped",
+          "notes",
+          "sources",
+          "backend",
+          "model",
+          "seconds"
+        ],
+        "title": "AssistOut",
+        "type": "object"
+      },
+      "AssistParamChange": {
+        "properties": {
+          "current": {
+            "title": "Current"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value"
+          }
+        },
+        "required": [
+          "name",
+          "value",
+          "current"
+        ],
+        "title": "AssistParamChange",
+        "type": "object"
+      },
+      "AssistRequirementsBody": {
+        "properties": {
+          "requirements": {
+            "default": "",
+            "maxLength": 4000,
+            "title": "Requirements",
+            "type": "string"
+          }
+        },
+        "title": "AssistRequirementsBody",
+        "type": "object"
+      },
+      "AssistRequirementsOut": {
+        "properties": {
+          "module": {
+            "title": "Module",
+            "type": "string"
+          },
+          "requirements": {
+            "title": "Requirements",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          },
+          "updated_by": {
+            "title": "Updated By",
+            "type": "string"
+          }
+        },
+        "required": [
+          "module",
+          "requirements",
+          "updated_at",
+          "updated_by"
+        ],
+        "title": "AssistRequirementsOut",
+        "type": "object"
+      },
+      "AssistSource": {
+        "properties": {
+          "cited": {
+            "title": "Cited",
+            "type": "boolean"
+          },
+          "heading": {
+            "title": "Heading",
+            "type": "string"
+          },
+          "n": {
+            "title": "N",
+            "type": "integer"
+          },
+          "rating": {
+            "title": "Rating",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "n",
+          "slug",
+          "title",
+          "source",
+          "rating",
+          "heading",
+          "cited"
+        ],
+        "title": "AssistSource",
+        "type": "object"
+      },
       "AuditOut": {
         "properties": {
           "action": {
@@ -22383,6 +22659,142 @@
           }
         },
         "summary": "Modules",
+        "tags": [
+          "workshop"
+        ]
+      }
+    },
+    "/api/workshop/assist": {
+      "post": {
+        "description": "The AI assistant of a module designs the form: prompt, lyrics, text and parameters, from the standing\nrequirements, this request and the wiki. It only proposes; the page applies the proposal to the form. Only wiki\npages the caller may see are read; a restricted page that was read is audited like opening it and the call is\nthen made under that rating (a model that never leaves this computer).",
+        "operationId": "assist_api_workshop_assist_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssistIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Assist",
+        "tags": [
+          "workshop"
+        ]
+      }
+    },
+    "/api/workshop/assist/{module}": {
+      "get": {
+        "description": "The standing requirements the author wrote for the AI assistant of this module.",
+        "operationId": "assist_requirements_api_workshop_assist__module__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "module",
+            "required": true,
+            "schema": {
+              "title": "Module",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistRequirementsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Assist Requirements",
+        "tags": [
+          "workshop"
+        ]
+      },
+      "put": {
+        "description": "Replace them (an empty text removes them). The assistant reads them on every call for this module.",
+        "operationId": "save_assist_requirements_api_workshop_assist__module__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "module",
+            "required": true,
+            "schema": {
+              "title": "Module",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssistRequirementsBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistRequirementsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Assist Requirements",
         "tags": [
           "workshop"
         ]

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, del, post, put } from "./client";
-import type { Asset, Job, PipelineResult, WorkshopHistoryItem, WorkshopModule, WorkshopParams } from "./types";
+import type { AssistProposal, AssistRequirements, Asset, Job, PipelineResult, WorkshopHistoryItem, WorkshopModule, WorkshopParams } from "./types";
 
 const LIVE_MS = 2000;
 
@@ -23,6 +23,33 @@ export const useWorkshopParams = (kind: string, model: string, tier: string) =>
     enabled: model !== "",
     queryFn: () => api<WorkshopParams>(`/api/workshop/params?${new URLSearchParams({ kind, model_ref: model, tier })}`),
   });
+
+/** The standing requirements of a module for its AI assistant. */
+export const useAssistRequirements = (module: string) =>
+  useQuery({ queryKey: ["workshop", "assist", module], queryFn: () => api<AssistRequirements>(`/api/workshop/assist/${module}`) });
+
+export function useAssistActions(module: string) {
+  const qc = useQueryClient();
+  return {
+    save: useMutation({
+      mutationFn: (requirements: string) => put<AssistRequirements>(`/api/workshop/assist/${module}`, { requirements }),
+      onSuccess: (data) => qc.setQueryData(["workshop", "assist", module], data),
+    }),
+    design: useMutation({
+      mutationFn: (b: {
+        module: string;
+        kind: string;
+        model_ref: string;
+        tier: string;
+        inputs: Record<string, unknown>;
+        params: Record<string, unknown>;
+        request: string;
+        use_wiki: boolean;
+        language: string;
+      }) => post<AssistProposal>("/api/workshop/assist", b),
+    }),
+  };
+}
 
 export const useWorkshopHistory = (module: string) =>
   useQuery({
