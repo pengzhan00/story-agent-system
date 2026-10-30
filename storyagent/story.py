@@ -66,6 +66,17 @@ _PARENT_ORDER = {"shots": "act_number, scene_number, shot_number, id", "scripts"
 _HAS_UPDATED = {"characters", "scenes", "scripts", "shots", "episodes", "seasons", "character_looks", "props"}
 
 
+def _payload_dict(payload: Any) -> dict[str, Any]:
+    """A shot payload whose sections are mappings. Rows written by outside tools may hold a file path (a string) in
+    ``audio``; it is kept under ``file`` so readers can use ``.get`` on the section."""
+    if not isinstance(payload, dict):
+        return {}
+    audio = payload.get("audio")
+    if audio is None or isinstance(audio, dict):
+        return payload
+    return {**payload, "audio": {"file": audio} if audio else {}}
+
+
 def _decode(table: str, row: Any) -> dict[str, Any]:
     out = dict(row)
     for col in _JSON[table]:
@@ -77,7 +88,7 @@ def _decode(table: str, row: Any) -> dict[str, Any]:
         out["locked"] = bool(out.get("locked"))
     if table == "shots":
         out["locked"] = bool(out.get("locked"))
-        payload = out.get("render_payload") or {}
+        payload = out["render_payload"] = _payload_dict(out.get("render_payload"))
         out["action"] = (payload.get("subject") or {}).get("action", "")
     return out
 

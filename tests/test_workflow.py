@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -440,6 +441,21 @@ def test_a_project_target_is_validated(tmp_path: Path) -> None:
     with pytest.raises(ConfigError):
         engine.projects.set_settings(pid, {"target_sec": -3})
     assert "target_sec" not in engine.projects.set_settings(pid, {"target_sec": None}).settings
+
+
+def test_a_shot_whose_audio_section_is_a_file_path_still_reads_and_composes(tmp_path: Path) -> None:
+    engine, _, _ = make_engine(tmp_path)
+    pid = new_project(engine)
+    engine.run(pid, None, {})
+    shot = engine.store.list_shots(pid)[0]
+    payload = {**shot["render_payload"], "audio": "/outside/tool/music.wav"}     # as an outside tool wrote it
+    with engine.db.transaction() as conn:
+        conn.execute("UPDATE shots SET render_payload=? WHERE id=?", (json.dumps(payload), shot["id"]))
+    read = engine.store.get_shot(shot["id"])
+    assert read["render_payload"]["audio"] == {"file": "/outside/tool/music.wav"}
+    assert read["render_payload"]["audio"].get("sfx_cues", []) == []
+    listed = next(s for s in engine.store.list_shots(pid) if s["id"] == shot["id"])
+    assert listed["render_payload"]["audio"] == {"file": "/outside/tool/music.wav"}
 
 
 def test_each_sound_cue_of_a_shot_becomes_an_english_effect_spec(tmp_path: Path) -> None:
