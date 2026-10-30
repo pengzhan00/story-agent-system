@@ -146,6 +146,8 @@ def main() -> None:
             {"prompt": "A woman faces the camera and blinks gently, her head stays still.", "image": ref("image")},
             {"mode": "i2v", "width": 384, "height": 640, "frames": 25, "upscale": "off", "quality": "balanced"},
         ),
+        # Draft size on purpose (fast): proves the run works, says nothing about lipsync quality (see
+        # docs/reviews/2026-10-30-a2v-ab.md: the same line scored 1 at 384x640 and 3 at the model's own defaults).
         "a2v": lambda: node(
             "video.lipsync",
             "ltx-2.5-lipsync",
