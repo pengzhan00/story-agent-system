@@ -173,7 +173,12 @@ def test_control_http_preview_submit_and_manual_publication(fsettings):
         assert client.get("/api/publications", params={"asset_id": asset.id}).json()["total"] == 1
 
 
-def test_lipsync_sequence_persists_dynamic_anchors_and_shares_one_stem(fsettings):
+@pytest.mark.parametrize("duration,kind,starts,stems,nodes", [
+    (10, "upload.audio", [0, 4.8, 9.6], 1, 8),     # parent + stem + 3 renders + 2 anchors + assembly
+    (5.03, "upload.audio", [0], 1, 4),             # what is left fits the first part's whole frames: no anchor
+    (10, "audio.tts", [0, 4.8, 9.6], 0, 7),        # synthesised speech is not separated first
+])
+def test_lipsync_sequence_persists_dynamic_anchors_and_shares_one_stem(fsettings, duration, kind, starts, stems, nodes):
     import struct
     import wave
     from dataclasses import replace
@@ -199,7 +204,7 @@ def test_lipsync_sequence_persists_dynamic_anchors_and_shares_one_stem(fsettings
         w.writeframes(struct.pack("<h", 200) * 8000 * 12)
     song = ledger.register_asset(
         NewAsset(
-            kind="upload.audio",
+            kind=kind,
             slot="song",
             path="song.wav",
             sha256="test-song",
@@ -240,13 +245,13 @@ def test_lipsync_sequence_persists_dynamic_anchors_and_shares_one_stem(fsettings
                     "-f",
                     "lavfi",
                     "-i",
-                    "color=c=black:s=64x64:r=24:d=10",
+                    f"color=c=black:s=64x64:r=24:d={job.params['duration']}",
                     "-f",
                     "lavfi",
                     "-i",
                     "anullsrc=r=8000:cl=mono",
                     "-t",
-                    "10",
+                    str(job.params["duration"]),
                     "-c:v",
                     "libx264",
                     "-pix_fmt",
@@ -272,7 +277,7 @@ def test_lipsync_sequence_persists_dynamic_anchors_and_shares_one_stem(fsettings
                     "kind": "video.lipsync",
                     "model_ref": "fake-lipsync",
                     "inputs": {"image": f"asset:{portrait.id}", "audio": f"asset:{song.id}"},
-                    "params": {"duration": 10},
+                    "params": {"duration": duration},
                 }
             ]
         },
@@ -282,18 +287,20 @@ def test_lipsync_sequence_persists_dynamic_anchors_and_shares_one_stem(fsettings
     try:
         assert worker.drain(10)
         done = store.get(run["id"])
-        assert done["status"] == "succeeded", done
+        assert done["status"] == "succeeded", [
+            {k: v for k, v in n.items() if k in ("node_id", "status", "error", "reason")} for n in done["nodes"]]
         jobs = ledger.list_jobs(limit=100)
-        assert sum(j.kind is MediaKind.AUDIO_SEPARATE for j in jobs) == 1
+        assert sum(j.kind is MediaKind.AUDIO_SEPARATE for j in jobs) == stems
         rendered = sorted(
             (j for j in jobs if j.kind is MediaKind.VIDEO_LIPSYNC), key=lambda j: j.params["audio_start_time"]
         )
-        assert [round(j.params["audio_start_time"], 1) for j in rendered] == [0, 4.8, 9.6]
+        assert [round(j.params["audio_start_time"], 1) for j in rendered] == starts
         assert all(j.params["audio_stem_auto"] is False for j in rendered)
-        assert rendered[1].inputs["refs"][0]["path"] != rendered[0].inputs["refs"][0]["path"]
+        if len(rendered) > 1:
+            assert rendered[1].inputs["refs"][0]["path"] != rendered[0].inputs["refs"][0]["path"]
         graph_plan = done["plan"]["nodes"][0]["sequence"]
-        assert sum(graph_plan["lengths"]) == pytest.approx(10)
-        assert len(done["nodes"]) == 8  # parent + stem + 3 renders + 2 anchors + assembly
+        assert sum(graph_plan["lengths"]) == pytest.approx(duration)
+        assert len(done["nodes"]) == nodes
     finally:
         worker.shutdown()
 

@@ -66,6 +66,15 @@ class GraphStore:
         self.settings, self.db = settings, db
         self.ledger = ledger or Ledger(db, settings)
 
+    def _is_speech(self, audio: Any) -> bool:
+        """Synthesised speech is already a clean voice: separating the vocals from it only costs time and detail."""
+        if not (isinstance(audio, str) and audio.startswith("asset:")):
+            return False
+        try:
+            return self.ledger.get_asset(audio[6:]).kind == MediaKind.AUDIO_TTS.value
+        except LedgerError:
+            return False
+
     def compile(self, definition: dict[str, Any]) -> dict[str, Any]:
         raw = definition.get("nodes", [])
         if not isinstance(raw, list) or not 1 <= len(raw) <= 200:
@@ -189,8 +198,9 @@ class GraphStore:
             sequence = sequence_options(node)
             if sequence is not None:
                 node["sequence"] = sequence
-                if not node["params"].get("audio_stem") and node["params"].get("audio_stem_auto", True):
-                    audio = node["inputs"]["audio"]
+                audio = node["inputs"]["audio"]
+                if (not node["params"].get("audio_stem") and node["params"].get("audio_stem_auto", True)
+                        and not self._is_speech(audio)):
                     stem_id = "__stem_" + digest(audio)[:16]
                     if not any(n["id"] == stem_id for n in result["nodes"]):
                         stem_ref = cfg.default_model("audio.separate").ref
@@ -214,6 +224,8 @@ class GraphStore:
                     node["depends_on"].append(stem_id)
                     node["params"]["audio_stem"] = {"$node": stem_id, "port": "main"}
                     node["params"]["audio_stem_auto"] = False
+                elif not node["params"].get("audio_stem") and self._is_speech(audio):
+                    node["params"]["audio_stem_auto"] = False       # the panel must not separate it either
         return result
 
     def submit(

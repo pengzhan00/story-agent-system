@@ -65,7 +65,9 @@ def advance(store: Any, run: dict[str, Any], node: dict[str, Any], states: dict[
         if spec["next"] == "render":
             spec["pieces"].append(asset.id)
             remaining = spec["end"] - spec["cursor"]
-            if remaining <= spec["maximum"] + 1e-6:
+            # The part just rendered covers whole frames, a little past `maximum`: what is left within that is done.
+            covered = frames_for(min(spec["maximum"], remaining), spec["fps"]) / spec["fps"]
+            if remaining <= max(spec["maximum"], covered) + 1e-6:
                 spec["lengths"].append(remaining)
                 spec["next"] = "stitch"
             else:
@@ -75,10 +77,15 @@ def advance(store: Any, run: dict[str, Any], node: dict[str, Any], states: dict[
             if not spec["cursor"] + 0.05 < start <= spec["cursor"] + spec["maximum"] + 0.05:
                 store._set(rid, nid, "failed", "anchor_did_not_advance")
                 return
-            spec["lengths"].append(start - spec["cursor"])
-            spec["cursor"] = start
-            spec["anchor"] = asset.id
-            spec["next"] = "render"
+            if start >= spec["end"] - 1e-6:         # the anchor lies at or past the end: nothing is left to render
+                spec["lengths"].append(spec["end"] - spec["cursor"])
+                spec["cursor"] = spec["end"]
+                spec["next"] = "stitch"
+            else:
+                spec["lengths"].append(start - spec["cursor"])
+                spec["cursor"] = start
+                spec["anchor"] = asset.id
+                spec["next"] = "render"
         else:
             store._set(rid, nid, "waiting_review" if node["review"] else "succeeded", outputs=child["outputs"])
             return
