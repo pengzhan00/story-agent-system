@@ -24,7 +24,6 @@
 | `ltx-2.5-av` | ltx-2.5-mlx-q4/q8 | ✅ 已接 | 音画一体出片(首选) |
 | `ltx-2.5-video` | 同上 | ✅ 已接 | 无声视频 |
 | `ltx-2.5-lipsync` | 同上 | ✅ 已接 | 口型对话(≈5s) |
-| `longcat-avatar-1.5-q4` | LongCat | ✅ 已接 | 数字人说话头 |
 | `minimax-h3` | h3.c 独立 CLI / MiniMax-H3 目录 | 已有专用适配器，本轮未重新生成 | 见 [h3.c](H3C.md)，不能与 DT 版权重互换 |
 
 ## LTX-2.3 —— Draw Things 无声视频备用

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Local, offline "idea → short-drama MP4" system (漫剧故事工坊 / Story Agent System), v2. LLM agents write the story; media adapters (FLUX/mflux images, CosyVoice/Seed-VC voices, ACE-Step music, Phosphene/h3/LongCat video, ffmpeg assembly) turn editable *specs* into assets; the episode is composed with ffmpeg, QC'd and exported with AIGC marking and provenance. SQLite persistence, FastAPI + SSE API, React/Vite web client. Target is vertical 720×1280 dramas on macOS / Apple Silicon. Docs and many comments are in Chinese. The v1 implementation (Gradio, ComfyUI-centred) is gone from the tree; it lives in git tag `v1-final`, and `docs/PARITY_MATRIX.md` says where each old feature went.
+Local, offline "idea → short-drama MP4" system (漫剧故事工坊 / Story Agent System), v2. LLM agents write the story; media adapters (FLUX/mflux images, CosyVoice/Seed-VC voices, ACE-Step music, Phosphene/h3 video, ffmpeg assembly) turn editable *specs* into assets; the episode is composed with ffmpeg, QC'd and exported with AIGC marking and provenance. SQLite persistence, FastAPI + SSE API, React/Vite web client. Target is vertical 720×1280 dramas on macOS / Apple Silicon. Docs and many comments are in Chinese. The v1 implementation (Gradio, ComfyUI-centred) is gone from the tree; it lives in git tag `v1-final`, and `docs/PARITY_MATRIX.md` says where each old feature went.
 
 **Taking over? Read `docs/HANDOFF.md` first** (sources of truth, data structures, architecture, local environment, what is done and what is next). The end goal is a continuous vertical short-drama series: `docs/SERIES.md`.
 

@@ -103,13 +103,6 @@ def _check_tools(settings: Settings, run: Runner) -> list[Entry]:
         [] if _exists(tp("h3", "binary"), executable=True) else ["h3 binary"],
         [] if _exists((tp("h3", "model_dir") or Path("/nonexistent")) / "model_index.json") else ["MiniMax-H3 weights"],
     )
-    lc_root = tp("longcat", "root")
-    lc_w, lc_v = tp("longcat", "weights_dir"), settings.tools.get("longcat", {}).get("variant_dir", "")
-    entry(
-        "longcat",
-        [] if _exists(tp("longcat", "python"), executable=True) and _exists(lc_root) else ["longcat runtime"],
-        [] if lc_w and lc_v and _exists(lc_w / lc_v) else [f"weights {lc_v or '(variant_dir unset)'}"],
-    )
     tts = settings.models.get(settings.default_models.get("audio.tts", ""))
     cosy_model_dir = (
         Path(str(tts.extra["model_dir"])).expanduser()

@@ -15,7 +15,7 @@
 | 备用无声视频 | Draw Things / `ltx-2.3-drawthings` | 备用短测通过（512×320 / 9 帧 / 24 fps，约 52.29 秒）；HTTP 返回帧数组，MP4 不含音轨 |
 | 歌曲 / 配乐 | Phosphene / YuE2 | 已有真实歌曲及纯器乐任务；ACE-Step 保留作另一音乐后端，不重复接入 |
 | 声部分离 | `audio.separate` / `demucs-htdemucs` | 使用仓库现有专用适配器；输出人声和伴奏两个资产，无需再造 CLI 分离模型 |
-| 配音、换声、口型、转写 | 原有 CosyVoice / Seed-VC / LongCat / Whisper | 各有独立用途，保留现有入口 |
+| 配音、换声、口型、转写 | 原有 CosyVoice / Seed-VC / Whisper | 各有独立用途，保留现有入口 |
 | 多参考图 / 特定工作流 | ComfyUI | 按需启用；DT HTTP 只接受一张参考图，自动多参考合成暂未启用 |
 | 装配、响度、规格转换 | 现有 ffmpeg 装配 / 交付 | 已覆盖，不为同一处理再增加重复默认模型 |
 

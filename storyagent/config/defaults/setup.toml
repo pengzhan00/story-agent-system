@@ -79,9 +79,6 @@ min_ram_gib = 36
 [capabilities.voice_convert]
 needs = ["base", "hub"]
 rec_ram_gib = 10
-[capabilities.avatar]
-needs = ["base", "hub"]
-rec_ram_gib = 32
 [capabilities.h3]
 needs = ["base", "hub"]
 rec_ram_gib = 48
@@ -622,66 +619,6 @@ argv = ["hf", "download", "nvidia/bigvgan_v2_22khz_80band_256x"]
 source = "huggingface.co/nvidia/bigvgan_v2_22khz_80band_256x"
 file = "bigvgan_v2_22khz_80band_256x"
 size_gib = 1.8
-
-# -- optional: LongCat avatar video -----------------------------------------------------------------------------------------
-[components.longcat_runtime]
-capability = "avatar"
-size_gib = 1.0
-license = "MIT"
-url = "https://github.com/xocialize/longcat-avatar-mlx"
-health = ["tool.longcat"]
-after = ["uv", "xcode_clt"]
-[components.longcat_runtime.layout]
-"tool:longcat.root" = "longcat-avatar-mlx"
-"tool:longcat.python" = "longcat-avatar-mlx/.venv/bin/python"
-"tool:longcat.weights_dir" = "longcat-avatar-mlx/weights"
-[[components.longcat_runtime.detect]]
-kind = "path"
-ref = "tool:longcat.python"
-is = "exec"
-[[components.longcat_runtime.detect]]
-kind = "path"
-ref = "tool:longcat.root"
-sub = "longcat_video_avatar_mlx.egg-info"
-is = "dir"
-[[components.longcat_runtime.steps]]
-kind = "command"
-argv = ["git", "clone", "https://github.com/xocialize/longcat-avatar-mlx.git", "{tool:longcat.root}"]
-[[components.longcat_runtime.steps]]
-kind = "command"
-argv = ["uv", "venv", "--python", "3.11", "{tool:longcat.root}/.venv"]
-[[components.longcat_runtime.steps]]
-kind = "command"
-argv = ["uv", "pip", "install", "--python", "{tool:longcat.python}", "-e", "{tool:longcat.root}"]
-
-[components.longcat_weights]
-capability = "avatar"
-size_gib = 23.0
-measured = true
-license = "MIT"
-url = "https://huggingface.co/mlx-community/LongCat-Video-Avatar-1.5-q4-dmd-merged"
-after = ["hf_cli", "longcat_runtime"]
-[[components.longcat_weights.detect]]
-kind = "path"
-ref = "tool:longcat.weights_dir"
-sub = "{tool:longcat.variant_dir}"
-is = "dir"
-[[components.longcat_weights.detect]]
-kind = "hf_cache"
-repos = ["openai/whisper-large-v3"]
-[[components.longcat_weights.steps]]
-kind = "download"
-argv = ["hf", "download", "mlx-community/LongCat-Video-Avatar-1.5-q4-dmd-merged", "--local-dir",
-        "{tool:longcat.weights_dir}/{tool:longcat.variant_dir}"]
-source = "huggingface.co/mlx-community/LongCat-Video-Avatar-1.5-q4-dmd-merged"
-file = "LongCat-Video-Avatar-1.5-q4-dmd-merged"
-size_gib = 23.0
-[[components.longcat_weights.steps]]
-kind = "download"
-argv = ["hf", "download", "openai/whisper-large-v3", "--include", "*.json"]
-source = "huggingface.co/openai/whisper-large-v3"
-file = "configuration/preprocessor json files only"
-size_gib = 0.01
 
 # -- optional: MiniMax H3 (h3.c) -------------------------------------------------------------------------------------------
 [components.h3_runtime]

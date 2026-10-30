@@ -306,7 +306,7 @@ def test_script_review_is_refused_while_a_heavy_job_runs(client: TestClient, fse
     run_to_end(fsettings)
     db = Database(fsettings.db_path)
     db.conn.execute("INSERT INTO media_jobs(id, project_id, kind, provider, model_ref, heavy, status)"
-                    " VALUES ('hj', ?, 'video.avatar', 'longcat', 'x', 1, 'running')", (pid,))
+                    " VALUES ('hj', ?, 'video.av', 'h3', 'x', 1, 'running')", (pid,))
     r = client.post(f"/api/projects/{pid}/review")
     assert r.status_code == 409 and r.json()["error"]["code"] == "heavy_busy"
 

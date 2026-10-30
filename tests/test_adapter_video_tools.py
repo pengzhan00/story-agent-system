@@ -1,4 +1,4 @@
-"""h3 (video+audio) and LongCat (talking head) adapters against stub executables."""
+"""h3 (video+audio) adapter against a stub executable."""
 from __future__ import annotations
 
 import json
@@ -13,7 +13,6 @@ import pytest
 from storyagent.domain import JobStatus, MediaKind
 from storyagent.domain.errors import ErrorCode
 from storyagent.media.adapters.h3 import H3Adapter, snap_frames
-from storyagent.media.adapters.longcat import LongCatAdapter
 from storyagent.media.probe import find_tool
 
 from .adapter_kit import Rig, job, make_rig, make_settings
@@ -35,20 +34,6 @@ H3_STUB = textwrap.dedent(f'''\
     if prompt != "NOFILE":
         import shutil
         shutil.copy(os.path.join(here, "tiny.mp4"), a[a.index("-o") + 1])
-''')
-LONGCAT_STUB = textwrap.dedent('''\
-    import json, os, sys
-    a = sys.argv[1:]
-    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "calls.jsonl"), "a", encoding="utf-8") as fh:
-        keep = ("LONGCAT_", "HF_", "TRANSFORMERS_", "PYTHONUNBUFFERED")
-        secret = ("TOKEN", "SECRET", "KEY", "PASSWORD")
-        env = {k: v for k, v in os.environ.items() if k.startswith(keep) and not any(s in k.upper() for s in secret)}
-        fh.write(json.dumps({"argv": a, "env": env}) + "\\n")
-    for i in range(1, 4):
-        print(f"step {i}/3", flush=True)
-    if os.environ.get("LONGCAT_PROMPT") != "NOFILE":
-        import shutil
-        shutil.copy(os.path.join(os.path.dirname(os.path.abspath(__file__)), "tiny.mp4"), a[a.index("--out") + 1])
 ''')
 
 
@@ -188,78 +173,4 @@ def test_h3_progress_and_capabilities() -> None:
     assert msg == "step 2/4" and abs(frac - 0.5) < 0.01
     caps = a.capabilities()
     assert caps.heavy and MediaKind.VIDEO_AV in caps.kinds
-
-
-# ---- LongCat -------------------------------------------------------------------------------------------------
-def build_longcat(tmp_path: Path, *, variant: bool = True, script: bool = True) -> Rig:
-    root = tmp_path / "longcat"
-    (root / "scripts").mkdir(parents=True, exist_ok=True)
-    if script:
-        (root / "scripts" / "run_inference.py").write_text(LONGCAT_STUB)
-        tiny_mp4(root / "scripts" / "tiny.mp4")
-    weights = root / "weights"
-    if variant:
-        (weights / "LongCat-Video-Avatar-1.5-q4-dmd-merged").mkdir(parents=True, exist_ok=True)
-    services = (f'[tools.longcat]\nroot = "{root}"\npython = "{sys.executable}"\nweights_dir = "{weights}"\n'
-                'variant_dir = "LongCat-Video-Avatar-1.5-q4-dmd-merged"\n')
-    models = """
-[models."lc-test"]
-kind = "video.avatar"
-provider = "longcat"
-timeout_sec = 30
-"""
-    return make_rig(make_settings(tmp_path, services=services, models=models), LongCatAdapter(poll_interval_sec=0.02))
-
-
-def lc_calls(tmp_path: Path) -> list[dict]:
-    f = tmp_path / "longcat" / "scripts" / "calls.jsonl"
-    return [json.loads(x) for x in f.read_text("utf-8").splitlines()] if f.exists() else []
-
-
-def test_longcat_makes_a_talking_head_from_portrait_and_speech(tmp_path: Path) -> None:
-    rig = build_longcat(tmp_path)
-    face, speech = tmp_path / "face.png", tmp_path / "speech.wav"
-    face.write_bytes(b"x")
-    speech.write_bytes(b"y")
-    rec, [a] = rig.run(job(MediaKind.VIDEO_AVATAR, "lc-test", {"prompt": "she greets the camera",
-                                                                "refs": [str(face), str(speech)]}, seed=4,
-                           params={"width": 832, "height": 480, "num_frames": 93}))
-    assert rec.status is JobStatus.COMPLETED, (rec.error_code, rec.error_message)
-    [call] = lc_calls(tmp_path)
-    assert flag(call["argv"], "--weights") == str(tmp_path / "longcat" / "weights")      # the root, not the variant
-    assert flag(call["argv"], "--variant") == "q4-merged"
-    assert (flag(call["argv"], "--width"), flag(call["argv"], "--height"), flag(call["argv"], "--num-frames")) == (
-        "832", "480", "93")
-    assert flag(call["argv"], "--seed") == "4"
-    expected_env = {"LONGCAT_IMAGE": str(face), "LONGCAT_AUDIO": str(speech),
-                    "LONGCAT_PROMPT": "she greets the camera",
-                    "PYTHONUNBUFFERED": "1", "HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1",
-                    "HF_HUB_DISABLE_XET": "1"}   # no hub
-    # the host also carries its own HF_* through clean_env; only the adapter's own keys are asserted
-    assert {k: call["env"].get(k) for k in expected_env} == expected_env
-    assert a.kind == "video.avatar" and a.metadata["engine"] == "longcat-avatar-1.5"
-
-
-def test_longcat_validation(tmp_path: Path) -> None:
-    rig = build_longcat(tmp_path)
-    rec, _ = rig.run(job(MediaKind.VIDEO_AVATAR, "lc-test", {"prompt": "p"}))
-    assert rec.error_code == ErrorCode.INVALID_INPUT.value
-    rec, _ = build_longcat(tmp_path / "a", variant=False).run(job(MediaKind.VIDEO_AVATAR, "lc-test", {"prompt": "p"}))
-    assert rec.error_code == ErrorCode.MISSING_MODEL.value                  # never downloaded
-    rec, _ = build_longcat(tmp_path / "b", script=False).run(job(MediaKind.VIDEO_AVATAR, "lc-test", {"prompt": "p"}))
-    assert rec.error_code == ErrorCode.MISSING_TOOL.value
-
-
-def test_longcat_no_output_and_capabilities(tmp_path: Path) -> None:
-    rig = build_longcat(tmp_path)
-    face, speech = tmp_path / "f.png", tmp_path / "s.wav"
-    face.write_bytes(b"x")
-    speech.write_bytes(b"y")
-    rec, assets = rig.run(job(MediaKind.VIDEO_AVATAR, "lc-test", {"prompt": "NOFILE", "image": str(face),
-                                                                   "audio": str(speech)}, seed=1))
-    assert rec.error_code == ErrorCode.OUTPUT_MISSING.value and not assets
-    caps = LongCatAdapter().capabilities()
-    assert caps.heavy and caps.kinds == (MediaKind.VIDEO_AVATAR,)
-    assert "longcat" in __import__("storyagent.media.registry", fromlist=["default_registry"]).default_registry(
-        rig.settings)
 

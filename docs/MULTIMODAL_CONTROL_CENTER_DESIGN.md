@@ -32,7 +32,7 @@
 | 通用图像生成 | Draw Things / FLUX.2 Klein 4B | Juggernaut SDXL；Krea2 风格配置 | DT FLUX.2 有系统任务实测；其他按各自配方验收 |
 | 图像编辑与控制 | ComfyUI 已导入的多参考工作流 | FLUX 3、Krea2 专用图；InstantID | 新模型出图成功不代表多参考编辑已接通；InstantID 待复验 |
 | t2v / i2v / 音画视频 | Phosphene / LTX-2.5 | h3.c / H3；DT / LTX-2.3；ComfyUI / LTX-2.5 | DT HTTP 实测返回无声帧数组；ComfyUI 新笔记记载带音轨出片，但未证明 Story Agent 接入 |
-| a2v / 口型同步 | Phosphene / LTX-2.5 | LongCat 专用口播 | 现有提交入口，分段、音频绑定、项目生产闭环仍需补齐 |
+| a2v / 口型同步 | Phosphene / LTX-2.5 | (无;LongCat 已移除) | 现有提交入口，分段、音频绑定、项目生产闭环仍需补齐 |
 | 歌曲与配乐 | ACE-Step 独立 API | Phosphene / YuE2 | YuE2 已有系统任务记录；不同风格和歌词遵循需人工评价 |
 | 音效 | ComfyUI / Stable Audio 3 | 其他已验证工作流 | 现有记录指出 Pinokio 重装后的系统调用仍待复验 |
 | 配音 / 换声 / 分离 / 转写 | CosyVoice3 / Seed-VC / Demucs / Whisper | 独立配方 | 复用现有适配器；把语言、音色、时间对齐分别验证 |
@@ -119,7 +119,7 @@ t2v、i2v、a2v 是可见的生成模式，不能仅根据 refs 文件后缀暗�
 | i2t | 看图描述、提示词反推、图像质量与身份检查；OCR | 已配置视觉模型、既有 QC/分析工具；专项识别绑定待核验 | 普通 caption、OCR、身份分数不是同一种证据 |
 | t2v | 提示词生成视频，可选原生音画 | Phosphene / LTX-2.5；其他兼容绑定 | 不强制生成关键帧；是否支持原生音轨是输出契约 |
 | i2v / i+t2v | 图生视频、首尾帧、参考图控制 | Phosphene、H3、DT / LTX-2.3 | 首尾帧、多参考、IC-LoRA 是专项约束，不能自动推导支持 |
-| a+i(+t)2v | 对口型、口播、唱歌视频 | Phosphene a2v；LongCat 备选 | 界面简称 a2v；明确要求的人物图、驱动音频和听觉音轨 |
+| a+i(+t)2v | 对口型、口播、唱歌视频 | Phosphene a2v | 界面简称 a2v；明确要求的人物图、驱动音频和听觉音轨 |
 | v2v / v+t2v | 视频增强、补帧、重定时、延展、局部重做、视频编辑 | ffmpeg、Phosphene 专项；ComfyUI 可导入模板 | 编码转码与生成式编辑分开；模型级操作必须有独立绑定与实测 |
 | v2a | 提取音轨；按画面生成音效/配音 | ffmpeg 提取；视频理解 → 音频节点可形成复合模板 | 提取不等于生成；原生视频条件音频生成待验证，不能标成现成能力 |
 | v2i | 抽帧、末帧/闭口锚点、关键帧选取 | ffmpeg、Phosphene 锚点接口、后续分析 | 保存来源帧/时间戳，区别机器选择和人工选择 |

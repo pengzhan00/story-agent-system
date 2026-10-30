@@ -91,7 +91,6 @@ def test_tool_states_distinguish_missing_tool_from_missing_model(tmp_path: Path)
     s = cfg(
         tmp_path,
         h3=f'binary = "{exe(root / "h3")}"\nmodel_dir = "{h3_dir}"',
-        longcat=f'root = "{root / "lc"}"\npython = "{root / "nope"}"\nweights_dir = "{root}"\nvariant_dir = "v"',
         cosyvoice=(f'python = "{exe(root / "cpy")}"\nworkdir = "{root}"\n'
                    f'model_dir = "{root / "missing_model"}"'),
         lora_train=f'command = "{exe(root / "mflux-train")}"\nbase_model_dir = "{root}"',
@@ -102,7 +101,6 @@ def test_tool_states_distinguish_missing_tool_from_missing_model(tmp_path: Path)
     (h3_dir).mkdir()
     (h3_dir / "model_index.json").write_text("{}")
     assert by_name(run_checks(s, probes=NO_LLM))["tool.h3"].state is HealthState.OK
-    assert e["tool.longcat"].state is HealthState.MISSING_TOOL
     assert e["tool.cosyvoice"].state is HealthState.MISSING_MODEL and "missing_model" in e["tool.cosyvoice"].missing
     assert e["tool.lora_train"].state is HealthState.OK
 

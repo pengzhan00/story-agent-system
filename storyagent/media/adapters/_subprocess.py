@@ -1,4 +1,4 @@
-"""Base for adapters that run a local command-line tool (CosyVoice, whisper, h3.c, LongCat, mflux-train ...).
+"""Base for adapters that run a local command-line tool (CosyVoice, whisper, h3.c, mflux-train ...).
 
 A subclass says *what to run* (``command``) and *what came out* (``collect``); this class owns the process:
 start it in its own session with output going to a log file, report progress, cancel it, and turn a bad exit

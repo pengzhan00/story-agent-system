@@ -539,8 +539,8 @@ function PipelineBuilder({ modules, recents }: { modules: WorkshopModule[]; rece
     <div className="stack">
       <p className="muted">{t("web.workshop.pipeline_hint")}</p>
       <div className="row">
-        <button onClick={() => example(["image.generate", "video.avatar"])}>{t("web.workshop.example_image_video")}</button>
-        <button onClick={() => example(["audio.tts", "video.avatar"])}>{t("web.workshop.example_voice_video")}</button>
+        <button onClick={() => example(["image.generate", "video.lipsync"])}>{t("web.workshop.example_image_video")}</button>
+        <button onClick={() => example(["audio.tts", "video.lipsync"])}>{t("web.workshop.example_voice_video")}</button>
         <button onClick={() => example(["audio.music", "audio.convert"])}>{t("web.workshop.example_song_swap")}</button>
       </div>
       {steps.map((s, i) => {

@@ -32,7 +32,7 @@ scripts/start.sh                       # worker + 网页服务;浏览器打开 h
 |---|---|---|
 | 配置 | `storyagent/config/` | 内置 TOML 默认值 < `$STORY_AGENT_HOME/config/*.toml` < 环境变量 < 项目 < 作业;代码里没有写死的路径/端口 |
 | 台账与规格 | `storyagent/media/` | 作业(幂等、租约、重启接管)、版本化资产、可编辑规格、重/轻任务仲裁、AIGC 合规 |
-| 适配器 | `storyagent/media/adapters/` | mflux(图)、cosyvoice、seedvc、whisper(语音)、acestep(音乐)、phosphene / h3 / longcat(视频)、lora_train、assemble(ffmpeg) |
+| 适配器 | `storyagent/media/adapters/` | mflux(图)、cosyvoice、seedvc、whisper(语音)、acestep(音乐)、phosphene / h3(视频)、lora_train、assemble(ffmpeg) |
 | 故事流水线 | `storyagent/workflow/`、`storyagent/agents/` | 九阶段可恢复流水线;agent 是 TOML 数据,多后端 LLM |
 | 成片 | `storyagent/compose/` | 先量语音再排时间轴、字幕、混音与闪避、QC、交付包 |
 | 接口 | `storyagent/api/` | FastAPI + SSE(`/api/docs`) |

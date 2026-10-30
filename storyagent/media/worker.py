@@ -118,7 +118,7 @@ class Worker:
                 graph_jobs = {r[0] for r in self.db.conn.execute(
                     "SELECT job_id FROM control_nodes WHERE status='running' AND job_id IS NOT NULL")}
                 accelerated = {"demucs", "seedvc", "cosyvoice", "acestep", "drawthings", "mflux",
-                               "comfy", "phosphene", "h3", "longcat"}
+                               "comfy", "phosphene", "h3"}
                 local_gpu = {j.id for j in queued if j.id in graph_jobs and
                              (j.heavy or j.provider in accelerated) and j.provider != "fake"}
                 external = self._external_rendering() if local_gpu else set()

@@ -25,12 +25,3 @@ label_key = "recipe.av_shot"
 [[recipes.av_shot.steps]]
 kind = "video.av"
 
-[recipes.avatar_shot]
-label_key = "recipe.avatar_shot"
-[[recipes.avatar_shot.steps]]
-kind = "image.generate"
-slot = "portrait"
-[[recipes.avatar_shot.steps]]
-kind = "audio.tts"
-[[recipes.avatar_shot.steps]]
-kind = "video.avatar"

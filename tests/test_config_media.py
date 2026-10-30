@@ -80,7 +80,7 @@ def test_user_can_add_a_model_with_custom_params(tmp_path: Path) -> None:
 # ---- recipes --------------------------------------------------------------------------------------
 def test_default_recipes(tmp_path: Path) -> None:
     s = load_settings(home_with(tmp_path))
-    assert {"quick_draft", "standard_shot", "av_shot", "avatar_shot"} <= set(s.recipes)
+    assert {"quick_draft", "standard_shot", "av_shot"} <= set(s.recipes)
     steps = s.recipe("standard_shot").steps
     assert [x.kind for x in steps] == ["image.generate", "video.generate", "audio.tts"]
     assert steps[0].slot == "keyframe" and steps[2].when == "shot.has_dialogue"

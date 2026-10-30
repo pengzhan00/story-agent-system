@@ -27,7 +27,7 @@
 | `story` | 基础 + 语言模型(Ollama + gemma4:31b) | 只写故事/剧本/分镜计划 |
 | `stills` | story + 图片(FLUX.2 klein)+ 配音(CosyVoice 3);建议再装 whisper、ACE-Step 配乐、ComfyUI 音效 | **图+配音、没有视频**:镜头是关键帧加缓慢运镜。引导会把方案的 `video_share` 写成 0、从 `requires` 里去掉 phosphene,体检和生产计划都不再要求视频 |
 | `full` | stills 必需 + ACE-Step + Pinokio/Phosphene(LTX-2.5);建议 whisper、音效 | **同参考机**,能做出项目 3 那样的整集 |
-| `everything` | full + whisper、音效 + 快速关键帧(klein 蒸馏版)+ Seed-VC | 全家桶;LongCat 数字人、H3、Draw Things 仍是可选 |
+| `everything` | full + whisper、音效 + 快速关键帧(klein 蒸馏版)+ Seed-VC | 全家桶;H3、Draw Things 仍是可选 |
 
 任何方案都可以用 `--with 能力,能力` 把某个可选部分算成必需(例如 `--with voice_convert`),能力名见 `setup.toml` 的 `[capabilities.*]`。
 
@@ -91,7 +91,6 @@ uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python -e '.[de
 | video | Pinokio ✋ | pinokio.computer 下载应用 | 0.4 GiB | MIT |
 | video | Phosphene + LTX-2.5 ✋ | Pinokio → Discover → Download from URL → `https://github.com/mrbizarro/phosphene` → Install;装完在 Pinokio 里点 Start(端口 8198) | **~27.5 GiB**(+后台 ~10.7) | MIT(面板);LTX-2.x Community License(模型,年收入门槛内免费商用) |
 | voice_convert | Seed-VC(可选) | 代码 + `uv venv --python 3.11` + `-r storyagent/setup/recipes/seedvc-venv.txt`;✋ 检查点 `ar_base.pth`/`cfm_small.pth`;HuBERT、BigVGAN 用 `hf download` | ~1.7 + 3.7 GiB | 代码 GPL-3.0(独立进程运行);权重条款未核实 |
-| avatar | LongCat(可选) | 代码 + venv + `hf download mlx-community/LongCat-Video-Avatar-1.5-q4-dmd-merged`(+ whisper-large-v3 配置) | 23 GiB | MIT |
 | h3 | MiniMax H3(可选) | `git clone https://github.com/antirez/h3.c.git`;`make`;权重 `hf download MiniMaxAI/MiniMax-H3` | **196 GiB** | 代码 MIT;权重 MiniMax H3 社区许可(**地域限制:欧盟/英国/韩国/美国除外;商用需署名**) |
 | drawthings | Draw Things(可选,受限内容方案) ✋ | App Store 安装;设置 → Advanced → API Server 打开 | 0.3 GiB | 见应用条款 |
 
@@ -140,9 +139,9 @@ scripts/start.sh                                       # worker + 网页服务(�
 | stills | ≈ 20 + 22 + 9.1 ≈ 51 GiB;加 whisper 1.5、ACE-Step 9.4+2、音效 9.7 ≈ 74 GiB |
 | full | stills(含音乐、音效、whisper)+ Phosphene/LTX-2.5 ≈ 27.5 → **≈ 102 GiB**(+ Pinokio 之后后台再下 ~10.7) |
 | everything | full + klein 蒸馏版 15 + Seed-VC ~5 ≈ 122 GiB |
-| 可选大件 | LongCat 23 GiB、H3 196 GiB |
+| 可选大件 | H3 196 GiB |
 
-(参考机上这些目录实际占用:`~/models/flux2-klein-base-4B` 22 G、`cosyvoice3` 9.1 G、`ACE-Step-1.5/checkpoints` 19 G(含 0.6B/4B 语言模型等额外的)、LTX-2.5 q4 19 G + q8 55 G(Pinokio 里)、LongCat 70 G(含 bf16 46 G)、H3 196 G、ComfyUI-Shared 167 G(含大量与本系统无关的检查点)。)
+(参考机上这些目录实际占用:`~/models/flux2-klein-base-4B` 22 G、`cosyvoice3` 9.1 G、`ACE-Step-1.5/checkpoints` 19 G(含 0.6B/4B 语言模型等额外的)、LTX-2.5 q4 19 G + q8 55 G(Pinokio 里)、H3 196 G、ComfyUI-Shared 167 G(含大量与本系统无关的检查点)。)
 
 ## 6. 已知不确定处(新机器上第一次会碰到)
 

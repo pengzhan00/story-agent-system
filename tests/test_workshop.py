@@ -68,9 +68,9 @@ def test_inputs_follow_the_kind_description() -> None:
 
 def test_every_module_kind_has_a_default_model_and_an_output() -> None:
     s = load_settings({"STORY_AGENT_HOME": "/nonexistent-home"})
-    # the post module's audio.enhance / video.enhance are wired to a per-machine CLI/HTTP connector, not a packaged
-    # model, so they have no packaged default (the operator's config points at them)
-    connector_only = {MediaKind.AUDIO_ENHANCE.value, MediaKind.VIDEO_ENHANCE.value}
+    # audio.enhance / video.enhance / video.avatar are wired to a per-machine CLI/HTTP connector (or ComfyUI workflow),
+    # not a packaged model, so they have no packaged default (the operator's config points at them)
+    connector_only = {MediaKind.AUDIO_ENHANCE.value, MediaKind.VIDEO_ENHANCE.value, MediaKind.VIDEO_AVATAR.value}
     for m in MODULES:
         for k in m.kinds:
             if k.kind.value not in connector_only:

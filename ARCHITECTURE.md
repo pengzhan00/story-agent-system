@@ -10,7 +10,7 @@ Single-user, local, offline. Two long-lived processes share one SQLite database 
                        storyagent worker  (executes media jobs and workflow runs, heartbeats, reattaches after a crash)
                               │
         adapters: ComfyUI-free; HTTP (acestep, phosphene) · subprocess (mflux, cosyvoice, seedvc, whisper, h3,
-                  longcat, lora_train) · ffmpeg runner (assemble)
+                  lora_train) · ffmpeg runner (assemble)
 ```
 
 Either process can restart at any time: queued work stays in the database, running work is recovered through leases.

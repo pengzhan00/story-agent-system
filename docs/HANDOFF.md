@@ -60,7 +60,7 @@ storyagent/
                engine.py 执行;stages.py/media.py/seed.py/shotplan.py 各阶段;progress.py 进度/ETA;flow.py "流程说明"
   media/       contracts(Adapter 协议)、ledger(作业/资产台账)、specs(规格存储)、worker、broker(并发/内存/互斥)、
                assetrefs(asset:/job:/library: 解析)、library、compliance、healthcheck、registry、params(参数分层)
-    adapters/  acestep comfy mflux phosphene cosyvoice seedvc whisper h3 longcat lora_train llm assemble remote_video fake(+_http/_subprocess 公共件)
+    adapters/  acestep comfy mflux phosphene cosyvoice seedvc whisper h3 lora_train llm assemble remote_video fake(+_http/_subprocess 公共件)
     runners/   assemble_episode.py(仅标准库,子进程跑 ffmpeg)
   compose/     timeline.py(纯函数 EDL)、pacing.py(目标时长→结构/镜头时长/QC窗口)、qc.py、export.py(交付包)
   workshop.py  工坊:模块(story script image episode lora song voice video transcript)= 单独可用,或串成流水线
@@ -69,7 +69,7 @@ storyagent/
   cli.py       `python -m storyagent …`(所有命令的入口)
 web/           React+TS+Vite;pages/(Launch Projects Project Workshop Library Queue Prompts System)
 tests/         pytest(默认不含 live);tests/test_guards.py 是红线
-docs/          API CONFIGURATION MEDIA_CONTRACT RUNBOOK WORKFLOW USER_GUIDE PARITY_MATRIX SERIES HANDOFF(本文) TOOLS(管线工具总览)；tools/ 各工具的命令与参数含义(LTX、Phosphene、h3.c、ComfyUI、ACE-Step、CosyVoice、Seed-VC、FLUX、LongCat、LLM、后期)；reviews/ 审查报告
+docs/          API CONFIGURATION MEDIA_CONTRACT RUNBOOK WORKFLOW USER_GUIDE PARITY_MATRIX SERIES HANDOFF(本文) TOOLS(管线工具总览)；tools/ 各工具的命令与参数含义(LTX、Phosphene、h3.c、ComfyUI、ACE-Step、CosyVoice、Seed-VC、FLUX、LLM、后期)；reviews/ 审查报告
 ```
 
 ### 3.1 核心数据流(必须记住)
@@ -164,15 +164,13 @@ docs/          API CONFIGURATION MEDIA_CONTRACT RUNBOOK WORKFLOW USER_GUIDE PARI
 - Ollama 0.40.6;已装 `gemma4:31b`(默认角色)、`gpt-oss-20b`(结构化 JSON 不稳,已退回)、`nomic-embed-text`。`qwen3.8:27b` 已放弃。
 - ACE-Step 8001(启动台可拉起);Phosphene 在 Pinokio(8198)。
 - ffmpeg-full:`/opt/homebrew/opt/ffmpeg-full/bin`(PATH 里的 ffmpeg 没有 libass,烧字幕/标识必须用它)。
-- LongCat(已实测通过):`~/myworkspace/longcat-avatar-mlx`(自带 py3.11 venv,权重 `LongCat-Video-Avatar-1.5-q4-dmd-merged`);
-  它脚本要从 HF 缓存读 whisper 特征配置(`openai/whisper-large-v3`),陈旧的 `.locks` 文件曾卡死;适配器设了离线环境变量+`PYTHONUNBUFFERED`。
-  **实测:一条 draft(832×480、93 帧 = 3.1 秒、30fps、无音轨)用了 54 分钟,口型和表情会动,首帧有些过饱和/变形**——本机数字人视频极慢,是整个规划的约束(见 SERIES.md S4)。
+- LongCat(2026-10-30 已整套移除,适配器、配置、安装目录都删了;要找回从 git 历史):q4 一条 draft(832×480、93 帧 = 3.1 秒)用了 54 分钟,bf16(`base`,运行时合并 DMD LoRA,仍是 8 步)3.7 秒的片跑 53 分钟仍无输出后被停掉。本机数字人视频极慢,是整个规划的约束(见 SERIES.md S4)。
 - 生产更新流程:在开发工作树改+测+推送 `origin/main` → 网页「更新并重启」(默认等运行中的任务做完,失败就停在原地、旧代码继续跑),或手动:主检出 `scripts/deploy.sh` → 确认没有在跑的重任务 → Ctrl-C 停 `scripts/start.sh` 再启动。需要开机自启/崩溃自拉起时再加 launchd(会改系统设置,须先问用户)。
 - 重启服务:server 偶尔忽略 SIGTERM,用明确 PID 先 `kill` 再必要时 `kill -9`(从不 pkill)。
 
 ## 7. 已做 / 未做(诚实清单)
 
-**已做且有测试**:故事全流程(analyze…compose)、规格/作业/资产台账与 worker、全部适配器(acestep comfy(音效,Stable Audio 3) mflux phosphene cosyvoice seedvc whisper h3 longcat lora_train llm assemble remote_video)、
+**已做且有测试**:故事全流程(analyze…compose)、规格/作业/资产台账与 worker、全部适配器(acestep comfy(音效,Stable Audio 3) mflux phosphene cosyvoice seedvc whisper h3 lora_train llm assemble remote_video)、
 合规/溯源、API+SSE、网页(启动台/项目/工坊/资产库/队列/AI 提示词/系统)、工坊九个模块(故事 剧本 图片 成片 LoRA 歌曲 配音 视频 转写)+流水线、
 启动台、目标时长/交付档位、**生产计划(先列清单、确认后才生成)**、**从文字建项目**。
 链路:剧本/故事 → 人物与场景 → 人物像/场景图 → 镜头关键帧(`image.edit`,以已做好的人物像+场景图为参考,`[workflow] keyframe_from_references`)→ 镜头视频。
@@ -198,7 +196,7 @@ docs/          API CONFIGURATION MEDIA_CONTRACT RUNBOOK WORKFLOW USER_GUIDE PARI
 0. (已完成)多集改造步骤 A(`docs/SERIES.md`):迁移 007、季表、按集的阶段状态;`workflow run --param episode=2` 能接着做第 2 集而不动第 1 集。步骤 B 也已做(配乐按集,迁移 008)。步骤 C 也已做(批量跑多集/一季,进度按集)。步骤 D 季大纲也已做(`outline` 阶段,迁移 009)。系列看板(E)也已做(网页「全剧」页)。圣经的人物部分也已做(锁定 + 后续集新角色自动加入,迁移 011)。镜头分层与预算(S4)也已做:`produce` 默认只给被选中的镜头做视频,其余是关键帧+推拉(`[workflow] video_share/video_min_per_episode/video_budget_hours`,项目可覆盖,镜头可单独指定)。下一步:试播集实测、场景/画风锁定、交叉叠化/音效合成/一集多首配乐。剪辑增强(场景淡入淡出、前情/片名/未完待续卡、字幕样式)已做。
 0. (已完成)「剧本→人物/场景图→关键帧」断链修复 + 生产计划确认队列 + 从文字建项目。项目级默认声音已做(`projects.settings.default_voice`,制作流程页可选)。仍未覆盖:口型头像步骤不在项目流程内、每集只用一首配乐、工坊成片模块要手工拼镜头。
 
-1. (已完成)LongCat 实测 54 分钟/3.1 秒;工坊「故事→剧本」用 gemma4 实测通过(故事 33 秒、剧本 17 秒)。
+1. (已完成)LongCat 实测 54 分钟/3.1 秒(后整套移除);工坊「故事→剧本」用 gemma4 实测通过(故事 33 秒、剧本 17 秒)。
 2. (已完成)生产环境与数据迁到主检出。2026-10-22 起生产跑新代码(迁移 013 已应用,数据未清);重启只用明确 PID `kill`,从不 pkill。
 3. (已完成)**云端视频接口预留**:`media/adapters/remote_video.py` 配置驱动的通用 REST 异步作业适配器,说明与完整配置示例见 `docs/CLOUD.md`;云端模型 `remote=true`,数据离开本机要 `allow_remote`(默认关),密钥只读环境变量名(`api_key_env`,不入库不入日志),任务号即 `external_id`(重启不重复付费),不占本机重任务锁、并发上限 `[runtime] max_remote_jobs`(默认 4),结果下载只对厂商域名带密钥,填了 `price_per_second` 则资产元数据带估算费用;7 个测试(`tests/test_remote_video.py` 用本地假服务)覆盖提交/轮询/下载/许可/密钥/接管/并行。没接具体厂商(不知道用哪家):给出厂商后只需填一段 TOML,差异大的写个小子类。
 4. 试播集(30 秒)在真实模型上端到端跑一遍,记各环节耗时画质 → 决定镜头分层策略。

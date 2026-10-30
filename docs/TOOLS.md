@@ -14,7 +14,7 @@
 | 训角色 LoRA | mflux-train | `flux2-klein-4b-lora-trainer` | [FLUX](tools/FLUX.md) |
 | 视频(音画一体,首选) | LTX-2.5(Phosphene 面板) | `ltx-2.5-av` / `ltx-2.5-video` | [LTX-2.5](tools/LTX.md)、[Phosphene](tools/PHOSPHENE.md) |
 | 视频(长镜头) | MiniMax H3(h3.c 命令行) | `minimax-h3` | [h3.c](tools/H3C.md) |
-| 口型对话 / 数字人 | LTX Lip-sync、LongCat | `ltx-2.5-lipsync` / `longcat-avatar-1.5-q4` | [LTX-2.5](tools/LTX.md)、[LongCat](tools/LONGCAT.md) |
+| 口型对话 | LTX Lip-sync(中文口型偏弱,见 reviews/2026-10-30-a2v-ab.md) | `ltx-2.5-lipsync` | [LTX-2.5](tools/LTX.md) |
 | 配音 / 声音克隆 | CosyVoice 3 / 2 | `cosyvoice3-0.5b` / `cosyvoice2-0.5b` | [CosyVoice](tools/COSYVOICE.md) |
 | 换声 / 歌声换音色 | Seed-VC + Demucs | `seed-vc-v2` | [Seed-VC](tools/SEEDVC.md) |
 | 配乐 / 主题曲(带人声) | ACE-Step 1.5 独立服务 | `acestep-1.5-turbo` | [ACE-Step](tools/ACESTEP.md) |
@@ -35,14 +35,14 @@
 | Phosphene 面板(Pinokio) | `127.0.0.1:8198` | 你(`open -a Pinokio`) | `/status` |
 | Draw Things API | `127.0.0.1:7860` | 你(打开应用并在设置里开 API Server) | `/` |
 | llama.cpp | `127.0.0.1:8080` | 默认关闭 | `/health` |
-| h3.c、CosyVoice、Seed-VC、whisper、mflux、LongCat、ffmpeg | 没有服务,每个任务起一个子进程 | 系统在任务里调用 | 工具路径检查 |
+| h3.c、CosyVoice、Seed-VC、whisper、mflux、ffmpeg | 没有服务,每个任务起一个子进程 | 系统在任务里调用 | 工具路径检查 |
 
 系统**不会替你启动或关闭不属于它的进程**;启动页只会运行 `services.toml` 里 `[launch.*]` 列出、并且你点了的那几个。所有路径、端口都在 `services.toml`,代码里没有写死。
 体检:`storyagent media healthcheck`。
 
 ## 同时只能跑一个重任务
 
-视频(LTX、h3、LongCat)、LoRA 训练是“重任务”,内存各占 50–80 GB,由 broker 串行;配音、出歌、音效、装配是轻任务,可以和重任务错开。
+视频(LTX、h3)、LoRA 训练是“重任务”,内存各占 50–80 GB,由 broker 串行;配音、出歌、音效、装配是轻任务,可以和重任务错开。
 重任务期间不要再开别的大模型(包括 Ollama 里驻留的 31B)。
 
 ## Draw Things

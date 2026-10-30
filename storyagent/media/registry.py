@@ -137,12 +137,6 @@ def _h3(settings: Settings) -> Adapter:
     return H3Adapter()
 
 
-def _longcat(settings: Settings) -> Adapter:
-    from .adapters.longcat import LongCatAdapter
-
-    return LongCatAdapter()
-
-
 def _cli(settings: Settings) -> Adapter:
     from .adapters.generic_cli import CliAdapter
 
@@ -163,7 +157,7 @@ def _control_tools(settings: Settings) -> Adapter:
 
 _BUILTIN: list[Callable[[Settings], Adapter]] = [
     _acestep, _comfy, _drawthings, _phosphene, _cosyvoice, _say, _whisper, _llm, _remote_video, _mflux, _lora_train,
-    _seedvc, _demucs, _ffmpeg, _delivery, _h3, _longcat, _cli, _http, _control_tools,
+    _seedvc, _demucs, _ffmpeg, _delivery, _h3, _cli, _http, _control_tools,
 ]
 
 

@@ -86,15 +86,6 @@ hint_key = "launch.hint.drawthings"
 binary = "~/myworkspace/h3.c/h3"
 model_dir = "~/myworkspace/MiniMax-H3"
 
-[tools.longcat]
-root = "~/myworkspace/longcat-avatar-mlx"
-python = "~/myworkspace/longcat-avatar-mlx/.venv/bin/python"
-weights_dir = "~/myworkspace/longcat-avatar-mlx/weights"
-variant_dir = "LongCat-Video-Avatar-1.5-q4-dmd-merged"
-# Only local files: the script would otherwise wait for the model hub (hangs without a route to it). Needs
-# openai/whisper-large-v3 (preprocessor config) in the local Hugging Face cache.
-offline = true
-
 [tools.cosyvoice]
 root = "~/cosyvoice"
 python = "~/cosyvoice/venv/bin/python"

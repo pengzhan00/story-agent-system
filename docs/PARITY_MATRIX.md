@@ -36,7 +36,7 @@
 
 | # | 旧功能 | v2 去向 | 状态 |
 |---|---|---|---|
-| C1 | LTX t2v/i2v 管线(ComfyUI 工作流) | 视频由 `phosphene`(LTX 2.5 原生)、`h3`(视频+音频)、`longcat`(数字人)适配器提供;**不再有 ComfyUI 适配器**,旧 ComfyUI 工作流 JSON 留在 `v1-final` | 🔀 |
+| C1 | LTX t2v/i2v 管线(ComfyUI 工作流) | 视频由 `phosphene`(LTX 2.5 原生)、`h3`(视频+音频)适配器提供(数字人 LongCat 已于 2026-10-30 移除);**不再有 ComfyUI 适配器**,旧 ComfyUI 工作流 JSON 留在 `v1-final` | 🔀 |
 | C2 | 预览/冒烟渲染、`quality_tier` | `QualityTier` draft/preview/final,按模型分档参数 | ✅ |
 | C3 | 管线回退链 + `allow_fallback` + stub 兜底 | 不静默降级:失败即报错并给出下一步;produce 报告「跳过/失败」原因 | ✅ |
 | C4 | Wan2.* 管线类(配置未启用) | 未验证、未启用 | ⛔ |
@@ -75,4 +75,4 @@
 
 ## 已知缺口(诚实清单)
 
-音效合成(C7)、RIFE 补帧(C9)、EDL/FCPXML(D3)、转场(D2)、参考图 Web 上传入口(B3)、AI 改写 + 变更清单(A11)、FastVideo(已移除:没有适配器,权重也没装;要用时从 git 历史找回配置)、longcat 尚未 live 验证(仅桩与契约测试;Phosphene、h3 视频已于 2026-10-21 实机验证)。
+音效合成(C7)、RIFE 补帧(C9)、EDL/FCPXML(D3)、转场(D2)、参考图 Web 上传入口(B3)、AI 改写 + 变更清单(A11)、FastVideo(已移除:没有适配器,权重也没装;要用时从 git 历史找回配置)、LongCat(已移除:本机 3.7 秒的片一小时仍出不来,见 SERIES.md;要用时从 git 历史找回适配器);Phosphene、h3 视频已于 2026-10-21 实机验证。

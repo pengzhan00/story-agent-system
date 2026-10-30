@@ -191,7 +191,7 @@ def test_openai_compat_client_uses_response_format_and_bearer() -> None:
 def _heavy_job(db: Database, status: str) -> None:
     db.conn.execute("INSERT INTO projects(slug, name) VALUES ('p', 'P')")
     db.conn.execute("INSERT INTO media_jobs(id, project_id, kind, provider, model_ref, heavy, status)"
-                    " VALUES ('j1', 1, 'video.avatar', 'longcat', 'm', 1, ?)", (status,))
+                    " VALUES ('j1', 1, 'video.av', 'h3', 'm', 1, ?)", (status,))
 
 
 def test_a_call_is_refused_at_once_while_a_heavy_job_runs(lsettings: Settings, tmp_path: Path) -> None:
