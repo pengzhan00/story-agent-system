@@ -116,7 +116,8 @@ class Ctx:
         """The form rules (kind of work) and genre notes every writing agent is given; see ``agents.craft``."""
         plan = self.state.get_data(self.pid, "plan") or {}
         genre = str(plan.get("genre") or self.project.genre or "")
-        return writing_vars(self.settings, self.project.kind, genre, vertical=self.frame_vertical())
+        return writing_vars(self.settings, self.project.kind, genre, vertical=self.frame_vertical(),
+                            rating=self.project.rating)
 
     def shot_range(self) -> tuple[float, float]:
         """Shortest and longest planned shot: the kind's ``shot_sec``; run parameters ``min_shot_sec`` and

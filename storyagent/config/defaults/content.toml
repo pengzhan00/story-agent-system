@@ -1,5 +1,8 @@
 # Content ratings: how material of a restricted rating is stored, shown, logged and exported. This is resource
-# MANAGEMENT only (isolation, masking, access, export, audit); it is not a content filter and writes no prompts.
+# MANAGEMENT only (isolation, masking, access, export, audit); it is not a content filter. It carries no prompt text of
+# its own either: a rating may name `writing` / `visual` notes (how detailed the story writers and the image/video
+# prompt writer must be for a project of that rating), but none are packaged; the operator writes them in
+# $STORY_AGENT_HOME/config/content.toml.
 # Honest limit: with auth off the "unlock" is a guard against showing or sending by mistake, not a security
 # boundary against other users of this computer. Real secrecy comes from putting the vault on an encrypted volume.
 [content]

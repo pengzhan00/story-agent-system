@@ -107,6 +107,19 @@ allow_remote = false            # 不送云端模型(忽略项目的 allow_remot
 受限分级的 `allow_remote = false` 现在在语言模型这一层真正生效:路由到的后端不在本机,调用以 `remote_forbidden` 拒绝。
 语言模型页显示来源「按内容分级」。仍然只是接线,不含提示词。
 
+## 按分级决定描写的细致程度(2026-11-09)
+分级可以带两段说明文字,写在 `$STORY_AGENT_HOME/config/content.toml`(程序自带的配置里没有,不含提示词):
+- `writing`:给编剧类智能体(季纲、大纲、改编、分镜、审稿、工坊故事/剧本)。它接在作品形式的写作规则(`kinds.toml` 的 `writing`)后面,一起进 `$form_guidance`。
+- `visual`:给写画面/视频提示词的 `shot.visual`,进 `$rating_visual`。
+
+项目是哪个分级就读哪一档;普通分级没写就不加任何东西。例子(本机已写在 `data/config/content.toml`):
+```toml
+[content.ratings.restricted]
+writing = "……亲密戏不跳过、不概述,逐拍写,每场都要改变人物的处境……具体到位置、衣着、触碰、呼吸与声音……"
+visual = "……身体与接触写得具体:每个人的姿势、哪些部位入镜、此镜头穿着与裸露、表情与视线、皮肤上的光;景别在 image_prompt 与 video_prompt 里保持一致……"
+```
+成年确认、硬闸门、保险库、遮掩、导出确认等照旧,与这两段文字无关。说明文字改了立即生效(配置热加载);已经出过的文本不会重写,需要重跑对应阶段。
+
 ## 素材分级可手动调整(2026-11-08)
 模型和方案不再替素材定级:`models.toml` 与 `pipelines.toml` 不写 `rating` 时,产物就是项目的级别(同一个模型既能出普通素材也能出受限素材,例如 Krea 2)。要把某个模型的产物一律当受限处理,仍可在它上面写 `rating`;这是可选的,不是默认。
 单个素材的分级随时可改:`PUT /api/assets/{id}/rating`(`{"rating": "restricted"}`)或 `storyagent asset rate ID --rating restricted`。文件会按新分级在 `projects/` 与保险库之间搬家(`content.rate_asset`),数据库更新失败时搬回原处;新位置已有同名文件、保险库卷没挂载、分级不存在、素材不在它分级应在的位置,都拒绝并且不改任何东西(`content.error.target_exists / vault_unavailable / unknown_rating / asset_not_in_place`)。改级别的人必须能看到旧分级和新分级(受限的要先解锁,年龄门槛照常),并写审计 `content.rate`(`from` / `to`)。遮掩缩略图缓存随之清掉。

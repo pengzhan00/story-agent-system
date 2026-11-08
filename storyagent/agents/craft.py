@@ -27,9 +27,12 @@ def shot_bounds(settings: Settings, name: str | None) -> tuple[float, float]:
 
 
 def writing_vars(settings: Settings, kind_name: str | None, genre: str = "",
-                 vertical: bool | None = None) -> dict[str, str]:
-    """Prompt variables ``form_guidance``, ``genre_guidance``, ``dialogue_chars``, ``shot_sec``, ``frame_note``."""
+                 vertical: bool | None = None, rating: str | None = None) -> dict[str, str]:
+    """Prompt variables ``form_guidance``, ``genre_guidance``, ``dialogue_chars``, ``shot_sec``, ``frame_note`` and
+    ``rating_visual``. The notes of the project's rating (``content.toml`` ``writing`` / ``visual``, how detailed to be)
+    are appended to ``form_guidance`` / given as ``rating_visual``; both are empty unless the operator wrote them."""
     kind = resolve_kind(settings, kind_name)
+    policy = settings.content.policy(rating) if rating else None
     shot = kind.shot_sec
     if vertical is None:
         frame = NONE
@@ -39,8 +42,10 @@ def writing_vars(settings: Settings, kind_name: str | None, genre: str = "",
     else:
         frame = ("Landscape frame: wide compositions, two or more people in one shot are fine, "
                  "use the width for place and blocking.")
+    form = "\n\n".join(t for t in (kind.writing.strip(), policy.writing if policy else "") if t)
     return {
-        "form_guidance": kind.writing.strip() or NONE,
+        "form_guidance": form or NONE,
+        "rating_visual": (policy.visual if policy else "") or NONE,
         "genre_guidance": settings.genres.guidance_for(genre) or NONE,
         "dialogue_chars": str(kind.dialogue_chars),
         "shot_sec": f"between {shot.min:g} and {shot.max:g} seconds, usually about {shot.default:g}",

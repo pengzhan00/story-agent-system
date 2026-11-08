@@ -317,6 +317,8 @@ def compose_keyframe(
     if not compose_wanted(settings, modes, spec) or spec.kind is not MediaKind.IMAGE_GENERATE:
         return job
     refs: list[str] = []
+    scenes: list[str] = []
+    people: list[str] = []
     for dep in spec.depends_on:
         if dep.get("subject_type") not in ("character.portrait", "scene.keyframe"):
             continue
@@ -325,6 +327,7 @@ def compose_keyframe(
         asset = current_asset(ledger, found) if found else None
         if asset is not None:
             refs.append(f"asset:{asset.id}")
+            (scenes if dep["subject_type"] == "scene.keyframe" else people).append(f"asset:{asset.id}")
     if not refs:
         return job
     try:
@@ -333,9 +336,14 @@ def compose_keyframe(
                 MediaKind.IMAGE_EDIT.value)
     except ConfigError:
         return job
+    if model.extra.get("ref_order") == "scene_first":   # e.g. Krea 2 Identity Edit: image 1 = scene, image 2 = person
+        refs = [*scenes, *people]
+    inputs = {**job.inputs, "refs": [*refs, *job.inputs.get("refs", [])]}
+    template = str(model.extra.get("edit_template") or "")   # the edit model's own wording, e.g. its scale rules
+    if "{prompt}" in template and str(inputs.get("prompt", "")).strip():
+        inputs["prompt"] = template.replace("{prompt}", str(inputs["prompt"]).strip())
     # the edit model has its own parameter defaults (tier layers resolve in the worker from model_ref and tier)
-    return MediaJob(**{**job.__dict__, "kind": MediaKind.IMAGE_EDIT, "model_ref": model.ref,
-                       "inputs": {**job.inputs, "refs": [*refs, *job.inputs.get("refs", [])]}})
+    return MediaJob(**{**job.__dict__, "kind": MediaKind.IMAGE_EDIT, "model_ref": model.ref, "inputs": inputs})
 
 
 # Seconds per job when the ledger has no history for the model yet (only used to shape the progress bar and the plan).

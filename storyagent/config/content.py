@@ -22,6 +22,8 @@ class RatingPolicy:
     allow_remote: bool = True
     gates: bool = False
     min_age: int = 0          # the age a viewer must have (approved by an admin) to see this rating at all
+    writing: str = ""         # optional notes for the story / script writers of a project of this rating (how detailed)
+    visual: str = ""          # optional notes for the agent that writes the image and video prompts
 
     @property
     def restricted(self) -> bool:
@@ -77,7 +79,8 @@ def build_content(raw: Mapping[str, Any], error: type[Exception]) -> ContentConf
             mask_ui=bool(spec.get("mask_ui", False)), vault=bool(spec.get("vault", False)),
             log_prompts=bool(spec.get("log_prompts", True)), allow_export=bool(spec.get("allow_export", True)),
             allow_remote=bool(spec.get("allow_remote", True)), gates=bool(spec.get("gates", False)),
-            min_age=int(spec.get("min_age", 0)))
+            min_age=int(spec.get("min_age", 0)), writing=str(spec.get("writing", "")).strip(),
+            visual=str(spec.get("visual", "")).strip())
         if policy.vault and not policy.gates:
             raise error(f"content.ratings.{name}: a rating stored in the vault must keep gates = true")
         ratings[name] = policy

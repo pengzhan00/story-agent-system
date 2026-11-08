@@ -3,9 +3,12 @@
 # (Phosphene) for video, CosyVoice for speech, ACE-Step for music. The plan carries no `rating`: neither a model nor a
 # plan makes assets restricted by itself. The rating is chosen by hand for each project (a project made as restricted
 # gets the vault, masking, adult confirmation per character and the export gate).
-# `video_share = 1.0`: every shot is a video, none is a still picture with a push-in. Keyframes are drawn straight from
-# words (keyframe_from_references = false): there is no Krea 2 image-edit model, so a face is kept by the same words and
-# a fixed per-character seed. Measured on this machine: keyframe ~48 s (720x1280, 8 steps), LTX preview 5 s ~10 min.
+# `video_share = 1.0`: every shot is a video, none is a still picture with a push-in. Keyframes are composed with the
+# Krea 2 Identity Edit model (keyframe_from_references = true): scene image first, then the character portrait, so the
+# face and the scale come from reference images. Give the edit model in models.toml `ref_order = "scene_first"` and an
+# `edit_template` that states the true-scale rule; the character portrait must be half-length or more, never a
+# head-and-shoulders close-up (character.design asks for that). Identity Edit takes one person at a time.
+# Measured on this machine: keyframe ~48 s (720x1280, 8 steps), LTX preview 5 s ~10 min.
 [pipelines.vertical_drama_krea2]
 label_key = "pipeline.vertical_drama_krea2"
 note_key = "pipeline.vertical_drama_krea2.note"
@@ -14,6 +17,7 @@ tier = "preview"
 requires = ["ollama", "acestep", "phosphene", "comfy", "tool.ffmpeg", "tool.cosyvoice"]
 [pipelines.vertical_drama_krea2.models]
 "image.generate" = "lustify-krea2-comfy"
+"image.edit" = "krea2-identity-edit-comfy"
 "video.generate" = "ltx-2.5-video"
 "video.av" = "ltx-2.5-av"
 "audio.tts" = "cosyvoice3-0.5b"
@@ -23,7 +27,7 @@ requires = ["ollama", "acestep", "phosphene", "comfy", "tool.ffmpeg", "tool.cosy
 [pipelines.vertical_drama_krea2.workflow]
 video_share = 1.0
 video_min_per_episode = 2
-keyframe_from_references = false
+keyframe_from_references = true
 [pipelines.vertical_drama_krea2.edit]
 title_card = false
 next_card = true

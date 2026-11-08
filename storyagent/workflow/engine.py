@@ -107,7 +107,7 @@ class WorkflowEngine:
         plan = self.state.get_data(project_id, "plan") or {}
         profile = self.settings.delivery_profile(project.delivery_profile)
         craft = writing_vars(self.settings, project.kind, str(plan.get("genre") or project.genre or ""),
-                             vertical=int(profile["height"]) > int(profile["width"]))
+                             vertical=int(profile["height"]) > int(profile["width"]), rating=project.rating)
         data = self.agents_for(project).run("reviewer.script", {
             "language": language_name(project.content_language), "script": text,
             "characters": json.dumps(chars, ensure_ascii=False), **craft}, project_id=project_id).data
