@@ -124,16 +124,28 @@ def test_text_to_video_with_sound(tmp_path: Path, panel: FakeServer) -> None:
 
 
 @needs_ffmpeg
-def test_picture_only_strips_the_sound(tmp_path: Path, panel: FakeServer) -> None:
+def test_a_shot_clip_is_picture_only_but_a_standalone_clip_keeps_its_sound(tmp_path: Path, panel: FakeServer) -> None:
     make_video(panel.state["video"])  # type: ignore[attr-defined]
-    r = rig(tmp_path, panel)
-    rec, [a] = r.run(job(MediaKind.VIDEO_GENERATE, "ltx-test-silent", {"prompt": "a lake"}, params={"frames": 49}))
+    def with_shot(p: Path) -> Any:
+        rg = rig(p, panel)
+        rg.db.conn.execute("INSERT INTO episodes(project_id, number) VALUES (1, 1)")
+        rg.db.conn.execute("INSERT INTO shots(project_id, episode_id) VALUES (1, 1)")
+        return rg
+
+    r = with_shot(tmp_path)
+    rec, [a] = r.run(job(MediaKind.VIDEO_GENERATE, "ltx-test-silent", {"prompt": "a lake"}, shot_id=1,
+                         params={"frames": 49}))
     assert rec.status is JobStatus.COMPLETED, (rec.error_code, rec.error_message)
     assert a.has_audio is False and a.metadata["audio_stripped"] is True
-    r2 = rig(tmp_path / "b", panel)
+    r2 = with_shot(tmp_path / "b")
     rec2, assets2 = r2.run(job(MediaKind.VIDEO_GENERATE, "ltx-test-silent", {"prompt": "a lake"},
-                               params={"frames": 49, "keep_audio": True}))
+                               shot_id=1, params={"frames": 49, "keep_audio": True}))
     assert assets2[0].has_audio is True
+    r3 = rig(tmp_path / "c", panel)       # no shot: made in the workshop, filed in the library - the sound stays
+    rec3, assets3 = r3.run(job(MediaKind.VIDEO_GENERATE, "ltx-test-silent", {"prompt": "a lake"},
+                               params={"frames": 49}))
+    assert rec3.status is JobStatus.COMPLETED and assets3[0].has_audio is True
+    assert "audio_stripped" not in assets3[0].metadata
 
 
 def test_upscaled_sibling_is_preferred(tmp_path: Path, panel: FakeServer) -> None:

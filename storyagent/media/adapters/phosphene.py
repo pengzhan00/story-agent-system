@@ -354,7 +354,10 @@ class PhospheneAdapter(AdapterBase):
             if want_w and want_h and not upscaled and (info.width, info.height) != (int(want_w), int(want_h)):
                 meta["requested_size"] = [int(want_w), int(want_h)]
                 ctx.log("resolution_clamped", "warning", requested=[want_w, want_h], actual=[info.width, info.height])
-        keep_audio = job.params.get("keep_audio", job.kind is not MediaKind.VIDEO_GENERATE)
+        # A picture-only clip of an episode shot is silent (its sound is the dialogue and the score); a clip made on its
+        # own (workshop, library) keeps what the model made. ``keep_audio`` decides either way.
+        keep_audio = job.params.get(
+            "keep_audio", not (job.kind is MediaKind.VIDEO_GENERATE and job.shot_id is not None))
         if not keep_audio:
             src = self._strip_audio(src, ctx)
             meta["audio_stripped"] = True
