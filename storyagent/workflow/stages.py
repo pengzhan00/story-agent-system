@@ -233,7 +233,8 @@ def _renumber(outline: dict[str, Any]) -> None:
             scene["number"] = s
 
 
-MAX_SHOT_FACTOR = 3     # a set-piece scene may take this many times the usual shots of a scene
+SHORT_SCENE_RETRIES = 2     # times a scene's shots are asked again when the writer gave fewer than the outline wants
+MAX_SHOT_FACTOR = 3    # a set-piece scene may take this many times the usual shots of a scene
 
 
 def _scene_shot_count(scene: dict[str, Any], usual: int, factor: int = MAX_SHOT_FACTOR) -> int:
@@ -434,12 +435,20 @@ def script(ctx: Ctx) -> dict[str, Any]:
             done += 1
             continue
         in_scene = _scene_shot_count(scene, shots_n, int(ctx.params.get("shot_count_factor") or MAX_SHOT_FACTOR))
-        data = ctx.run_agent("screenwriter.shots", {
-            "title": outline["title"], "act_title": act.get("title", ""), "scene": scene,
-            "characters": _character_brief(chars), "shots_per_scene": in_scene, "previous": previous or "(start)",
-            "feedback": feedback if revising else "(none)",
-            "current": dump(scene["shots"]) if revising and scene.get("shots") else "(none)"})
-        shots = data["shots"]
+        shots, earlier = [], "(none)"
+        asked = bool(scene.get("shot_count")) and not revising      # only a number the outline asked for is chased
+        for _ in range(1 + (SHORT_SCENE_RETRIES if asked else 0)):
+            data = ctx.run_agent("screenwriter.shots", {
+                "title": outline["title"], "act_title": act.get("title", ""), "scene": scene,
+                "characters": _character_brief(chars), "shots_per_scene": in_scene,
+                "previous": previous or "(start)", "earlier_count": earlier,
+                "feedback": feedback if revising else "(none)",
+                "current": dump(scene["shots"]) if revising and scene.get("shots") else "(none)"})
+            if len(data["shots"]) > len(shots):
+                shots = data["shots"]
+            if len(shots) >= in_scene:
+                break
+            earlier = str(len(shots))      # too few: ask again, telling the writer how many it gave
         _clean_shots(shots, scene)
         for i, shot in enumerate(shots, start=1):
             shot["shot_number"] = i

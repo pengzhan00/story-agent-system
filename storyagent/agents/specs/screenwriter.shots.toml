@@ -4,7 +4,7 @@ temperature = 0.75
 max_tokens = 3500
 schema = "scene_shots"
 inputs = ["language", "title", "act_title", "scene", "characters", "shots_per_scene", "previous", "feedback", "current",
-          "form_guidance", "genre_guidance", "dialogue_chars", "shot_sec", "frame_note"]
+          "form_guidance", "genre_guidance", "dialogue_chars", "shot_sec", "frame_note", "earlier_count"]
 system = """You are a professional screenwriter and storyboard artist. You break one scene into shots with the dialogue
 spoken in each. Dialogue is in character and moves the plot: at most $dialogue_chars characters of spoken text per
 line, 1-3 lines per shot, none in purely visual shots. Write all story content in $language.
@@ -26,6 +26,9 @@ What happened just before: $previous
 Editor feedback to apply (nothing to apply when it says "(none)"): $feedback
 Current shots of this scene (when there is feedback, keep what already works and change only what the feedback asks
 for; "(none)" means write them fresh): $current
+
+Earlier attempt (nothing to correct when it says "(none)"): it had this many shots, which is too few. Split the
+scene into more separate moves until you reach the number asked: $earlier_count
 
 Produce exactly $shots_per_scene shots in order. Each shot shows ONE move or ONE beat, so a set piece is written as a
 chain of them: a fight is strike, block, counter, fall, one shot per exchange, each saying who does what to whom and
