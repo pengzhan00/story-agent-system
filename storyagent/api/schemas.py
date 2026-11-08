@@ -1494,6 +1494,10 @@ class TextEdit(BaseModel):
     text: str = Field(max_length=2_000_000)
 
 
+class AssetRating(BaseModel):
+    rating: str = Field(min_length=1, max_length=40)
+
+
 class LlmBackendOut(Strict):
     name: str
     kind: str

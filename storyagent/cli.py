@@ -472,6 +472,19 @@ def _cmd_asset_import(s: Settings, a: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_asset_rate(s: Settings, a: argparse.Namespace) -> int:
+    from storyagent.content import rate_asset
+
+    c = _ctx(s)
+    old = c.ledger.get_asset(a.id)
+    new = rate_asset(s, c.ledger, a.id, a.rating)
+    if new.rating != old.rating:
+        _users(s).audit("content.rate", actor="cli", project_id=old.project_id,
+                        detail={"asset": old.id, "from": old.rating, "to": new.rating})
+    print(t("cli.asset.rated", id=new.id, rating=new.rating))
+    return 0
+
+
 # -- asset packs ------------------------------------------------------------------------------------
 def _print_pack_report(report: Any) -> None:
     d = report.as_dict()
@@ -1452,6 +1465,9 @@ def build_parser() -> argparse.ArgumentParser:
     ai.add_argument("file")
     ai.add_argument("--project", type=int, required=True)
     ai.add_argument("--slot", default="main")
+    ar = add(asset, "rate", _cmd_asset_rate)
+    ar.add_argument("id")
+    ar.add_argument("--rating", required=True, help="a rating from content.toml, e.g. general or restricted")
 
     pk = sub.add_parser("pack").add_subparsers(dest="cmd", required=True)
     pe = add(pk, "export", _cmd_pack_export)

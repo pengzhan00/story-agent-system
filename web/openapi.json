@@ -602,6 +602,21 @@
         "title": "AssetOut",
         "type": "object"
       },
+      "AssetRating": {
+        "properties": {
+          "rating": {
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Rating",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rating"
+        ],
+        "title": "AssetRating",
+        "type": "object"
+      },
       "AssistDropped": {
         "properties": {
           "detail": {
@@ -12127,6 +12142,59 @@
           }
         },
         "summary": "Purge Asset Version",
+        "tags": [
+          "assets"
+        ]
+      }
+    },
+    "/api/assets/{asset_id}/rating": {
+      "put": {
+        "description": "Set the rating of one asset by hand (nothing is rated by its model or plan). The file moves between the\nvault and the open folders when the ratings keep files in different places. Needs to be allowed to see both\nratings (unlocked for a restricted one); written to the audit trail.",
+        "operationId": "rate_one_asset_api_assets__asset_id__rating_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "asset_id",
+            "required": true,
+            "schema": {
+              "title": "Asset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssetRating"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rate One Asset",
         "tags": [
           "assets"
         ]

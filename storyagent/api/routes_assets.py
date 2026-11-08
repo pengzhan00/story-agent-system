@@ -7,13 +7,13 @@ from typing import Annotated
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import FileResponse
 
-from storyagent.content import mask_thumbnail
+from storyagent.content import mask_thumbnail, rate_asset
 from storyagent.media.ledger import NewAsset
 from storyagent.util import home_file, new_id
 
 from .context import ctx_of
 from .errors import ApiError
-from .schemas import AssetOut, StaleAsset, TextEdit
+from .schemas import AssetOut, AssetRating, StaleAsset, TextEdit
 from .visibility import require_viewable
 
 router = APIRouter(prefix="/api", tags=["assets"])
@@ -99,6 +99,23 @@ def edit_text_asset(asset_id: str, body: TextEdit, request: Request) -> AssetOut
             provenance={**old.provenance, "edited_by": str(user.username) if user else "local", "edited_from": old.id},
             rating=old.rating),
         project_id=old.project_id, shot_id=old.shot_id)
+    return AssetOut.model_validate(new)
+
+
+@router.put("/assets/{asset_id}/rating", response_model=AssetOut)
+def rate_one_asset(asset_id: str, body: AssetRating, request: Request) -> AssetOut:
+    """Set the rating of one asset by hand (nothing is rated by its model or plan). The file moves between the
+    vault and the open folders when the ratings keep files in different places. Needs to be allowed to see both
+    ratings (unlocked for a restricted one); written to the audit trail."""
+    ctx = ctx_of(request)
+    old = ctx.ledger.get_asset(asset_id)
+    require_viewable(request, old.rating, old.project_id, what=old.id)
+    require_viewable(request, body.rating, old.project_id, what=old.id)
+    new = rate_asset(ctx.settings, ctx.ledger, asset_id, body.rating)
+    if new.rating != old.rating:
+        user = request.scope.get("state", {}).get("user")
+        ctx.auth.audit("content.rate", user=user, actor="local", path=request.url.path, project_id=old.project_id,
+                       detail={"asset": old.id, "from": old.rating, "to": new.rating})
     return AssetOut.model_validate(new)
 
 

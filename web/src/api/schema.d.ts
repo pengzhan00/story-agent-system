@@ -273,6 +273,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/assets/{asset_id}/rating": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Rate One Asset
+         * @description Set the rating of one asset by hand (nothing is rated by its model or plan). The file moves between the
+         *     vault and the open folders when the ratings keep files in different places. Needs to be allowed to see both
+         *     ratings (unlocked for a restricted one); written to the audit trail.
+         */
+        put: operations["rate_one_asset_api_assets__asset_id__rating_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/assets/{asset_id}/restore": {
         parameters: {
             query?: never;
@@ -3674,6 +3696,11 @@ export interface components {
             version: number;
             /** Width */
             width: number | null;
+        };
+        /** AssetRating */
+        AssetRating: {
+            /** Rating */
+            rating: string;
         };
         /** AssistDropped */
         AssistDropped: {
@@ -8498,6 +8525,41 @@ export interface operations {
                     "application/json": {
                         [key: string]: number;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rate_one_asset_api_assets__asset_id__rating_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                asset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssetRating"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetOut"];
                 };
             };
             /** @description Validation Error */

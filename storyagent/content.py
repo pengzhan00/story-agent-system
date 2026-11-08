@@ -7,6 +7,7 @@ from __future__ import annotations
 import hashlib
 import os
 import re
+import shutil
 import subprocess
 import time
 from collections.abc import Iterator, Mapping
@@ -213,6 +214,49 @@ def check_export(settings: Settings, db: Database, project_id: int, *, confirmed
     if not settings.content.policy(rating).allow_export and not confirmed:
         raise ContentError("export_blocked", rating=rating)
     return rating
+
+
+# -- rating an asset by hand --------------------------------------------------------------------------------
+def rate_asset(settings: Settings, ledger: Any, asset_id: str, rating: str) -> Any:
+    """Set the rating of one asset by hand. Neither a model nor a plan rates a picture by itself, so this is how a
+    finished asset is marked restricted (or taken back to an open rating). When the two ratings keep their files in
+    different places (the vault and the open project folders) the file moves with the record; if the record cannot
+    be written the file goes back, so path and file never disagree."""
+    cfg = settings.content
+    if not cfg.known(rating):
+        raise ContentError("unknown_rating", rating=rating)
+    asset = ledger.get_asset(asset_id)
+    if asset.rating == rating:
+        return asset
+    was_vault, will_vault = cfg.policy(asset.rating).vault, cfg.policy(rating).vault
+    moved: tuple[Path, Path] | None = None
+    path = asset.path
+    if was_vault != will_vault:
+        if will_vault and not vault_ready(settings):
+            raise ContentError("vault_unavailable")
+        src_root = settings.vault_dir if was_vault else settings.projects_dir
+        dst_root = settings.vault_dir if will_vault else settings.projects_dir
+        src = settings.home / asset.path
+        try:
+            relative = src.relative_to(src_root)
+        except ValueError:
+            raise ContentError("asset_not_in_place", asset=asset.id) from None
+        dst = dst_root / relative
+        if dst.exists():
+            raise ContentError("target_exists", asset=asset.id)
+        if src.is_file():
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(src), str(dst))
+            moved = (src, dst)
+        path = dst.relative_to(settings.home).as_posix()
+    try:
+        ledger.db.conn.execute("UPDATE media_assets SET rating=?, path=? WHERE id=?", (rating, path, asset.id))
+    except Exception:
+        if moved is not None:
+            shutil.move(str(moved[1]), str(moved[0]))
+        raise
+    (settings.home / "cache" / "mask" / f"{asset.id}.jpg").unlink(missing_ok=True)   # a stale masked thumbnail
+    return ledger.get_asset(asset.id)
 
 
 # -- masked thumbnails --------------------------------------------------------------------------------------

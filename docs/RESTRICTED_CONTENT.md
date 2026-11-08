@@ -106,3 +106,7 @@ allow_remote = false            # 不送云端模型(忽略项目的 allow_remot
 `llm.toml` 的 `[llm.ratings.<分级>]` 把该分级的项目分到指定的本地模型(例子见 `docs/examples/restricted-llm/llm.toml`,本机用 `qwen3.6-35b-a3b-abliterated:iq4xs`)。
 受限分级的 `allow_remote = false` 现在在语言模型这一层真正生效:路由到的后端不在本机,调用以 `remote_forbidden` 拒绝。
 语言模型页显示来源「按内容分级」。仍然只是接线,不含提示词。
+
+## 素材分级可手动调整(2026-11-08)
+模型和方案不再替素材定级:`models.toml` 与 `pipelines.toml` 不写 `rating` 时,产物就是项目的级别(同一个模型既能出普通素材也能出受限素材,例如 Krea 2)。要把某个模型的产物一律当受限处理,仍可在它上面写 `rating`;这是可选的,不是默认。
+单个素材的分级随时可改:`PUT /api/assets/{id}/rating`(`{"rating": "restricted"}`)或 `storyagent asset rate ID --rating restricted`。文件会按新分级在 `projects/` 与保险库之间搬家(`content.rate_asset`),数据库更新失败时搬回原处;新位置已有同名文件、保险库卷没挂载、分级不存在、素材不在它分级应在的位置,都拒绝并且不改任何东西(`content.error.target_exists / vault_unavailable / unknown_rating / asset_not_in_place`)。改级别的人必须能看到旧分级和新分级(受限的要先解锁,年龄门槛照常),并写审计 `content.rate`(`from` / `to`)。遮掩缩略图缓存随之清掉。
