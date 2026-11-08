@@ -2057,7 +2057,7 @@
   "pipeline.vertical_drama_lustify": "竖屏短剧 / 连续剧(Lustify · Draw Things,受限)",
   "pipeline.vertical_drama_lustify.note": "9:16 竖屏,图像用 Draw Things 里的 Lustify 模型(需打开 Draw Things 并开启 API Server);其余同竖屏短剧。受限方案:新建项目即为受限,素材进保险库、默认遮掩、导出需确认。参数默认取 Draw Things 当前设置。",
   "pipeline.vertical_drama_krea2": "写实竖屏短剧 / 连续剧(Krea2 Lustify · ComfyUI,受限)",
-  "pipeline.vertical_drama_krea2.note": "9:16 竖屏写实;图像全部走 ComfyUI 的 Krea2 Lustify + LoRA(不需要 Draw Things),视频用 LTX-2.5(Phosphene),所有镜头都出视频,不用静图推拉。关键帧由文字直接画出,没有参考图,同一角色靠相同描述和固定种子保持面孔。受限方案:新建项目即为受限,素材进保险库、默认遮掩、导出需确认。",
+  "pipeline.vertical_drama_krea2.note": "9:16 竖屏写实;图像全部走 ComfyUI 的 Krea2 Lustify + LoRA(不需要 Draw Things),视频用 LTX-2.5(Phosphene),所有镜头都出视频,不用静图推拉。关键帧由文字直接画出,没有参考图,同一角色靠相同描述和固定种子保持面孔。方案本身不带分级:要不要按受限处理,由你在新建项目时手动选。",
   "pipeline.landscape_drama": "横屏短剧 / 网剧",
   "pipeline.landscape_drama.note": "16:9 横屏 720p,同一套模型,集长几分钟到十几分钟。",
   "pipeline.tv_series": "电视剧",

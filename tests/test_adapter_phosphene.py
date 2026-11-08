@@ -168,6 +168,21 @@ def test_image_to_video_and_lipsync_modes(tmp_path: Path, panel: FakeServer) -> 
     assert f2["mode"] == "a2v" and f2["image"] == str(img) and f2["audio"] == str(wav) and f2["enhance"] == "false"
 
 
+@needs_ffmpeg
+def test_a_clip_with_an_end_picture_runs_the_two_keyframe_mode(tmp_path: Path, panel: FakeServer) -> None:
+    make_video(panel.state["video"])  # type: ignore[attr-defined]
+    first, last = tmp_path / "first.png", tmp_path / "last.png"
+    first.write_bytes(b"png")
+    last.write_bytes(b"png")
+    r = rig(tmp_path, panel)
+    refs = [{"role": "image", "path": str(first)}, {"role": "end_image", "path": str(last)}]
+    rec, _ = r.run(job(MediaKind.VIDEO_AV, "ltx-test", {"prompt": "she turns", "refs": refs}, seed=3))
+    assert rec.status is JobStatus.COMPLETED, (rec.error_code, rec.error_message)
+    f = form(next(q for q in panel.requests if q.path == "/queue/add"))
+    assert f["mode"] == "keyframe" and f["start_image"] == str(first) and f["end_image"] == str(last)
+    assert "image" not in f
+
+
 def test_input_validation_blocks_submission(tmp_path: Path, panel: FakeServer) -> None:
     r = rig(tmp_path, panel)
     cases = [

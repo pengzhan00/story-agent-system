@@ -151,8 +151,10 @@ class PhospheneAdapter(AdapterBase):
             return str(explicit)
         if job.kind is MediaKind.VIDEO_LIPSYNC:
             return "a2v"
-        has_image = any((r := _role(x)) and r[0] == "image" for x in job.inputs.get("refs", []))
-        return "i2v" if has_image else "t2v"
+        roles = {r[0] for x in job.inputs.get("refs", []) if (r := _role(x))}
+        if "end_image" in roles and roles & {"image", "start_image"}:
+            return "keyframe"      # a clip that must land on a given picture: the panel's two-keyframe path
+        return "i2v" if "image" in roles else "t2v"
 
     def _files(self, job: JobRecord, ctx: JobContext) -> dict[str, Path]:
         out: dict[str, Path] = {}
@@ -162,6 +164,8 @@ class PhospheneAdapter(AdapterBase):
                 role, raw = parsed
                 p = Path(raw).expanduser()
                 out.setdefault(role, p if p.is_absolute() else ctx.settings.home / p)
+        if self.mode_for(job) == "keyframe" and "image" in out and "start_image" not in out:
+            out["start_image"] = out.pop("image")   # keyframe mode reads start_image, not the i2v ``image``
         return out
 
     def validate(self, job: JobRecord, ctx: JobContext) -> list[ValidationIssue]:
