@@ -15,7 +15,8 @@ Kind of work: $kind
 $guidance
 The plan made up front (empty when there is none): $brief
 
-Return the production plan: a project name, genre, overall tone, a two-sentence summary, the main characters (3-5,
-each with a role and a one-line brief), the key locations, and style keywords for the look of the film.
+Return the production plan: a project name, genre, overall tone, a two-sentence summary, the main characters (every
+person the idea names, and only as many more as the story cannot work without; a piece about two people keeps two;
+at most 5; each with a role and a one-line brief), the key locations, and style keywords for the look of the film.
 Name the genre in plain common words (for example romance, mystery, thriller, historical, comedy, workplace, campus,
 science fiction or fantasy, family, revenge, horror; at most two, or your own if none fits)."""

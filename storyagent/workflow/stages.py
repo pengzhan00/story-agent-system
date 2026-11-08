@@ -233,6 +233,58 @@ def _renumber(outline: dict[str, Any]) -> None:
             scene["number"] = s
 
 
+MAX_SHOT_FACTOR = 3     # a set-piece scene may take this many times the usual shots of a scene
+
+
+def _scene_shot_count(scene: dict[str, Any], usual: int, factor: int = MAX_SHOT_FACTOR) -> int:
+    """How many shots a scene is broken into: the outline's ``shot_count`` for it, kept between one and ``factor``
+    times the usual number (a scene without the hint gets the usual number)."""
+    try:
+        wanted = int(scene.get("shot_count") or 0)
+    except (TypeError, ValueError):
+        wanted = 0
+    return max(1, min(wanted, usual * max(factor, 1))) if wanted else usual
+
+
+def _flatten_json_text(value: Any) -> Any:
+    """A model sometimes answers a plain text field with a JSON object or list written out as text; the words are
+    kept, the braces and keys are not."""
+    if not isinstance(value, str):
+        return value
+    text = value.strip()
+    if not text or text[0] not in "{[":
+        return value
+    try:
+        parsed = json.loads(text)
+    except ValueError:
+        return value
+
+    def words(item: Any) -> list[str]:
+        if isinstance(item, dict):
+            return [w for v in item.values() for w in words(v)]
+        if isinstance(item, list):
+            return [w for v in item for w in words(v)]
+        return [str(item)] if item not in (None, "") else []
+
+    return ", ".join(words(parsed))
+
+
+def _clean_shots(shots: list[dict[str, Any]], scene: dict[str, Any]) -> None:
+    """Repairs a scene's freshly written shots in place: text fields that are JSON written out as text are
+    flattened, and a narration that repeats the previous shot's or the scene's own line is dropped (the model
+    tends to paste one line into every shot)."""
+    seen = {str(scene.get("narration") or "").strip()} - {""}
+    for shot in shots:
+        for key, value in list(shot.items()):
+            if isinstance(value, str):
+                shot[key] = _flatten_json_text(value)
+        line = str(shot.get("narration") or "").strip()
+        if line and line in seen:
+            shot["narration"] = ""
+        elif line:
+            seen.add(line)
+
+
 OUTLINE_CHUNK = 15      # episodes planned per request; later chunks see what the earlier ones decided
 
 
@@ -364,7 +416,8 @@ def script(ctx: Ctx) -> dict[str, Any]:
                 premise += f"\n\nThis is episode {episode} of a series. Earlier episodes: {' / '.join(before)}"
             outline = ctx.run_agent("screenwriter.outline", {
                 "premise": premise, "genre": plan.get("genre", ctx.project.genre), "tone": plan.get("tone", ""),
-                "acts": acts_n, "scenes_per_act": per_act, "characters": brief, "plan": plan.get("summary", "")})
+                "acts": acts_n, "scenes_per_act": per_act, "characters": brief, "plan": plan.get("summary", ""),
+                "shots_per_scene": shots_n})
         _renumber(outline)
         ctx.store.save_script(ctx.pid, episode, title=outline["title"], synopsis=outline.get("synopsis", ""),
                               acts=outline["acts"])
@@ -380,12 +433,14 @@ def script(ctx: Ctx) -> dict[str, Any]:
             previous = scene.get("beat", "")
             done += 1
             continue
+        in_scene = _scene_shot_count(scene, shots_n, int(ctx.params.get("shot_count_factor") or MAX_SHOT_FACTOR))
         data = ctx.run_agent("screenwriter.shots", {
             "title": outline["title"], "act_title": act.get("title", ""), "scene": scene,
-            "characters": _character_brief(chars), "shots_per_scene": shots_n, "previous": previous or "(start)",
+            "characters": _character_brief(chars), "shots_per_scene": in_scene, "previous": previous or "(start)",
             "feedback": feedback if revising else "(none)",
             "current": dump(scene["shots"]) if revising and scene.get("shots") else "(none)"})
         shots = data["shots"]
+        _clean_shots(shots, scene)
         for i, shot in enumerate(shots, start=1):
             shot["shot_number"] = i
         scene["shots"] = shots

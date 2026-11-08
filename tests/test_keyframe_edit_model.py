@@ -2,8 +2,10 @@
 (`edit_template`): Krea 2 Identity Edit takes image 1 = the scene, image 2 = the person, and an instruction."""
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
+from storyagent.domain.enums import MediaKind
 from storyagent.media.adapters.fake import FakeAdapter
 from storyagent.media.ledger import Ledger
 from storyagent.media.registry import AdapterRegistry
@@ -32,7 +34,7 @@ def _produced(tmp_path: Path, models: str) -> tuple[FakeAdapter, Ledger, object,
     jobs = {j.spec_id: j for j in ledger.list_jobs(project_id=1, limit=500)}
     shot = engine.store.list_shots(1)[0]
     key = engine.spec_store.current(1, "shot.keyframe", str(shot["id"]))
-    return fake, ledger, key, {"job": jobs[key.id], "home": tmp_path / "home"}
+    return fake, ledger, key, {"job": jobs[key.id], "home": tmp_path / "home", "engine": engine}
 
 
 def test_an_edit_model_with_scene_first_gets_the_scene_before_the_person_and_its_own_wording(tmp_path: Path) -> None:
@@ -52,6 +54,21 @@ def test_without_those_settings_the_order_and_the_prompt_stay_as_they_were(tmp_p
     fake, _, key, ctx = _produced(tmp_path, FAKE_MODELS)
     seen = fake.seen[ctx["job"].id][0]     # type: ignore[attr-defined]
     assert "Place the person in the scene" not in seen["prompt"]
+
+
+def test_an_edit_model_that_places_one_person_leaves_a_shot_with_two_to_the_image_model(tmp_path: Path) -> None:
+    one_at_a_time = SCENE_FIRST.replace('ref_order = "scene_first"\n', 'ref_order = "scene_first"\nmax_people = 1\n')
+    _, ledger, _, ctx = _produced(tmp_path, one_at_a_time)
+    engine = ctx["engine"]
+    jobs = ledger.list_jobs(project_id=1, limit=500)
+    kinds = {}
+    for shot in engine.store.list_shots(1):                                       # type: ignore[attr-defined]
+        spec = engine.spec_store.current(1, "shot.keyframe", str(shot["id"]))    # type: ignore[attr-defined]
+        who = shot["characters"]
+        people = len(json.loads(who) if isinstance(who, str) else who)
+        kinds[people] = next(j.kind for j in jobs if j.spec_id == spec.id)
+    assert kinds[1] == MediaKind.IMAGE_EDIT
+    assert kinds[2] == MediaKind.IMAGE_GENERATE
 
 
 def _subject_of(ledger: Ledger, spec_id: str | None) -> str:

@@ -27,7 +27,14 @@ Editor feedback to apply (nothing to apply when it says "(none)"): $feedback
 Current shots of this scene (when there is feedback, keep what already works and change only what the feedback asks
 for; "(none)" means write them fresh): $current
 
-Produce exactly $shots_per_scene shots in order. Each shot: shot_number, camera_angle (wide / medium / close-up / ...),
+Produce exactly $shots_per_scene shots in order. Each shot shows ONE move or ONE beat, so a set piece is written as a
+chain of them: a fight is strike, block, counter, fall, one shot per exchange, each saying who does what to whom and
+where the blow lands; an intimate scene goes forward one beat per shot (approach, first touch, undressing, contact,
+the reaction on a face), each with the concrete action of the bodies as the rating notes above allow. Never replace a
+beat with a summary line in the narration: what happens is shown in `action`. `narration` is used only when it adds
+what the picture cannot, and is never repeated from the scene's line or an earlier shot. `characters_present` lists
+the people seen from the characters above, nobody else; it is empty only for an insert of a place or an object.
+Each shot: shot_number, camera_angle (wide / medium / close-up / ...),
 camera_movement, who is in frame, mood, what they do (action) and look like (expression), optional narration, the
 dialogue lines (character, line, emotion), duration_sec ($shot_sec), and sound-effect cues. `character` in dialogue
 must be one of the characters above. Shot length follows the beat: a reaction is short, a moment that has to land is

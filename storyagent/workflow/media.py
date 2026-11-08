@@ -336,6 +336,13 @@ def compose_keyframe(
                 MediaKind.IMAGE_EDIT.value)
     except ConfigError:
         return job
+    try:
+        most = int(model.extra.get("max_people") or 0)
+    except (TypeError, ValueError):
+        most = 0
+    in_frame = sum(1 for dep in spec.depends_on if dep.get("subject_type") == "character.portrait")
+    if most and in_frame > most:      # an edit model that places one person at a time: the plan's own image model
+        return job                    # draws the whole shot from the prompt and its fixed look text instead
     if model.extra.get("ref_order") == "scene_first":   # e.g. Krea 2 Identity Edit: image 1 = scene, image 2 = person
         refs = [*scenes, *people]
     inputs = {**job.inputs, "refs": [*refs, *job.inputs.get("refs", [])]}

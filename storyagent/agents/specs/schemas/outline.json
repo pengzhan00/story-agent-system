@@ -54,6 +54,13 @@
         },
         "beat": {
          "type": "string"
+        },
+        "scene_type": {
+         "type": "string"
+        },
+        "shot_count": {
+         "type": "integer",
+         "minimum": 1
         }
        },
        "required": [

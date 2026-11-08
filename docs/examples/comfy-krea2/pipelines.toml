@@ -7,7 +7,8 @@
 # Krea 2 Identity Edit model (keyframe_from_references = true): scene image first, then the character portrait, so the
 # face and the scale come from reference images. Give the edit model in models.toml `ref_order = "scene_first"` and an
 # `edit_template` that states the true-scale rule; the character portrait must be half-length or more, never a
-# head-and-shoulders close-up (character.design asks for that). Identity Edit takes one person at a time.
+# head-and-shoulders close-up (character.design asks for that). Identity Edit takes one person at a time: give the
+# edit model `max_people = 1`, and a shot with two people is then drawn by the plan's image model from the prompt.
 # Measured on this machine: keyframe ~48 s (720x1280, 8 steps), LTX preview 5 s ~10 min.
 [pipelines.vertical_drama_krea2]
 label_key = "pipeline.vertical_drama_krea2"

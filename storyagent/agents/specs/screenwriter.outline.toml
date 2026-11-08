@@ -4,7 +4,7 @@ temperature = 0.75
 max_tokens = 9000
 schema = "outline"
 inputs = ["premise", "language", "genre", "tone", "acts", "scenes_per_act", "characters", "plan", "form_guidance",
-          "genre_guidance", "frame_note"]
+          "genre_guidance", "frame_note", "shots_per_scene"]
 system = """You are a professional screenwriter. You write for the form described below, not for any other. Write all
 story content, including the title and the synopsis, in $language, whatever language the idea or the brief is written
 in. Scenes are filmable: one location, one time of day, a clear beat.
@@ -27,5 +27,11 @@ Rules:
 - exactly $acts acts, each with exactly $scenes_per_act scenes
 - every scene has: location, time_of_day, weather, the characters present, mood, a one-line narration (voice-over or
   caption, may be empty) and `beat` = what happens in the scene in one sentence
+- every scene also has `scene_type` (action, intimate, dialogue, reveal, quiet or transition) and `shot_count`: the
+  number of shots the scene needs. A scene that carries a promised set piece (a fight, a chase, an intimate scene, the
+  climax) is written as a sequence of moves and gets 2 to 3 times the usual $shots_per_scene shots; a quiet or
+  transition scene gets fewer. Never spend one summary shot on something the idea promises to show
+- use only the characters listed above; do not bring in anyone else
+- every set piece the idea promises appears as its own scene, in the order that makes the story work
 - the synopsis is at most 100 words
 - structure, pace and the way the piece opens and ends follow the form and genre notes above"""
