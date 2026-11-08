@@ -325,6 +325,24 @@ def _cmd_media_health(s: Settings, a: argparse.Namespace) -> int:
     return report.exit_code
 
 
+def _cmd_pipeline_scan(s: Settings, a: argparse.Namespace) -> int:
+    """Probe the machine once and say which pipeline plans can run; ``--tools`` narrows it to the tools you have."""
+    from storyagent.pipelines import scan_plans
+
+    selected = None if a.tools is None else [x for x in a.tools.split(",") if x]
+    report = health.run_checks(s, registry=default_registry(s))
+    scans = scan_plans(s, {e.name: e.state.value for e in report.entries}, selected)
+    if a.json:
+        print(json.dumps([{"name": p.name, "usable": p.usable, "missing": [list(m) for m in p.missing]}
+                          for p in scans], ensure_ascii=False, indent=2))
+    for p in scans:
+        if not a.json:
+            what = ", ".join(f"{n} ({t(f'health.{st}')})" for n, st in p.missing)
+            print(t("cli.pipeline.scan.ok", name=p.name) if p.usable
+                  else t("cli.pipeline.scan.bad", name=p.name, missing=what))
+    return 0 if any(p.usable for p in scans) else 1
+
+
 def _project_settings(c: Ctx, project_id: int | None) -> dict[str, Any]:
     if project_id is None:
         return {}
@@ -1423,6 +1441,10 @@ def build_parser() -> argparse.ArgumentParser:
     hc.add_argument("--require", default="")
     hc.add_argument("--pipeline", help="what this pipeline plan needs counts as required")
     hc.add_argument("--project", type=int, help="the same, for the plan of this project")
+    pipe = sub.add_parser("pipeline").add_subparsers(dest="cmd", required=True)
+    scan = add(pipe, "scan", _cmd_pipeline_scan)
+    scan.add_argument("--tools", default=None, help="tools/services you have, comma-separated (default: the machine)")
+    scan.add_argument("--json", action="store_true")
     ms = add(me, "submit", _cmd_media_submit)
     ms.add_argument("--kind", required=True, choices=[k.value for k in MediaKind])
     ms.add_argument("--model")

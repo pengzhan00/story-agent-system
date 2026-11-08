@@ -10,7 +10,8 @@ when the family has none, and says so (``notes``).
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
+from dataclasses import dataclass
 from typing import Any
 
 from storyagent.config import ConfigError, Settings
@@ -120,3 +121,41 @@ def describe(settings: Settings, pipeline: str, choices: Mapping[str, Any] | Non
         if cfg.policy(model_rating(settings, ref)).rank > cfg.policy(project_rating).rank and kind in picked:
             notes.append({"code": "rated_model", "kind": kind, "model": ref})
     return {"plan": plan.name, "rows": rows, "notes": notes, "overridden": bool(picked)}
+
+
+@dataclass(frozen=True)
+class PlanScan:
+    """Whether one plan can run on this machine now: ``missing`` names what stops it (health entries), each with the
+    state it is in (``not_running``, ``missing_tool``, ``missing_model``, ``not_selected`` ...)."""
+
+    name: str
+    usable: bool
+    missing: tuple[tuple[str, str], ...] = ()
+
+
+def needs_of(settings: Settings, plan_name: str) -> tuple[str, ...]:
+    """Everything a plan depends on, found from the plan itself: the services and tools it lists in ``requires`` plus
+    the adapter of every model it uses (``adapter.<provider>``), so a new plan needs no hand-kept list."""
+    plan = settings.pipeline(plan_name)
+    providers = {settings.model(ref).provider for ref in plan.models.values()}
+    return tuple(dict.fromkeys([*plan.requires, *(f"adapter.{p}" for p in sorted(providers))]))
+
+
+def scan_plans(
+    settings: Settings, state_of: Mapping[str, str], selected: Collection[str] | None = None,
+) -> list[PlanScan]:
+    """Which plans are usable. ``state_of`` maps health entry names to their state (``ok`` or what is wrong with them,
+    from the healthcheck); ``selected`` is the set of tools/services the operator says they have (bare names accepted
+    for ``tool.x``), ``None`` = whatever the machine shows. A service or tool that is not selected counts as missing
+    even when it is up, so choosing tools narrows the list."""
+    chosen = {n for s in selected for n in (s, f"tool.{s}")} if selected is not None else None
+    out: list[PlanScan] = []
+    for name in settings.pipelines:
+        missing: list[tuple[str, str]] = []
+        for need in needs_of(settings, name):
+            if chosen is not None and need not in chosen and not need.startswith("adapter."):
+                missing.append((need, "not_selected"))
+            elif state_of.get(need, "unknown") != "ok":
+                missing.append((need, state_of.get(need, "unknown")))
+        out.append(PlanScan(name=name, usable=not missing, missing=tuple(missing)))
+    return out

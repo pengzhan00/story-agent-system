@@ -435,7 +435,8 @@ def script(ctx: Ctx) -> dict[str, Any]:
             done += 1
             continue
         in_scene = _scene_shot_count(scene, shots_n, int(ctx.params.get("shot_count_factor") or MAX_SHOT_FACTOR))
-        shots, earlier = [], "(none)"
+        shots: list[dict[str, Any]] = []
+        earlier = "(none)"
         asked = bool(scene.get("shot_count")) and not revising      # only a number the outline asked for is chased
         for _ in range(1 + (SHORT_SCENE_RETRIES if asked else 0)):
             data = ctx.run_agent("screenwriter.shots", {

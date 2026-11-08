@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useMeta, useProjectFromText } from "../api/hooks";
 import { useT } from "../i18n";
 import { ErrorNote } from "./ErrorNote";
+import { PlanOptions } from "./PlanOptions";
 
 /** A written story or script becomes a project: its story stages run, then the media are confirmed in the plan. */
 export function MakeProject({ assetId }: { assetId: string }) {
@@ -25,11 +26,7 @@ export function MakeProject({ assetId }: { assetId: string }) {
         <input value={name} placeholder={t("web.project.from_text_name")} aria-label={t("web.project.from_text_name")} onChange={(e) => setName(e.target.value)} />
         <select value={plan} aria-label={t("web.plan.pipeline")} onChange={(e) => setPlan(e.target.value)}>
           <option value="">{t("web.plan.default")}</option>
-          {plans.map((p) => (
-            <option key={p.name} value={p.name}>
-              {`${p.label} · ${p.width}×${p.height}`}
-            </option>
-          ))}
+          <PlanOptions plans={plans} label={(p) => `${p.label} · ${p.width}×${p.height}`} />
         </select>
         <button
           type="button"

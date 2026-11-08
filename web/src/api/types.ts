@@ -13,6 +13,7 @@ export type StageProgress = S["StageProgressOut"];
 export type WorkflowOverview = S["WorkflowOut"];
 export type WorkflowStage = S["WorkflowStageOut"];
 export type Health = S["HealthOut"];
+export type PipelineScan = S["PipelineScan"];
 export type Launch = S["LaunchOut"];
 export type UpdateState = S["UpdateOut"];
 export type UpdateCommit = S["UpdateCommitOut"];

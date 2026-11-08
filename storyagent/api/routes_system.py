@@ -16,6 +16,7 @@ from storyagent.domain import JobStatus, MediaKind, QualityTier, SubjectType
 from storyagent.i18n import available_locales
 from storyagent.media import healthcheck as health
 from storyagent.media.registry import default_registry
+from storyagent.pipelines import needs_of, scan_plans
 from storyagent.workflow import STAGES
 
 from .context import ApiContext, Translator, ctx_of, translator_of
@@ -29,7 +30,10 @@ from .schemas import (
     LabeledValue,
     Meta,
     ModelOut,
+    PipelineScan,
+    PlanMissing,
     PlanOut,
+    PlanScanOut,
     RangeOut,
     Ready,
     RecipeOut,
@@ -64,6 +68,25 @@ def pipeline_health(request: Request, pipeline: str = "", project: int | None = 
         for e in report.entries
     ]
     return HealthOut(exit_code=report.exit_code, entries=entries)  # type: ignore[arg-type]
+
+
+@router.get("/pipelines/scan", response_model=PipelineScan)
+def scan_pipelines(request: Request, tools: str | None = None) -> PipelineScan:
+    """Which pipeline plans can run on this machine now. The healthcheck probes every service, tool and adapter once;
+    each plan is usable when everything it needs (its ``requires`` and the adapters of its models) is ``ok``. With
+    ``tools`` (comma-separated names the operator has chosen) a service or tool outside that set counts as missing."""
+    ctx = ctx_of(request)
+    t = translator_of(request)
+    selected = None if tools is None else [x for x in tools.split(",") if x]
+    report = health.run_checks(ctx.settings, registry=default_registry(ctx.settings))
+    scans = scan_plans(ctx.settings, {e.name: e.state.value for e in report.entries}, selected)
+    every = dict.fromkeys(n for p in ctx.settings.pipelines for n in needs_of(ctx.settings, p)
+                          if not n.startswith("adapter."))
+    return PipelineScan(
+        plans=[PlanScanOut(name=s.name, usable=s.usable,
+                           missing=[PlanMissing(name=n, state=st, label=t(f"health.{st}")) for n, st in s.missing])
+               for s in scans],
+        tools=list(every), selected=selected)
 
 
 def _labeled(t: Translator, prefix: str, values: Any) -> list[LabeledValue]:

@@ -28,6 +28,11 @@ const estimate = (pipeline: string) => ({
   total_sec: 8640, hours: 2.4, video_budget_hours: null, over_budget: false,
 });
 
+const SCAN = {
+  plans: [{ name: "advert", usable: false, missing: [{ name: "tool.mflux", state: "missing_tool", label: "Tool missing" }] }],
+  tools: ["tool.mflux"],
+  selected: null,
+};
 let calls: { url: string; method: string; body: unknown }[] = [];
 beforeEach(() => {
   calls = [];
@@ -36,6 +41,7 @@ beforeEach(() => {
     const body = init?.body ? (JSON.parse(init.body) as { kind?: string; pipeline?: string }) : undefined;
     calls.push({ url, method: init?.method ?? "GET", body });
     const json = url.includes("/api/i18n") ? en : url.includes("/api/meta") ? meta
+      : url.includes("/api/pipelines/scan") ? SCAN
       : url.includes("/estimate") ? estimate(body?.pipeline || (body?.kind === "advert" ? "advert" : "vertical_drama"))
       : { id: 7, name: "X" };
     return { ok: true, status: 200, json: async () => json, text: async () => JSON.stringify(json) };
@@ -65,6 +71,13 @@ describe("NewProject", () => {
     fireEvent.click(screen.getByLabelText(/Advert/));
     await waitFor(() => expect(screen.queryByLabelText(/Seasons/)).not.toBeInTheDocument());
     expect((screen.getByRole("combobox") as HTMLSelectElement).value).toBe("advert");     // the kind recommends its plan
+  });
+
+  it("marks a plan that cannot run now with what is missing, found by the scan", async () => {
+    view();
+    await screen.findByText("Short-drama series");
+    expect(await screen.findByRole("option", { name: /not available: tool\.mflux \(Tool missing\)/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Scan available plans" })).toBeInTheDocument();
   });
 
   it("creates the project with the kind, the plan only when changed, and the answers", async () => {

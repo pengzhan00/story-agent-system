@@ -692,6 +692,27 @@ class HealthOut(BaseModel):
     entries: list[HealthEntry]
 
 
+class PlanMissing(Strict):
+    name: str              # the health entry that stops the plan (a service, a tool or an adapter)
+    state: str
+    label: str
+
+
+class PlanScanOut(Strict):
+    name: str
+    usable: bool
+    missing: list[PlanMissing]
+
+
+class PipelineScan(Strict):
+    """Which pipeline plans can run now, found by probing the machine (and narrowed to the tools the operator
+    selected, when they did)."""
+
+    plans: list[PlanScanOut]
+    tools: list[str]       # every service / tool the plans need, for the picker of "the tools I have"
+    selected: list[str] | None = None
+
+
 class Ready(BaseModel):
     ok: bool = True
     schema_version: int

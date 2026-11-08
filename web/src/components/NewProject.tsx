@@ -7,6 +7,7 @@ import { useI18n } from "../i18n";
 import { useDebounced } from "../lib/debounce";
 import { ErrorNote } from "./ErrorNote";
 import { EstimateView } from "./EstimateView";
+import { PlanOptions, ScanPlansButton } from "./PlanOptions";
 
 const num = (v: string): number | undefined => (v.trim() === "" || Number.isNaN(Number(v)) ? undefined : Number(v));
 
@@ -91,12 +92,9 @@ export function NewProject() {
       <label className="field">
         <span>{t("web.plan.pipeline")}</span>
         <select value={chosenPlan} onChange={(e) => setPlan(e.target.value === kind?.pipeline ? "" : e.target.value)}>
-          {plans.map((p) => (
-            <option key={p.name} value={p.name}>
-              {p.name === kind?.pipeline ? `${p.label} · ${t("web.plan.recommended")}` : p.label}
-            </option>
-          ))}
+          <PlanOptions plans={plans} label={(p) => (p.name === kind?.pipeline ? `${p.label} · ${t("web.plan.recommended")}` : p.label)} />
         </select>
+        <ScanPlansButton />
         {planInfo ? (
           <span className="muted small">
             {`${planInfo.note} ${t("web.plan.frame", { w: planInfo.width, h: planInfo.height, tier: t(`media.tier.${planInfo.tier}`) })}`}

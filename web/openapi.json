@@ -4718,6 +4718,46 @@
         "title": "PipelineRow",
         "type": "object"
       },
+      "PipelineScan": {
+        "description": "Which pipeline plans can run now, found by probing the machine (and narrowed to the tools the operator\nselected, when they did).",
+        "properties": {
+          "plans": {
+            "items": {
+              "$ref": "#/components/schemas/PlanScanOut"
+            },
+            "title": "Plans",
+            "type": "array"
+          },
+          "selected": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected"
+          },
+          "tools": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tools",
+            "type": "array"
+          }
+        },
+        "required": [
+          "plans",
+          "tools",
+          "selected"
+        ],
+        "title": "PipelineScan",
+        "type": "object"
+      },
       "PipelineStep": {
         "properties": {
           "inputs": {
@@ -4968,6 +5008,29 @@
         "title": "PlanIn",
         "type": "object"
       },
+      "PlanMissing": {
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "state",
+          "label"
+        ],
+        "title": "PlanMissing",
+        "type": "object"
+      },
       "PlanOut": {
         "properties": {
           "delivery_profile": {
@@ -5030,6 +5093,32 @@
           "requires"
         ],
         "title": "PlanOut",
+        "type": "object"
+      },
+      "PlanScanOut": {
+        "properties": {
+          "missing": {
+            "items": {
+              "$ref": "#/components/schemas/PlanMissing"
+            },
+            "title": "Missing",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "usable": {
+            "title": "Usable",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "usable",
+          "missing"
+        ],
+        "title": "PlanScanOut",
         "type": "object"
       },
       "PlanTotals": {
@@ -14935,6 +15024,56 @@
         "summary": "Download",
         "tags": [
           "packs"
+        ]
+      }
+    },
+    "/api/pipelines/scan": {
+      "get": {
+        "description": "Which pipeline plans can run on this machine now. The healthcheck probes every service, tool and adapter once;\neach plan is usable when everything it needs (its ``requires`` and the adapters of its models) is ``ok``. With\n``tools`` (comma-separated names the operator has chosen) a service or tool outside that set counts as missing.",
+        "operationId": "scan_pipelines_api_pipelines_scan_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "tools",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tools"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PipelineScan"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Scan Pipelines",
+        "tags": [
+          "system"
         ]
       }
     },

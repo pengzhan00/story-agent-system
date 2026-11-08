@@ -1236,6 +1236,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/pipelines/scan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Scan Pipelines
+         * @description Which pipeline plans can run on this machine now. The healthcheck probes every service, tool and adapter once;
+         *     each plan is usable when everything it needs (its ``requires`` and the adapters of its models) is ``ok``. With
+         *     ``tools`` (comma-separated names the operator has chosen) a service or tool outside that set counts as missing.
+         */
+        get: operations["scan_pipelines_api_pipelines_scan_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/platforms": {
         parameters: {
             query?: never;
@@ -5296,6 +5318,19 @@ export interface components {
             /** Overridden */
             overridden: boolean;
         };
+        /**
+         * PipelineScan
+         * @description Which pipeline plans can run now, found by probing the machine (and narrowed to the tools the operator
+         *     selected, when they did).
+         */
+        PipelineScan: {
+            /** Plans */
+            plans: components["schemas"]["PlanScanOut"][];
+            /** Selected */
+            selected: string[] | null;
+            /** Tools */
+            tools: string[];
+        };
         /** PipelineStep */
         PipelineStep: {
             /** Inputs */
@@ -5385,6 +5420,15 @@ export interface components {
             /** Template Version */
             template_version: number | null;
         };
+        /** PlanMissing */
+        PlanMissing: {
+            /** Label */
+            label: string;
+            /** Name */
+            name: string;
+            /** State */
+            state: string;
+        };
         /** PlanOut */
         PlanOut: {
             /** Delivery Profile */
@@ -5409,6 +5453,15 @@ export interface components {
             tier: string;
             /** Width */
             width: number;
+        };
+        /** PlanScanOut */
+        PlanScanOut: {
+            /** Missing */
+            missing: components["schemas"]["PlanMissing"][];
+            /** Name */
+            name: string;
+            /** Usable */
+            usable: boolean;
         };
         /** PlanTotals */
         PlanTotals: {
@@ -10368,6 +10421,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    scan_pipelines_api_pipelines_scan_get: {
+        parameters: {
+            query?: {
+                tools?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PipelineScan"];
                 };
             };
             /** @description Validation Error */

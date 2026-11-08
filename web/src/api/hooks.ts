@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, api, del, patch, post, put } from "./client";
-import type { Agent, AgentEdit, AiCallDetail, AutoVoices, AiCallRow, BriefAnswers, Estimate, FlowStep, Health, Launch, ProjectCard, ProducePlan, SeriesBoard, ProjectFromText, ScriptReview, Job, Meta, Project, QueueState, Row, UpdateState, WorkflowOverview, WorkflowRun, WorkflowRunRow } from "./types";
+import type { Agent, AgentEdit, AiCallDetail, AutoVoices, AiCallRow, BriefAnswers, Estimate, FlowStep, Health, Launch, PipelineScan, ProjectCard, ProducePlan, SeriesBoard, ProjectFromText, ScriptReview, Job, Meta, Project, QueueState, Row, UpdateState, WorkflowOverview, WorkflowRun, WorkflowRunRow } from "./types";
 import { useI18n } from "../i18n";
 
 /** Polling is the fallback; the SSE feed (``events.ts``) pushes the same data much sooner. */
@@ -199,6 +199,10 @@ export function useJobActions() {
 }
 
 export const useHealth = () => useQuery({ queryKey: ["health"], queryFn: () => api<Health>("/api/health") });
+
+/** Which pipeline plans can run on this machine now (probes the services, tools and adapters each plan needs). */
+export const usePlanScan = () =>
+  useQuery({ queryKey: ["pipeline-scan"], queryFn: () => api<PipelineScan>("/api/pipelines/scan"), staleTime: 30_000 });
 
 // ---- transparency: what the models were asked, the prompts, the plan/style, the chain ---------------------------
 export const useFlow = (projectId?: number) =>
