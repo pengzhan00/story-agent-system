@@ -2056,6 +2056,8 @@
   "pipeline.vertical_drama_fast.note": "9:16 竖屏,同上一套,但关键帧用 FLUX.2 klein 蒸馏版(经 ComfyUI)合成,约 1 分钟一张(Base 版约 10 分钟)。脸与姿态略不如 Base 版,适合出草稿或赶进度;整个项目内不混用两种关键帧模型。",
   "pipeline.vertical_drama_lustify": "竖屏短剧 / 连续剧(Lustify · Draw Things,受限)",
   "pipeline.vertical_drama_lustify.note": "9:16 竖屏,图像用 Draw Things 里的 Lustify 模型(需打开 Draw Things 并开启 API Server);其余同竖屏短剧。受限方案:新建项目即为受限,素材进保险库、默认遮掩、导出需确认。参数默认取 Draw Things 当前设置。",
+  "pipeline.vertical_drama_krea2": "写实竖屏短剧 / 连续剧(Krea2 Lustify · ComfyUI,受限)",
+  "pipeline.vertical_drama_krea2.note": "9:16 竖屏写实;图像全部走 ComfyUI 的 Krea2 Lustify + LoRA(不需要 Draw Things),视频用 LTX-2.5(Phosphene),所有镜头都出视频,不用静图推拉。关键帧由文字直接画出,没有参考图,同一角色靠相同描述和固定种子保持面孔。受限方案:新建项目即为受限,素材进保险库、默认遮掩、导出需确认。",
   "pipeline.landscape_drama": "横屏短剧 / 网剧",
   "pipeline.landscape_drama.note": "16:9 横屏 720p,同一套模型,集长几分钟到十几分钟。",
   "pipeline.tv_series": "电视剧",

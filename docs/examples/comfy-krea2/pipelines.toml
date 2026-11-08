@@ -1,0 +1,29 @@
+# Append to $STORY_AGENT_HOME/config/pipelines.toml (after the models in models.toml next to it are in place).
+# Realistic vertical drama, every picture through ComfyUI (no Draw Things): Krea 2 Lustify + LoRA for pictures, LTX-2.5
+# (Phosphene) for video, CosyVoice for speech, ACE-Step for music. `rating = "restricted"`: a project made with this
+# plan starts restricted (vault, masking, adult confirmation per character, export gate).
+# `video_share = 1.0`: every shot is a video, none is a still picture with a push-in. Keyframes are drawn straight from
+# words (keyframe_from_references = false): there is no Krea 2 image-edit model, so a face is kept by the same words and
+# a fixed per-character seed. Measured on this machine: keyframe ~48 s (720x1280, 8 steps), LTX preview 5 s ~10 min.
+[pipelines.vertical_drama_krea2]
+label_key = "pipeline.vertical_drama_krea2"
+note_key = "pipeline.vertical_drama_krea2.note"
+delivery_profile = "series_vertical_720"
+tier = "preview"
+rating = "restricted"
+requires = ["ollama", "acestep", "phosphene", "comfy", "tool.ffmpeg", "tool.cosyvoice"]
+[pipelines.vertical_drama_krea2.models]
+"image.generate" = "lustify-krea2-comfy"
+"video.generate" = "ltx-2.5-video"
+"video.av" = "ltx-2.5-av"
+"audio.tts" = "cosyvoice3-0.5b"
+"audio.music" = "acestep-1.5-turbo"
+"audio.sfx" = "stable-audio-3-medium"
+"compose.assemble" = "ffmpeg-assemble"
+[pipelines.vertical_drama_krea2.workflow]
+video_share = 1.0
+video_min_per_episode = 2
+keyframe_from_references = false
+[pipelines.vertical_drama_krea2.edit]
+title_card = false
+next_card = true
