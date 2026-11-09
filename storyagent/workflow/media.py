@@ -612,6 +612,11 @@ def build_episode_timeline(ctx: Ctx, episode: int) -> dict[str, Any]:
     shots = ctx.store.list_shots(ctx.pid, ep["id"])
     if not shots:
         raise StageError("needs_stage", "run the shotplan stage first", stage="shotplan")
+    picked = {str(x) for x in ctx.params.get("shots", [])}       # a cut of chosen shots, in story order
+    if picked:
+        shots = [s for s in shots if str(s["id"]) in picked]
+        if not shots:
+            raise StageError("needs_stage", "none of the chosen shots exists", stage="shotplan")
     inputs: list[ShotInput] = []
     for shot in shots:
         sid = str(shot["id"])

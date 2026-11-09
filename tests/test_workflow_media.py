@@ -237,6 +237,16 @@ def test_compose_assembles_the_episode_from_the_assets_that_exist(tmp_path: Path
     assert out["qc"] and {c["code"] for c in out["qc"]["checks"]} >= {"duration", "aspect", "loudness", "black_ratio"}
 
 
+def test_compose_can_cut_just_the_chosen_shots(tmp_path: Path) -> None:
+    engine, worker = _episode_rig(tmp_path)
+    chosen = [s["id"] for s in engine.store.list_shots(1)[:3]]
+    with serving(worker):
+        out = engine.run_stage(1, "compose", {"burn_subtitles": False, "shots": [str(i) for i in chosen]})
+    assert out["shots"] == 3 and out["asset_id"]
+    tl = engine.spec_store.ledger.get_job(out["job_id"]).inputs["timeline"]
+    assert [s["shot_id"] for s in tl["segments"] if s.get("shot_id")] == chosen
+
+
 def test_compliance_label_goes_into_the_film_and_the_package_describes_it(tmp_path: Path) -> None:
     import json
 
