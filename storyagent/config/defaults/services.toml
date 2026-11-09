@@ -202,6 +202,10 @@ detail = true
 detail_scene_types = ["intimate", "action"]
 detail_attempts = 2
 detail_min_words = 60
+# The keyframe prompt repeats each person's clothing, body parts, pose and limbs after the opening frame that already
+# says them. false leaves that second paragraph out (shorter prompt; some picture models draw a person twice when told
+# twice). The video prompt is not affected.
+detail_image_people = true
 # Words and phrases that show nothing to a picture model: a card using one is sent back.
 detail_vague = ["entwined", "lost in passion", "make love", "made love", "making love", "reach climax", "reached climax",
                 "the heat between", "passion takes over", "caught up in the moment", "intimacy", "缠绵", "情欲交融",

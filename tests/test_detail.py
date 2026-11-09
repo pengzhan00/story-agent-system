@@ -72,6 +72,14 @@ def test_the_prompts_come_from_the_card_word_for_word() -> None:
     assert "Ends on: the last still" in built["video_prompt"] and built["negative_prompt"] == "extra limbs"
 
 
+def test_the_per_person_paragraph_can_be_left_out_of_the_still() -> None:
+    card = _card()
+    assert "the woman: torn shirt" in detail.prompts_from_detail(card)["image_prompt"]
+    short = detail.prompts_from_detail(card, per_person=False)
+    assert "the woman: torn shirt" not in short["image_prompt"] and "Contact:" in short["image_prompt"]
+    assert short["video_prompt"] == detail.prompts_from_detail(card)["video_prompt"]
+
+
 def test_a_repeated_framing_word_is_said_once() -> None:
     card = _card()
     card["camera"] = {**card["camera"], "size": "medium", "angle": "Medium", "crop": "knees."}

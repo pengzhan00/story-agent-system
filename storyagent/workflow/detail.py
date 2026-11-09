@@ -149,9 +149,11 @@ def _position_key(name: str) -> str:
     return " ".join(name.lower().split()[:4])
 
 
-def prompts_from_detail(card: Mapping[str, Any], style: str = "") -> dict[str, str]:
+def prompts_from_detail(card: Mapping[str, Any], style: str = "", per_person: bool = True) -> dict[str, str]:
     """``image_prompt`` / ``video_prompt`` / ``negative_prompt`` built from a card, word for word: the still is the
-    card's opening frame with each person's visible state, the clip starts from that still and only moves."""
+    card's opening frame with each person's visible state, the clip starts from that still and only moves. The
+    per-person paragraph says again what the opening frame already says; ``per_person=False`` leaves it out, for a
+    picture model that draws a person twice when it is told the same thing twice."""
     cam = card.get("camera") or {}
     lens = f"{cam['lens_mm']:g}mm lens" if cam.get("lens_mm") else ""
     seen: set[str] = set()
@@ -166,7 +168,7 @@ def prompts_from_detail(card: Mapping[str, Any], style: str = "") -> dict[str, s
         f"{p['who']}: " + ", ".join(x for x in (p.get("clothing"), p.get("body_in_view"), p.get("pose"),
                                                 p.get("limbs"), p.get("face"), p.get("skin")) if x) + "."
         for p in card.get("people") or [])
-    parts = [framing + "." if framing else "", card.get("start_frame", ""), people,
+    parts = [framing + "." if framing else "", card.get("start_frame", ""), people if per_person else "",
              f"Contact: {card['contact']}." if card.get("contact") else "",
              f"Setting: {card['setting']}." if card.get("setting") else "",
              f"Light: {card['light']}." if card.get("light") else "", style]

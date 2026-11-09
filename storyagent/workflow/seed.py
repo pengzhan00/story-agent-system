@@ -155,7 +155,8 @@ def _shot_prompts(ctx: Ctx, shot: dict[str, Any], chars: dict[str, dict[str, Any
                 "negative_prompt": payload["style"]["negative_prompt"]}
     card = payload.get("detail") or {}
     if card.get("start_frame"):         # a shot card is the whole description: no second guess by a model
-        built = detail.prompts_from_detail(card, base_style)
+        built = detail.prompts_from_detail(card, base_style,
+                                           per_person=bool(ctx.settings.workflow.get("detail_image_people", True)))
         built["negative_prompt"] = ", ".join(x for x in (built["negative_prompt"], fallback["negative_prompt"]) if x)
         return built
     if not use_llm:
