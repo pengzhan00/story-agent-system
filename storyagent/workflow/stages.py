@@ -242,7 +242,8 @@ def _renumber(outline: dict[str, Any]) -> None:
             scene["number"] = s
 
 
-MAX_SHOT_FACTOR = 3    # a set-piece scene may take this many times the usual shots of a scene
+MAX_SHOT_FACTOR = 6    # a set-piece scene may take at most this many times the usual shots of a scene (a writer
+#                        that asks for a fight of 8 or an intimate scene of 12 moves is believed up to here)
 
 
 def _scene_shot_count(scene: dict[str, Any], usual: int, factor: int = MAX_SHOT_FACTOR) -> int:

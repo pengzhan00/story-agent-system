@@ -38,7 +38,7 @@ Rules:
   in every scene; a reveal is planted earlier by a concrete detail the viewer can spot
 - every scene also has `scene_type` (action, intimate, dialogue, reveal, quiet or transition) and `shot_count`: the
   number of shots the scene needs. A scene that carries a promised set piece (a fight, a chase, an intimate scene, the
-  climax) is written as a sequence of moves and gets 2 to 3 times the usual $shots_per_scene shots; a quiet or
+  climax) is written as a sequence of moves and gets 3 to 6 times the usual $shots_per_scene shots (a fight of about 8 moves, an intimate scene of about 12 beats); a quiet or
   transition scene gets fewer. Never spend one summary shot on something the idea promises to show
 - use only the characters listed above; do not bring in anyone else
 - every set piece the idea promises appears as its own scene, in the order that makes the story work; one set piece
