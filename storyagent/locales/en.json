@@ -1294,6 +1294,7 @@
   "agent.var.shots_per_scene": "Shots per scene",
   "agent.var.next_shot": "The shot to write next",
   "agent.var.previous": "Previous shot",
+  "agent.var.next_beat": "What the next scene covers",
   "agent.var.people": "People in frame and their fixed looks",
   "agent.var.setting": "The place and its fixed look",
   "agent.var.ledger": "Clothing and marks so far",

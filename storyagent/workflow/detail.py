@@ -208,6 +208,8 @@ def write_card(ctx: Ctx, shot: Mapping[str, Any], scene: Mapping[str, Any], name
     problems: list[str] = []
     for _ in range(1 + int(cfg.get("detail_attempts", 2))):
         card = clean_card(ctx.run_agent("shot.detail", variables))
+        if shot.get("camera_angle"):                  # the framing was decided with the cuts in mind (framing.py)
+            card["camera"]["size"] = _clean(shot["camera_angle"])
         problems = lint_card(card, people=len(labelled), vague=vague, min_words=min_words, used=used)
         if not problems:
             break

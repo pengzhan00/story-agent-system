@@ -3,7 +3,8 @@ role = "writer"
 temperature = 0.75
 max_tokens = 6000
 schema = "scene_shots"
-inputs = ["language", "title", "act_title", "scene", "characters", "shots_per_scene", "previous", "feedback", "current",
+inputs = ["language", "title", "act_title", "scene", "characters", "shots_per_scene", "previous", "next_beat",
+          "feedback", "current",
           "form_guidance", "genre_guidance", "dialogue_chars", "shot_sec", "frame_note", "next_shot"]
 system = """You are a professional screenwriter and storyboard artist. You break one scene into shots with the dialogue
 spoken in each. At most $dialogue_chars characters of spoken text per line, 1-3 lines per shot, none in purely visual
@@ -34,6 +35,10 @@ Scene to break down: $scene
 
 Characters (use these names exactly): $characters
 What happened just before: $previous
+What the NEXT scene covers (it is shown there, never here): $next_beat
+Everything in these shots happens inside this scene's `beat` and stops where the beat stops. When the beat is short for
+the number of shots, spread its moves over all of them in smaller steps, with reactions and inserts; never carry on
+into what the next scene covers.
 Editor feedback to apply (nothing to apply when it says "(none)"): $feedback
 Current shots of this scene (when there is feedback, keep what already works and change only what the feedback asks
 for; "(none)" means write them fresh): $current
@@ -63,6 +68,10 @@ arrangement a fourth time with only the speed or depth changed.
 Never replace a beat with a summary line in the narration: what happens is shown in `action`. `narration` is used only when it adds
 what the picture cannot, and is never repeated from the scene's line or an earlier shot. `characters_present` lists
 the people seen from the characters above, nobody else; it is empty only for an insert of a place or an object.
+Framing follows film grammar: the first shot of a scene somewhere new is a wide or full shot that shows where we are;
+neighbouring shots of the same people differ in size (wide, full, medium, medium-close, close-up, extreme-close-up),
+so a run of close-ups is broken by a medium or a wider shot and no two neighbours frame almost the same; the same
+person faces the same screen direction in neighbouring shots; shot lengths are not all equal.
 Names are written exactly as listed, never translated or spelled in pinyin. Each field holds only its own content:
 the camera, the screen direction and the lens go in their own fields, never inside `action`, `narration` or the poses.
 Each shot: shot_number, camera_angle (wide / medium / close-up / ...),

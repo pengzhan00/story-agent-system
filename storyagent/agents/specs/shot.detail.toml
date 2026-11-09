@@ -51,7 +51,8 @@ Write the card:
 - `contact`: what touches what, whose part, how hard, how deep, in which direction; empty only for a shot without contact.
 - `motion`: `main` (the one movement), `rhythm` (speed, amplitude, direction, rhythm), `secondary` (small motions: hair,
   breathing, sheets, trembling, sweat), `still` (what does not move).
-- `camera`: `size` (how much of each body is in frame), `angle`, `height`, `lens_mm`, `movement`, `crop` (what the
+- `camera`: `size` (the shot's `camera_angle` as given: the framing is already decided so the cuts work; do not change
+  it, say what of each body it shows in `crop`), `angle`, `height`, `lens_mm`, `movement`, `crop` (what the
   frame cuts off), `focus`.
 - `light` (direction, colour, softness, skin sheen), `setting` (what of the place shows, the state of bed and bedding,
   one scale cue such as the bed edge against a body), `sound` (breath, voice, skin, fabric, bed, plus dialogue).

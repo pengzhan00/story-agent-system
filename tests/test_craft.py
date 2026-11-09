@@ -46,7 +46,7 @@ def test_forms_differ_and_the_house_style_is_not_everywhere(settings) -> None:
         v = writing_vars(settings, kind, "romance", vertical=False)
         v.update(language="English", premise="p", genre="romance", tone="t", acts="3", scenes_per_act="2",
                  characters="[]", plan="", title="T", act_title="A", scene="{}", shots_per_scene="3", previous="",
-                 feedback="", current="", next_shot="(none)")
+                 feedback="", current="", next_shot="(none)", next_beat="(none)")
         systems[kind], _ = runner.render("screenwriter.shots", v)
     assert len(set(systems.values())) == 3
     assert "cliffhanger" in systems["drama_series"] and "call to action" in systems["advert"]

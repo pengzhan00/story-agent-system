@@ -36,6 +36,7 @@ from storyagent.db import Database
 from storyagent.projects import Project, ProjectStore
 from storyagent.story import StoryStore
 
+from .framing import fix_framing
 from .grammar import run_check
 from .shotplan import build_shot_rows
 from .state import WorkflowState
@@ -438,13 +439,13 @@ def _introduce_characters(
 
 def _write_shots(
     ctx: Ctx, outline: dict[str, Any], act: dict[str, Any], scene: dict[str, Any], chars: list[dict[str, Any]],
-    previous: str, feedback: str, capped: bool, count: int, current: str, next_shot: str = "(none)",
+    previous: str, next_beat: str, feedback: str, capped: bool, count: int, current: str, next_shot: str = "(none)",
 ) -> list[dict[str, Any]]:
     """One request to the shot writer for a scene, its answer cleaned; ``capped`` keeps at most ``count`` shots."""
     data = ctx.run_agent("screenwriter.shots", {
         "title": outline["title"], "act_title": act.get("title", ""), "scene": scene,
         "characters": _character_brief(chars), "shots_per_scene": count, "previous": previous,
-        "next_shot": next_shot, "feedback": feedback, "current": current})
+        "next_beat": next_beat, "next_shot": next_shot, "feedback": feedback, "current": current})
     return _clean_shots(data["shots"], scene, cap=count if capped else None)
 
 
@@ -497,12 +498,15 @@ def script(ctx: Ctx) -> dict[str, Any]:
     scenes = [(act, sc) for act in outline["acts"] for sc in act.get("scenes", [])]
     names = [c["name"] for c in chars]
     previous = ""
+    place: Any = None            # where the scene before this one took place
     done = 0
-    for act, scene in scenes:
+    for index, (act, scene) in enumerate(scenes):
         ctx.step(done, len(scenes), f"{act['number']}.{scene['number']}")
+        following = scenes[index + 1][1].get("beat", "") if index + 1 < len(scenes) else ""
         revising = bool(feedback) and (not revise or f"{act['number']}.{scene['number']}" in revise)
         if scene.get("shots") and not ctx.force() and not revising:
             previous = scene.get("beat", "")
+            place = scene.get("location")
             done += 1
             continue
         in_scene = _scene_shot_count(scene, shots_n, int(ctx.params.get("shot_count_factor") or MAX_SHOT_FACTOR))
@@ -510,7 +514,7 @@ def script(ctx: Ctx) -> dict[str, Any]:
         asked = bool(scene.get("shot_count")) and not revising      # only a number the outline asked for is chased
 
         write = partial(_write_shots, ctx, outline, act, scene, chars, previous or "(start)",
-                        feedback if revising else "(none)", asked)
+                        following or "(this is the last scene)", feedback if revising else "(none)", asked)
         # a long set piece starts with a few shots and goes on one shot at a time: a model writes each move in far
         # more detail when it has only one to write
         first = min(in_scene, FIRST_SHOTS) if asked else in_scene
@@ -524,6 +528,8 @@ def script(ctx: Ctx) -> dict[str, Any]:
             shots.append(more[0])
         for i, shot in enumerate(shots, start=1):
             shot["shot_number"] = i
+        fix_framing(shots, ctx.settings.grammar, new_place=scene.get("location") != place)
+        place = scene.get("location")
         scene["shots"] = shots
         ctx.store.update_script_scene(ctx.pid, episode, act["number"], scene["number"], {"shots": shots})
         previous = scene.get("beat", "")

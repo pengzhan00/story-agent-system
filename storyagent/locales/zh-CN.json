@@ -1294,6 +1294,7 @@
   "agent.var.shots_per_scene": "每场景镜头数",
   "agent.var.next_shot": "接下来要写的镜头",
   "agent.var.previous": "前一个镜头",
+  "agent.var.next_beat": "下一场演什么",
   "agent.var.people": "画面中的人物及其固定外观",
   "agent.var.setting": "场景及其固定外观",
   "agent.var.ledger": "到此为止的衣着与痕迹",
