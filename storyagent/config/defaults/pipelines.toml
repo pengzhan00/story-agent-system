@@ -141,7 +141,7 @@ title_card = false
 recap_card = false
 next_card = false
 
-# -- feature film: very long, produced in parts, clips only where they count ------------------------------------------------
+# -- feature film: very long, produced in parts, every shot is a clip (the time it takes is expected, there is no budget) ---
 [pipelines.feature_film]
 label_key = "pipeline.feature_film"
 note_key = "pipeline.feature_film.note"
@@ -158,12 +158,16 @@ requires = ["ollama", "acestep", "phosphene", "tool.ffmpeg", "tool.mflux", "tool
 "audio.sfx" = "stable-audio-3-medium"
 "compose.assemble" = "ffmpeg-assemble"
 [pipelines.feature_film.workflow]
-video_share = 0.12
-video_min_per_episode = 20
+video_share = 1.0
+video_budget_hours = 0
 keyframe_from_references = true
 [pipelines.feature_film.edit]
 title_card = true
 dissolve_sec = 0.8
 j_cut_sec = 0.3
 [pipelines.feature_film.mix]
-loudnorm_i = -23.0
+# A feature film is not mixed like television (EBU R128, -23 LUFS): cinema and streaming deliveries use about -27 LKFS
+# integrated with a low true peak and a wide loudness range, so loud scenes stay loud and quiet ones quiet.
+loudnorm_i = -27.0
+loudnorm_tp = -2.0
+loudnorm_lra = 20.0

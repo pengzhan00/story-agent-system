@@ -57,7 +57,7 @@ kind = "image.generate"
 | `landscape_drama` 横屏短剧/网剧 | 16:9 720p | 3–10 min | preview | 同模型栈,方向换横屏 |
 | `tv_series` 电视剧 | 16:9 1080p | 20–45 min | preview | 长集:镜头多,视频占比低/按预算;片头片尾卡、前情 |
 | `advert` 广告 | 16:9 1080p(可复制成竖屏) | 15–60 s | final | 每镜都出视频,质量优先,无片头卡 |
-| `feature_film` 电影 | 2.35:1 1080p | 90–180 min | final | 超长:分段生产,预算/视频占比由项目定 |
+| `feature_film` 电影 | 2.35:1 1080p | 90–180 min | final | 超长:分段生产,每个镜头都出视频(`video_share = 1.0`,不设预算;耗时长是预期) |
 (预留:云端视频方案,接口已有,缺厂商。)具体数字只是起点,可在 `pipelines.toml` 里改。需要新增交付档位:`landscape_1080`、`tv_landscape_1080`、`advert_1080`、`film_scope_1080`(1920×816)等。
 
 ### 换方案的规则

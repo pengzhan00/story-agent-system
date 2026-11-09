@@ -118,9 +118,10 @@ guidance = "A feature film in three acts: setup, confrontation, resolution, with
 writing = "A feature film in three acts. Spend the first act on the ordinary world and the inciting incident, the second on rising confrontation with a midpoint turn and a low point, the third on the climax and its aftermath. Scenes are long enough to breathe: dialogue is natural and may overlap or trail off, subtext does most of the work, and silence and image are allowed to tell the story. Let a theme recur in small ways. Set pieces and quiet scenes alternate; characters change because of what the story costs them, not because they announce it."
 dialogue_chars = 60
 [kinds.feature_film.shot_sec]
-min = 3
-default = 8
-max = 15
+# Average shot length of a dramatic feature is about 5-6 s: action is cut at 2-3 s, a held take or a long take runs 15 s or more.
+min = 2
+default = 6
+max = 20
 [kinds.feature_film.episodes]
 min = 1
 default = 1

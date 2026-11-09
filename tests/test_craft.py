@@ -76,7 +76,7 @@ def test_a_workshop_text_without_a_kind_gets_no_form_rules(settings) -> None:
 
 def test_shot_length_bounds_follow_the_kind_and_unknown_kinds_fall_back(settings) -> None:
     assert shot_bounds(settings, "advert") == (1.0, 6.0)
-    assert shot_bounds(settings, "feature_film") == (3.0, 15.0)
+    assert shot_bounds(settings, "feature_film") == (2.0, 20.0)
     assert shot_bounds(settings, "no_such_kind") == shot_bounds(settings, "drama_series") == (2.0, 8.0)
     assert shot_bounds(settings, "") == (2.0, 8.0)                          # a project without a kind: the default
 

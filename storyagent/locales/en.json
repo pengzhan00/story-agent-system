@@ -2108,7 +2108,7 @@
   "pipeline.advert": "Advert",
   "pipeline.advert.note": "16:9 1080p, short: every shot is a real clip, quality first, no title or end cards.",
   "pipeline.feature_film": "Feature film",
-  "pipeline.feature_film.note": "2.35:1 widescreen 1080p, very long: produced in parts, clips only where they count, broadcast loudness.",
+  "pipeline.feature_film.note": "2.35:1 widescreen 1080p, very long: produced in parts, every shot is a clip (the long run time is expected, there is no budget), cinema/streaming film loudness (about -27 LKFS, wide dynamic range).",
   "brief.kind.drama_series": "Short-drama series",
   "brief.kind.drama_series.note": "A vertical series in seasons and episodes: a hook at the start, a turn, a cliffhanger at the end of each episode.",
   "brief.kind.drama_single": "Single short drama",

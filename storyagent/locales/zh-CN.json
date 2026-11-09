@@ -2108,7 +2108,7 @@
   "pipeline.advert": "广告",
   "pipeline.advert.note": "16:9 1080p,短:每个镜头都出视频,质量优先,无片头片尾卡。",
   "pipeline.feature_film": "电影",
-  "pipeline.feature_film.note": "2.35:1 宽银幕 1080p,超长:分段生产,只在关键镜头出视频,响度按广播标准。",
+  "pipeline.feature_film.note": "2.35:1 宽银幕 1080p,超长:分段生产,每个镜头都出视频(耗时长是预期,不设预算),响度按院线/流媒体电影标准(约 -27 LKFS,动态范围宽)。",
   "brief.kind.drama_series": "连续短剧",
   "brief.kind.drama_series.note": "分季分集的竖屏连续剧:每集有开场钩子、至少一次反转和结尾悬念。",
   "brief.kind.drama_single": "单本短剧",
