@@ -49,6 +49,19 @@ def test_a_looping_writer_cannot_fill_a_scene_with_copies_or_empty_shots() -> No
     assert len(_clean_shots(many, {}, cap=4)) == 4 and len(_clean_shots(many, {})) == 9
 
 
+def test_fields_a_model_left_inside_one_text_are_put_back() -> None:
+    leaked = ("林岚被压于墙，陆沉贴近。”,“end_pose”: “林岚挣扎未果。”，“duration_sec”: 4.0,"
+              "“camera_position”: “eye_level”，“lens_mm”: 50,“action”: ")
+    shot = {"start_pose": leaked, "narration": "雨声渐歇。"}
+    kept = _clean_shots([shot], {})
+    assert kept[0]["start_pose"] == "林岚被压于墙，陆沉贴近。"
+    assert kept[0]["end_pose"] == "林岚挣扎未果。" and kept[0]["camera_position"] == "eye_level"
+    assert kept[0]["duration_sec"] == 4.0 and kept[0]["lens_mm"] == 50.0
+    assert kept[0]["action"] == "林岚被压于墙，陆沉贴近。 → 林岚挣扎未果。"    # no action written: the poses are it
+    own = {"start_pose": "a.”,“end_pose”: “b.”", "end_pose": "already here", "action": "does it"}
+    assert _clean_shots([own], {})[0]["end_pose"] == "already here"          # a field the shot has is not overwritten
+
+
 def test_the_outline_and_shot_prompts_ask_for_the_number_and_the_beats() -> None:
     outline = (SPECS / "screenwriter.outline.toml").read_text(encoding="utf-8")
     shots = (SPECS / "screenwriter.shots.toml").read_text(encoding="utf-8")

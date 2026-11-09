@@ -1,6 +1,12 @@
 {
  "type": "object",
  "properties": {
+  "set_pieces": {
+   "type": "array",
+   "items": {
+    "type": "string"
+   }
+  },
   "title": {
    "type": "string",
    "minLength": 1

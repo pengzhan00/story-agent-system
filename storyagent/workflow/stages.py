@@ -20,6 +20,7 @@ Params (all optional): ``premise``, ``episode`` (default 1), ``season``, ``episo
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Callable
 from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass, field
@@ -278,6 +279,36 @@ def _flatten_json_text(value: Any) -> Any:
 
 
 _SHOT_CONTENT = ("action", "start_pose", "end_pose", "narration", "expression", "dialogue")
+_SHOT_NUMBERS = ("duration_sec", "lens_mm")
+_SHOT_TEXT = ("camera_position", "screen_direction", "gait", "end_pose", "start_pose", "action", "expression", "mood")
+_LEAKED_KEY = re.compile(
+    r"[\"”’]?\s*[,，]\s*[\"“‘]?(" + "|".join((*_SHOT_NUMBERS, *_SHOT_TEXT)) + r")[\"”’]?\s*[:：]\s*")
+
+
+def _unleak_shot(shot: dict[str, Any]) -> None:
+    """A model that writes its answer with typographic quotes leaves the rest of the object inside one text field
+    (``start_pose: 'she turns.”,“end_pose”: “he waits.”,“action”: '``). The pieces go back to their own fields; a field
+    the shot already has is not overwritten, and the same text is not left in two places."""
+    for key, value in list(shot.items()):
+        if not isinstance(value, str):
+            continue
+        found = list(_LEAKED_KEY.finditer(value))
+        if not found:
+            continue
+        shot[key] = value[: found[0].start()].strip(" \"“”‘’,，")
+        for i, m in enumerate(found):
+            end = found[i + 1].start() if i + 1 < len(found) else len(value)
+            piece = value[m.end(): end].strip(" \"“”‘’,，")
+            name = m.group(1)
+            if name in _SHOT_NUMBERS:
+                number = re.match(r"\d+(\.\d+)?", piece)
+                if number and not shot.get(name):
+                    shot[name] = float(number.group(0))
+            elif piece and not shot.get(name):
+                shot[name] = piece
+    if not shot.get("action"):          # a shot without its action still has the move its poses describe
+        poses = [str(shot.get(k) or "").strip() for k in ("start_pose", "end_pose")]
+        shot["action"] = " → ".join(p for p in poses if p)
 
 
 def _clean_shots(shots: list[dict[str, Any]], scene: dict[str, Any], cap: int | None = None) -> list[dict[str, Any]]:
@@ -289,6 +320,7 @@ def _clean_shots(shots: list[dict[str, Any]], scene: dict[str, Any], cap: int | 
     kept: list[dict[str, Any]] = []
     copies: set[str] = set()
     for shot in shots:
+        _unleak_shot(shot)
         for key, value in list(shot.items()):
             if isinstance(value, str):
                 shot[key] = _flatten_json_text(value)

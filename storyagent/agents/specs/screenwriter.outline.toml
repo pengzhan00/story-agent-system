@@ -24,6 +24,9 @@ Production plan: $plan
 Characters (use these names exactly): $characters
 
 Rules:
+- first fill `set_pieces`: every showpiece the idea promises (each fight, chase, intimate scene, reveal or other
+  scene the viewer is waiting for), one short line each, in story order. Then write the scenes so that every entry of
+  `set_pieces` has its own scene, and no promised showpiece is cut or merged into another
 - exactly $acts acts, each with exactly $scenes_per_act scenes
 - every scene has: location, time_of_day, weather, the characters present, mood, a one-line narration (voice-over or
   caption, may be empty) and `beat` = what happens in the scene in one or two sentences: who wants what, what gets in
