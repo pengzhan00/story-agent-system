@@ -83,10 +83,11 @@ th { font-size: 0.8rem; color: var(--muted); font-weight: 600; } tr:last-child t
 /* creative */
 .split { display: grid; grid-template-columns: 280px 1fr; gap: var(--gap); align-items: start; }
 @media (max-width: 800px) { .split { grid-template-columns: 1fr; } }
-/* the list and the detail each scroll on their own, so a long list never pushes the chosen item's content off screen */
+/* every list + detail layout (.split, .review-layout, .wiki-split) shares this rule: the list and the detail each scroll on
+   their own, so a long list never pushes the chosen item's content off screen. A new two-column page uses one of these classes. */
 @media (min-width: 801px) {
-  .split > aside, .split > section { position: sticky; top: 8px; max-height: calc(100vh - 16px); overflow-y: auto; min-width: 0; }
-  .split > section { padding-right: 4px; }
+  .split > *, .review-layout:not(.review-wide) > * { position: sticky; top: 8px; max-height: calc(100vh - 16px); overflow-y: auto; min-width: 0; }
+  .split > :last-child, .review-layout:not(.review-wide) > :last-child { padding-right: 4px; }
 }
 .group { font-size: 0.8rem; color: var(--muted); text-transform: none; margin: 8px 0 4px; }
 .pick { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
