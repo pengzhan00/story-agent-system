@@ -5,6 +5,7 @@ import type { LibraryItem, Row } from "../api/types";
 import { ErrorNote } from "../components/ErrorNote";
 import { PromptAssist } from "../components/PromptAssist";
 import { ScriptOutline } from "../components/ScriptOutline";
+import { ShotCard, cardOf } from "../components/ShotCard";
 import { VoiceUpload } from "../components/VoiceUpload";
 import { useT } from "../i18n";
 
@@ -22,7 +23,7 @@ const COLUMNS: Record<StoryPart, string[]> = {
   locations: ["name", "description", "lighting", "keyframe_mode"],
   music: ["name", "kind", "mood", "description"],
   sfx: ["name", "category", "description"],
-  shots: ["act_number", "scene_number", "shot_number", "location", "narration", "treatment"],
+  shots: ["act_number", "scene_number", "shot_number", "location", "action", "card_position", "narration", "treatment"],
   dialogue: ["character", "line", "emotion"],
   scripts: ["episode_no", "title", "synopsis"],
 };
@@ -51,6 +52,12 @@ const EDITABLE: Partial<Record<StoryPart, Field[]>> = {
     { key: "camera_notes", type: "area", rows: 2 }, { key: "treatment", type: "select", options: ["auto", "video", "still"] },
   ],
 };
+
+/** What a table cell shows: the stored value, or for the shot table the position tag of the shot's detail card. */
+function shown(row: Row, key: string): string {
+  if (key === "card_position") return cell(cardOf(row)?.["position_name"]);
+  return cell(row[key]);
+}
 
 function cell(v: unknown): string {
   if (v === null || v === undefined) return "";
@@ -129,7 +136,7 @@ function RowView(props: { pid: number; part: StoryPart; row: Row; columns: strin
       <tr>
         {columns.map((f) => (
           <td key={f} className={f === "name" ? "strong" : ""}>
-            {cell(row[f])}
+            {shown(row, f)}
           </td>
         ))}
         {editable ? (
@@ -177,6 +184,7 @@ export function RowEditor({ pid, part, row, onDone }: { pid: number; part: Story
   const locked = part === "shots" && row["locked"] === true;
   return (
     <div className="stack">
+      {part === "shots" ? <ShotCard row={row} /> : null}
       {part === "shots" ? <ShotDialogue pid={pid} row={row} disabled={locked} /> : null}
       {part === "characters" ? <VoiceUpload pid={pid} row={row} /> : null}
       <div className="form-grid">
