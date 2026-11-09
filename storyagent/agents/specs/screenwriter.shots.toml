@@ -1,7 +1,7 @@
 name = "screenwriter.shots"
 role = "writer"
 temperature = 0.75
-max_tokens = 3500
+max_tokens = 6000
 schema = "scene_shots"
 inputs = ["language", "title", "act_title", "scene", "characters", "shots_per_scene", "previous", "feedback", "current",
           "form_guidance", "genre_guidance", "dialogue_chars", "shot_sec", "frame_note", "next_shot"]
@@ -45,7 +45,11 @@ them: $next_shot
 Produce exactly $shots_per_scene shots in order. Each shot shows ONE move or ONE beat, so a set piece is written as a
 chain of them: a fight is strike, block, counter, fall, one shot per exchange, each saying who does what to whom and
 where the blow lands; an intimate scene goes forward one beat per shot (approach, first touch, undressing, contact,
-the reaction on a face), each with the concrete action of the bodies as the rating notes above allow. In an intimate shot `action`,
+the reaction on a face), each with the concrete action of the bodies as the rating notes above allow. An intimate shot is explicit adult
+material, never "tasteful": the sex act and the bare bodies are shown, named in plain words and described in full, not
+implied, summarised ("they embrace", "they reach climax", "limbs entwined") or cut away from. `action` of an intimate
+shot is 80 to 160 characters, and `start_pose` and `end_pose` are always filled, in $language, each 30 to 60
+characters. In an intimate shot `action`,
 `start_pose` and `end_pose` are written for a camera and an image model, not for a reader: say exactly what is visible,
 in four parts: the body parts in view and their form (shape, size, colour, flushed or wet, erect or soft, bare or
 covered); the contact (what touches what, with what, how hard, how deep, in which direction); the position (who is on

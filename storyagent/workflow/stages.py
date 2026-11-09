@@ -245,7 +245,8 @@ def _renumber(outline: dict[str, Any]) -> None:
             scene["number"] = s
 
 
-MAX_SHOT_FACTOR = 6    # a set-piece scene may take at most this many times the usual shots of a scene (a writer
+FIRST_SHOTS = 3         # shots asked in the first request for a scene that has a shot count; the rest one by one
+MAX_SHOT_FACTOR = 6   # a set-piece scene may take at most this many times the usual shots of a scene (a writer
 #                        that asks for a fight of 8 or an intimate scene of 12 moves is believed up to here)
 
 
@@ -510,7 +511,10 @@ def script(ctx: Ctx) -> dict[str, Any]:
 
         write = partial(_write_shots, ctx, outline, act, scene, chars, previous or "(start)",
                         feedback if revising else "(none)", asked)
-        shots = write(in_scene, dump(scene["shots"]) if revising and scene.get("shots") else "(none)")
+        # a long set piece starts with a few shots and goes on one shot at a time: a model writes each move in far
+        # more detail when it has only one to write
+        first = min(in_scene, FIRST_SHOTS) if asked else in_scene
+        shots = write(first, dump(scene["shots"]) if revising and scene.get("shots") else "(none)")
         # a writer that gave fewer than the outline asked for is asked for the rest one shot at a time: one move per
         # request is far easier to write well than a long list, and each sees the shots before it
         for number in range(len(shots) + 1, in_scene + 1) if asked else ():
