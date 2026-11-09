@@ -904,6 +904,7 @@ class ProjectFromTextOut(Strict):
 
 class ReviewIssue(Strict):
     severity: str = ""
+    lens: str = ""
     where: str = ""
     problem: str = ""
     fix: str = ""

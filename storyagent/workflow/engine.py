@@ -22,6 +22,7 @@ from storyagent.pipelines import settings_for
 from storyagent.projects import ProjectStore
 from storyagent.story import StoryStore
 
+from . import detail, keyframe
 from .progress import RunProgress, stage_key
 from .stages import STAGE_FUNCS, Ctx, Progress, StageError, WorkflowCancelled
 from .state import SEASON_STAGES, SERIES_STAGES, WorkflowState, WorkflowStateError
@@ -108,10 +109,34 @@ class WorkflowEngine:
         profile = self.settings.delivery_profile(project.delivery_profile)
         craft = writing_vars(self.settings, project.kind, str(plan.get("genre") or project.genre or ""),
                              vertical=int(profile["height"]) > int(profile["width"]), rating=project.rating)
-        data = self.agents_for(project).run("reviewer.script", {
-            "language": language_name(project.content_language), "script": text,
-            "characters": json.dumps(chars, ensure_ascii=False), **craft}, project_id=project_id).data
-        return dict(data)
+        runner = self.agents_for(project)
+        language = language_name(project.content_language)
+        story = dict(runner.run("reviewer.script", {
+            "language": language, "script": text, "characters": json.dumps(chars, ensure_ascii=False), **craft},
+            project_id=project_id).data)
+        results = [("story", story)]
+        # the package: the story together with every shot card and the fixed descriptions, read by reviewers who each
+        # look at one thing (continuity, whether it can be produced, whether the intensity matches the rating)
+        cards = any(sh.get("detail") for act in script["acts"] for sc in act.get("scenes", [])
+                    for sh in sc.get("shots", []))
+        if cards:
+            package = detail.package_text(script["title"], script["acts"])
+            by_name = {c["name"]: c for c in self.store.list_characters(project_id)}
+            anchors = {n: detail.anchor_of(self.state, project_id, "character", n) for n in by_name}
+            anchors.update({f"place:{loc['name']}": detail.anchor_of(self.state, project_id, "location", loc["name"])
+                            for loc in self.store.list_locations(project_id)})
+            shared = {"language": language, "package": package, **craft}
+            lenses: list[tuple[str, dict[str, Any]]] = [
+                ("continuity", {"anchors": json.dumps(anchors, ensure_ascii=False),
+                                "characters": json.dumps(chars, ensure_ascii=False)}),
+                ("producible", {"anchors": json.dumps(anchors, ensure_ascii=False),
+                                "tool_notes": keyframe.guide(with_references=True)})]
+            if project.rating != "general":
+                lenses.append(("rating", {}))
+            for lens, extra in lenses:
+                results.append((lens, dict(runner.run(f"reviewer.{lens}", {**shared, **extra},
+                                                      project_id=project_id).data)))
+        return detail.merge_reviews(results)
 
     def translate_lines(self, project_id: int, lines: Sequence[str], target: str) -> list[str]:
         """Subtitle lines into ``target`` (a language code) by the translator agent; one text out per text in."""

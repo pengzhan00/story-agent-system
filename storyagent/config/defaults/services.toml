@@ -194,6 +194,18 @@ non_character_speakers = ["narrator", "voice-over", "voiceover", "v.o.", "captio
 video_share = 0.2
 # The sentence a voice sample speaks (the character's voice clone): a neutral line, never one of the drama's own lines.
 voice_sample_text = "你好，很高兴认识你。"
+# Shot detail cards (docs/WORKFLOW.md): after the script stage, every shot of a scene whose `scene_type` is listed
+# here is turned into a complete card by the prompter role (its model is routed in llm.toml), and the keyframe and
+# video prompts are built from that card. The fixed look of each person and place is written once and pasted word for
+# word into every shot. A card with problems is asked again `detail_attempts` more times.
+detail = true
+detail_scene_types = ["intimate", "action"]
+detail_attempts = 2
+detail_min_words = 60
+# Words and phrases that show nothing to a picture model: a card using one is sent back.
+detail_vague = ["entwined", "lost in passion", "make love", "made love", "making love", "reach climax", "reached climax",
+                "the heat between", "passion takes over", "caught up in the moment", "intimacy", "缠绵", "情欲交融",
+                "沉溺", "水乳交融", "渐入佳境", "翻云覆雨", "春宵"]
 video_min_per_episode = 2
 video_budget_hours = 0
 # The produce stage turns every spec into media. Quality tier for the first pass (draft | preview | final).

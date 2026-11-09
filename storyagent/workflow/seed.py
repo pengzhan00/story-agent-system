@@ -11,7 +11,7 @@ from typing import Any
 from storyagent.domain import MediaKind
 from storyagent.media.specs import SpecLocked, SpecRecord, SpecStore
 
-from . import keyframe
+from . import detail, keyframe
 from .stages import Ctx
 from .video_mode import video_params
 
@@ -92,26 +92,31 @@ _MALE = re.compile(r"\b(man|male|boy|gentleman)\b", re.IGNORECASE)
 _ORDINALS = ("first", "second", "third", "fourth")
 
 
-def _character_identities(shot: dict[str, Any], chars: dict[str, dict[str, Any]]) -> str:
-    """'The woman is ... the man is ...' block for verbatim injection. A person is called by the sex their own
-    description gives (never by the order they are listed in: a lone man is 'the man'); two of the same sex are told
-    apart as 'the first woman' / 'the second woman'."""
-    found: list[tuple[str, str]] = []
-    for name in shot["characters"]:
+def labelled_identities(names: list[str], chars: dict[str, dict[str, Any]]) -> list[tuple[str, str, str]]:
+    """``(label, name, identity)`` of each person in frame. A person is called by the sex their own description gives
+    (never by the order they are listed in: a lone man is 'the man'); two of the same sex are told apart as 'the first
+    woman' / 'the second woman'."""
+    found: list[tuple[str, str, str]] = []
+    for name in names:
         c = chars.get(name, {})
         ident = _character_identity(c.get("prompt_template", "") or c.get("appearance", ""))
         if not ident:
             continue
         noun = "woman" if _FEMALE.search(ident) else "man" if _MALE.search(ident) else "person"
-        found.append((noun, ident[0].lower() + ident[1:]))
-    total = {noun: sum(1 for n, _ in found if n == noun) for noun, _ in found}
+        found.append((noun, name, ident[0].lower() + ident[1:]))
+    total = {noun: sum(1 for n, _, _ in found if n == noun) for noun, _, _ in found}
     seen: dict[str, int] = {}
-    parts: list[str] = []
-    for noun, ident in found:
+    out: list[tuple[str, str, str]] = []
+    for noun, name, ident in found:
         seen[noun] = seen.get(noun, 0) + 1
         label = f"the {noun}" if total[noun] == 1 else f"the {_ORDINALS[min(seen[noun], 4) - 1]} {noun}"
-        parts.append(f"{label} is {ident}.")
-    return " ".join(parts)
+        out.append((label, name, ident))
+    return out
+
+
+def _character_identities(shot: dict[str, Any], chars: dict[str, dict[str, Any]]) -> str:
+    """'The woman is ... the man is ...' block for verbatim injection."""
+    return " ".join(f"{label} is {ident}." for label, _, ident in labelled_identities(shot["characters"], chars))
 
 
 def _shot_prompts(ctx: Ctx, shot: dict[str, Any], chars: dict[str, dict[str, Any]], style: dict[str, Any],
@@ -138,6 +143,11 @@ def _shot_prompts(ctx: Ctx, shot: dict[str, Any], chars: dict[str, dict[str, Any
                                    f"ends {staging['end_pose']}" if staging.get("end_pose") else "") if x)
     fallback = {"image_prompt": opening, "video_prompt": opening + (", " + motion if motion else ""),
                 "negative_prompt": payload["style"]["negative_prompt"]}
+    card = payload.get("detail") or {}
+    if card.get("start_frame"):         # a shot card is the whole description: no second guess by a model
+        built = detail.prompts_from_detail(card, base_style)
+        built["negative_prompt"] = ", ".join(x for x in (built["negative_prompt"], fallback["negative_prompt"]) if x)
+        return built
     if not use_llm:
         return fallback
     try:
@@ -274,7 +284,9 @@ def seed_specs(ctx: Ctx) -> dict[str, Any]:
         lead = shot["characters"][0] if shot["characters"] else f"location:{shot['location']}"
         if shot["characters"]:
             lead = f"character:{lead}"
-            ident = _character_identities(shot, chars)
+            ident = " ".join(x for x in (
+                _character_identities(shot, chars),
+                detail.fixed_block(ctx.state, ctx.pid, shot["characters"], chars, shot["location"])) if x)
             if ident:
                 shown = f"{shown} {ident}"
                 video_shown = f"{video_shown} {ident}"

@@ -6321,6 +6321,11 @@ export interface components {
              */
             fix: string;
             /**
+             * Lens
+             * @default
+             */
+            lens: string;
+            /**
              * Problem
              * @default
              */

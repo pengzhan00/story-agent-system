@@ -528,6 +528,9 @@ def script(ctx: Ctx) -> dict[str, Any]:
         ctx.store.update_script_scene(ctx.pid, episode, act["number"], scene["number"], {"shots": shots})
         previous = scene.get("beat", "")
         done += 1
+    from .detail import detail_pass
+
+    detailed = detail_pass(ctx, episode, scenes)
     unknown = sorted({str(line.get("character", "")).strip() for _, sc in scenes for sh in sc.get("shots", [])
                       for line in sh.get("dialogue", []) if str(line.get("character", "")).strip() not in names})
     introduced = _introduce_characters(ctx, episode, unknown, outline.get("synopsis", ""), plan)
@@ -537,7 +540,7 @@ def script(ctx: Ctx) -> dict[str, Any]:
     ctx.step(len(scenes), len(scenes), "done")
     return {"episode": episode, "acts": len(outline["acts"]), "scenes": len(scenes),
             "shots": sum(len(sc.get("shots", [])) for _, sc in scenes), "unknown_speakers": unknown,
-            "new_characters": introduced}
+            "new_characters": introduced, **detailed}
 
 
 def scenes(ctx: Ctx) -> dict[str, Any]:

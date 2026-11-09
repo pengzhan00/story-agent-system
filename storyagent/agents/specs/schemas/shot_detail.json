@@ -1,0 +1,57 @@
+{
+ "type": "object",
+ "properties": {
+  "summary": {"type": "string"},
+  "position_name": {"type": "string"},
+  "people": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "who": {"type": "string"},
+     "clothing": {"type": "string"},
+     "body_in_view": {"type": "string"},
+     "pose": {"type": "string"},
+     "limbs": {"type": "string"},
+     "face": {"type": "string"},
+     "skin": {"type": "string"}
+    },
+    "required": ["who", "clothing", "body_in_view", "pose", "limbs", "face", "skin"]
+   }
+  },
+  "contact": {"type": "string"},
+  "motion": {
+   "type": "object",
+   "properties": {
+    "main": {"type": "string"},
+    "rhythm": {"type": "string"},
+    "secondary": {"type": "string"},
+    "still": {"type": "string"}
+   },
+   "required": ["main", "rhythm", "secondary", "still"]
+  },
+  "camera": {
+   "type": "object",
+   "properties": {
+    "size": {"type": "string"},
+    "angle": {"type": "string"},
+    "height": {"type": "string"},
+    "lens_mm": {"type": "number"},
+    "movement": {"type": "string"},
+    "crop": {"type": "string"},
+    "focus": {"type": "string"}
+   },
+   "required": ["size", "angle", "movement", "crop"]
+  },
+  "light": {"type": "string"},
+  "setting": {"type": "string"},
+  "sound": {"type": "string"},
+  "start_frame": {"type": "string"},
+  "end_frame": {"type": "string"},
+  "video_motion": {"type": "string"},
+  "continuity_out": {"type": "string"},
+  "negative": {"type": "string"}
+ },
+ "required": ["summary", "position_name", "people", "contact", "motion", "camera", "light", "setting", "sound",
+              "start_frame", "end_frame", "video_motion", "continuity_out", "negative"]
+}

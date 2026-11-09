@@ -96,6 +96,7 @@ def build_payload(
         "camera": {"shot_type": str(shot.get("camera_angle", "")), "movement": str(shot.get("camera_movement", "")),
                    "duration_sec": duration},
         "staging": {k: str(shot.get(k) or "").strip() for k in STAGING_FIELDS},
+        "detail": dict(shot.get("detail") or {}),      # the shot card (workflow/detail.py); empty for most shots
         "audio": {"bgm_mood": str(scene.get("bgm_mood") or mood), "tts_required": bool(dialogue),
                   "sfx_cues": [str(c) for c in shot.get("sfx_cues", [])]},
         "style": {"visual_style": str(style.get("visual_style", "")),

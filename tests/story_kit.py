@@ -26,6 +26,8 @@ class StoryClient:
         self.speaker: str | None = None     # who speaks in every shot (overrides the defaults)
         self.scenes_per_act = 2
         self.translate_to = "xx"
+        self.card_people = 1                # people in each canned shot card
+        self.card_words = 70                # words in each canned card's opening frame
 
     def list_models(self) -> list[str]:
         return ["fake-model"]
@@ -33,11 +35,12 @@ class StoryClient:
     @staticmethod
     def shape(schema: dict[str, Any] | None) -> str:
         keys = set((schema or {}).get("properties", {}))
-        for marker, name in (("project_name", "plan"), ("primary_colors", "style"), ("episodes", "season"),
+        for marker, name in (("position_name", "detail"), ("project_name", "plan"), ("primary_colors", "style"),
+                             ("episodes", "season"),
                              ("acts", "outline"), ("shots", "shots"), ("appearance", "character"),
                              ("sound_effects", "sound"), ("effects", "sound_cue"),
                              ("music_prompt", "music"), ("video_prompt", "visual"), ("score", "review"),
-                             ("image_prompt", "location"), ("translations", "translate")):
+                             ("image_prompt", "location"), ("translations", "translate"), ("text", "anchor")):
             if marker in keys:
                 return name
         return "?"
@@ -124,6 +127,22 @@ class StoryClient:
 
     def _review(self, prompt: str) -> dict[str, Any]:
         return {"score": 7, "summary": "fine", "issues": []}
+
+    def _anchor(self, prompt: str) -> dict[str, Any]:
+        return {"text": "fixed description " + str(len(self.calls))}
+
+    def _detail(self, prompt: str) -> dict[str, Any]:
+        n = self.calls.count("detail")
+        who = [{"who": "the woman", "clothing": "torn shirt", "body_in_view": "bare shoulders", "pose": "kneeling",
+                "limbs": "left hand on his chest", "face": "eyes closed", "skin": "sweat on the collarbone"}]
+        return {"summary": "x", "position_name": f"position {n}", "people": who * self.card_people,
+                "contact": "her left hand presses his chest", "motion": {"main": "leans in", "rhythm": "slow",
+                                                                          "secondary": "hair sways", "still": "bed"},
+                "camera": {"size": "medium", "angle": "eye level", "height": "bed height", "lens_mm": 50,
+                           "movement": "slow push", "crop": "above the knees", "focus": "faces"},
+                "light": "warm lamp from the left", "setting": "a wide bed with rumpled sheets", "sound": "breath",
+                "start_frame": " ".join(["word"] * self.card_words), "end_frame": "she lies down",
+                "video_motion": "she leans in", "continuity_out": "shirt torn, sweat", "negative": "extra limbs"}
 
 
 def make_engine(

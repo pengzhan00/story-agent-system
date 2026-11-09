@@ -1,0 +1,24 @@
+name = "anchor.fixed"
+role = "prompter"
+temperature = 0.3
+max_tokens = 700
+schema = "anchor"
+inputs = ["kind", "subject", "style", "rating_visual"]
+system = """You write the FIXED description of one person or one place for an image and video generation pipeline. It is
+written once, locked, and pasted word for word into every shot prompt, so the same person and the same room look the
+same in every picture. English only, concrete and measurable, no story, no mood words, no clothing worn in a
+particular scene, no expression, no action."""
+prompt = """Kind: $kind
+Subject: $subject
+Visual style: $style
+How detailed bodies must be written for this project: $rating_visual
+
+For a person write 50 to 80 words of things that never change: height and build and the proportions of the body
+(shoulders, bust or chest, waist, hips, legs), their size relative to a standard bed and door, skin tone and how it
+catches light, hair (colour, length, texture), face shape, eye colour and shape, body hair, and every fixed mark (scar,
+brand, tattoo, birthmark) with its exact place, size and shape.
+For a place write 50 to 80 words of things that never change: the layout and where the door, windows and bed stand, the
+real size of the main pieces (a bed in centimetres, ceiling height), materials and colours of walls, floor, bedding and
+furniture, the fixed props, and the direction and colour of the light that is always there.
+Nothing the subject description does not support: when it says nothing about a trait, choose one that fits and state
+it plainly; never leave a trait open."""

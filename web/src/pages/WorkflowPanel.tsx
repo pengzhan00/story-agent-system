@@ -273,11 +273,20 @@ export function WorkflowPanel({ id }: { id: number }) {
               <strong>
                 {t("web.review.title")}: {t("web.review.score", { score: review.data.score })}
               </strong>
-              <p>{review.data.summary}</p>
+              {review.data.summary.split("\n").map((line, n) => {
+                const lens = /^\[(story|continuity|producible|rating)\] (.*)$/.exec(line);
+                return (
+                  <p key={n}>
+                    {lens ? <strong>{t(`web.review.lens.${lens[1]}`)}</strong> : null}
+                    {lens ? ` ${lens[2]}` : line}
+                  </p>
+                );
+              })}
               {review.data.issues.length === 0 ? <p className="muted">{t("web.review.none")}</p> : null}
               <ul className="plain">
                 {review.data.issues.map((i, n) => (
                   <li key={n}>
+                    {i.lens ? <span className="chip">{t(`web.review.lens.${i.lens}`)}</span> : null}{" "}
                     <span className="muted">{`[${i.severity}] ${i.where}`}</span> {i.problem}
                     {i.fix ? <span className="muted">{` → ${i.fix}`}</span> : null}
                   </li>

@@ -46,6 +46,7 @@ def writing_vars(settings: Settings, kind_name: str | None, genre: str = "",
     return {
         "form_guidance": form or NONE,
         "rating_visual": (policy.visual if policy else "") or NONE,
+        "rating_writing": (policy.writing if policy else "") or NONE,
         "genre_guidance": settings.genres.guidance_for(genre) or NONE,
         "dialogue_chars": str(kind.dialogue_chars),
         "shot_sec": f"between {shot.min:g} and {shot.max:g} seconds, usually about {shot.default:g}",

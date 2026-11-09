@@ -7062,6 +7062,11 @@
             "title": "Fix",
             "type": "string"
           },
+          "lens": {
+            "default": "",
+            "title": "Lens",
+            "type": "string"
+          },
           "problem": {
             "default": "",
             "title": "Problem",
@@ -7080,6 +7085,7 @@
         },
         "required": [
           "severity",
+          "lens",
           "where",
           "problem",
           "fix"
