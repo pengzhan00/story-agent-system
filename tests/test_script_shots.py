@@ -34,9 +34,19 @@ def test_a_repeated_narration_is_kept_once_and_the_scene_line_is_not_copied() ->
     scene = {"narration": "晨风微凉。"}
     shots = [{"narration": "晨风微凉。"}, {"narration": "她决定留下。"}, {"narration": "她决定留下。"},
              {"narration": "她决定留下。", "start_pose": '{"a": "hands open"}'}, {"narration": ""}]
-    _clean_shots(shots, scene)
-    assert [s["narration"] for s in shots] == ["", "她决定留下。", "", "", ""]
-    assert shots[3]["start_pose"] == "hands open"
+    kept = _clean_shots(shots, scene)
+    assert [s["narration"] for s in kept] == ["", "她决定留下。", ""]       # the empty last shot is left out
+    assert kept[2]["start_pose"] == "hands open"
+
+
+def test_a_looping_writer_cannot_fill_a_scene_with_copies_or_empty_shots() -> None:
+    copy = {"camera_movement": "pull back", "start_pose": "they walk out together"}
+    shots = [dict(copy) for _ in range(6)] + [{"camera_angle": "Close-up", "camera_movement": "pull back"}] * 3
+    shots.insert(1, {"action": "she drops the blade", "start_pose": "blade raised"})
+    kept = _clean_shots(shots, {})
+    assert [s.get("action") or s.get("start_pose") for s in kept] == ["they walk out together", "she drops the blade"]
+    many = [{"action": f"move {i}"} for i in range(9)]
+    assert len(_clean_shots(many, {}, cap=4)) == 4 and len(_clean_shots(many, {})) == 9
 
 
 def test_the_outline_and_shot_prompts_ask_for_the_number_and_the_beats() -> None:

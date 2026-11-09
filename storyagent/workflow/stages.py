@@ -151,8 +151,15 @@ def _premise(ctx: Ctx) -> str:
     return text
 
 
+BRIEF_FIELDS = (("role", "role", 80), ("look", "appearance", 120), ("personality", "personality", 160),
+                ("speech", "voice_profile", 160), ("habit", "mannerism", 120), ("past", "background", 160))
+
+
 def _character_brief(chars: list[dict[str, Any]]) -> list[dict[str, str]]:
-    return [{"name": c["name"], "role": c.get("role", ""), "look": str(c.get("appearance", ""))[:120]} for c in chars]
+    """What the writers are told about each person: who they are and how they talk and move, not only the look, so the
+    lines they write sound like one person and not like the next."""
+    return [{"name": c["name"], **{key: str(c.get(src) or "")[:size] for key, src, size in BRIEF_FIELDS}}
+            for c in chars]
 
 
 def analyze(ctx: Ctx) -> dict[str, Any]:
@@ -270,20 +277,35 @@ def _flatten_json_text(value: Any) -> Any:
     return ", ".join(words(parsed))
 
 
-def _clean_shots(shots: list[dict[str, Any]], scene: dict[str, Any]) -> None:
-    """Repairs a scene's freshly written shots in place: text fields that are JSON written out as text are
-    flattened, and a narration that repeats the previous shot's or the scene's own line is dropped (the model
-    tends to paste one line into every shot)."""
+_SHOT_CONTENT = ("action", "start_pose", "end_pose", "narration", "expression", "dialogue")
+
+
+def _clean_shots(shots: list[dict[str, Any]], scene: dict[str, Any], cap: int | None = None) -> list[dict[str, Any]]:
+    """The scene's freshly written shots, repaired: text fields that are JSON written out as text are flattened, a
+    narration that repeats an earlier shot's or the scene's own line is dropped (the model tends to paste one line
+    into every shot), a shot with nothing in it or one that copies an earlier shot word for word is left out (a
+    model that loops writes the same shot to the end of its answer), and at most ``cap`` shots are kept."""
     seen = {str(scene.get("narration") or "").strip()} - {""}
+    kept: list[dict[str, Any]] = []
+    copies: set[str] = set()
     for shot in shots:
         for key, value in list(shot.items()):
             if isinstance(value, str):
                 shot[key] = _flatten_json_text(value)
+        if not any(shot.get(k) for k in _SHOT_CONTENT):
+            continue
+        fingerprint = json.dumps({k: shot.get(k) for k in (*_SHOT_CONTENT, "camera_movement")}, sort_keys=True,
+                                 ensure_ascii=False, default=str)
+        if fingerprint in copies:
+            continue
+        copies.add(fingerprint)
         line = str(shot.get("narration") or "").strip()
         if line and line in seen:
             shot["narration"] = ""
         elif line:
             seen.add(line)
+        kept.append(shot)
+    return kept[:cap] if cap else kept
 
 
 OUTLINE_CHUNK = 15      # episodes planned per request; later chunks see what the earlier ones decided
@@ -445,12 +467,12 @@ def script(ctx: Ctx) -> dict[str, Any]:
                 "previous": previous or "(start)", "earlier_count": earlier,
                 "feedback": feedback if revising else "(none)",
                 "current": dump(scene["shots"]) if revising and scene.get("shots") else "(none)"})
-            if len(data["shots"]) > len(shots):
-                shots = data["shots"]
+            written = _clean_shots(data["shots"], scene, cap=in_scene if asked else None)
+            if len(written) > len(shots):
+                shots = written
             if len(shots) >= in_scene:
                 break
             earlier = str(len(shots))      # too few: ask again, telling the writer how many it gave
-        _clean_shots(shots, scene)
         for i, shot in enumerate(shots, start=1):
             shot["shot_number"] = i
         scene["shots"] = shots

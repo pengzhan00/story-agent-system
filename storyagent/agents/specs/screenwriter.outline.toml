@@ -26,12 +26,18 @@ Characters (use these names exactly): $characters
 Rules:
 - exactly $acts acts, each with exactly $scenes_per_act scenes
 - every scene has: location, time_of_day, weather, the characters present, mood, a one-line narration (voice-over or
-  caption, may be empty) and `beat` = what happens in the scene in one sentence
+  caption, may be empty) and `beat` = what happens in the scene in one or two sentences: who wants what, what gets in
+  the way, and what has changed when the scene ends. Concrete actions, objects and facts, never summary words such as
+  "they decide", "the truth comes out", "a new chapter begins". Each scene starts from where the one before it ended,
+  and what one person does is the reason for what the other does next
+- facts of the story (who did what, the secret, the token, the scar) are fixed once in the outline and kept the same
+  in every scene; a reveal is planted earlier by a concrete detail the viewer can spot
 - every scene also has `scene_type` (action, intimate, dialogue, reveal, quiet or transition) and `shot_count`: the
   number of shots the scene needs. A scene that carries a promised set piece (a fight, a chase, an intimate scene, the
   climax) is written as a sequence of moves and gets 2 to 3 times the usual $shots_per_scene shots; a quiet or
   transition scene gets fewer. Never spend one summary shot on something the idea promises to show
 - use only the characters listed above; do not bring in anyone else
-- every set piece the idea promises appears as its own scene, in the order that makes the story work
+- every set piece the idea promises appears as its own scene, in the order that makes the story work; one set piece
+  per scene, so a fight and an intimate scene are two scenes, never one scene that holds both
 - the synopsis is at most 100 words
 - structure, pace and the way the piece opens and ends follow the form and genre notes above"""
