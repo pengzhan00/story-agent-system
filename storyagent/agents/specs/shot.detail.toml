@@ -19,6 +19,8 @@ Rules of the card:
 - People are called by the labels in `people` ("the woman", "the man", "the first woman"), never by name. Their fixed
   looks (face, build, skin, hair, marks) are pasted automatically; never rewrite or contradict them and never repeat
   them. Only what changes from shot to shot goes in the card.
+- Each entry of `people` describes only its own person: that person's clothing, body parts, pose, limbs, face and skin.
+  Never copy the other person's clothing or limbs into it. What one person does to the other goes in `contact`.
 - One continuous action per shot, readable in five seconds. A video model cannot do two different things at once, so
   the motion has one main movement and a few small secondary ones.
 - The still (`start_frame`) is a single frozen moment; the motion (`video_motion`) starts from exactly that pose.

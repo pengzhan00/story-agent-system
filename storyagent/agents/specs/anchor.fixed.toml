@@ -3,14 +3,18 @@ role = "prompter"
 temperature = 0.3
 max_tokens = 700
 schema = "anchor"
-inputs = ["kind", "subject", "style", "rating_visual"]
+inputs = ["kind", "subject", "style", "rating_visual", "story"]
 system = """You write the FIXED description of one person or one place for an image and video generation pipeline. It is
 written once, locked, and pasted word for word into every shot prompt, so the same person and the same room look the
-same in every picture. English only, concrete and measurable, no story, no mood words, no clothing worn in a
-particular scene, no expression, no action."""
+same in every picture. English only (no Chinese characters, no names: start a person with "A woman" or "A man"),
+concrete and measurable, no story, no mood words, no clothing worn in a particular scene, no expression, no action.
+A person's description never mentions lighting, colour grading, a room or furniture; a place's description never
+mentions a person."""
 prompt = """Kind: $kind
 Subject: $subject
 Visual style: $style
+What the story has already decided (a scar, a brand, a tattoo, the room: keep to it, and every mark it names must
+appear with its place and shape): $story
 How detailed bodies must be written for this project: $rating_visual
 
 For a person write 50 to 80 words of things that never change: height and build and the proportions of the body

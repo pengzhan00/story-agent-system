@@ -26,7 +26,7 @@ class StoryClient:
         self.speaker: str | None = None     # who speaks in every shot (overrides the defaults)
         self.scenes_per_act = 2
         self.translate_to = "xx"
-        self.card_people = 1                # people in each canned shot card
+        self.card_people = 2                # people in each canned shot card (the two characters)
         self.card_words = 70                # words in each canned card's opening frame
 
     def list_models(self) -> list[str]:
@@ -133,9 +133,11 @@ class StoryClient:
 
     def _detail(self, prompt: str) -> dict[str, Any]:
         n = self.calls.count("detail")
-        who = [{"who": "the woman", "clothing": "torn shirt", "body_in_view": "bare shoulders", "pose": "kneeling",
-                "limbs": "left hand on his chest", "face": "eyes closed", "skin": "sweat on the collarbone"}]
-        return {"summary": "x", "position_name": f"position {n}", "people": who * self.card_people,
+        who = [{"who": f"person {i}", "clothing": f"torn shirt {i}", "body_in_view": "bare shoulders",
+                "pose": "kneeling", "limbs": "left hand on his chest" if i == 0 else f"hands on hips {i}",
+                "face": "eyes closed", "skin": "sweat on the collarbone"}
+               for i in range(prompt.count('"label"') or self.card_people)]       # one card entry per person asked
+        return {"summary": "x", "position_name": f"position {n}", "people": who,
                 "contact": "her left hand presses his chest", "motion": {"main": "leans in", "rhythm": "slow",
                                                                           "secondary": "hair sways", "still": "bed"},
                 "camera": {"size": "medium", "angle": "eye level", "height": "bed height", "lens_mm": 50,

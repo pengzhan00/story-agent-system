@@ -12,6 +12,7 @@ word for word into every shot prompt; the card only holds what varies from shot 
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping, Sequence
 from typing import Any
 
@@ -31,10 +32,14 @@ def anchor_of(state: Any, project_id: int, kind: str, name: str) -> str:
     return str((data or {}).get("text") or "").strip()
 
 
+_NOT_ENGLISH = re.compile(r"[^\x00-\x7f]+")        # a description is English: anything else is left out
+
+
 def ensure_anchors(ctx: Ctx, characters: Sequence[Mapping[str, Any]], locations: Sequence[Mapping[str, Any]],
-                   *, redo: bool = False) -> int:
+                   *, redo: bool = False, story: str = "") -> int:
     """Write the fixed description of every character and place that has none yet (one request each); a written one
-    is kept, an edit of it too, unless ``redo``. Returns how many were written."""
+    is kept, an edit of it too, unless ``redo``. ``story`` is what the writer already decided (a scar, a brand, the
+    room): the description keeps to it. Returns how many were written."""
     style = _style_text(ctx)
     made = 0
     jobs: list[tuple[str, str, dict[str, Any]]] = [
@@ -46,8 +51,8 @@ def ensure_anchors(ctx: Ctx, characters: Sequence[Mapping[str, Any]], locations:
         if anchor_of(ctx.state, ctx.pid, kind, name) and not redo:
             continue
         data = ctx.run_agent("anchor.fixed", {"kind": kind, "subject": json.dumps(subject, ensure_ascii=False),
-                                              "style": style or "(none)"})
-        text = " ".join(str(data.get("text") or "").split())
+                                              "style": style or "(none)", "story": story or "(none)"})
+        text = " ".join(_NOT_ENGLISH.sub(" ", str(data.get("text") or "")).split())
         if text:
             ctx.state.put_data(ctx.pid, f"anchor:{kind}:{name}", {"text": text, "locked": True})
             made += 1
@@ -58,7 +63,8 @@ def fixed_block(state: Any, project_id: int, names: list[str], chars: dict[str, 
     """The locked descriptions of the people in frame and of the place, in the labels the prompts use."""
     from .seed import labelled_identities
 
-    parts = [f"{label}, fixed details: {text}" for label, name, _ in labelled_identities(names, chars)
+    parts = [f"{label}, fixed details: {text}"
+             for label, name, _ in labelled_identities(names, chars, keep_missing=True)
              if (text := anchor_of(state, project_id, "character", name))]
     place = anchor_of(state, project_id, "location", location)
     if place:
@@ -119,10 +125,21 @@ def lint_card(card: Mapping[str, Any], *, people: int, vague: Sequence[str], min
     found = sorted({w for w in vague if w.lower() in text})
     if found:
         problems.append("vague words that show nothing: " + ", ".join(found) + "; say what is physically happening")
-    position = str(card.get("position_name", "")).strip().lower()
-    if position and len(used) >= 2 and all(u.strip().lower() == position for u in used[-2:]):
-        problems.append(f"the position '{position}' was already used in the last two shots; move on")
+    if people > 1:
+        owned = [(p.get("clothing"), p.get("limbs")) for p in card.get("people") or []]
+        if len(set(owned)) < len(owned):
+            problems.append("two people have the same `clothing` and `limbs`: each entry describes only its own person")
+    position = _position_key(str(card.get("position_name", "")))
+    if position and len(used) >= 2 and all(_position_key(u) == position for u in used[-2:]):
+        problems.append(f"the position '{card.get('position_name')}' was already used in the last two shots; "
+                        "change the arrangement of the bodies")
     return problems
+
+
+def _position_key(name: str) -> str:
+    """The first words of a position tag: 'woman prone man behind' and 'woman prone man behind deep thrust' are the
+    same arrangement."""
+    return " ".join(name.lower().split()[:4])
 
 
 def prompts_from_detail(card: Mapping[str, Any], style: str = "") -> dict[str, str]:
@@ -166,7 +183,7 @@ def write_card(ctx: Ctx, shot: Mapping[str, Any], scene: Mapping[str, Any], name
     from .seed import labelled_identities
 
     cfg = ctx.settings.workflow
-    labelled = labelled_identities(names, chars)
+    labelled = labelled_identities(names, chars, keep_missing=True)
     people = [{"label": label, "fixed": anchor_of(ctx.state, ctx.pid, "character", name) or ident}
               for label, name, ident in labelled]
     variables: dict[str, Any] = {
@@ -216,7 +233,12 @@ def detail_pass(ctx: Ctx, episode: int, scenes: Sequence[tuple[dict[str, Any], d
         if name and name not in places:
             places[name] = known.get(name) or {"name": name, "description": f"{sc.get('beat', '')} "
                                                f"({sc.get('time_of_day', '')}, {sc.get('weather', '')})"}
-    ensure_anchors(ctx, list(chars.values()), list(places.values()), redo=redo and bool(ctx.params.get("reanchor")))
+    row = ctx.store.get_script(ctx.pid, episode) or {}
+    story = json.dumps({"synopsis": row.get("synopsis", ""), "scenes": [
+        {"where": f"{act['number']}.{sc['number']}", "beat": sc.get("beat", "")} for act, sc in scenes]},
+        ensure_ascii=False)[:3500]
+    ensure_anchors(ctx, list(chars.values()), list(places.values()), redo=bool(ctx.params.get("reanchor")),
+                   story=story)
     made = flagged = 0
     total = sum(len(sc["shots"]) for _, sc in todo)
     done = 0

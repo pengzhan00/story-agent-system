@@ -45,6 +45,15 @@ def test_what_is_missing_or_vague_is_named() -> None:
 def test_a_position_is_not_repeated_a_third_time() -> None:
     assert _lint(_card(position_name="on top"), used=["on top", "on top"])
     assert not _lint(_card(position_name="on top"), used=["behind", "on top"])
+    held = "woman prone man behind"
+    assert _lint(_card(position_name=held + " deep thrust"), used=[held, held + " thrusting"])    # same arrangement
+
+
+def test_two_people_may_not_share_one_description() -> None:
+    twin = {**_card()["people"][0], "who": "the man"}
+    assert any("same `clothing` and `limbs`" in p for p in _lint(_card(people=[_card()["people"][0], twin]), people=2))
+    other = {**twin, "clothing": "bare", "limbs": "hands on her hips"}
+    assert _lint(_card(people=[_card()["people"][0], other]), people=2) == []
 
 
 def test_the_prompts_come_from_the_card_word_for_word() -> None:
@@ -87,6 +96,7 @@ def test_only_the_set_piece_scenes_get_cards_and_the_anchors_are_written_once(tm
     scenes = [sc for act in engine.store.get_script(pid, 1)["acts"] for sc in act["scenes"]]
     assert [bool(sh.get("detail")) for sh in scenes[0]["shots"]] == [True, True]
     assert all(not sh.get("detail") for sc in scenes[1:] for sh in sc["shots"])
+    assert [sh["detail"].get("problems") for sh in scenes[0]["shots"]] == [None, None]
     assert client.calls.count("detail") == 2 and client.calls.count("anchor") >= 3       # people and the places
     assert detail.anchor_of(engine.state, pid, "character", "Lin Wan").startswith("fixed description")
     engine.run_stage(pid, "script", {"visual_prompts": False})                          # nothing is written twice
