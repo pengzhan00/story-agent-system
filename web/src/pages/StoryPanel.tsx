@@ -23,7 +23,7 @@ const COLUMNS: Record<StoryPart, string[]> = {
   locations: ["name", "description", "lighting", "keyframe_mode"],
   music: ["name", "kind", "mood", "description"],
   sfx: ["name", "category", "description"],
-  shots: ["act_number", "scene_number", "shot_number", "location", "action", "card_position", "narration", "treatment"],
+  shots: ["act_number", "scene_number", "shot_number", "scene_type", "location", "action", "card_position", "narration", "treatment"],
   dialogue: ["character", "line", "emotion"],
   scripts: ["episode_no", "title", "synopsis"],
 };
@@ -54,8 +54,14 @@ const EDITABLE: Partial<Record<StoryPart, Field[]>> = {
 };
 
 /** What a table cell shows: the stored value, or for the shot table the position tag of the shot's detail card. */
-function shown(row: Row, key: string): string {
+const SCENE_TYPES = ["action", "intimate", "reveal", "dialogue", "quiet", "transition"];
+
+function shown(row: Row, key: string, t: (k: string) => string): string {
   if (key === "card_position") return cell(cardOf(row)?.["position_name"]);
+  if (key === "scene_type") {
+    const kind = cell(row[key]);
+    return SCENE_TYPES.includes(kind) ? t(`web.scene_type.${kind}`) : kind;
+  }
   return cell(row[key]);
 }
 
@@ -136,7 +142,7 @@ function RowView(props: { pid: number; part: StoryPart; row: Row; columns: strin
       <tr>
         {columns.map((f) => (
           <td key={f} className={f === "name" ? "strong" : ""}>
-            {shown(row, f)}
+            {shown(row, f, t)}
           </td>
         ))}
         {editable ? (

@@ -144,6 +144,16 @@ def test_the_keyframe_prompt_is_the_card_plus_the_fixed_descriptions(tmp_path: P
     assert video is not None and video.prompt.startswith("Starting exactly")
 
 
+def test_the_shot_list_names_the_kind_of_scene_each_shot_is_in(tmp_path: Path) -> None:
+    engine, pid = _story(tmp_path, Detailing())
+    for stage in ("scenes", "shotplan"):
+        engine.run_stage(pid, stage, {})
+    rows = engine.store.list_shots(pid)
+    first = [r for r in rows if (r["act_number"], r["scene_number"]) == (1, 1)]
+    assert first and {r["scene_type"] for r in first} == {"intimate"}
+    assert all("scene_type" in r for r in rows)
+
+
 def test_the_review_reads_the_story_with_the_cards_through_several_lenses(tmp_path: Path) -> None:
     client = Detailing()
     engine, pid = _story(tmp_path, client)

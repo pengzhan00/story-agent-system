@@ -459,9 +459,22 @@ class StoryStore:
 
     # -- shots ----------------------------------------------------------------------------------------
     def list_shots(self, project_id: int, episode_id: int | None = None) -> list[dict[str, Any]]:
-        if episode_id is None:
-            return self._list("shots", project_id)
-        return self._list("shots", project_id, "AND episode_id=?", (episode_id,))
+        rows = (self._list("shots", project_id) if episode_id is None
+                else self._list("shots", project_id, "AND episode_id=?", (episode_id,)))
+        types: dict[int, dict[tuple[int, int], str]] = {}
+        for row in rows:                                    # the kind of scene each shot belongs to, for the table
+            sid = row.get("script_id")
+            if sid is not None and sid not in types:
+                found = self.db.conn.execute("SELECT acts FROM scripts WHERE id=?", (sid,)).fetchone()
+                try:
+                    acts = json.loads(found["acts"]) if found else []
+                except ValueError:
+                    acts = []
+                types[sid] = {(int(a.get("number", 0)), int(s.get("number", 0))): str(s.get("scene_type") or "")
+                              for a in acts for s in a.get("scenes", [])}
+            of_script = types.get(sid, {}) if sid is not None else {}
+            row["scene_type"] = of_script.get((row["act_number"], row["scene_number"]), "")
+        return rows
 
     def get_shot(self, shot_id: int) -> dict[str, Any]:
         return self._get("shots", shot_id)
