@@ -81,7 +81,7 @@ export function RunProgress({ run }: { run: WorkflowRun }) {
 export function RunError({ code, message }: { code: string; message?: string | null }) {
   const t = useT();
   const key = code.includes(".") ? code.replace(".", ".error.") : `error.${code}`;
-  const text = t(key);
+  const text = t(key, { detail: message ?? "" });
   const known = text !== key;
   return (
     <div className="error-box" role="alert">

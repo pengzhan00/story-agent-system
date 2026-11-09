@@ -282,6 +282,21 @@ def test_a_keyframe_is_composed_from_the_made_portraits_and_scene_image(tmp_path
     assert deps == {"character.portrait", "scene.keyframe"}
 
 
+def test_produce_skips_specs_of_a_shot_a_replan_removed(tmp_path: Path) -> None:
+    """A spec outlives its shot (specs are append-only history); produce says so instead of failing on it."""
+    fake = FakeAdapter()
+    engine, worker, _ = story(tmp_path, [fake])
+    gone = engine.store.list_shots(1)[0]["id"]
+    with engine.db.transaction() as conn:
+        conn.execute("DELETE FROM shots WHERE id=?", (gone,))
+    with serving(worker):
+        out = engine.run_stage(1, "produce", {})
+    assert out["failed"] == 0
+    skipped = [s for s in out["skipped_detail"] if s["reason"] == "shot_gone"]
+    assert {s["subject"] for s in skipped} >= {"shot.keyframe", "shot.video"}
+    assert all(s["id"].partition("#")[0] == str(gone) for s in skipped)
+
+
 def test_the_plan_lists_what_would_be_made_and_only_the_confirmed_part_runs(tmp_path: Path) -> None:
     from storyagent.domain import QualityTier
     from storyagent.workflow.plan import produce_plan, totals

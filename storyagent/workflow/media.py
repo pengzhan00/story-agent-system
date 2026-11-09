@@ -44,6 +44,7 @@ PHASES: tuple[tuple[str, ...], ...] = (
     ("shot.keyframe",),
     ("shot.video",),
 )
+SHOT_SUBJECTS = ("shot.keyframe", "shot.video", "shot.sfx", "dialogue.line")   # specs that hang on one shot
 FAILED = {JobStatus.WORKFLOW_ERROR, JobStatus.TRANSPORT_ERROR, JobStatus.TIMEOUT, JobStatus.FAILED_VALIDATION}
 
 
@@ -211,8 +212,13 @@ def _plan_phase(
     picks = video_picks(ctx.settings, ctx.store, ledger, ctx.pid, ctx.project.settings, tier)
     skip = {str(x) for x in ctx.params.get("skip", [])}      # e.g. ["shot.video"]: stills only
     only = {str(x) for x in ctx.params.get("only", [])}      # the confirmed plan: just these specs
+    live_shots = {str(sh["id"]) for sh in ctx.store.list_shots(ctx.pid)}
     for spec in specs:
         if spec.subject_type not in types or spec.subject_type in skip or (only and spec.id not in only):
+            continue
+        if spec.subject_type in SHOT_SUBJECTS and spec.subject_id.partition("#")[0] not in live_shots:
+            # a re-plan removed this shot: its old spec stays as history but there is nothing to make
+            skipped.append({"subject": spec.subject_type, "id": spec.subject_id, "reason": "shot_gone"})
             continue
         if spec.subject_type == "dialogue.line" and not ctx.settings.workflow.get("narration_voiced", True):
             shot_id, _, line_index = spec.subject_id.partition("#")

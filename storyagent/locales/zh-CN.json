@@ -913,6 +913,7 @@
   "web.produce.reason.blocked_term": "含被禁用词",
   "web.produce.reason.no_model": "这类素材没有可用模型",
   "web.produce.reason.no_keyframe": "缺少关键帧",
+  "web.produce.reason.shot_gone": "这个镜头已被重新分镜删掉,没有可生成的内容",
   "workflow.progress.phase.1": "角色形象、场景、配乐与配音",
   "workflow.progress.phase.2": "镜头关键帧",
   "workflow.progress.phase.3": "镜头视频",

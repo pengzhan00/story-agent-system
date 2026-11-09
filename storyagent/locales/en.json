@@ -913,6 +913,7 @@
   "web.produce.reason.blocked_term": "contains a blocked term",
   "web.produce.reason.no_model": "no model for this kind",
   "web.produce.reason.no_keyframe": "its keyframe is missing",
+  "web.produce.reason.shot_gone": "a re-plan removed this shot, so there is nothing to make",
   "workflow.progress.phase.1": "Characters, locations, music and voices",
   "workflow.progress.phase.2": "Shot keyframes",
   "workflow.progress.phase.3": "Shot videos",
