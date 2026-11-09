@@ -81,13 +81,17 @@ NO_EXPIRY = "9999-12-31T23:59:59.000Z"
 
 
 # -- the hard gates ------------------------------------------------------------------------------------------
+_AVOID_KEYS = frozenset({"negative_prompt", "negative"})   # what the picture must NOT show: a term there guards
+
+
 def _strings(node: Any) -> Iterator[str]:
     if isinstance(node, str):
         if not _REF.match(node) and not ("/" in node and " " not in node):
             yield node
     elif isinstance(node, Mapping):
-        for value in node.values():
-            yield from _strings(value)
+        for key, value in node.items():
+            if key not in _AVOID_KEYS:
+                yield from _strings(value)
     elif isinstance(node, (list, tuple)):
         for value in node:
             yield from _strings(value)

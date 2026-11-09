@@ -179,6 +179,19 @@ def test_a_minor_age_or_a_blocked_term_stops_the_job_whatever_else_is_set(rclien
     assert rclient.get(f"/api/jobs/{third['id']}").json()["error_code"] == "content_blocked"
 
 
+def test_a_blocked_term_in_the_negative_prompt_is_a_guard_not_a_violation(rclient: TestClient,
+                                                                         rsettings: Settings) -> None:
+    pid = restricted_project(rclient)
+    ok = rclient.post("/api/jobs", json=job_body(pid, inputs={"prompt": "a woman waits",
+                                                              "negative_prompt": "baby face, child, blurry"},
+                                                 seed=11)).json()["job"]
+    bad = rclient.post("/api/jobs", json=job_body(pid, inputs={"prompt": "a baby waits",
+                                                               "negative_prompt": "blurry"}, seed=12)).json()["job"]
+    drain(rsettings)
+    assert rclient.get(f"/api/jobs/{ok['id']}").json()["status"] == "completed"
+    assert rclient.get(f"/api/jobs/{bad['id']}").json()["error_code"] == "content_blocked"
+
+
 def test_the_production_plan_names_what_would_stop_a_restricted_project(rclient: TestClient) -> None:
     pid = restricted_project(rclient, adults=False, characters=("Ann", "Bo"))
     plan = rclient.get(f"/api/projects/{pid}/produce/plan").json()
