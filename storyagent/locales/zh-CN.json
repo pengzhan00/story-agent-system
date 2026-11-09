@@ -1273,7 +1273,7 @@
   "agent.var.plan": "制作方案",
   "agent.var.act_title": "幕标题",
   "agent.var.shots_per_scene": "每场景镜头数",
-  "agent.var.earlier_count": "上一次写出的镜头数",
+  "agent.var.next_shot": "接下来要写的镜头",
   "agent.var.previous": "前一个镜头",
   "agent.var.shot": "当前镜头",
   "agent.var.location": "地点",

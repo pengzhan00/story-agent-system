@@ -23,6 +23,7 @@ import json
 from collections.abc import Callable
 from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass, field
+from functools import partial
 from typing import Any
 
 from storyagent.agents import AgentRunner
@@ -240,7 +241,6 @@ def _renumber(outline: dict[str, Any]) -> None:
             scene["number"] = s
 
 
-SHORT_SCENE_RETRIES = 2     # times a scene's shots are asked again when the writer gave fewer than the outline wants
 MAX_SHOT_FACTOR = 3    # a set-piece scene may take this many times the usual shots of a scene
 
 
@@ -399,6 +399,18 @@ def _introduce_characters(
     return made
 
 
+def _write_shots(
+    ctx: Ctx, outline: dict[str, Any], act: dict[str, Any], scene: dict[str, Any], chars: list[dict[str, Any]],
+    previous: str, feedback: str, capped: bool, count: int, current: str, next_shot: str = "(none)",
+) -> list[dict[str, Any]]:
+    """One request to the shot writer for a scene, its answer cleaned; ``capped`` keeps at most ``count`` shots."""
+    data = ctx.run_agent("screenwriter.shots", {
+        "title": outline["title"], "act_title": act.get("title", ""), "scene": scene,
+        "characters": _character_brief(chars), "shots_per_scene": count, "previous": previous,
+        "next_shot": next_shot, "feedback": feedback, "current": current})
+    return _clean_shots(data["shots"], scene, cap=count if capped else None)
+
+
 def script(ctx: Ctx) -> dict[str, Any]:
     plan = _plan(ctx)
     episode = int(ctx.params.get("episode") or 1)
@@ -458,21 +470,18 @@ def script(ctx: Ctx) -> dict[str, Any]:
             continue
         in_scene = _scene_shot_count(scene, shots_n, int(ctx.params.get("shot_count_factor") or MAX_SHOT_FACTOR))
         shots: list[dict[str, Any]] = []
-        earlier = "(none)"
         asked = bool(scene.get("shot_count")) and not revising      # only a number the outline asked for is chased
-        for _ in range(1 + (SHORT_SCENE_RETRIES if asked else 0)):
-            data = ctx.run_agent("screenwriter.shots", {
-                "title": outline["title"], "act_title": act.get("title", ""), "scene": scene,
-                "characters": _character_brief(chars), "shots_per_scene": in_scene,
-                "previous": previous or "(start)", "earlier_count": earlier,
-                "feedback": feedback if revising else "(none)",
-                "current": dump(scene["shots"]) if revising and scene.get("shots") else "(none)"})
-            written = _clean_shots(data["shots"], scene, cap=in_scene if asked else None)
-            if len(written) > len(shots):
-                shots = written
-            if len(shots) >= in_scene:
+
+        write = partial(_write_shots, ctx, outline, act, scene, chars, previous or "(start)",
+                        feedback if revising else "(none)", asked)
+        shots = write(in_scene, dump(scene["shots"]) if revising and scene.get("shots") else "(none)")
+        # a writer that gave fewer than the outline asked for is asked for the rest one shot at a time: one move per
+        # request is far easier to write well than a long list, and each sees the shots before it
+        for number in range(len(shots) + 1, in_scene + 1) if asked else ():
+            more = write(1, dump(shots), f"{number} of {in_scene}")
+            if not more:
                 break
-            earlier = str(len(shots))      # too few: ask again, telling the writer how many it gave
+            shots.append(more[0])
         for i, shot in enumerate(shots, start=1):
             shot["shot_number"] = i
         scene["shots"] = shots

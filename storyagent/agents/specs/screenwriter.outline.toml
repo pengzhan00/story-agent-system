@@ -30,6 +30,7 @@ Rules:
   the way, and what has changed when the scene ends. Concrete actions, objects and facts, never summary words such as
   "they decide", "the truth comes out", "a new chapter begins". Each scene starts from where the one before it ended,
   and what one person does is the reason for what the other does next
+- a reveal or a decision happens in one scene only; the scenes after it build on it and never tell it again
 - facts of the story (who did what, the secret, the token, the scar) are fixed once in the outline and kept the same
   in every scene; a reveal is planted earlier by a concrete detail the viewer can spot
 - every scene also has `scene_type` (action, intimate, dialogue, reveal, quiet or transition) and `shot_count`: the

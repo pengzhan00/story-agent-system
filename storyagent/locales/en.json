@@ -1273,7 +1273,7 @@
   "agent.var.plan": "Production plan",
   "agent.var.act_title": "Act title",
   "agent.var.shots_per_scene": "Shots per scene",
-  "agent.var.earlier_count": "Shots of an earlier attempt",
+  "agent.var.next_shot": "The shot to write next",
   "agent.var.previous": "Previous shot",
   "agent.var.shot": "Current shot",
   "agent.var.location": "Location",

@@ -4,7 +4,7 @@ temperature = 0.75
 max_tokens = 3500
 schema = "scene_shots"
 inputs = ["language", "title", "act_title", "scene", "characters", "shots_per_scene", "previous", "feedback", "current",
-          "form_guidance", "genre_guidance", "dialogue_chars", "shot_sec", "frame_note", "earlier_count"]
+          "form_guidance", "genre_guidance", "dialogue_chars", "shot_sec", "frame_note", "next_shot"]
 system = """You are a professional screenwriter and storyboard artist. You break one scene into shots with the dialogue
 spoken in each. At most $dialogue_chars characters of spoken text per line, 1-3 lines per shot, none in purely visual
 shots. Write all story content in $language.
@@ -38,8 +38,9 @@ Editor feedback to apply (nothing to apply when it says "(none)"): $feedback
 Current shots of this scene (when there is feedback, keep what already works and change only what the feedback asks
 for; "(none)" means write them fresh): $current
 
-Earlier attempt (nothing to correct when it says "(none)"): it had this many shots, which is too few. Split the
-scene into more separate moves until you reach the number asked: $earlier_count
+Writing one shot at a time (nothing special when it says "(none)"): the shots already written are under "Current
+shots" above. Write only the shot with this number, the next move that follows the last one and repeats none of
+them: $next_shot
 
 Produce exactly $shots_per_scene shots in order. Each shot shows ONE move or ONE beat, so a set piece is written as a
 chain of them: a fight is strike, block, counter, fall, one shot per exchange, each saying who does what to whom and
@@ -48,6 +49,8 @@ the reaction on a face), each with the concrete action of the bodies as the rati
 beat with a summary line in the narration: what happens is shown in `action`. `narration` is used only when it adds
 what the picture cannot, and is never repeated from the scene's line or an earlier shot. `characters_present` lists
 the people seen from the characters above, nobody else; it is empty only for an insert of a place or an object.
+Names are written exactly as listed, never translated or spelled in pinyin. Each field holds only its own content:
+the camera, the screen direction and the lens go in their own fields, never inside `action`, `narration` or the poses.
 Each shot: shot_number, camera_angle (wide / medium / close-up / ...),
 camera_movement, who is in frame, mood, what they do (action) and look like (expression), optional narration, the
 dialogue lines (character, line, emotion), duration_sec ($shot_sec), and sound-effect cues. `character` in dialogue
