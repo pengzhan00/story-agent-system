@@ -83,6 +83,11 @@ th { font-size: 0.8rem; color: var(--muted); font-weight: 600; } tr:last-child t
 /* creative */
 .split { display: grid; grid-template-columns: 280px 1fr; gap: var(--gap); align-items: start; }
 @media (max-width: 800px) { .split { grid-template-columns: 1fr; } }
+/* the list and the detail each scroll on their own, so a long list never pushes the chosen item's content off screen */
+@media (min-width: 801px) {
+  .split > aside, .split > section { position: sticky; top: 8px; max-height: calc(100vh - 16px); overflow-y: auto; min-width: 0; }
+  .split > section { padding-right: 4px; }
+}
 .group { font-size: 0.8rem; color: var(--muted); text-transform: none; margin: 8px 0 4px; }
 .pick { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .pick-item { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 8px; text-align: left; border: 1px solid transparent; background: none; padding: 6px 10px; }
@@ -114,7 +119,9 @@ input[type="number"] { width: 5.5rem; padding: 8px 10px; border: 1px solid var(-
 .line-row input { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); min-width: 0; }
 button.link.bad { color: var(--bad); }
 
-.project-card { display: flex; flex-direction: column; gap: 8px; }
+.project-card { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.project-card .badges { display: flex; flex-wrap: wrap; white-space: normal; margin: 0; }
+.project-card .chip { max-width: 100%; overflow-wrap: anywhere; }
 .poster { position: relative; padding: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #000; cursor: pointer; aspect-ratio: 16 / 9; }
 .poster video { width: 100%; height: 100%; object-fit: cover; pointer-events: none; display: block; }
 .poster .play { position: absolute; inset: 0; margin: auto; width: 48px; height: 48px; border-radius: 50%; background: rgba(0, 0, 0, 0.55); }

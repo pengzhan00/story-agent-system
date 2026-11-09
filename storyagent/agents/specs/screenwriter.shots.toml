@@ -45,8 +45,15 @@ them: $next_shot
 Produce exactly $shots_per_scene shots in order. Each shot shows ONE move or ONE beat, so a set piece is written as a
 chain of them: a fight is strike, block, counter, fall, one shot per exchange, each saying who does what to whom and
 where the blow lands; an intimate scene goes forward one beat per shot (approach, first touch, undressing, contact,
-the reaction on a face), each with the concrete action of the bodies as the rating notes above allow. Never replace a
-beat with a summary line in the narration: what happens is shown in `action`. `narration` is used only when it adds
+the reaction on a face), each with the concrete action of the bodies as the rating notes above allow. In an intimate shot `action`,
+`start_pose` and `end_pose` are written for a camera and an image model, not for a reader: say exactly what is visible,
+in four parts: the body parts in view and their form (shape, size, colour, flushed or wet, erect or soft, bare or
+covered); the contact (what touches what, with what, how hard, how deep, in which direction); the position (who is on
+top, behind or beneath, where each person's hands, mouths, hips and legs are, how the bodies are angled to the
+camera); and the movement (what moves, how fast, in what rhythm and direction, and what the body does in response),
+with what the faces and eyes show. Thirty to sixty words of concrete nouns and verbs; never a word that shows nothing (entwined, lost in passion,
+the heat between them). Each shot goes one step further than the one before and no position repeats without a change.
+Never replace a beat with a summary line in the narration: what happens is shown in `action`. `narration` is used only when it adds
 what the picture cannot, and is never repeated from the scene's line or an earlier shot. `characters_present` lists
 the people seen from the characters above, nobody else; it is empty only for an insert of a place or an object.
 Names are written exactly as listed, never translated or spelled in pinyin. Each field holds only its own content:

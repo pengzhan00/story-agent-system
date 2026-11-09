@@ -147,9 +147,12 @@ def _style(ctx: Ctx) -> dict[str, Any]:
 
 
 def _premise(ctx: Ctx) -> str:
-    text = str(ctx.params.get("premise") or ctx.project.description or "").strip()
+    given = str(ctx.params.get("premise") or "").strip()
+    text = given or str(ctx.project.description or "").strip()
     if not text:
         raise StageError("no_premise", "the project has no description to start from")
+    if given and not str(ctx.project.description or "").strip():      # the story setting belongs to the project
+        ctx.projects.update(ctx.pid, description=given)
     return text
 
 
