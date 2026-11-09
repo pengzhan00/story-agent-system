@@ -49,6 +49,14 @@ def test_a_position_is_not_repeated_a_third_time() -> None:
     assert _lint(_card(position_name=held + " deep thrust"), used=[held, held + " thrusting"])    # same arrangement
 
 
+def test_everyone_the_shot_names_is_in_frame_even_when_the_list_says_one() -> None:
+    names = ["Lin", "Lu"]
+    shot = {"characters_present": ["Lu"], "action": "Lu grips Lin's wrist and drags her down"}
+    assert detail._in_frame(shot, {"characters": names}, names) == ["Lin", "Lu"]
+    assert detail._in_frame({"characters_present": ["Lu"], "action": "he turns"}, {}, names) == ["Lu"]
+    assert detail._in_frame({"action": "a door"}, {"characters": ["Lin"]}, names) == ["Lin"]
+
+
 def test_two_people_may_not_share_one_description() -> None:
     twin = {**_card()["people"][0], "who": "the man"}
     assert any("same `clothing` and `limbs`" in p for p in _lint(_card(people=[_card()["people"][0], twin]), people=2))

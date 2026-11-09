@@ -170,8 +170,12 @@ def prompts_from_detail(card: Mapping[str, Any], style: str = "") -> dict[str, s
 
 # -- the pass ----------------------------------------------------------------------------------------------
 def _in_frame(shot: Mapping[str, Any], scene: Mapping[str, Any], names: Sequence[str]) -> list[str]:
+    """Who is in the shot: the writer's list plus everyone the shot's own words name (a writer who lists one person
+    for 'he grips her wrist' still means two), else the scene's cast."""
     asked = [str(n).strip() for n in shot.get("characters_present") or []]
-    present = [n for n in asked if n in names]
+    text = " ".join(str(shot.get(k) or "") for k in ("action", "start_pose", "end_pose", "expression", "narration"))
+    named = [n for n in names if n in text]
+    present = [n for n in names if n in asked or n in named]
     return present or [n for n in (str(x).strip() for x in scene.get("characters") or []) if n in names]
 
 
@@ -223,8 +227,9 @@ def detail_pass(ctx: Ctx, episode: int, scenes: Sequence[tuple[dict[str, Any], d
     todo = [(act, sc) for act, sc in scenes if str(sc.get("scene_type") or "") in kinds and sc.get("shots")]
     if not todo:
         return {"detailed": 0, "detail_problems": 0}
-    redo = bool(ctx.params.get("redetail"))
-    chars = {c["name"]: c for c in ctx.store.list_characters(ctx.pid)}
+    again = ctx.params.get("redetail")                 # true: every card; "problems": only the cards that had problems
+    redo = bool(again) and again != "problems"
+    chars ={c["name"]: c for c in ctx.store.list_characters(ctx.pid)}
     ctx.step(0, 1, "anchors")
     known = {str(loc["name"]): loc for loc in ctx.store.list_locations(ctx.pid)}
     places: dict[str, Mapping[str, Any]] = {}
@@ -251,7 +256,7 @@ def detail_pass(ctx: Ctx, episode: int, scenes: Sequence[tuple[dict[str, Any], d
             ctx.step(done, total, f"{act['number']}.{scene['number']}.{i}")
             done += 1
             card = shot.get("detail")
-            if not card or redo:
+            if not card or redo or (again == "problems" and card.get("problems")):
                 names = _in_frame(shot, scene, list(chars))
                 card = write_card(ctx, shot, scene, names, chars, str(scene.get("location", "")), previous, ledger,
                                   used, i, len(shots))
