@@ -32,7 +32,13 @@ def anchor_of(state: Any, project_id: int, kind: str, name: str) -> str:
     return str((data or {}).get("text") or "").strip()
 
 
-_NOT_ENGLISH = re.compile(r"[^\x00-\x7f]+")        # a description is English: anything else is left out
+def anchors_of(state: Any, project_id: int, names: Sequence[str]) -> dict[str, str]:
+    """The locked fixed description of each named character that has one."""
+    found = {n: anchor_of(state, project_id, "character", n) for n in names}
+    return {n: text for n, text in found.items() if text}
+
+
+_NOT_ENGLISH =re.compile(r"[^\x00-\x7f]+")        # a description is English: anything else is left out
 
 
 def ensure_anchors(ctx: Ctx, characters: Sequence[Mapping[str, Any]], locations: Sequence[Mapping[str, Any]],
@@ -63,9 +69,10 @@ def fixed_block(state: Any, project_id: int, names: list[str], chars: dict[str, 
     """The locked descriptions of the people in frame and of the place, in the labels the prompts use."""
     from .seed import labelled_identities
 
+    anchors = anchors_of(state, project_id, names)
     parts = [f"{label}, fixed details: {text}"
-             for label, name, _ in labelled_identities(names, chars, keep_missing=True)
-             if (text := anchor_of(state, project_id, "character", name))]
+             for label, name, _ in labelled_identities(names, chars, keep_missing=True, anchors=anchors)
+             if (text := anchors.get(name))]
     place = anchor_of(state, project_id, "location", location)
     if place:
         parts.append(f"The place, fixed details: {place}")
@@ -187,7 +194,8 @@ def write_card(ctx: Ctx, shot: Mapping[str, Any], scene: Mapping[str, Any], name
     from .seed import labelled_identities
 
     cfg = ctx.settings.workflow
-    labelled = labelled_identities(names, chars, keep_missing=True)
+    labelled = labelled_identities(names, chars, keep_missing=True,
+                                   anchors=anchors_of(ctx.state, ctx.pid, names))
     people = [{"label": label, "fixed": anchor_of(ctx.state, ctx.pid, "character", name) or ident}
               for label, name, ident in labelled]
     variables: dict[str, Any] = {

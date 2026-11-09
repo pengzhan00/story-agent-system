@@ -18,11 +18,12 @@ appear with its place and shape): $story
 How detailed bodies must be written for this project: $rating_visual
 
 For a person write 50 to 80 words of things that never change: height and build and the proportions of the body
-(shoulders, bust or chest, waist, hips, legs), their size relative to a standard bed and door, skin tone and how it
-catches light, hair (colour, length, texture), face shape, eye colour and shape, body hair, and every fixed mark (scar,
-brand, tattoo, birthmark) with its exact place, size and shape.
+(shoulders, bust or chest, waist, hips, legs), skin tone and how it catches light, hair (colour, length, texture), face
+shape, eye colour and shape, body hair, and every fixed mark (scar, brand, tattoo, birthmark) with its exact place,
+size and shape. Give the height as a plain number in centimetres (for example 170 cm).
 For a place write 50 to 80 words of things that never change: the layout and where the door, windows and bed stand, the
-real size of the main pieces (a bed in centimetres, ceiling height), materials and colours of walls, floor, bedding and
-furniture, the fixed props, and the direction and colour of the light that is always there.
+real size of the main pieces as plain numbers with units (a bed 180 cm wide and 200 cm long, a ceiling 2.7 m high, a
+window 1.5 m wide), materials and colours of walls, floor, bedding and furniture, the fixed props, and the direction
+and colour of the light that is always there. Never compare a size with "standard" or with another thing.
 Nothing the subject description does not support: when it says nothing about a trait, choose one that fits and state
 it plainly; never leave a trait open."""

@@ -6,6 +6,7 @@ version) when the story changed; one a person edited (``author='user'``) or lock
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from typing import Any
 
 from storyagent.domain import MediaKind
@@ -92,21 +93,23 @@ _MALE = re.compile(r"\b(man|male|boy|gentleman)\b", re.IGNORECASE)
 _ORDINALS = ("first", "second", "third", "fourth")
 
 
-def labelled_identities(names: list[str], chars: dict[str, dict[str, Any]], *,
-                        keep_missing: bool = False) -> list[tuple[str, str, str]]:
+def labelled_identities(names: list[str], chars: dict[str, dict[str, Any]], *, keep_missing: bool = False,
+                        anchors: Mapping[str, str] | None = None) -> list[tuple[str, str, str]]:
     """``(label, name, identity)`` of each person in frame. A person is called by the sex their own description gives
     (never by the order they are listed in: a lone man is 'the man'); two of the same sex are told apart as 'the first
-    woman' / 'the second woman'. A person whose template gives no clean identity is described by their appearance
-    text; with ``keep_missing`` one who has no description at all is still listed (as 'the person')."""
+    woman' / 'the second woman'. The identity is the person's locked fixed description (``anchors``) when there is one,
+    else what the character's English template gives; with ``keep_missing`` a person with neither is still listed (as
+    'the person')."""
     found: list[tuple[str, str, str]] = []
     for name in names:
         c = chars.get(name, {})
-        ident = (_character_identity(c.get("prompt_template", "") or c.get("appearance", ""))
-                 or str(c.get("appearance", "") or "").strip().rstrip(".")[:240])
+        own = _character_identity(c.get("prompt_template", "") or c.get("appearance", ""))
+        ident = (anchors or {}).get(name) or own
         if not ident and not keep_missing:
             continue
         ident = ident or "a person"
-        noun = "woman" if _FEMALE.search(ident) else "man" if _MALE.search(ident) else "person"
+        said = f"{ident} {own}"           # the sex may be told by either of the two descriptions
+        noun = "woman" if _FEMALE.search(said) else "man" if _MALE.search(said) else "person"
         found.append((noun, name, ident[0].lower() + ident[1:]))
     total = {noun: sum(1 for n, _, _ in found if n == noun) for noun, _, _ in found}
     seen: dict[str, int] = {}
@@ -118,9 +121,12 @@ def labelled_identities(names: list[str], chars: dict[str, dict[str, Any]], *,
     return out
 
 
-def _character_identities(shot: dict[str, Any], chars: dict[str, dict[str, Any]]) -> str:
-    """'The woman is ... the man is ...' block for verbatim injection."""
-    return " ".join(f"{label} is {ident}." for label, _, ident in labelled_identities(shot["characters"], chars))
+def _character_identities(shot: dict[str, Any], chars: dict[str, dict[str, Any]],
+                          anchors: Mapping[str, str] | None = None) -> str:
+    """'The woman is ... the man is ...' block for verbatim injection. A person who has a locked fixed description is
+    left out: ``detail.fixed_block`` pastes that one (the same words, never two descriptions of one person)."""
+    return " ".join(f"{label} is {ident}." for label, name, ident
+                    in labelled_identities(shot["characters"], chars, anchors=anchors) if name not in (anchors or {}))
 
 
 def _shot_prompts(ctx: Ctx, shot: dict[str, Any], chars: dict[str, dict[str, Any]], style: dict[str, Any],
@@ -289,7 +295,7 @@ def seed_specs(ctx: Ctx) -> dict[str, Any]:
         if shot["characters"]:
             lead = f"character:{lead}"
             ident = " ".join(x for x in (
-                _character_identities(shot, chars),
+                _character_identities(shot, chars, detail.anchors_of(ctx.state, ctx.pid, shot["characters"])),
                 detail.fixed_block(ctx.state, ctx.pid, shot["characters"], chars, shot["location"])) if x)
             if ident:
                 shown = f"{shown} {ident}"

@@ -60,5 +60,5 @@ Write the card:
 - `end_frame`: the same for the last moment of the shot.
 - `video_motion`: the motion only, as the video model should do it, one paragraph, starting from `start_frame`.
 - `continuity_out`: clothing, marks, sweat and flush at the end of this shot, for the next card.
-- `negative`: what must not appear: wrong limb counts, extra or missing hands and fingers, merged bodies, floating
+- `negative`: a comma-separated list of short phrases (never sentences, never "must not") of what must not appear: wrong limb counts, extra or missing hands and fingers, merged bodies, floating
   limbs, cropped heads, cartoon or doll skin, anything that would make a person look under 18."""

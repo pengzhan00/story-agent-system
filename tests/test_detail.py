@@ -170,3 +170,15 @@ def test_the_fixed_block_uses_the_labels_of_the_prompts() -> None:
     block = detail.fixed_block(State(), 1, ["Lin", "Lu"], chars, "Bedroom")
     assert block == ("the woman, fixed details: broad shoulders, a scar on the left hip. "
                      "The place, fixed details: a 180 cm wide bed under the window.")
+
+
+def test_a_person_with_a_fixed_description_is_not_described_twice() -> None:
+    from storyagent.workflow.seed import _character_identities, labelled_identities
+
+    chars = {"Lin": {"prompt_template": "Cinematic realism, gritty texture"},      # no usable identity of its own
+             "Lu": {"prompt_template": "A man of 32 with a short beard."}}
+    anchors = {"Lin": "A Chinese woman, 28 years old, with a slender build"}
+    labels = labelled_identities(["Lin", "Lu"], chars, keep_missing=True, anchors=anchors)
+    assert [(label, name) for label, name, _ in labels] == [("the woman", "Lin"), ("the man", "Lu")]
+    block = _character_identities({"characters": ["Lin", "Lu"]}, chars, anchors)
+    assert block == "the man is a man of 32 with a short beard."               # Lin is in the fixed block instead
