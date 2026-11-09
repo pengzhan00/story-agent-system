@@ -72,6 +72,13 @@ def test_the_prompts_come_from_the_card_word_for_word() -> None:
     assert "Ends on: the last still" in built["video_prompt"] and built["negative_prompt"] == "extra limbs"
 
 
+def test_a_repeated_framing_word_is_said_once() -> None:
+    card = _card()
+    card["camera"] = {**card["camera"], "size": "medium", "angle": "Medium", "crop": "knees."}
+    head = detail.prompts_from_detail(card)["image_prompt"].split(". ")[0]
+    assert head.startswith("medium, low, 50mm lens, knees") and head.count("medium") == 1
+
+
 def test_reviews_are_merged_with_the_lens_named() -> None:
     one = detail.merge_reviews([("story", {"score": 6, "summary": "ok", "issues": [{"problem": "a"}]})])
     assert one["summary"] == "ok" and one["issues"] == [{"problem": "a", "lens": "story"}]

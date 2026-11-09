@@ -154,8 +154,14 @@ def prompts_from_detail(card: Mapping[str, Any], style: str = "") -> dict[str, s
     card's opening frame with each person's visible state, the clip starts from that still and only moves."""
     cam = card.get("camera") or {}
     lens = f"{cam['lens_mm']:g}mm lens" if cam.get("lens_mm") else ""
-    framing = ", ".join(x for x in (cam.get("size"), cam.get("angle"), cam.get("height"), lens, cam.get("crop"),
-                                    cam.get("focus")) if x)
+    seen: set[str] = set()
+    framing_parts: list[str] = []
+    for x in (cam.get("size"), cam.get("angle"), cam.get("height"), lens, cam.get("crop"), cam.get("focus")):
+        word = str(x or "").strip().rstrip(".")
+        if word and word.lower() not in seen:                      # the model sometimes repeats the size as the angle
+            seen.add(word.lower())
+            framing_parts.append(word)
+    framing = ", ".join(framing_parts)
     people = " ".join(
         f"{p['who']}: " + ", ".join(x for x in (p.get("clothing"), p.get("body_in_view"), p.get("pose"),
                                                 p.get("limbs"), p.get("face"), p.get("skin")) if x) + "."
