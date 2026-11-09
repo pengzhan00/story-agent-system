@@ -203,7 +203,7 @@ export function ReviewPanel({ id }: { id: number }) {
   const shots = board.data ?? [];
   const shot = shots.find((s) => s.shot_id === shotId) ?? shots[0];
   return (
-    <div className="review-layout">
+    <div className={view === "strip" ? "review-layout review-wide" : "review-layout"}>
       <aside className="stack">
         <ErrorNote error={board.error} />
         {board.isLoading ? <p className="muted">{t("web.loading")}</p> : null}
