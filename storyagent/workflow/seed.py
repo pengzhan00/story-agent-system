@@ -280,7 +280,10 @@ def seed_specs(ctx: Ctx) -> dict[str, Any]:
         ctx.step(len(chars) + i, len(chars) + len(shots), f"shot {shot['id']}")
         sid = str(shot["id"])
         have = specs.current(ctx.pid, KEYFRAME, sid)
-        if have is not None and not ctx.force():
+        carded = bool((shot["render_payload"].get("detail") or {}).get("start_frame"))
+        # a shot that has a keyframe spec is left alone, unless a card says what its prompts are now: the card is
+        # deterministic (no model call), so a changed card refreshes the spec (an edited or locked spec is still kept)
+        if have is not None and not ctx.force() and not carded:
             video = specs.current(ctx.pid, VIDEO, sid)
             if video is not None and video.author == "agent":
                 seeder.sync(VIDEO, sid, video.kind,

@@ -179,6 +179,27 @@ def test_a_portrait_is_one_person_on_an_upright_canvas(tmp_path: Path) -> None:
     assert keyframe.image_prompt("a woman", language="zh").startswith("East Asian Chinese people,")
 
 
+def test_a_changed_card_reaches_the_spec_without_force_but_an_edited_spec_is_kept(tmp_path: Path) -> None:
+    import json
+
+    engine, pid = _story(tmp_path, Detailing())
+    for stage in ("scenes", "shotplan", "specs"):
+        engine.run_stage(pid, stage, {})
+    carded = [s for s in engine.store.list_shots(pid) if s["render_payload"].get("detail")]
+    first, second = carded[0], carded[1]
+    for shot, text in ((first, "A brand new opening."), (second, "Another new opening.")):
+        payload = shot["render_payload"]
+        payload["detail"]["image_prompt"] = text
+        with engine.db.transaction() as conn:
+            conn.execute("UPDATE shots SET render_payload=? WHERE id=?", (json.dumps(payload), shot["id"]))
+    engine.spec_store.edit(pid, "shot.keyframe", str(second["id"]), author="user", prompt="my own words")
+    engine.run_stage(pid, "specs", {})                                                        # no force
+    new = engine.spec_store.current(pid, "shot.keyframe", str(first["id"]))
+    kept = engine.spec_store.current(pid, "shot.keyframe", str(second["id"]))
+    assert new is not None and new.version == 2 and new.prompt.startswith("A brand new opening.")
+    assert kept is not None and kept.prompt == "my own words"
+
+
 def test_an_empty_place_is_drawn_without_people(tmp_path: Path) -> None:
     engine, pid = _story(tmp_path, Detailing())
     for stage in ("scenes", "shotplan", "specs"):
