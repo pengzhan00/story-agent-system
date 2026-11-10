@@ -37,9 +37,14 @@ frame for the whole clip, so do not zoom in until the arms leave the frame and d
 face unless the shot asks for it. Never make the subject turn around, change facing or cross a large distance unless
 `image_prompt` already shows it. Keep the exposure readable: name the light sources that let the subject be seen, and
 avoid fog, mist, haze and smoke.
+Say in the first sentence of `image_prompt` how many people are in frame, and never hint at another one (do not
+describe the frame's edge by a limb). Every object a person uses (knife, sword, glass) is held by a named, visible hand;
+when the holder is out of frame, a hand or forearm reaches in from the edge of the frame holding it. Items of the place
+(a sword on the wall) are left out of close shots.
 Do NOT write any character's age, hair, face, skin or ethnicity — they are appended automatically outside this prompt.
-Refer to each person only as 'the woman' / 'the man' (in the order given) plus their action and pose. Describe what each
-character is wearing from THIS shot — the scene may show them partly or fully undressed — and describe every prop with
-the words given.
+Refer to each person only as 'the woman' / 'the man' (in the order given) plus their action and pose. Each
+character wears exactly the `costume` given for them, the same garments in the same colours in every shot of the scene;
+they are undressed only when this shot's own text says they undress or are undressed (never because the scene is
+intimate or the mood is tense), and a person who is dressed stays dressed. Describe every prop with the words given.
 `negative_prompt`: short list of things to avoid; always include missing arm, disappearing limbs, extra limbs,
 deformed hands, floating hand, cropped body, stiff posed portrait."""

@@ -301,6 +301,8 @@ def detail_pass(ctx: Ctx, episode: int, scenes: Sequence[tuple[dict[str, Any], d
         return {"detailed": 0, "detail_problems": 0}
     again = ctx.params.get("redetail")        # true: every card; "problems": cards with problems or no image_prompt
     redo = bool(again) and again != "problems"
+    # `redetail_scenes` = ["3.3", "1.1"] (act.scene): write the cards of just those scenes again, whatever they hold
+    named = {str(x).strip() for x in ctx.params.get("redetail_scenes") or ()}
     chars ={c["name"]: c for c in ctx.store.list_characters(ctx.pid)}
     ctx.step(0, 1, "anchors")
     known = {str(loc["name"]): loc for loc in ctx.store.list_locations(ctx.pid)}
@@ -328,7 +330,9 @@ def detail_pass(ctx: Ctx, episode: int, scenes: Sequence[tuple[dict[str, Any], d
             ctx.step(done, total, f"{act['number']}.{scene['number']}.{i}")
             done += 1
             card = shot.get("detail")
-            if not card or redo or (again == "problems" and (card.get("problems") or not card.get("image_prompt"))):
+            here = f"{act['number']}.{scene['number']}" in named
+            broken = again == "problems" and (card.get("problems") or not card.get("image_prompt"))
+            if not card or redo or here or broken:
                 names = _in_frame(shot, scene, list(chars))
                 card = write_card(ctx, shot, scene, names, chars, str(scene.get("location", "")), previous, ledger,
                                   used, i, len(shots), (episode, int(act["number"]), int(scene["number"])))

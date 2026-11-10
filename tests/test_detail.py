@@ -145,6 +145,10 @@ def test_only_the_set_piece_scenes_get_cards_and_the_anchors_are_written_once(tm
     again = client.calls.count("anchor")
     engine.run_stage(pid, "script", {"visual_prompts": False, "redetail": True})
     assert client.calls.count("detail") == 4 and client.calls.count("anchor") == again
+    engine.run_stage(pid, "script", {"visual_prompts": False, "redetail_scenes": ["9.9"]})    # no such scene
+    assert client.calls.count("detail") == 4
+    engine.run_stage(pid, "script", {"visual_prompts": False, "redetail_scenes": ["1.1"]})    # just that scene
+    assert client.calls.count("detail") == 6
 
 
 def test_a_card_with_problems_is_asked_again_and_then_kept_with_them_listed(tmp_path: Path) -> None:

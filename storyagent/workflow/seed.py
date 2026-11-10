@@ -160,8 +160,8 @@ def _shot_prompts(ctx: Ctx, shot: dict[str, Any], chars: dict[str, dict[str, Any
     lens = f"{staging['lens_mm']}mm lens" if staging.get("lens_mm") else ""
     opening = ", ".join(x for x in (plain, staging.get("start_pose", ""), staging.get("camera_position", ""), lens)
                         if x)
-    motion = ", ".join(x for x in (payload["camera"]["movement"], staging.get("gait", ""),
-                                   f"ends {staging['end_pose']}" if staging.get("end_pose") else "") if x)
+    # no ending pose here either: a clip told where to end cuts or dissolves into it half way
+    motion = ", ".join(x for x in (payload["camera"]["movement"], staging.get("gait", "")) if x)
     fallback = {"image_prompt": opening, "video_prompt": opening + (", " + motion if motion else ""),
                 "negative_prompt": payload["style"]["negative_prompt"]}
     card = payload.get("detail") or {}
