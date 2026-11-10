@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { useContentStatus } from "../api/content";
 import { useT } from "../i18n";
 import { ContentBar } from "./ContentBar";
@@ -10,6 +10,19 @@ export function ContentToggle() {
   const t = useT();
   const status = useContentStatus().data;
   const [open, setOpen] = useState(false);
+  const pop = useRef<HTMLDivElement>(null);
+  // the panel hangs from the button's right edge; when the top bar wrapped the button to the left of the page that
+  // would push it off the screen, so it then hangs from the left edge instead
+  useLayoutEffect(() => {
+    const el = pop.current;
+    if (!open || !el) return;
+    el.style.left = "";
+    el.style.right = "";
+    if (el.getBoundingClientRect().left < 8) {
+      el.style.left = "0";
+      el.style.right = "auto";
+    }
+  }, [open, status?.unlocked]);
   if (!status) return null;
   const until = status.expires_at ? new Date(status.expires_at).toLocaleTimeString() : "";
   return (
@@ -23,7 +36,7 @@ export function ContentToggle() {
         {`${t("web.content.title")} · ${status.unlocked ? (status.expires_at ? t("web.content.unlocked", { time: until }) : t("web.content.unlocked_open")) : t("web.content.locked")}`}
       </button>
       {open ? (
-        <div className="content-pop">
+        <div className="content-pop" ref={pop}>
           <ContentBar />
         </div>
       ) : null}
