@@ -105,7 +105,8 @@ def clean_card(data: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def lint_card(card: Mapping[str, Any], *, people: int, vague: Sequence[str], min_words: int,
-              used: Sequence[str], held: Sequence[str] = (), holders: Sequence[str] = ()) -> list[str]:
+              used: Sequence[str], held: Sequence[str] = (), holders: Sequence[str] = (),
+              sequence: Sequence[str] = (), main_words: int = 0) -> list[str]:
     """What is wrong with a card, as short sentences the writer is asked to fix (empty = good)."""
     problems: list[str] = []
     for key in ("image_prompt", "start_frame", "end_frame", "video_motion", "continuity_out", "light", "setting",
@@ -136,6 +137,12 @@ def lint_card(card: Mapping[str, Any], *, people: int, vague: Sequence[str], min
         owned = [(p.get("clothing"), p.get("limbs")) for p in card.get("people") or []]
         if len(set(owned)) < len(owned):
             problems.append("two people have the same `clothing` and `limbs`: each entry describes only its own person")
+    main = str(motion.get("main") or "")
+    chained = sorted({w for w in sequence if re.search(rf"\b{re.escape(w)}\b", main.lower())})
+    if chained or (main_words and len(main.split()) > main_words):
+        said = f" (it says: {', '.join(chained)})" if chained else ""
+        problems.append(f"`motion.main` is more than one movement{said}: a five-second clip does one thing; keep the "
+                        "single main movement and move the rest to the next shot")
     unheld = _unheld(str(card.get("image_prompt", "")), held, holders)
     if unheld:
         problems.append("nothing is said to hold the " + ", ".join(unheld) + ": an object with no hand on it floats in "
@@ -195,12 +202,15 @@ def prompts_from_detail(card: Mapping[str, Any], style: str = "", per_person: bo
     if paragraph:        # the opening still written as one plain paragraph (what picture sites' prompts look like)
         parts = [paragraph, f"Framing: {framing}." if framing else "", style]
     motion = card.get("motion") or {}
+    # One movement from the opening frame, and no ending pose: a clip told where to end (or given the next picture as
+    # its last frame) cuts or dissolves into it half way. The card's `video_motion` is only the fallback when it has
+    # no `motion.main`: written freely, it tends to string several actions together.
     clip = [f"Starting exactly from the opening frame: {card.get('start_frame', '')}",
-            card.get("video_motion", ""),
+            f"{str(motion['main']).rstrip('.')}." if motion.get("main") else card.get("video_motion", ""),
             f"Rhythm: {motion['rhythm']}." if motion.get("rhythm") else "",
             f"Small motions: {motion['secondary']}." if motion.get("secondary") else "",
             f"Camera: {cam['movement']}." if cam.get("movement") else "",
-            f"Ends on: {card['end_frame']}" if card.get("end_frame") else ""]
+            "Everyone keeps the same clothes and stays in the same place in the room."]
     return {"image_prompt": " ".join(x for x in parts if x), "video_prompt": " ".join(x for x in clip if x),
             "negative_prompt": str(card.get("negative", ""))}
 
@@ -251,7 +261,9 @@ def write_card(ctx: Ctx, shot: Mapping[str, Any], scene: Mapping[str, Any], name
             card["camera"]["size"] = _clean(shot["camera_angle"])
         problems = lint_card(card, people=len(labelled), vague=vague, min_words=min_words, used=used,
                              held=[str(w) for w in cfg.get("detail_held_things") or ()],
-                             holders=[str(w) for w in cfg.get("detail_holder_words") or ()])
+                             holders=[str(w) for w in cfg.get("detail_holder_words") or ()],
+                             sequence=[str(w) for w in cfg.get("detail_sequence_words") or ()],
+                             main_words=int(cfg.get("detail_main_max_words", 0)))
         if not problems:
             break
         variables["problems"] = "; ".join(problems)

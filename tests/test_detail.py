@@ -75,7 +75,10 @@ def test_the_prompts_come_from_the_card_word_for_word() -> None:
     assert "the opening still" in built["image_prompt"] and "left hand on his chest" in built["image_prompt"]
     assert "50mm lens" in built["image_prompt"] and built["image_prompt"].endswith("film grain")
     assert built["video_prompt"].startswith("Starting exactly from the opening frame: the opening still")
-    assert "Ends on: the last still" in built["video_prompt"] and built["negative_prompt"] == "extra limbs"
+    assert "the last still" not in built["video_prompt"] and "Ends on" not in built["video_prompt"]   # no ending pose
+    assert "leans in." in built["video_prompt"]                      # the one main movement ...
+    assert "she leans in" not in built["video_prompt"]                  # ... not the free-written `video_motion`
+    assert built["negative_prompt"] == "extra limbs"
 
 
 def test_the_per_person_paragraph_can_be_left_out_of_the_still() -> None:
@@ -200,6 +203,26 @@ def test_a_changed_card_reaches_the_spec_without_force_but_an_edited_spec_is_kep
     assert kept is not None and kept.prompt == "my own words"
 
 
+def test_a_shot_without_a_card_is_written_again_only_when_its_plan_changed(tmp_path: Path) -> None:
+    import json
+
+    engine, pid = _story(tmp_path, Detailing())
+    plainly = {"visual_prompts": False}                              # the plan's own words, no model in between
+    for stage in ("scenes", "shotplan", "specs"):
+        engine.run_stage(pid, stage, plainly)
+    plain = next(s for s in engine.store.list_shots(pid) if not s["render_payload"].get("detail"))
+    sid = str(plain["id"])
+    engine.run_stage(pid, "specs", plainly)                                       # nothing changed: nothing new
+    assert engine.spec_store.current(pid, "shot.keyframe", sid).version == 1            # type: ignore[union-attr]
+    payload = plain["render_payload"]
+    payload["subject"]["action"] = "she throws the door open and runs"
+    with engine.db.transaction() as conn:
+        conn.execute("UPDATE shots SET render_payload=? WHERE id=?", (json.dumps(payload), plain["id"]))
+    engine.run_stage(pid, "specs", plainly)
+    new = engine.spec_store.current(pid, "shot.keyframe", sid)
+    assert new is not None and new.version == 2 and "throws the door open" in new.prompt
+
+
 def test_an_empty_place_is_drawn_without_people(tmp_path: Path) -> None:
     engine, pid = _story(tmp_path, Detailing())
     for stage in ("scenes", "shotplan", "specs"):
@@ -268,6 +291,19 @@ def test_a_person_with_a_fixed_description_is_not_described_twice() -> None:
 
 HELD = ["knife", "sword"]
 HOLDERS = ["hand", "grips", "holds"]
+
+
+def test_a_clip_does_one_movement() -> None:
+    def lint(main: str) -> list[str]:
+        card = _card()
+        card["motion"] = {**card["motion"], "main": main}
+        return detail.lint_card({**card, "image_prompt": "p"}, people=1, vague=VAGUE, min_words=60, used=[],
+                                sequence=["then", "simultaneously"], main_words=12)
+
+    assert not lint("she swings the knife down in one arc")
+    assert any("more than one movement" in p and "then" in p for p in lint("she swings the knife, then kneels"))
+    assert any("more than one movement" in p for p in lint(" ".join(["move"] * 13)))
+    assert any("simultaneously" in p for p in lint("she swings while he steps back simultaneously"))
 
 
 def _held(paragraph: str) -> list[str]:

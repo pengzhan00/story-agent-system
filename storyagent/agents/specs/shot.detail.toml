@@ -23,6 +23,8 @@ Rules of the card:
   Never copy the other person's clothing or limbs into it. What one person does to the other goes in `contact`.
 - One continuous action per shot, readable in five seconds. A video model cannot do two different things at once, so
   the motion has one main movement and a few small secondary ones.
+  `motion.main` is one short sentence of at most 40 words with a single verb phrase ("she swings the knife down in one
+  arc"); a clip that has to chain actions or reach an ending pose cuts or dissolves half way through.
 - The still (`start_frame`) is a single frozen moment; the motion (`video_motion`) starts from exactly that pose.
 - Continuity: clothing only comes off, never goes back on; marks, sweat and flush only build up unless the story says
   otherwise. Keep what `ledger` says and carry it forward in `continuity_out`.
@@ -77,7 +79,8 @@ Write the card:
   the people's faces, hair, build or skin: those are pasted automatically.
 - `start_frame`: the opening still as one long English paragraph of at least 60 words that a model can draw from alone.
 - `end_frame`: the same for the last moment of the shot.
-- `video_motion`: the motion only, as the video model should do it, one paragraph, starting from `start_frame`.
+- `video_motion`: the motion only, as the video model should do it, one paragraph, starting from `start_frame`: ONE
+  movement, no sequence (no "then", "simultaneously", "ends with"), no ending pose; whatever comes next is the next shot.
 - `continuity_out`: clothing, marks, sweat and flush at the end of this shot, for the next card.
 - `negative`: a comma-separated list of short phrases (never sentences, never "must not") of what must not appear: wrong limb counts, extra or missing hands and fingers, merged bodies, floating
   limbs, cropped heads, cartoon or doll skin, anything that would make a person look under 18."""

@@ -221,6 +221,10 @@ detail_holder_words = ["hand", "grip", "grips", "gripping", "gripped", "hold", "
 # shot (`end_shot_id`). Off by default: shots are separate camera set-ups, and a clip forced to reach another picture
 # dissolves into it half way (ghosting, changed clothes).
 video_chain_end = false
+# A clip does one movement: `motion.main` naming a sequence (one of these words) or running past this many words is sent back.
+detail_sequence_words = ["then", "simultaneously", "afterwards", "after that", "finally", "next", "before", "while also",
+                         "ends", "ending"]
+detail_main_max_words = 40
 video_min_per_episode = 2
 video_budget_hours = 0
 # The produce stage turns every spec into media. Quality tier for the first pass (draft | preview | final).

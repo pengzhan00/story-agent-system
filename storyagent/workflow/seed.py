@@ -5,6 +5,8 @@ version) when the story changed; one a person edited (``author='user'``) or lock
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from collections.abc import Mapping
 from typing import Any
@@ -127,6 +129,15 @@ def _character_identities(shot: dict[str, Any], chars: dict[str, dict[str, Any]]
     left out: ``detail.fixed_block`` pastes that one (the same words, never two descriptions of one person)."""
     return " ".join(f"{label} is {ident}." for label, name, ident
                     in labelled_identities(shot["characters"], chars, anchors=anchors) if name not in (anchors or {}))
+
+
+def _source_hash(shot: dict[str, Any]) -> str:
+    """A fingerprint of what a shot's prompts are made of (its plan, who is in it, where), to see that it changed."""
+    payload = shot["render_payload"]
+    keys = ("subject", "scene", "camera", "story", "staging", "continuity", "style")
+    body = {"payload": {k: payload.get(k) for k in keys}, "characters": shot["characters"],
+            "location": shot["location"]}
+    return hashlib.sha256(json.dumps(body, sort_keys=True, ensure_ascii=False, default=str).encode()).hexdigest()[:16]
 
 
 def _shot_prompts(ctx: Ctx, shot: dict[str, Any], chars: dict[str, dict[str, Any]], style: dict[str, Any],
@@ -282,8 +293,15 @@ def seed_specs(ctx: Ctx) -> dict[str, Any]:
         have = specs.current(ctx.pid, KEYFRAME, sid)
         carded = bool((shot["render_payload"].get("detail") or {}).get("start_frame"))
         # a shot that has a keyframe spec is left alone, unless a card says what its prompts are now: the card is
-        # deterministic (no model call), so a changed card refreshes the spec (an edited or locked spec is still kept)
-        if have is not None and not ctx.force() and not carded:
+        # deterministic (no model call), so a changed card refreshes the spec (an edited or locked spec is still kept).
+        # A shot without a card is written again only when what its prompts are made of has changed since they were
+        # written (a re-planned shot keeps its id, so it would otherwise keep its old prompt for good).
+        source = _source_hash(shot)
+        seen = ctx.state.get_data(ctx.pid, f"shot_source:{sid}")
+        changed = have is not None and isinstance(seen, dict) and seen.get("hash") != source
+        if have is not None and not ctx.force() and not carded and not changed:
+            if seen is None:
+                ctx.state.put_data(ctx.pid, f"shot_source:{sid}", {"hash": source})
             video = specs.current(ctx.pid, VIDEO, sid)
             if video is not None and video.author == "agent":
                 seeder.sync(VIDEO, sid, video.kind,
@@ -323,6 +341,7 @@ def seed_specs(ctx: Ctx) -> dict[str, Any]:
                           seed=keyframe.fixed_seed(ctx.pid, lead))
         seeder.sync(VIDEO, sid, MediaKind.VIDEO_GENERATE, prompt=keyframe.clean(video_shown),
                     negative_prompt=shot_neg, depends_on=seeder.dep(key), params=video_params(shot["render_payload"]))
+        ctx.state.put_data(ctx.pid, f"shot_source:{sid}", {"hash": source})
         sync_dialogue(shot)
         sync_sfx(shot)
         previous = shot["narration"]

@@ -111,9 +111,10 @@ def test_produce_makes_every_spec_in_dependency_order_and_is_resumable(tmp_path:
     assert jobs[key.id].finished_at <= jobs[vid.id].created_at          # the video waited for its keyframe
     frame = next(a for a in ledger.list_assets(project_id=1, spec_id=key.id))
     video_refs = fake.seen[jobs[vid.id].id][0]["refs"]
-    # the first frame (role=image) starts the clip; the shot's tail joins the next shot's keyframe (end_image)
+    # the first frame (role=image) starts the clip and nothing ends it: a clip is not tied to the next shot's keyframe
+    # (that is `video_chain_end`, or a shot's own `end_shot_id`)
     assert video_refs[0] == {"role": "image", "path": str(tmp_path / "home" / frame.path)}
-    assert any(r.get("role") == "end_image" for r in video_refs)
+    assert not any(r.get("role") == "end_image" for r in video_refs)
     # progress: monotonic item counts, labelled with i18n keys
     counts = [d for _, d, _, _ in seen]
     assert counts == sorted(counts) and seen[-1][1] == seen[-1][2]
