@@ -6,6 +6,11 @@
 realism = "anatomically correct bodies with clearly separated, correctly placed body parts, men with a flat muscular chest, natural matte skin with visible pores and fine texture, soft diffused key light, well exposed with bright readable midtones, open spacious room with depth and a visible background"
 same_faces = "the people keep exactly the faces, hair and skin tone of the reference portraits"
 
+# An empty place: no word about bodies or skin (a model draws the people it is told about), and people are the negative.
+[scene]
+realism = "soft diffused key light, well exposed with bright readable midtones, natural true-to-life colour, open spacious room with depth and a visible background, an empty room with nobody in it"
+negative = "people, person, man, woman, nude, human figure, crowd, silhouette, statue, mannequin"
+
 # Handed to the prompt-writing agent as `tool_notes` (what the tool can and cannot do). `edit`: the keyframe is composed
 # from the character portraits and the scene image (an image-edit model); `direct`: the picture model draws it from words.
 [guides]

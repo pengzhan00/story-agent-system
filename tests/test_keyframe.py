@@ -52,7 +52,8 @@ def test_a_fixed_seed_is_stable_per_project_and_key() -> None:
 
 
 def test_anatomy_is_stated_in_the_prompt_and_the_negative() -> None:
-    assert "flat muscular chest" in keyframe.scene_prompt("a room") and "gynecomastia" in keyframe.negative_prompt("")
+    assert "flat muscular chest" in keyframe.image_prompt("a man") and "gynecomastia" in keyframe.negative_prompt("")
+    assert "flat muscular chest" not in keyframe.scene_prompt("a room")       # an empty place has no bodies to describe
 
 
 def test_skin_that_glistens_is_rewritten_but_other_liquids_are_left_alone() -> None:

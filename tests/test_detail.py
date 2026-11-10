@@ -179,6 +179,15 @@ def test_a_portrait_is_one_person_on_an_upright_canvas(tmp_path: Path) -> None:
     assert keyframe.image_prompt("a woman", language="zh").startswith("East Asian Chinese people,")
 
 
+def test_an_empty_place_is_drawn_without_people(tmp_path: Path) -> None:
+    engine, pid = _story(tmp_path, Detailing())
+    for stage in ("scenes", "shotplan", "specs"):
+        engine.run_stage(pid, stage, {})
+    place = next(sp for sp in engine.spec_store.list_current(pid) if sp.subject_type == "scene.keyframe")
+    assert "men with" not in place.prompt and "nobody in it" in place.prompt
+    assert "nude" in place.negative_prompt and "crowd" in place.negative_prompt
+
+
 def test_the_shot_list_names_the_kind_of_scene_each_shot_is_in(tmp_path: Path) -> None:
     engine, pid = _story(tmp_path, Detailing())
     for stage in ("scenes", "shotplan"):

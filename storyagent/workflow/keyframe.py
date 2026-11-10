@@ -54,7 +54,7 @@ def image_prompt(prompt: str, *, language: str = "", with_portraits: bool = Fals
 
 def scene_prompt(prompt: str) -> str:
     """A prompt for an empty place: cleaned, and kept bright and open."""
-    return ", ".join(p for p in (clean(prompt).strip().rstrip(".,; "), _data()["realism"]) if p)
+    return ", ".join(p for p in (clean(prompt).strip().rstrip(".,; "), _data()["scene"]["realism"]) if p)
 
 
 def negative_prompt(negative: str, *, language: str = "") -> str:
@@ -85,3 +85,8 @@ def portrait_negative(negative: str) -> str:
     """The negative prompt of a character portrait: the usual one plus the words against sheets and copies."""
     extra = str(_data()["portrait"]["negative"])
     return ", ".join(x for x in (negative, extra) if x)
+
+
+def scene_negative(negative: str) -> str:
+    """The negative prompt of an empty place: the usual one plus the people it must not get."""
+    return ", ".join(x for x in (negative, str(_data()["scene"]["negative"])) if x)

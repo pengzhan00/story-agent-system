@@ -228,7 +228,8 @@ def seed_specs(ctx: Ctx) -> dict[str, Any]:
     for loc in store.list_locations(ctx.pid):
         extra = ctx.state.get_data(ctx.pid, f"location_extra:{loc['name']}", {}) or {}
         locations[loc["name"]] = seeder.sync(
-            LOCATION, str(loc["id"]), MediaKind.IMAGE_GENERATE, negative_prompt=neg, refs=list(loc["ref_images"]),
+            LOCATION, str(loc["id"]), MediaKind.IMAGE_GENERATE, negative_prompt=keyframe.scene_negative(neg),
+            refs=list(loc["ref_images"]),
             prompt=keyframe.scene_prompt(extra.get("image_prompt") or loc["prompt_template"] or loc["description"]),
             seed=keyframe.fixed_seed(ctx.pid, f"location:{loc['name']}"))
 
@@ -312,6 +313,8 @@ def seed_specs(ctx: Ctx) -> dict[str, Any]:
             shown = keyframe.scene_prompt(shown)
         shot_neg = (keyframe.negative_prompt(prompts["negative_prompt"], language=lang)
                     if prompts["negative_prompt"] else neg)
+        if not shot["characters"]:
+            shot_neg = keyframe.scene_negative(shot_neg)
         key = seeder.sync(KEYFRAME, sid, MediaKind.IMAGE_GENERATE, prompt=shown,
                           negative_prompt=shot_neg, refs=refs, depends_on=deps,
                           seed=keyframe.fixed_seed(ctx.pid, lead))
