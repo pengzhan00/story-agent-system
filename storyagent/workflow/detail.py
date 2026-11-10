@@ -105,7 +105,7 @@ def clean_card(data: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def lint_card(card: Mapping[str, Any], *, people: int, vague: Sequence[str], min_words: int,
-              used: Sequence[str]) -> list[str]:
+              used: Sequence[str], held: Sequence[str] = (), holders: Sequence[str] = ()) -> list[str]:
     """What is wrong with a card, as short sentences the writer is asked to fix (empty = good)."""
     problems: list[str] = []
     for key in ("image_prompt", "start_frame", "end_frame", "video_motion", "continuity_out", "light", "setting",
@@ -136,11 +136,30 @@ def lint_card(card: Mapping[str, Any], *, people: int, vague: Sequence[str], min
         owned = [(p.get("clothing"), p.get("limbs")) for p in card.get("people") or []]
         if len(set(owned)) < len(owned):
             problems.append("two people have the same `clothing` and `limbs`: each entry describes only its own person")
+    unheld = _unheld(str(card.get("image_prompt", "")), held, holders)
+    if unheld:
+        problems.append("nothing is said to hold the " + ", ".join(unheld) + ": an object with no hand on it floats in "
+                        "the picture; say whose hand holds it, and if the holder is out of frame say that a hand or "
+                        "arm reaches in from the edge of the frame holding it")
     position = _position_key(str(card.get("position_name", "")))
     if position and len(used) >= 2 and all(_position_key(u) == position for u in used[-2:]):
         problems.append(f"the position '{card.get('position_name')}' was already used in the last two shots; "
                         "change the arrangement of the bodies")
     return problems
+
+
+def _unheld(paragraph: str, held: Sequence[str], holders: Sequence[str]) -> list[str]:
+    """The things from ``held`` (knife, sword, ...) named in a sentence of the paragraph that has no word from
+    ``holders`` (hand, grips, holds, ...): a picture model draws it floating or invents a person to hold it."""
+    found: list[str] = []
+    for sentence in re.split(r"(?<=[.!?])\s+", paragraph.lower()):
+        words = set(re.findall(r"[a-z']+", sentence))
+        if any(h in words or h + "s" in words for h in holders):
+            continue
+        for thing in held:
+            if thing in words and thing not in found:
+                found.append(thing)
+    return found
 
 
 def _position_key(name: str) -> str:
@@ -199,7 +218,7 @@ def _in_frame(shot: Mapping[str, Any], scene: Mapping[str, Any], names: Sequence
 
 def write_card(ctx: Ctx, shot: Mapping[str, Any], scene: Mapping[str, Any], names: list[str],
                chars: dict[str, dict[str, Any]], place: str, previous: Mapping[str, Any] | None, ledger: str,
-               used: list[str], number: int, total: int) -> dict[str, Any]:
+               used: list[str], number: int, total: int, where: tuple[int, int, int] | None = None) -> dict[str, Any]:
     """One shot's card: asked of the model, checked, asked again with the problems named (at most
     ``detail_attempts`` more times); a card that still has problems is kept with them listed."""
     from .seed import labelled_identities
@@ -218,7 +237,8 @@ def write_card(ctx: Ctx, shot: Mapping[str, Any], scene: Mapping[str, Any], name
         "style": _style_text(ctx) or "(none)",
         "previous": json.dumps({k: previous.get(k) for k in ("summary", "position_name", "end_frame")}
                                if previous else "(start of the scene)", ensure_ascii=False),
-        "ledger": ledger or "(nothing yet: everyone starts as the scene's first shot describes)",
+        "wardrobe": json.dumps(_wardrobe(ctx, labelled, chars, where), ensure_ascii=False) if where else "(none)",
+        "ledger": ledger or "(nothing yet: everyone starts in the wardrobe above)",
         "used_positions": json.dumps(used, ensure_ascii=False) if used else "(none)",
         "position": f"{number} of {total}", "problems": "(none)"}
     vague = [str(w) for w in cfg.get("detail_vague") or ()]
@@ -229,13 +249,32 @@ def write_card(ctx: Ctx, shot: Mapping[str, Any], scene: Mapping[str, Any], name
         card = clean_card(ctx.run_agent("shot.detail", variables))
         if shot.get("camera_angle"):                  # the framing was decided with the cuts in mind (framing.py)
             card["camera"]["size"] = _clean(shot["camera_angle"])
-        problems = lint_card(card, people=len(labelled), vague=vague, min_words=min_words, used=used)
+        problems = lint_card(card, people=len(labelled), vague=vague, min_words=min_words, used=used,
+                             held=[str(w) for w in cfg.get("detail_held_things") or ()],
+                             holders=[str(w) for w in cfg.get("detail_holder_words") or ()])
         if not problems:
             break
         variables["problems"] = "; ".join(problems)
     if problems:
         card["problems"] = problems
     return card
+
+
+def _wardrobe(ctx: Ctx, labelled: Sequence[tuple[str, str, str]], chars: Mapping[str, Mapping[str, Any]],
+              where: tuple[int, int, int]) -> dict[str, str]:
+    """What each person in frame wears at this point of the story (the look in force), by the card's label: the card
+    starts from it and names the same garments in the same colours in every shot until the story takes them off."""
+    from .continuity import look_for
+
+    out: dict[str, str] = {}
+    for label, name, _ in labelled:
+        char = chars.get(name)
+        if not char:
+            continue
+        look = look_for(ctx.store.list_looks(ctx.pid, char["id"]), char["id"], *where)
+        if look and str(look["costume"]).strip():
+            out[label] = str(look["costume"]).strip()
+    return out
 
 
 def detail_pass(ctx: Ctx, episode: int, scenes: Sequence[tuple[dict[str, Any], dict[str, Any]]]) -> dict[str, Any]:
@@ -280,7 +319,7 @@ def detail_pass(ctx: Ctx, episode: int, scenes: Sequence[tuple[dict[str, Any], d
             if not card or redo or (again == "problems" and (card.get("problems") or not card.get("image_prompt"))):
                 names = _in_frame(shot, scene, list(chars))
                 card = write_card(ctx, shot, scene, names, chars, str(scene.get("location", "")), previous, ledger,
-                                  used, i, len(shots))
+                                  used, i, len(shots), (episode, int(act["number"]), int(scene["number"])))
                 shot["detail"] = card
                 made += 1
                 flagged += 1 if card.get("problems") else 0

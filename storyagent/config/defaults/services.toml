@@ -212,6 +212,11 @@ detail_image_people = true
 detail_vague = ["entwined", "lost in passion", "make love", "made love", "making love", "reach climax", "reached climax",
                 "the heat between", "passion takes over", "caught up in the moment", "intimacy", "缠绵", "情欲交融",
                 "沉溺", "水乳交融", "渐入佳境", "翻云覆雨", "春宵"]
+# Things a person must be holding when a picture shows them (a sentence naming one without a holder word is sent back:
+# the picture model draws it floating) and the words that say someone holds something.
+detail_held_things = ["knife", "sword", "dagger", "blade", "gun", "pistol", "axe", "bottle", "cup", "phone", "rope", "whip"]
+detail_holder_words = ["hand", "grip", "grips", "gripping", "gripped", "hold", "holds", "holding", "held", "clutch", "clutches",
+                       "clutching", "wield", "wields", "wielding", "grasp", "grasps", "grasping", "fingers", "fist", "arm"]
 video_min_per_episode = 2
 video_budget_hours = 0
 # The produce stage turns every spec into media. Quality tier for the first pass (draft | preview | final).

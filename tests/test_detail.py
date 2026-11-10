@@ -264,3 +264,38 @@ def test_a_person_with_a_fixed_description_is_not_described_twice() -> None:
     assert [(label, name) for label, name, _ in labels] == [("the woman", "Lin"), ("the man", "Lu")]
     block = _character_identities({"characters": ["Lin", "Lu"]}, chars, anchors)
     assert block == "the man is a man of 32 with a short beard."               # Lin is in the fixed block instead
+
+
+HELD = ["knife", "sword"]
+HOLDERS = ["hand", "grips", "holds"]
+
+
+def _held(paragraph: str) -> list[str]:
+    return detail.lint_card({**_card(), "image_prompt": paragraph}, people=1, vague=VAGUE, min_words=60, used=[],
+                            held=HELD, holders=HOLDERS)
+
+
+def test_a_knife_with_no_hand_on_it_is_sent_back() -> None:
+    problems = _held("A shirtless man sits with his eyes closed. A knife blade is pressed against his throat.")
+    assert any("hold the knife" in p and "reaches in from the edge" in p for p in problems)
+    assert not _held("A shirtless man sits. A woman's hand, cut off by the frame edge, holds a knife to his throat.")
+    assert not _held("A man sits. The woman grips a knife against his throat.")
+    assert any("sword" in p for p in _held("A man sits. A sword leans on the wall behind him."))
+
+
+def test_the_wardrobe_in_force_goes_to_the_card_writer() -> None:
+    chars = {"Lin": {"id": 7}}
+
+    class Store:
+        def list_looks(self, pid: int, cid: int) -> list[dict[str, Any]]:
+            return [{"id": 1, "character_id": 7, "from_episode": 1, "from_act": 1, "from_scene": 1,
+                     "costume": " a cream blouse "},
+                    {"id": 2, "character_id": 7, "from_episode": 1, "from_act": 2, "from_scene": 1,
+                     "costume": "a black suit"}]
+
+    class Ctx:
+        pid, store = 11, Store()
+
+    labelled = [("the woman", "Lin", "x"), ("the man", "Lu", "y")]
+    assert detail._wardrobe(Ctx(), labelled, chars, (1, 1, 3)) == {"the woman": "a cream blouse"}  # type: ignore[arg-type]
+    assert detail._wardrobe(Ctx(), labelled, chars, (1, 2, 1)) == {"the woman": "a black suit"}    # type: ignore[arg-type]

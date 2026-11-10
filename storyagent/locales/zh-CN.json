@@ -1339,6 +1339,7 @@
   "agent.var.people": "画面中的人物及其固定外观",
   "agent.var.setting": "场景及其固定外观",
   "agent.var.ledger": "到此为止的衣着与痕迹",
+  "agent.var.wardrobe": "本场开始时每个人的服装",
   "agent.var.used_positions": "本场已用过的体位",
   "agent.var.position": "本镜头在场景中的序号",
   "agent.var.problems": "上一张卡片的问题",

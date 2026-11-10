@@ -1339,6 +1339,7 @@
   "agent.var.people": "People in frame and their fixed looks",
   "agent.var.setting": "The place and its fixed look",
   "agent.var.ledger": "Clothing and marks so far",
+  "agent.var.wardrobe": "What each person wears at the start of the scene",
   "agent.var.used_positions": "Positions already used in the scene",
   "agent.var.position": "Number of this shot in the scene",
   "agent.var.problems": "Problems found in the last card",
