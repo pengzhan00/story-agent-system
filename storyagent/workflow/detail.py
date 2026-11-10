@@ -19,7 +19,7 @@ from typing import Any
 from .stages import Ctx
 
 CARD_TEXT = ("summary", "position_name", "contact", "light", "setting", "sound", "start_frame", "end_frame",
-             "video_motion", "continuity_out", "negative")
+             "image_prompt", "video_motion", "continuity_out", "negative")
 PERSON_TEXT = ("who", "clothing", "body_in_view", "pose", "limbs", "face", "skin")
 SHOT_KEYS = ("action", "start_pose", "end_pose", "expression", "camera_angle", "camera_movement", "narration",
              "dialogue", "mood", "duration_sec", "sfx_cues")
@@ -172,6 +172,9 @@ def prompts_from_detail(card: Mapping[str, Any], style: str = "", per_person: bo
              f"Contact: {card['contact']}." if card.get("contact") else "",
              f"Setting: {card['setting']}." if card.get("setting") else "",
              f"Light: {card['light']}." if card.get("light") else "", style]
+    paragraph = str(card.get("image_prompt") or "").strip()
+    if paragraph:        # the opening still written as one plain paragraph (what picture sites' prompts look like)
+        parts = [paragraph, f"Framing: {framing}." if framing else "", style]
     motion = card.get("motion") or {}
     clip = [f"Starting exactly from the opening frame: {card.get('start_frame', '')}",
             card.get("video_motion", ""),

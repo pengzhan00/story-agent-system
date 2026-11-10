@@ -80,6 +80,15 @@ def test_the_per_person_paragraph_can_be_left_out_of_the_still() -> None:
     assert short["video_prompt"] == detail.prompts_from_detail(card)["video_prompt"]
 
 
+def test_a_plain_paragraph_replaces_the_pieced_together_still() -> None:
+    card = _card(image_prompt="A man and a woman are having sex in missionary position on a low bed.")
+    built = detail.prompts_from_detail(card, "film grain")["image_prompt"]
+    assert built.startswith("A man and a woman are having sex in missionary position")
+    assert "Framing: " in built and "50mm lens" in built and built.endswith("film grain")
+    assert "Contact:" not in built and "the woman: torn shirt" not in built
+    assert "Contact:" in detail.prompts_from_detail(_card())["image_prompt"]      # no paragraph: as before
+
+
 def test_a_repeated_framing_word_is_said_once() -> None:
     card = _card()
     card["camera"] = {**card["camera"], "size": "medium", "angle": "Medium", "crop": "knees."}

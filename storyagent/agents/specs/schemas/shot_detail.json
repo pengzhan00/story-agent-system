@@ -46,6 +46,7 @@
   "light": {"type": "string"},
   "setting": {"type": "string"},
   "sound": {"type": "string"},
+  "image_prompt": {"type": "string"},
   "start_frame": {"type": "string"},
   "end_frame": {"type": "string"},
   "video_motion": {"type": "string"},

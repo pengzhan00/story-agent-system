@@ -511,7 +511,7 @@ def script(ctx: Ctx) -> dict[str, Any]:
             continue
         in_scene = _scene_shot_count(scene, shots_n, int(ctx.params.get("shot_count_factor") or MAX_SHOT_FACTOR))
         shots: list[dict[str, Any]] = []
-        asked = bool(scene.get("shot_count")) and not revising      # only a number the outline asked for is chased
+        asked = bool(scene.get("shot_count"))      # only a number the outline asked for is chased, revising or not
 
         write = partial(_write_shots, ctx, outline, act, scene, chars, previous or "(start)",
                         following or "(this is the last scene)", feedback if revising else "(none)", asked)

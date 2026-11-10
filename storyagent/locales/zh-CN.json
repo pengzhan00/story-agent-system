@@ -2144,6 +2144,8 @@
   "pipeline.landscape_drama_krea2.note": "16:9 横屏写实;模型栈和竖屏版相同(Krea2 Lustify + LoRA 出图,LTX-2.5 出视频,所有镜头都出视频)。两个人并排放进宽画面更容易画对,LTX 也更适合横屏。已有图片的项目不能在竖屏和横屏之间切换。",
   "pipeline.landscape_drama_zimage": "写实横屏短剧 / 连续剧(Z-Image · ComfyUI,受限)",
   "pipeline.landscape_drama_zimage.note": "16:9 横屏写实;图像用 ComfyUI 里的 Z-Image Turbo(不带 LoRA),视频用 LTX-2.5,所有镜头都出视频。Z-Image 没有身份编辑模型,关键帧只靠文字提示出图,人物脸由固定的角色描述保持。",
+  "pipeline.landscape_drama_lustify": "写实横屏短剧 / 连续剧(Lustify · ComfyUI,受限)",
+  "pipeline.landscape_drama_lustify.note": "16:9 横屏写实;图像用 ComfyUI 里的 Lustify(Krea2 V10 Turbo),视频用 LTX-2.5,所有镜头都出视频。关键帧只靠文字提示出图(不走身份编辑),人物脸由固定的角色描述保持。",
   "pipeline.vertical_drama_krea2": "写实竖屏短剧 / 连续剧(Krea2 Lustify · ComfyUI,受限)",
   "pipeline.vertical_drama_krea2.note": "9:16 竖屏写实;图像全部走 ComfyUI 的 Krea2 Lustify + LoRA(不需要 Draw Things),视频用 LTX-2.5(Phosphene),所有镜头都出视频,不用静图推拉。关键帧用 Krea2 Identity Edit 合成:场景图在前、角色立绘(半身以上)在后,每次只放一个人,脸和比例由参考图保持。方案本身不带分级:要不要按受限处理,由你在新建项目时手动选。",
   "pipeline.landscape_drama": "横屏短剧 / 网剧",

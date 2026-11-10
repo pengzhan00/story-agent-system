@@ -56,6 +56,13 @@ Write the card:
   frame cuts off), `focus`.
 - `light` (direction, colour, softness, skin sheen), `setting` (what of the place shows, the state of bed and bedding,
   one scale cue such as the bed edge against a body), `sound` (breath, voice, skin, fabric, bed, plus dialogue).
+- `image_prompt`: the opening still written the way prompts on picture-sharing sites are: ONE plain English paragraph of
+  60 to 110 words, no lists and no technical terms. First sentence: who is doing what, with the position named in
+  everyday words ("A naked man and a naked woman are having sex in doggystyle position on a low bed."). Second sentence:
+  the contact in one plain declarative sentence ("The man's penis is inserted into the woman's vagina from behind."), as
+  the project's explicitness allows. Then one short sentence for each of: where each hand is, the faces and sounds, the
+  place, the light, and the viewpoint ("The image is a wide side view."). Each body part is named once. Do not describe
+  the people's faces, hair, build or skin: those are pasted automatically.
 - `start_frame`: the opening still as one long English paragraph of at least 60 words that a model can draw from alone.
 - `end_frame`: the same for the last moment of the shot.
 - `video_motion`: the motion only, as the video model should do it, one paragraph, starting from `start_frame`.
