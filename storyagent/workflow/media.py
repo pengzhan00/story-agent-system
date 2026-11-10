@@ -180,9 +180,11 @@ def default_voice_of(settings: Settings, project_settings: dict[str, Any] | None
 
 
 def _end_frame(story: StoryStore, specs: SpecStore, ledger: Ledger, project_id: int, shot_id: int,
-               first: AssetRecord) -> AssetRecord | None:
+               first: AssetRecord, chain: bool = False) -> AssetRecord | None:
     """What keyframe this clip ends on. The shot's ``end_shot_id``: ``0`` = cut free (first frame only),
-    ``>0`` = that shot's keyframe, ``None``/absent = automatic (the next shot in story order)."""
+    ``>0`` = that shot's keyframe, ``None``/absent = the next shot in story order when ``chain`` (``[workflow]
+    video_chain_end``), else cut free. Each shot is its own camera set-up, so ending a clip on the next shot's still
+    makes the video model dissolve into another picture half way through (and change the clothes)."""
     shots = story.list_shots(project_id)
     mine = next((s for s in shots if s["id"] == shot_id), None)
     if mine is None:
@@ -192,6 +194,8 @@ def _end_frame(story: StoryStore, specs: SpecStore, ledger: Ledger, project_id: 
         return None
     if mode and mode > 0:
         target = mode
+    elif not chain:
+        return None
     else:
         order = [s["id"] for s in shots]
         idx = order.index(shot_id) if shot_id in order else -1
@@ -284,7 +288,8 @@ def _plan_phase(
             if frame is None:
                 skipped.append({"subject": spec.subject_type, "id": spec.subject_id, "reason": "no_keyframe"})
                 continue
-            end = _end_frame(ctx.store, store, ledger, ctx.pid, int(spec.subject_id), frame)
+            end = _end_frame(ctx.store, store, ledger, ctx.pid, int(spec.subject_id), frame,
+                             chain=bool(ctx.settings.workflow.get("video_chain_end", False)))
             model = (ctx.settings.model(spec.model_ref) if spec.model_ref
                      else ctx.settings.default_model(spec.kind.value))
             if model.provider == "h3":

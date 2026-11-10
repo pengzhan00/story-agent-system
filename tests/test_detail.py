@@ -299,3 +299,31 @@ def test_the_wardrobe_in_force_goes_to_the_card_writer() -> None:
     labelled = [("the woman", "Lin", "x"), ("the man", "Lu", "y")]
     assert detail._wardrobe(Ctx(), labelled, chars, (1, 1, 3)) == {"the woman": "a cream blouse"}  # type: ignore[arg-type]
     assert detail._wardrobe(Ctx(), labelled, chars, (1, 2, 1)) == {"the woman": "a black suit"}    # type: ignore[arg-type]
+
+
+def test_a_clip_ends_on_the_next_shots_still_only_when_asked_to() -> None:
+    from types import SimpleNamespace
+
+    from storyagent.workflow import media
+
+    class Story:
+        def list_shots(self, pid: int) -> list[dict[str, Any]]:
+            return [{"id": 1, "end_shot_id": None}, {"id": 2, "end_shot_id": 0}, {"id": 3, "end_shot_id": 1}]
+
+    class Specs:
+        def current(self, pid: int, kind: str, subject: str) -> str:
+            return f"key{subject}"
+
+    real = media.current_asset
+    media.current_asset = lambda ledger, key: SimpleNamespace(id=f"asset-{key}")      # type: ignore[assignment]
+    try:
+        first = SimpleNamespace(id="first")
+
+        def end(shot: int, chain: bool = False) -> Any:
+            return media._end_frame(Story(), Specs(), None, 1, shot, first, chain)    # type: ignore[arg-type]
+
+        assert end(1) is None and end(1, True).id == "asset-key2"       # automatic: only with the switch on
+        assert end(2, True) is None                                       # 0 = cut free, always
+        assert end(3).id == "asset-key1"                                  # a shot that names its end shot keeps it
+    finally:
+        media.current_asset = real                                        # type: ignore[assignment]
