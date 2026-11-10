@@ -167,6 +167,18 @@ def test_the_keyframe_prompt_is_the_card_plus_the_fixed_descriptions(tmp_path: P
     assert video is not None and video.prompt.startswith("Starting exactly")
 
 
+def test_a_portrait_is_one_person_on_an_upright_canvas(tmp_path: Path) -> None:
+    engine, pid = _story(tmp_path, Detailing())
+    for stage in ("scenes", "shotplan", "specs"):
+        engine.run_stage(pid, stage, {})
+    portrait = next(sp for sp in engine.spec_store.list_current(pid) if sp.subject_type == "character.portrait")
+    assert (portrait.params["width"], portrait.params["height"]) == (832, 1216)
+    assert "collage" in portrait.negative_prompt and "character sheet" in portrait.negative_prompt
+    from storyagent.workflow import keyframe
+    assert keyframe.image_prompt("a woman", language="zh", one=True).startswith("East Asian Chinese person,")
+    assert keyframe.image_prompt("a woman", language="zh").startswith("East Asian Chinese people,")
+
+
 def test_the_shot_list_names_the_kind_of_scene_each_shot_is_in(tmp_path: Path) -> None:
     engine, pid = _story(tmp_path, Detailing())
     for stage in ("scenes", "shotplan"):

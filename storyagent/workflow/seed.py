@@ -205,12 +205,17 @@ def seed_specs(ctx: Ctx) -> dict[str, Any]:
         ctx.step(i, total, c["name"])
         extra = ctx.state.get_data(ctx.pid, f"character_extra:{c['name']}", {}) or {}
         prompt = keyframe.image_prompt(extra.get("image_prompt") or c["prompt_template"] or c["appearance"],
-                                       language=lang)
+                                       language=lang, one=True)
+        # one person on an upright canvas: a landscape frame makes the model draw the same person several times
         params: dict[str, Any] = {}
+        size = ctx.settings.workflow.get("portrait_size")
+        if size and len(size) == 2:
+            params.update({"width": int(size[0]), "height": int(size[1])})
         if c["lora_ref"]:
             params["loras"] = [{"path": c["lora_ref"], "scale": 0.8}]
         portraits[c["name"]] = seeder.sync(PORTRAIT, str(c["id"]), MediaKind.IMAGE_GENERATE, prompt=prompt,
-                                           negative_prompt=neg, refs=list(c["ref_images"]), params=params,
+                                           negative_prompt=keyframe.portrait_negative(neg),
+                                           refs=list(c["ref_images"]), params=params,
                                            seed=keyframe.fixed_seed(ctx.pid, f"character:{c['name']}"))
         sample = str(extra.get("voice_sample_text") or ctx.settings.workflow.get("voice_sample_text") or "")
         # ^ the character designer writes a neutral sample; the config value is only the fallback

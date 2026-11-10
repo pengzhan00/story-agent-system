@@ -37,11 +37,12 @@ def clean(text: str) -> str:
     return text
 
 
-def image_prompt(prompt: str, *, language: str = "", with_portraits: bool = False) -> str:
-    """A prompt for a picture with people in it: cleaned, then who they are and how it should look."""
+def image_prompt(prompt: str, *, language: str = "", with_portraits: bool = False, one: bool = False) -> str:
+    """A prompt for a picture with people in it: cleaned, then who they are and how it should look (``one``: the
+    picture shows a single person, a portrait)."""
     data = _data()
     body = clean(prompt).strip().rstrip(".,; ")
-    who = _for_language(data["identity"], language)
+    who = _for_language(data["identity_one" if one else "identity"], language)
     # The ethnicity goes first: models latched onto Western faces read the leading words strongest, so a trailing
     # "East Asian Chinese people" is too weak to hold the face (seen first in the Lustify checkpoint).
     parts = ([who] if who else []) + [body]
@@ -78,3 +79,9 @@ def fixed_seed(project_id: int, key: str) -> int:
     which keeps the face close from one shot to the next (a help, not a guarantee, without reference images)."""
     digest = hashlib.sha256(f"{project_id}:{key}".encode()).digest()
     return int.from_bytes(digest[:4], "big") % 2_000_000_000
+
+
+def portrait_negative(negative: str) -> str:
+    """The negative prompt of a character portrait: the usual one plus the words against sheets and copies."""
+    extra = str(_data()["portrait"]["negative"])
+    return ", ".join(x for x in (negative, extra) if x)

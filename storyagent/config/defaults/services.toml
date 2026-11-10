@@ -198,6 +198,8 @@ voice_sample_text = "你好，很高兴认识你。"
 # here is turned into a complete card by the prompter role (its model is routed in llm.toml), and the keyframe and
 # video prompts are built from that card. The fixed look of each person and place is written once and pasted word for
 # word into every shot. A card with problems is asked again `detail_attempts` more times.
+# Character portraits are one person on an upright canvas of this size (width, height), whatever the project frame is.
+portrait_size = [832, 1216]
 detail = true
 detail_scene_types = ["intimate", "action"]
 detail_attempts = 2
