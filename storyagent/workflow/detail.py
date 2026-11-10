@@ -108,8 +108,8 @@ def lint_card(card: Mapping[str, Any], *, people: int, vague: Sequence[str], min
               used: Sequence[str]) -> list[str]:
     """What is wrong with a card, as short sentences the writer is asked to fix (empty = good)."""
     problems: list[str] = []
-    for key in ("start_frame", "end_frame", "video_motion", "continuity_out", "light", "setting", "negative",
-                "position_name"):
+    for key in ("image_prompt", "start_frame", "end_frame", "video_motion", "continuity_out", "light", "setting",
+                "negative", "position_name"):
         if not card.get(key):
             problems.append(f"`{key}` is empty")
     if people and len(card.get("people") or []) != people:
@@ -248,7 +248,7 @@ def detail_pass(ctx: Ctx, episode: int, scenes: Sequence[tuple[dict[str, Any], d
     todo = [(act, sc) for act, sc in scenes if str(sc.get("scene_type") or "") in kinds and sc.get("shots")]
     if not todo:
         return {"detailed": 0, "detail_problems": 0}
-    again = ctx.params.get("redetail")                 # true: every card; "problems": only the cards that had problems
+    again = ctx.params.get("redetail")        # true: every card; "problems": cards with problems or no image_prompt
     redo = bool(again) and again != "problems"
     chars ={c["name"]: c for c in ctx.store.list_characters(ctx.pid)}
     ctx.step(0, 1, "anchors")
@@ -277,7 +277,7 @@ def detail_pass(ctx: Ctx, episode: int, scenes: Sequence[tuple[dict[str, Any], d
             ctx.step(done, total, f"{act['number']}.{scene['number']}.{i}")
             done += 1
             card = shot.get("detail")
-            if not card or redo or (again == "problems" and card.get("problems")):
+            if not card or redo or (again == "problems" and (card.get("problems") or not card.get("image_prompt"))):
                 names = _in_frame(shot, scene, list(chars))
                 card = write_card(ctx, shot, scene, names, chars, str(scene.get("location", "")), previous, ledger,
                                   used, i, len(shots))

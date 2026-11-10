@@ -26,11 +26,17 @@ def _card(**changes: Any) -> dict[str, Any]:
 
 
 def _lint(card: dict[str, Any], used: list[str] | None = None, people: int = 1) -> list[str]:
+    card = {"image_prompt": "a plain paragraph", **card}
     return detail.lint_card(card, people=people, vague=VAGUE, min_words=60, used=used or [])
 
 
 def test_a_complete_card_has_no_problems() -> None:
     assert _lint(_card()) == []
+
+
+def test_a_card_without_the_plain_paragraph_is_asked_again() -> None:
+    assert any("`image_prompt` is empty" in p for p in detail.lint_card(
+        _card(), people=1, vague=VAGUE, min_words=60, used=[]))
 
 
 def test_what_is_missing_or_vague_is_named() -> None:
@@ -155,8 +161,8 @@ def test_the_keyframe_prompt_is_the_card_plus_the_fixed_descriptions(tmp_path: P
         engine.run_stage(pid, stage, {})
     shot = next(s for s in engine.store.list_shots(pid) if s["render_payload"].get("detail"))
     spec = engine.spec_store.current(pid, "shot.keyframe", str(shot["id"]))
-    assert spec is not None and "word word word" in spec.prompt
-    assert "left hand on his chest" in spec.prompt and "extra limbs" in spec.negative_prompt
+    assert spec is not None and spec.prompt.startswith("A man and a woman sit on a wide bed, kissing.")
+    assert "Framing: " in spec.prompt and "extra limbs" in spec.negative_prompt
     video = engine.spec_store.current(pid, "shot.video", str(shot["id"]))
     assert video is not None and video.prompt.startswith("Starting exactly")
 

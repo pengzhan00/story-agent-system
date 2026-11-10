@@ -9,7 +9,8 @@ Phases (each waits for the one before, because a video starts from its keyframe)
     2  shot keyframes
     3  shot videos (first frame = the keyframe)
 Params: ``tier``, ``skip`` (subject types not to make), ``only`` (spec ids: make just these - the confirmed
-production plan, see ``workflow/plan.py``), ``force``.
+production plan, see ``workflow/plan.py``), ``shots`` (shot ids: make just what hangs on
+these shots), ``force``.
 A shot keyframe is composed from what the earlier phase made: the portraits of the characters in the shot and the
 scene keyframe go in as reference images of an image-edit job (``[workflow] keyframe_from_references``), so the faces
 and the place stay the ones that were approved instead of being re-imagined from words.
@@ -202,6 +203,18 @@ def _end_frame(story: StoryStore, specs: SpecStore, ledger: Ledger, project_id: 
     return end if end is not None and end.id != first.id else None
 
 
+def _only(ctx: Ctx, specs: list[SpecRecord]) -> set[str]:
+    """The spec ids a run is limited to (empty: everything): ``only`` as given, plus every spec that hangs on a shot
+    named in ``shots`` (a list of shot ids)."""
+    only = {str(x) for x in ctx.params.get("only", [])}
+    chosen = {str(x) for x in ctx.params.get("shots", [])}
+    if chosen:
+        only |= {s.id for s in specs if s.subject_type in SHOT_SUBJECTS and s.subject_id.partition("#")[0] in chosen}
+        if not only:
+            raise StageError("needs_stage", "none of the chosen shots has a spec", stage="specs")
+    return only
+
+
 def _plan_phase(
     ctx: Ctx, ledger: Ledger, specs: list[SpecRecord], types: tuple[str, ...], skipped: list[dict[str, Any]],
     tier: QualityTier, counts: dict[str, int],
@@ -211,7 +224,7 @@ def _plan_phase(
     default_voice = default_voice_of(ctx.settings, ctx.project.settings)
     picks = video_picks(ctx.settings, ctx.store, ledger, ctx.pid, ctx.project.settings, tier)
     skip = {str(x) for x in ctx.params.get("skip", [])}      # e.g. ["shot.video"]: stills only
-    only = {str(x) for x in ctx.params.get("only", [])}      # the confirmed plan: just these specs
+    only = _only(ctx, specs)                                 # the confirmed plan / the chosen shots
     live_shots = {str(sh["id"]) for sh in ctx.store.list_shots(ctx.pid)}
     for spec in specs:
         if spec.subject_type not in types or spec.subject_type in skip or (only and spec.id not in only):
@@ -467,7 +480,7 @@ def video_picks(
 def _expected_seconds(ctx: Ctx, ledger: Ledger, specs: list[SpecRecord], tier: QualityTier) -> float:
     total = 0.0
     skip = {str(x) for x in ctx.params.get("skip", [])}
-    only = {str(x) for x in ctx.params.get("only", [])}
+    only = _only(ctx, specs)
     modes = scene_modes(ctx.store, ctx.pid)
     picks = video_picks(ctx.settings, ctx.store, ledger, ctx.pid, ctx.project.settings, tier)
     for spec in specs:
@@ -509,7 +522,7 @@ def produce(ctx: Ctx) -> dict[str, Any]:
     made = failed = 0
     counts = {"reused": 0}
     failures: list[dict[str, Any]] = []
-    only = {str(x) for x in ctx.params.get("only", [])}
+    only = _only(ctx, specs)
     total_planned = sum(1 for s in specs if any(s.subject_type in p for p in PHASES) and (not only or s.id in only))
     ctx.hint_weight(_expected_seconds(ctx, ledger, specs, tier))
     ctx.step(0, max(total_planned, 1), "")

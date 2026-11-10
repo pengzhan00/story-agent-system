@@ -307,6 +307,19 @@ def test_produce_skips_specs_of_a_shot_a_replan_removed(tmp_path: Path) -> None:
     assert all(s["id"].partition("#")[0] == str(gone) for s in skipped)
 
 
+def test_produce_can_make_just_the_chosen_shots(tmp_path: Path) -> None:
+    fake = FakeAdapter()
+    engine, worker, _ = story(tmp_path, [fake])
+    picked = engine.store.list_shots(1)[0]["id"]
+    with serving(worker):
+        out = engine.run_stage(1, "produce", {"shots": [picked], "skip": ["dialogue.line"]})
+    made = [a for a in engine.spec_store.ledger.list_assets(project_id=1, current_only=True, limit=200)
+            if a.shot_id is not None]
+    assert out["failed"] == 0 and made and {a.shot_id for a in made} == {picked}
+    with pytest.raises(StageError):
+        engine.run_stage(1, "produce", {"shots": [99999]})
+
+
 def test_the_plan_lists_what_would_be_made_and_only_the_confirmed_part_runs(tmp_path: Path) -> None:
     from storyagent.domain import QualityTier
     from storyagent.workflow.plan import produce_plan, totals

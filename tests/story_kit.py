@@ -143,6 +143,7 @@ class StoryClient:
                 "camera": {"size": "medium", "angle": "eye level", "height": "bed height", "lens_mm": 50,
                            "movement": "slow push", "crop": "above the knees", "focus": "faces"},
                 "light": "warm lamp from the left", "setting": "a wide bed with rumpled sheets", "sound": "breath",
+                "image_prompt": "A man and a woman sit on a wide bed, kissing.",
                 "start_frame": " ".join(["word"] * self.card_words), "end_frame": "she lies down",
                 "video_motion": "she leans in", "continuity_out": "shirt torn, sweat", "negative": "extra limbs"}
 
