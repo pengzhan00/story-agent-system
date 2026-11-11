@@ -35,6 +35,7 @@ from . import compliance
 from .assetrefs import RefError, Resolver
 from .broker import CaffeinateGuard, select_next, system_available_gib
 from .contracts import (
+    Adapter,
     AdapterError,
     ArtifactSpec,
     JobContext,
@@ -327,6 +328,15 @@ class Worker:
                 self._keep_tool_log(job.id, work_dir)
             shutil.rmtree(work_dir, ignore_errors=True)
 
+    @staticmethod
+    def _stop_previous(adapter: Adapter, ext: str, job: JobRecord, ctx: JobContext) -> None:
+        """Stop what an earlier attempt of this job left running (a lease lost over a sleep): a second heavy child
+        next to the first would fight it for memory. Adapters only act on their own processes or requests."""
+        try:
+            adapter.cancel(ext, job, ctx)
+        except Exception:                                  # best effort: the new attempt must still go on
+            log.warning("could not stop the earlier attempt %s of job %s", ext, job.id, exc_info=True)
+
     def _keep_tool_log(self, job_id: str, work_dir: Path) -> None:
         """The scratch directory is always removed; a failed job's tool log is the one thing worth keeping."""
         src = work_dir / "tool.log"
@@ -422,6 +432,7 @@ class Worker:
                 raise AdapterError(ErrorCode.WORKER_LOST, "reconciliation_required")
             if ext:
                 log_event("resubmitting", "warning", previous=ext)
+                self._stop_previous(adapter, ext, job, ctx)
             if graph_owned:
                 log_event("submission_started")
             ext = adapter.submit(job, ctx)
@@ -434,6 +445,7 @@ class Worker:
         t0, failures = time.monotonic(), 0
         while True:
             if lost.is_set():
+                self._stop_previous(adapter, ext, job, ctx)    # the job goes to another attempt: no lingering child
                 return
             if self._stop.is_set():
                 led.release(job.id, self.owner)
@@ -459,6 +471,7 @@ class Worker:
             owned, cancel_req = led.heartbeat(job.id, self.owner, self._lease, prog.fraction, prog.message)
             if not owned:
                 lost.set()
+                self._stop_previous(adapter, ext, job, ctx)
                 return
             if cancel_req:
                 cancel_flag.set()

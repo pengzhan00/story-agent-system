@@ -215,7 +215,9 @@ def test_dead_worker_job_is_resubmitted_when_reattach_is_impossible(fsettings: S
     w, _, adapter = make(fsettings, fdb, FakeAdapter(reattachable=False), ledger=led)
     assert w.drain(10)
     assert led.get_job(jid).status is JobStatus.COMPLETED
-    assert [c[0] for c in adapter.calls].count("submit") == 1
+    kinds = [c[0] for c in adapter.calls]
+    assert kinds.count("submit") == 1
+    assert kinds.index("cancel") < kinds.index("submit")   # the earlier attempt is stopped before the new one starts
     assert "resubmitting" in [e["event"] for e in led.events(jid)]
     assert len(led.list_assets(project_id=1)) == 1  # exactly one result, no duplicates
     w.shutdown()
@@ -225,7 +227,7 @@ def test_lost_lease_makes_the_old_worker_stand_down(fsettings: Settings, fdb: Da
     """If another worker took the job over, the original must not write anything."""
     clock = Clock()
     led = Ledger(fdb, fsettings, clock=clock)
-    w, _, _ = make(fsettings, fdb, ledger=led)
+    w, _, adapter = make(fsettings, fdb, ledger=led)
     rec = submit(led, fake_hang=True)
     w.tick()
     deadline = time.monotonic() + 5
@@ -236,6 +238,7 @@ def test_lost_lease_makes_the_old_worker_stand_down(fsettings: Settings, fdb: Da
     job = led.get_job(rec.id)
     assert job.status is JobStatus.RUNNING and job.lease_owner == "thief"
     assert led.list_assets(project_id=1) == []
+    assert "cancel" in [c[0] for c in adapter.calls]       # and the tool it started is stopped, not left running
     w.shutdown()
 
 

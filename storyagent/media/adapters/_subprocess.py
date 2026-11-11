@@ -3,8 +3,9 @@
 A subclass says *what to run* (``command``) and *what came out* (``collect``); this class owns the process:
 start it in its own session with output going to a log file, report progress, cancel it, and turn a bad exit
 into an ``AdapterError`` carrying the tail of the log. Processes are children of the worker, so they are not
-re-attachable: after a worker crash the job is simply re-submitted (and the abandoned child finishes harmlessly
-into a scratch directory that is removed).
+re-attachable: after a worker crash the job is simply re-submitted. When the same worker lost the lease (a sleep
+stalled its heartbeat) the worker calls ``cancel`` on the earlier attempt first, so two heavy children never
+run side by side; after a real worker crash the child dies with its session or is left to the operator.
 """
 from __future__ import annotations
 
