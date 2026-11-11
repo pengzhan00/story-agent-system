@@ -405,7 +405,7 @@ def _cmd_media_prioritize(s: Settings, a: argparse.Namespace) -> int:
 
 
 def _cmd_media_adopt(s: Settings, a: argparse.Namespace) -> int:
-    print(t("cli.asset.adopted", id=_ctx(s).ledger.adopt(a.id).id))
+    print(t("cli.asset.adopted", id=_ctx(s).ledger.adopt(a.id, select=True, actor="cli").id))
     return 0
 
 

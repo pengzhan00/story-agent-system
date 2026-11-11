@@ -615,8 +615,13 @@ class Ledger:
         ).fetchall()
         return [AssetRecord.from_row(r) for r in rows]
 
-    def adopt(self, asset_id: str) -> AssetRecord:
-        """Make a candidate the current asset of its slot (the previous current becomes a candidate)."""
+    def adopt(self, asset_id: str, *, select: bool = False, actor: str = "local") -> AssetRecord:
+        """Make a candidate the current asset of its slot (the previous current becomes a candidate).
+
+        A shot's picture/clip is what the shot's *selection* says (``asset_selections``), and that is what the
+        compose stage reads. An existing selection always follows the adoption. With ``select`` (a person pressing
+        "use this", ``media adopt``) a shot that has no selection yet gets one, so a take made outside the spec flow
+        (a hand-submitted job, another slot) becomes usable too; without it nothing new is created."""
         with self.db.transaction() as conn:
             a = self.get_asset(asset_id)
             if a.trashed_at:
@@ -629,6 +634,12 @@ class Ledger:
             conn.execute("UPDATE media_assets SET is_current=1 WHERE id=?", (asset_id,))
             if a.shot_id is not None:
                 selection_slot = "shot.keyframe" if a.kind.startswith("image.") else "shot.video"
+                if select:
+                    conn.execute(
+                        "INSERT INTO asset_selections VALUES ('shot',?,?,?,1,?,?) "
+                        "ON CONFLICT(owner_type,owner_id,slot) DO UPDATE SET asset_id=excluded.asset_id,"
+                        "revision=asset_selections.revision+1,actor=excluded.actor,updated_at=excluded.updated_at",
+                        (str(a.shot_id), selection_slot, asset_id, actor, self._now()))
                 conn.execute(
                     "UPDATE asset_selections SET asset_id=?,revision=revision+1,updated_at=? "
                     "WHERE owner_type='shot' AND owner_id=? AND slot=? AND asset_id!=?",

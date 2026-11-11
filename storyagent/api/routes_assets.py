@@ -123,9 +123,10 @@ def rate_one_asset(asset_id: str, body: AssetRating, request: Request) -> AssetO
 def adopt_asset(asset_id: str, request: Request) -> AssetOut:
     """Make this candidate the current asset of its slot (and resolve the review notes that asked for this redo)."""
     ctx = ctx_of(request)
-    asset = ctx.ledger.adopt(asset_id)
     user = request.scope.get("state", {}).get("user")
-    ctx.review.adopted(asset, str(user.username) if user else "local")
+    who = str(user.username) if user else "local"
+    asset = ctx.ledger.adopt(asset_id, select=True, actor=who)
+    ctx.review.adopted(asset, who)
     return AssetOut.model_validate(asset)
 
 

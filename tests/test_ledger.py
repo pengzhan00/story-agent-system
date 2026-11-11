@@ -170,6 +170,27 @@ def test_candidates_versioning_and_adoption(led: Ledger) -> None:
         led.adopt(chosen.id)
 
 
+def test_adopt_with_select_makes_a_take_the_shots_selection(led: Ledger) -> None:
+    """The compose stage reads the shot's selection: a take made outside the spec flow only becomes usable once
+    "use this" (select=True) creates it; a plain adopt never invents one, and a later pick bumps the revision."""
+    sel = ("SELECT asset_id, revision, actor FROM asset_selections "
+           "WHERE owner_type='shot' AND owner_id='1' AND slot='shot.video'")
+    first, _ = led.enqueue(job(seed=1))
+    led.claim(first.id, "w", 10)
+    a1 = led.complete(first.id, "w", [asset(path="p/1.mp4")])[0]
+    second, _ = led.enqueue(job(seed=2))
+    led.claim(second.id, "w", 10)
+    a2 = led.complete(second.id, "w", [asset(path="p/2.mp4")])[0]
+    led.adopt(a1.id)
+    assert led.db.conn.execute(sel).fetchone() is None            # plain adopt: nothing is created
+    led.adopt(a1.id, select=True, actor="ann")
+    assert tuple(led.db.conn.execute(sel).fetchone()) == (a1.id, 1, "ann")
+    led.adopt(a2.id, select=True, actor="bob")
+    assert tuple(led.db.conn.execute(sel).fetchone()) == (a2.id, 2, "bob")
+    led.adopt(a1.id)                                              # an existing selection still follows a plain adopt
+    assert led.db.conn.execute(sel).fetchone()[0] == a1.id
+
+
 def test_auto_adopt_off_keeps_existing_current(tmp_path, clock) -> None:  # noqa: ANN001
     from storyagent.config import load_settings
     from storyagent.db import migrate
