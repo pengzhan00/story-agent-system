@@ -25,6 +25,10 @@ Rules of the card:
   the motion has one main movement and a few small secondary ones.
   `motion.main` is one short sentence of at most 40 words with a single verb phrase ("she swings the knife down in one
   arc"); a clip that has to chain actions or reach an ending pose cuts or dissolves half way through.
+- When the movement IS the shot (a fight, sex, running, a fall), say how big and how fast it is: the whole body or hip
+  travels a clear distance (a hand's width or more), the stroke is long and the pace steady and quick, and the rest
+  of the body follows it. Words like "slightly", "gently" or "subtly" make a video model barely move: use them only
+  for quiet shots (a look, a breath, a held pose), where small is right.
 - The still (`start_frame`) is a single frozen moment; the motion (`video_motion`) starts from exactly that pose.
 - Continuity: clothing only comes off, never goes back on; marks, sweat and flush only build up unless the story says
   otherwise. Keep what `ledger` says and carry it forward in `continuity_out`.

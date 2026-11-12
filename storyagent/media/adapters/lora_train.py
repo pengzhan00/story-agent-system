@@ -80,8 +80,12 @@ class LoraTrainAdapter(SubprocessAdapter):
     # -- config -------------------------------------------------------------------------------
     @staticmethod
     def _tool(ctx: JobContext) -> tuple[Path | None, Path | None]:
+        """The trainer command and the base model folder: a model entry may name its own ``base_model_dir``
+        (each base model lives in its own folder); otherwise the tool's default applies."""
         s = ctx.settings
-        return s.tool_path("lora_train", "command"), s.tool_path("lora_train", "base_model_dir")
+        own = s.models[ctx.job.model_ref].extra.get("base_model_dir")
+        base = Path(str(own)).expanduser() if own else s.tool_path("lora_train", "base_model_dir")
+        return s.tool_path("lora_train", "command"), base
 
     @staticmethod
     def _images(job: JobRecord, ctx: JobContext) -> list[Path]:

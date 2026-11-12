@@ -624,6 +624,74 @@ module_path = "transformer_blocks.{block}.attn.to_v"
 blocks = { start = 0, end = 5 }
 rank = 16
 
+# Krea 2 Raw LoRA (QLoRA over a q8 base, attention + MLP on all 28 blocks), as in mflux's Krea 2 README. The adapter
+# trained here loads on Krea 2 Turbo, which is how Krea recommends using it. `base_model_dir` is the diffusers-format
+# `krea/Krea-2-Raw` folder; the tool default (flux2 klein) does not apply to this entry.
+# Licence: krea-2-community-license (hub tag "other"); the terms are not read here, so commercial use is NOT assumed.
+[models."krea2-raw-lora-trainer"]
+kind = "train.lora"
+provider = "lora_train"
+version = "mflux-train"
+family = "krea2"
+heavy = true
+est_memory_gib = 64   # estimate, to be measured on the first real run
+license_tag = "krea-2-community-license"
+commercial_ok = false
+timeout_sec = 86400
+base_model_dir = "~/models/Krea-2-Raw"
+[models."krea2-raw-lora-trainer".params]
+epochs = 16
+learning_rate = 0.0002
+max_resolution = 512
+seed = 42
+save_frequency = 96
+min_images = 8
+rank = 16
+blocks = 28
+[models."krea2-raw-lora-trainer".train_template]
+model = "krea-2-raw"
+seed = 42
+steps = 20
+guidance = 0.0
+quantize = 8
+max_resolution = 512
+[models."krea2-raw-lora-trainer".train_template.training_loop]
+num_epochs = 16
+batch_size = 1
+[models."krea2-raw-lora-trainer".train_template.optimizer]
+name = "AdamW"
+learning_rate = 0.0002
+[models."krea2-raw-lora-trainer".train_template.checkpoint]
+save_frequency = 96
+[[models."krea2-raw-lora-trainer".train_template.lora_layers.targets]]
+module_path = "blocks.{block}.attn.wq"
+blocks = { start = 0, end = 28 }
+rank = 16
+[[models."krea2-raw-lora-trainer".train_template.lora_layers.targets]]
+module_path = "blocks.{block}.attn.wk"
+blocks = { start = 0, end = 28 }
+rank = 16
+[[models."krea2-raw-lora-trainer".train_template.lora_layers.targets]]
+module_path = "blocks.{block}.attn.wv"
+blocks = { start = 0, end = 28 }
+rank = 16
+[[models."krea2-raw-lora-trainer".train_template.lora_layers.targets]]
+module_path = "blocks.{block}.attn.wo"
+blocks = { start = 0, end = 28 }
+rank = 16
+[[models."krea2-raw-lora-trainer".train_template.lora_layers.targets]]
+module_path = "blocks.{block}.mlp.gate"
+blocks = { start = 0, end = 28 }
+rank = 16
+[[models."krea2-raw-lora-trainer".train_template.lora_layers.targets]]
+module_path = "blocks.{block}.mlp.up"
+blocks = { start = 0, end = 28 }
+rank = 16
+[[models."krea2-raw-lora-trainer".train_template.lora_layers.targets]]
+module_path = "blocks.{block}.mlp.down"
+blocks = { start = 0, end = 28 }
+rank = 16
+
 # Internal CPU/I/O nodes used by the persisted a2v subflow, not creative defaults.
 [models."control-anchor"]
 kind = "image.generate"

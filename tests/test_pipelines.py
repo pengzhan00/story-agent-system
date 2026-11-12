@@ -247,3 +247,21 @@ def test_a_model_states_its_own_time_per_job_until_the_ledger_has_history(tmp_pa
     assert fallback_seconds(s, "flux2-klein-4b-edit-comfy", "image.edit") == 60.0
     assert fallback_seconds(s, "flux2-klein-base-4b-edit", "image.edit") == 600.0
     assert fallback_seconds(s, "no-such-model", "image.edit") == 600.0        # unknown model: the kind's figure
+
+
+def test_a_clip_with_its_own_sound_is_made_by_the_projects_video_av_model(settings: Settings, db: Database) -> None:
+    """The pipeline panel's pick for video.av (e.g. H3) is what the sound clips use, not a built-in LTX constant;
+    a plan without a pick keeps LTX."""
+    from storyagent.pipelines import settings_for
+    from storyagent.workflow.media import allowed_models, shot_with_sound, sound_video_model
+
+    plan = settings_for(settings, "vertical_drama")
+    picked = settings_for(settings, "vertical_drama", {"video.av": "minimax-h3"})
+    assert sound_video_model(plan) == "ltx-2.5-av" and sound_video_model(picked) == "minimax-h3"
+    projects, ledger = ProjectStore(db, settings), Ledger(db, settings)
+    specs = SpecStore(db, settings, ledger)
+    p = projects.create("A")
+    spec = specs.create(p.id, "shot.video", "1", MediaKind.VIDEO_GENERATE, prompt="x")
+    assert "minimax-h3" in allowed_models(picked, spec) and "minimax-h3" not in allowed_models(plan, spec)
+    job = shot_with_sound(specs, spec, specs.build_job(spec), sound_video_model(picked))
+    assert job.kind is MediaKind.VIDEO_AV and job.model_ref == "minimax-h3"

@@ -98,7 +98,7 @@ def allowed_models(settings: Settings, spec: SpecRecord) -> set[str]:
     except ConfigError:
         pass
     if spec.subject_type == "shot.video" and not spec.model_ref:
-        allowed.add(SOUND_VIDEO_MODEL)      # a clip that carries its own sound (project option video_with_sound)
+        allowed.add(sound_video_model(settings))   # a clip that carries its own sound (project option video_with_sound)
         if spec.params.get("mode") == "a2v":
             allowed.add(settings.default_model(MediaKind.VIDEO_LIPSYNC.value).ref)
     return allowed
@@ -137,7 +137,7 @@ def up_to_date(ledger: Ledger, spec: SpecRecord, settings: Settings | None = Non
         if spec.subject_type == "shot.video" and video_with_sound is not None:
             try:
                 wanted = settings.default_model(MediaKind.VIDEO_LIPSYNC.value).ref if spec.params.get("mode") == "a2v" \
-                    else SOUND_VIDEO_MODEL if video_with_sound else (
+                    else sound_video_model(settings) if video_with_sound else (
                     spec.model_ref or settings.default_model(spec.kind.value).ref)
             except ConfigError:
                 wanted = ""
@@ -292,6 +292,8 @@ def _plan_phase(
                              chain=bool(ctx.settings.workflow.get("video_chain_end", False)))
             model = (ctx.settings.model(spec.model_ref) if spec.model_ref
                      else ctx.settings.default_model(spec.kind.value))
+            if ctx.project.settings.get("video_with_sound") and mode != "a2v":
+                model = ctx.settings.model(sound_video_model(ledger.settings_for(spec.project_id)))
             if model.provider == "h3":
                 # h3 reads the first ref image as the first frame and inputs.last_frame as the end frame.
                 extra["refs"] = [f"asset:{frame.id}"]
@@ -310,24 +312,34 @@ def _plan_phase(
             frame = current_asset(ledger, key) if key else None
             job = prepare_video(ctx.settings, job, shot["render_payload"], frame, ctx.project.settings)
             if job.kind is not MediaKind.VIDEO_LIPSYNC and ctx.project.settings.get("video_with_sound"):
-                job = shot_with_sound(store, spec, job)
+                job = shot_with_sound(store, spec, job, sound_video_model(ledger.settings_for(spec.project_id)))
         if spec.subject_type == "shot.keyframe":
             job = keyframe_from_references(ctx, ledger, spec, job)
         out.append((spec, job))
     return out
 
 
-SOUND_VIDEO_MODEL = "ltx-2.5-av"
+SOUND_VIDEO_MODEL = "ltx-2.5-av"      # only the fallback: the project's plan (or its own pick) names the model
 
 
-def shot_with_sound(store: SpecStore, spec: SpecRecord, job: MediaJob) -> MediaJob:
-    """The clip carries its own sound: LTX-2.5-av speaks the shot's lines, so the separate TTS pass is not needed."""
+def sound_video_model(settings: Settings) -> str:
+    """The model that makes a clip carrying its own sound: the project's ``video.av`` model (its plan, or what the
+    pipeline panel picked - e.g. H3), else the built-in LTX one."""
+    try:
+        return settings.default_model(MediaKind.VIDEO_AV.value).ref
+    except ConfigError:
+        return SOUND_VIDEO_MODEL
+
+
+def shot_with_sound(store: SpecStore, spec: SpecRecord, job: MediaJob, model_ref: str = SOUND_VIDEO_MODEL) -> MediaJob:
+    """The clip carries its own sound, so the separate TTS pass is not needed (LTX-2.5-av speaks the shot's lines;
+    a model without speech, like H3, only makes the room sound). The model is the project's ``video.av`` one."""
     lines = [str(line.text_payload) for line in store.list_current(spec.project_id, "dialogue.line")
              if line.subject_id.split("#")[0] == str(spec.subject_id) and line.text_payload]
     return MediaJob(**{
         **job.__dict__,
         "kind": MediaKind.VIDEO_AV,
-        "model_ref": SOUND_VIDEO_MODEL,
+        "model_ref": model_ref,
         "inputs": {**job.inputs, "text": " ".join(lines)},
     })
 

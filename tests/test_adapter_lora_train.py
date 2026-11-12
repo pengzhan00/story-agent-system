@@ -69,7 +69,7 @@ rank = 16
 """
 
 
-def build(tmp_path: Path, *, binary: bool = True, base: bool = True) -> Rig:
+def build(tmp_path: Path, *, binary: bool = True, base: bool = True, extra_models: str = "") -> Rig:
     bindir = tmp_path / "bin"
     bindir.mkdir(parents=True, exist_ok=True)
     if binary:
@@ -80,7 +80,7 @@ def build(tmp_path: Path, *, binary: bool = True, base: bool = True) -> Rig:
     if base:
         base_dir.mkdir(exist_ok=True)
     s = make_settings(tmp_path, services=f'[tools.lora_train]\ncommand = "{bindir / "stub-train"}"\n'
-                                         f'base_model_dir = "{base_dir}"\n', models=MODELS)
+                                         f'base_model_dir = "{base_dir}"\n', models=MODELS + extra_models)
     return make_rig(s, LoraTrainAdapter(poll_interval_sec=0.02))
 
 
@@ -124,6 +124,24 @@ def test_trains_and_registers_the_newest_adapter(tmp_path: Path) -> None:
                          "05.txt", "preview_1.txt", "preview_2.txt"]
     assert s["caption"].strip() == "lwx woman young woman"
     assert a.provenance["model"]["license_tag"] == "apache-test"
+
+
+def test_a_model_entry_names_its_own_base_model_folder(tmp_path: Path) -> None:
+    """Each base model lives in its own folder: the entry's base_model_dir wins over the tool default, and a
+    missing folder is reported for that entry (not for the default one)."""
+    own = tmp_path / "krea-base"
+    own.mkdir()
+    entry = (f'\n[models."trainer-own"]\nkind = "train.lora"\nprovider = "lora_train"\nheavy = true\n'
+             f'license_tag = "x"\ncommercial_ok = false\ntimeout_sec = 60\nbase_model_dir = "{own}"\n'
+             '[models."trainer-own".train_template]\nmodel = "krea-2-raw"\nquantize = 8\n')
+    rig = build(tmp_path, extra_models=entry)
+    rec, _ = rig.run(job(MediaKind.TRAIN_LORA, "trainer-own", inputs(tmp_path)))
+    assert rec.status is JobStatus.COMPLETED, (rec.error_code, rec.error_message)
+    cfg = seen(tmp_path)["cfg"]
+    assert cfg["model_path"] == str(own) and cfg["model"] == "krea-2-raw" and cfg["quantize"] == 8
+    own.rmdir()
+    rec, _ = rig.run(job(MediaKind.TRAIN_LORA, "trainer-own", inputs(tmp_path)))
+    assert rec.error_code == ErrorCode.MISSING_MODEL.value and "krea-base" in rec.error_message
 
 
 def test_custom_captions_previews_and_raw_overrides(tmp_path: Path) -> None:
