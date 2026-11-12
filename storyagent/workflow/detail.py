@@ -179,17 +179,17 @@ def lint_card(card: Mapping[str, Any], *, people: int, vague: Sequence[str], min
 
 
 def _unheld(paragraph: str, held: Sequence[str], holders: Sequence[str]) -> list[str]:
-    """The things from ``held`` (knife, sword, ...) named in a sentence of the paragraph that has no word from
-    ``holders`` (hand, grips, holds, ...): a picture model draws it floating or invents a person to hold it."""
-    found: list[str] = []
+    """The things from ``held`` (knife, sword, ...) the paragraph names but never in a sentence with a word from
+    ``holders`` (hand, grips, holds, ...): a picture model draws it floating or invents a person to hold it. Saying
+    who holds it once is enough; a later sentence may use the thing again ("the blade slides up ...")."""
+    named: dict[str, bool] = {}
     for sentence in re.split(r"(?<=[.!?])\s+", paragraph.lower()):
         words = set(re.findall(r"[a-z']+", sentence))
-        if any(h in words or h + "s" in words for h in holders):
-            continue
+        held_here = any(h in words or h + "s" in words for h in holders)
         for thing in held:
-            if thing in words and thing not in found:
-                found.append(thing)
-    return found
+            if thing in words:
+                named[thing] = named.get(thing, False) or held_here
+    return [thing for thing, ok in named.items() if not ok]
 
 
 def _position_key(name: str) -> str:
@@ -326,6 +326,8 @@ def detail_pass(ctx: Ctx, episode: int, scenes: Sequence[tuple[dict[str, Any], d
     redo = bool(again) and again != "problems"
     # `redetail_scenes` = ["3.3", "1.1"] (act.scene): write the cards of just those scenes again, whatever they hold
     named = {str(x).strip() for x in ctx.params.get("redetail_scenes") or ()}
+    # `redetail_shots` = ["3.3.4", "3.3.7"] (act.scene.shot): just those cards, the rest of the scene is left as it is
+    picked = {str(x).strip() for x in ctx.params.get("redetail_shots") or ()}
     chars ={c["name"]: c for c in ctx.store.list_characters(ctx.pid)}
     ctx.step(0, 1, "anchors")
     known = {str(loc["name"]): loc for loc in ctx.store.list_locations(ctx.pid)}
@@ -355,7 +357,8 @@ def detail_pass(ctx: Ctx, episode: int, scenes: Sequence[tuple[dict[str, Any], d
             card = shot.get("detail")
             here = f"{act['number']}.{scene['number']}" in named
             broken = again == "problems" and (card.get("problems") or not card.get("image_prompt"))
-            if not card or redo or here or broken:
+            chosen = f"{act['number']}.{scene['number']}.{i}" in picked
+            if not card or redo or here or broken or chosen:
                 names = _in_frame(shot, scene, list(chars))
                 card = write_card(ctx, shot, scene, names, chars, str(scene.get("location", "")), previous, ledger,
                                   used, i, len(shots), (episode, int(act["number"]), int(scene["number"])))

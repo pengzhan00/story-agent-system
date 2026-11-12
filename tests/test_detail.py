@@ -187,6 +187,8 @@ def test_only_the_set_piece_scenes_get_cards_and_the_anchors_are_written_once(tm
     assert client.calls.count("detail") == 4
     engine.run_stage(pid, "script", {"visual_prompts": False, "redetail_scenes": ["1.1"]})    # just that scene
     assert client.calls.count("detail") == 6
+    engine.run_stage(pid, "script", {"visual_prompts": False, "redetail_shots": ["1.1.2"]})   # just that one card
+    assert client.calls.count("detail") == 7
 
 
 def test_a_card_with_problems_is_asked_again_and_then_kept_with_them_listed(tmp_path: Path) -> None:
@@ -359,6 +361,8 @@ def test_a_knife_with_no_hand_on_it_is_sent_back() -> None:
     assert not _held("A shirtless man sits. A woman's hand, cut off by the frame edge, holds a knife to his throat.")
     assert not _held("A man sits. The woman grips a knife against his throat.")
     assert any("sword" in p for p in _held("A man sits. A sword leans on the wall behind him."))
+    # who holds it is said once; a later sentence may name the blade again without repeating the hand
+    assert not _held("A man stands, holding a long blade in his right hand. The blade slides up under a chin.")
 
 
 def test_the_wardrobe_in_force_goes_to_the_card_writer() -> None:
