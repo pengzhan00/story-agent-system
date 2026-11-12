@@ -913,6 +913,7 @@
   "web.produce.reason.no_model": "这类素材没有可用模型",
   "web.produce.reason.no_keyframe": "缺少关键帧",
   "web.produce.reason.shot_gone": "这个镜头已被重新分镜删掉,没有可生成的内容",
+  "web.produce.reason.old_card": "它的分镜卡片是旧格式(提示词里没有脸、表情和衣着):请运行脚本阶段重写卡片",
   "workflow.progress.phase.1": "角色形象、场景、配乐与配音",
   "workflow.progress.phase.2": "镜头关键帧",
   "workflow.progress.phase.3": "镜头视频",

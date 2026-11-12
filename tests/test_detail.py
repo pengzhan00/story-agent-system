@@ -189,6 +189,14 @@ def test_only_the_set_piece_scenes_get_cards_and_the_anchors_are_written_once(tm
     assert client.calls.count("detail") == 6
     engine.run_stage(pid, "script", {"visual_prompts": False, "redetail_shots": ["1.1.2"]})   # just that one card
     assert client.calls.count("detail") == 7
+    # a card from before the plain paragraph existed is written again by a plain run, nobody has to ask
+    row = engine.store.get_script(pid, 1)
+    shots = row["acts"][0]["scenes"][0]["shots"]
+    shots[0]["detail"].pop("image_prompt")
+    engine.store.update_script_scene(pid, 1, row["acts"][0]["number"], row["acts"][0]["scenes"][0]["number"],
+                                     {"shots": shots})
+    engine.run_stage(pid, "script", {"visual_prompts": False})
+    assert client.calls.count("detail") == 8
 
 
 def test_a_card_with_problems_is_asked_again_and_then_kept_with_them_listed(tmp_path: Path) -> None:

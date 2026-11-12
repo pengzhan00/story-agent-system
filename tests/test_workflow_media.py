@@ -1,6 +1,7 @@
 """produce (specs -> media) and compose (media -> episode): a real worker, fake media adapters, real ffmpeg."""
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
 import threading
@@ -306,6 +307,26 @@ def test_produce_skips_specs_of_a_shot_a_replan_removed(tmp_path: Path) -> None:
     skipped = [s for s in out["skipped_detail"] if s["reason"] == "shot_gone"]
     assert {s["subject"] for s in skipped} >= {"shot.keyframe", "shot.video"}
     assert all(s["id"].partition("#")[0] == str(gone) for s in skipped)
+
+
+def test_produce_leaves_a_shot_with_an_old_format_card_until_its_card_is_written_again(tmp_path: Path) -> None:
+    """A card without the plain image paragraph gives a keyframe prompt with no faces, expressions or clothes: the
+    shot is skipped (and says why) instead of being drawn from nothing."""
+    fake = FakeAdapter()
+    engine, worker, _ = story(tmp_path, [fake])
+    old = engine.store.list_shots(1)[0]
+    payload = dict(old["render_payload"])
+    payload["detail"] = {"summary": "from before the paragraph existed", "people": []}
+    with engine.db.transaction() as conn:
+        conn.execute("UPDATE shots SET render_payload=? WHERE id=?", (json.dumps(payload), old["id"]))
+    with serving(worker):
+        out = engine.run_stage(1, "produce", {})
+    skipped = [s for s in out["skipped_detail"] if s["reason"] == "old_card"]
+    assert {(s["subject"], s["id"]) for s in skipped} == {("shot.keyframe", str(old["id"])),
+                                                          ("shot.video", str(old["id"]))}
+    drawn = [a for a in engine.spec_store.ledger.list_assets(project_id=1, shot_id=old["id"])
+             if a.kind in ("image.generate", "video.generate")]
+    assert drawn == []                                                         # nothing was drawn for it
 
 
 def test_produce_can_make_just_the_chosen_shots(tmp_path: Path) -> None:

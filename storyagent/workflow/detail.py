@@ -358,7 +358,10 @@ def detail_pass(ctx: Ctx, episode: int, scenes: Sequence[tuple[dict[str, Any], d
             here = f"{act['number']}.{scene['number']}" in named
             broken = again == "problems" and (card.get("problems") or not card.get("image_prompt"))
             chosen = f"{act['number']}.{scene['number']}.{i}" in picked
-            if not card or redo or here or broken or chosen:
+            # a card from before the plain paragraph existed carries no faces, expressions or clothes into the
+            # keyframe prompt: it is written again by itself, not left for someone to ask for
+            old = bool(card) and not card.get("image_prompt")
+            if not card or redo or here or broken or chosen or old:
                 names = _in_frame(shot, scene, list(chars))
                 card = write_card(ctx, shot, scene, names, chars, str(scene.get("location", "")), previous, ledger,
                                   used, i, len(shots), (episode, int(act["number"]), int(scene["number"])))

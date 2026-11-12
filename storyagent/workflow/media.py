@@ -219,6 +219,12 @@ def _only(ctx: Ctx, specs: list[SpecRecord]) -> set[str]:
     return only
 
 
+def _has_old_card(shot: dict[str, Any]) -> bool:
+    """The shot has a card, but one from before the plain image paragraph existed."""
+    card: dict[str, Any] = (shot.get("render_payload") or {}).get("detail") or {}
+    return bool(card) and not card.get("image_prompt")
+
+
 def _plan_phase(
     ctx: Ctx, ledger: Ledger, specs: list[SpecRecord], types: tuple[str, ...], skipped: list[dict[str, Any]],
     tier: QualityTier, counts: dict[str, int],
@@ -229,7 +235,11 @@ def _plan_phase(
     picks = video_picks(ctx.settings, ctx.store, ledger, ctx.pid, ctx.project.settings, tier)
     skip = {str(x) for x in ctx.params.get("skip", [])}      # e.g. ["shot.video"]: stills only
     only = _only(ctx, specs)                                 # the confirmed plan / the chosen shots
-    live_shots = {str(sh["id"]) for sh in ctx.store.list_shots(ctx.pid)}
+    shots_now = ctx.store.list_shots(ctx.pid)
+    live_shots = {str(sh["id"]) for sh in shots_now}
+    # a shot card without the plain image paragraph (written before it existed) would draw faces, expressions and
+    # clothes from nothing: such a shot waits until the script stage has written its card again
+    old_cards = {str(sh["id"]) for sh in shots_now if _has_old_card(sh)}
     for spec in specs:
         if spec.subject_type not in types or spec.subject_type in skip or (only and spec.id not in only):
             continue
@@ -258,6 +268,9 @@ def _plan_phase(
                        end_keyframe=end_keyframe) \
                 and not ctx.force():
             counts["reused"] += 1
+            continue
+        if spec.subject_type in ("shot.keyframe", "shot.video") and spec.subject_id in old_cards:
+            skipped.append({"subject": spec.subject_type, "id": spec.subject_id, "reason": "old_card"})
             continue
         if spec.subject_type == "shot.video" and spec.subject_id not in picks and spec.id not in only \
                 and spec.params.get("mode") not in {"t2v", "i2v", "a2v"}:

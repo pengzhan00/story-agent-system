@@ -913,6 +913,7 @@
   "web.produce.reason.no_model": "no model for this kind",
   "web.produce.reason.no_keyframe": "its keyframe is missing",
   "web.produce.reason.shot_gone": "a re-plan removed this shot, so there is nothing to make",
+  "web.produce.reason.old_card": "its shot card is from an older format (no faces, expressions or clothes in the prompt): run the script stage to write it again",
   "workflow.progress.phase.1": "Characters, locations, music and voices",
   "workflow.progress.phase.2": "Shot keyframes",
   "workflow.progress.phase.3": "Shot videos",
