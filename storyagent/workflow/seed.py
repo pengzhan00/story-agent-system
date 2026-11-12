@@ -64,6 +64,17 @@ class Seeder:
                  "version": spec.version}] if spec else []
 
 
+def _keyframe_model(ctx: Ctx, shot: dict[str, Any]) -> str:
+    """The picture model a shot's keyframe is routed to, '' = the plan's own. A plan that names ``sfw_image_model``
+    sends every shot of a scene that is not one of ``adult_scene_types`` there: an adult checkpoint draws people
+    undressed whatever the prompt says, so the dressed scenes of a restricted project go to a general model."""
+    sfw = str(ctx.settings.workflow.get("sfw_image_model") or "")
+    if not sfw:
+        return ""
+    adult = {str(t) for t in ctx.settings.workflow.get("adult_scene_types") or ()}
+    return "" if str(shot.get("scene_type") or "") in adult else sfw
+
+
 _COSTUME = re.compile(r"\b(wears|wearing|dressed in|dons|dresses)\b", re.IGNORECASE)
 
 
@@ -299,9 +310,13 @@ def seed_specs(ctx: Ctx) -> dict[str, Any]:
         source = _source_hash(shot)
         seen = ctx.state.get_data(ctx.pid, f"shot_source:{sid}")
         changed = have is not None and isinstance(seen, dict) and seen.get("hash") != source
+        route = _keyframe_model(ctx, shot)
+        model_fields: dict[str, Any] = {"model_ref": route} if route else {}
         if have is not None and not ctx.force() and not carded and not changed:
             if seen is None:
                 ctx.state.put_data(ctx.pid, f"shot_source:{sid}", {"hash": source})
+            if route:
+                seeder.sync(KEYFRAME, sid, MediaKind.IMAGE_GENERATE, **model_fields)
             video = specs.current(ctx.pid, VIDEO, sid)
             if video is not None and video.author == "agent":
                 seeder.sync(VIDEO, sid, video.kind,
@@ -338,7 +353,7 @@ def seed_specs(ctx: Ctx) -> dict[str, Any]:
             shot_neg = keyframe.scene_negative(shot_neg)
         key = seeder.sync(KEYFRAME, sid, MediaKind.IMAGE_GENERATE, prompt=shown,
                           negative_prompt=shot_neg, refs=refs, depends_on=deps,
-                          seed=keyframe.fixed_seed(ctx.pid, lead))
+                          seed=keyframe.fixed_seed(ctx.pid, lead), **model_fields)
         seeder.sync(VIDEO, sid, MediaKind.VIDEO_GENERATE, prompt=keyframe.clean(video_shown),
                     negative_prompt=shot_neg, depends_on=seeder.dep(key), params=video_params(shot["render_payload"]))
         ctx.state.put_data(ctx.pid, f"shot_source:{sid}", {"hash": source})

@@ -34,6 +34,26 @@ def test_a_complete_card_has_no_problems() -> None:
     assert _lint(_card()) == []
 
 
+def test_chinese_words_in_a_prompt_field_are_sent_back_but_a_chinese_name_is_fine() -> None:
+    problems = _lint(_card(video_motion="she turns, 背靠背 against him", motion={
+        "main": "leans in", "rhythm": "slow", "secondary": "头发", "still": "bed"}))
+    text = " | ".join(problems)
+    assert "`video_motion` (背靠背)" in text and "`motion.secondary` (头发)" in text and "English only" in text
+    named = _card()
+    named["people"][0]["who"] = "林岚"
+    assert _lint(named) == []
+
+
+def test_an_english_only_model_is_not_sent_chinese_but_a_sound_clip_may_carry_a_spoken_line() -> None:
+    from storyagent.media.prompts import language_issues
+
+    [issue] = language_issues("en", "image.generate", {"prompt": "a street, 背靠背", "negative_prompt": ""})
+    assert "背靠背" in issue.message and issue.code.value == "invalid_input"
+    assert language_issues("en", "image.generate", {"prompt": "a street", "negative_prompt": "blur"}) == []
+    assert language_issues("", "image.generate", {"prompt": "街道"}) == []                  # a model that reads Chinese
+    assert language_issues("en", "video.av", {"prompt": "DIALOGUE in Mandarin: 你好"}) == []   # speech is legitimate
+
+
 def test_a_card_without_the_plain_paragraph_is_asked_again() -> None:
     assert any("`image_prompt` is empty" in p for p in detail.lint_card(
         _card(), people=1, vague=VAGUE, min_words=60, used=[]))
@@ -129,6 +149,24 @@ def _story(tmp_path: Path, client: StoryClient) -> tuple[Any, int]:
     for stage in ("analyze", "cast", "script"):
         engine.run_stage(pid, stage, {"visual_prompts": False})
     return engine, pid
+
+
+def test_shots_of_dressed_scenes_are_routed_to_the_general_picture_model(tmp_path: Path) -> None:
+    """An adult checkpoint undresses people whatever the prompt says: with `sfw_image_model` named, only the shots
+    of the adult scene types keep the plan's picture model; the others get the general one on their keyframe spec."""
+    engine, _, _ = make_engine(tmp_path, client=Detailing(),
+                               services='[workflow]\nsfw_image_model = "flux2-klein-base-4b"\n')
+    pid = new_project(engine)
+    for stage in ("analyze", "cast", "script", "scenes", "shotplan", "specs"):
+        engine.run_stage(pid, stage, {"visual_prompts": False})
+    routed: dict[str, set[str]] = {}
+    for shot in engine.store.list_shots(pid):
+        spec = engine.spec_store.current(pid, "shot.keyframe", str(shot["id"]))
+        assert spec is not None
+        routed.setdefault(str(shot["scene_type"]), set()).add(spec.model_ref or "")
+    assert routed["intimate"] == {""}
+    assert [v for k, v in routed.items() if k != "intimate"] and all(
+        v == {"flux2-klein-base-4b"} for k, v in routed.items() if k != "intimate")
 
 
 def test_only_the_set_piece_scenes_get_cards_and_the_anchors_are_written_once(tmp_path: Path) -> None:

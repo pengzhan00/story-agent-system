@@ -45,6 +45,7 @@ from .ledger import Ledger, NewAsset
 from .llm_resident import ResidentLLMProbe, build_probes
 from .params import validate_params
 from .probe import probe
+from .prompts import language_issues
 from .registry import AdapterRegistry
 
 if TYPE_CHECKING:
@@ -404,6 +405,9 @@ class Worker:
         if notice:
             log_event("license_notice", "warning", **notice)
         issues += content.gate_issues(s, self.db, job, job.project_id, rating)
+        picked = s.models.get(job.model_ref)
+        if picked is not None:
+            issues += language_issues(picked.prompt_language, job.kind.value, job.inputs)
         p_issues, warnings = validate_params(job.params, caps.param_schema, strict=s.strict_params)
         issues += p_issues + adapter.validate(job, ctx)
         for w in warnings:

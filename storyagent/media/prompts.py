@@ -9,6 +9,10 @@ from collections.abc import Callable, Mapping
 from typing import Any
 
 from storyagent.config import ConfigError
+from storyagent.domain.errors import ErrorCode
+from storyagent.util import cjk_words
+
+from .contracts import ValidationIssue
 
 _H3_ORDER = (("scene", "Scene"), ("action", "Action"), ("camera", "Camera"), ("look", "Look"), ("audio", "Audio"))
 
@@ -50,6 +54,26 @@ PROFILES: dict[str, Callable[[str, Mapping[str, Any] | None], str]] = {
     "music_tags": _plain,  # tags live in `prompt`, lyrics in `text_payload`; the adapter combines them
     "h3_structured": _h3_structured,
 }
+
+
+# Kinds whose prompt never holds speech: Chinese in it is a leak from the story text, not a spoken line (the sound
+# clips legitimately carry a Mandarin line in their prompt, so they are only warned about at enqueue time).
+_STRICT_KINDS = frozenset({"image.generate", "image.edit", "video.generate"})
+
+
+def language_issues(prompt_language: str, kind: str, inputs: Mapping[str, Any]) -> list[ValidationIssue]:
+    """An English-only picture or video model must not be sent Chinese words: it draws something else (a leaked word
+    turned a clothed street scene into a naked one), so the job stops here and says which words."""
+    if prompt_language != "en" or kind not in _STRICT_KINDS:
+        return []
+    found: list[str] = []
+    for key in ("prompt", "negative_prompt"):
+        found += cjk_words(str(inputs.get(key) or ""))
+    if not found:
+        return []
+    words = ", ".join(dict.fromkeys(found[:5]))
+    return [ValidationIssue(ErrorCode.INVALID_INPUT, f"the prompt contains Chinese ({words}) but the model reads "
+                            "English only: write the prompt in English", {"detail": words})]
 
 
 def render_prompt(profile: str, prompt: str, structured: Mapping[str, Any] | None = None) -> str:

@@ -202,6 +202,11 @@ voice_sample_text = "你好，很高兴认识你。"
 portrait_size = [832, 1216]
 detail = true
 detail_scene_types = ["intimate", "action"]
+# Keyframe routing by scene: a plan (or `[workflow]`) that names `sfw_image_model` sends every shot of a scene whose
+# `scene_type` is NOT in `adult_scene_types` to that picture model; the adult scenes keep the plan's own model. Empty =
+# off. Needed when the plan's picture model is an adult checkpoint that draws people undressed in any scene.
+sfw_image_model = ""
+adult_scene_types = ["intimate"]
 detail_attempts = 2
 detail_min_words = 60
 # The keyframe prompt repeats each person's clothing, body parts, pose and limbs after the opening frame that already

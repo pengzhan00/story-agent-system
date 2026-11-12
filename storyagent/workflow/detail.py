@@ -16,6 +16,8 @@ import re
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from storyagent.util import cjk_words
+
 from .stages import Ctx
 
 CARD_TEXT = ("summary", "position_name", "contact", "light", "setting", "sound", "start_frame", "end_frame",
@@ -104,6 +106,23 @@ def clean_card(data: Mapping[str, Any]) -> dict[str, Any]:
     return card
 
 
+_PROMPT_FIELDS = ("image_prompt", "start_frame", "end_frame", "video_motion", "contact", "light", "setting", "negative")
+
+
+def _chinese_fields(card: Mapping[str, Any]) -> list[tuple[str, str]]:
+    """The card fields that feed a picture or video prompt and hold Chinese: (field, the words found). A person's
+    name (``people.who``) is not a prompt field, so a Chinese name is fine."""
+    motion = card.get("motion") or {}
+    fields = [(k, card.get(k)) for k in _PROMPT_FIELDS] + [(f"motion.{k}", motion.get(k)) for k in
+                                                           ("main", "rhythm", "secondary", "still")]
+    out: list[tuple[str, str]] = []
+    for key, value in fields:
+        found = cjk_words(str(value or ""))
+        if found:
+            out.append((key, " ".join(found[:3])))
+    return out
+
+
 def lint_card(card: Mapping[str, Any], *, people: int, vague: Sequence[str], min_words: int,
               used: Sequence[str], held: Sequence[str] = (), holders: Sequence[str] = (),
               sequence: Sequence[str] = (), main_words: int = 0) -> list[str]:
@@ -137,6 +156,10 @@ def lint_card(card: Mapping[str, Any], *, people: int, vague: Sequence[str], min
         owned = [(p.get("clothing"), p.get("limbs")) for p in card.get("people") or []]
         if len(set(owned)) < len(owned):
             problems.append("two people have the same `clothing` and `limbs`: each entry describes only its own person")
+    chinese = _chinese_fields(card)
+    if chinese:
+        problems.append("Chinese text in " + ", ".join(f"`{k}` ({w})" for k, w in chinese) + ": the picture and video "
+                        "models read English only; write every prompt field in English, with no Chinese words")
     main = str(motion.get("main") or "")
     chained = sorted({w for w in sequence if re.search(rf"\b{re.escape(w)}\b", main.lower())})
     if chained or (main_words and len(main.split()) > main_words):

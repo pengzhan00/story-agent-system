@@ -50,6 +50,14 @@ def home_file(home: Path, rel: str) -> Path | None:
 _CJK = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\u3040-\u30ff\uac00-\ud7af]")
 
 
+_CJK_RUNS = re.compile(_CJK.pattern + "+")
+
+
+def cjk_words(text: str) -> list[str]:
+    """The runs of Chinese, Japanese or Korean characters in ``text``, in order (to name what leaked into a prompt)."""
+    return _CJK_RUNS.findall(text or "")
+
+
 def has_cjk(text: str) -> bool:
     """Chinese, Japanese or Korean characters in ``text`` (what an English-only model cannot read)."""
     return bool(_CJK.search(text or ""))
