@@ -93,3 +93,7 @@ On by default, switchable globally / per env / per project (see CONFIGURATION). 
 ## Error codes -> i18n
 
 Every `ErrorCode` has `error.<code>` and `error.<code>.remediation` in `locales/*.json`; statuses `status.<job status>`, kinds `media.kind.<kind>`, tiers `media.tier.<tier>`, subjects `spec.subject.<type>`, wait reasons `wait.<reason>`, health `health.<state>`. `tests/test_i18n.py` fails if any enum value lacks a label.
+
+## H3-Image (`h3image` provider)
+
+`h3-image` (image.generate) and `h3-image-edit` (image.edit) run the local `h3-image-mlx generate` command (`[tools.h3image]`: `binary`, `model_dir`; weights are never downloaded). Native 256–4096 px (multiples of 32) and up to 16 reference images; `<Picture n>` in the prompt is the n-th entry of `refs` (a prompt naming a picture that is not there is refused before the tool starts). The sampler is fixed, so no steps/guidance. `dit_mode` = `resident` (default, ~21 GB, 1024² in ~24 s) or `stream` (3–7 GB, slower; use it for 4096² or beside ComfyUI). Heavy (serial), not a default model, `commercial_ok = false` (MiniMax-H3-Image community licence: territory limits, attribution "MiniMax-H3-Image", its outputs must not train other models). Errors: `missing_tool` / `missing_model` (incomplete weights folder) / `invalid_params` (size) / `invalid_input` (references, prompt) are all raised before the process starts and so are never confused with a tool failure. Output colour is flat and grey: grade after, don't tune the model.

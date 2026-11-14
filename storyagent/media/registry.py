@@ -107,6 +107,12 @@ def _mflux(settings: Settings) -> Adapter:
     return MfluxAdapter()
 
 
+def _h3image(settings: Settings) -> Adapter:
+    from .adapters.h3image import H3ImageAdapter
+
+    return H3ImageAdapter()
+
+
 def _seedvc(settings: Settings) -> Adapter:
     from .adapters.seedvc import SeedVcAdapter
 
@@ -156,8 +162,8 @@ def _control_tools(settings: Settings) -> Adapter:
 
 
 _BUILTIN: list[Callable[[Settings], Adapter]] = [
-    _acestep, _comfy, _drawthings, _phosphene, _cosyvoice, _say, _whisper, _llm, _remote_video, _mflux, _lora_train,
-    _seedvc, _demucs, _ffmpeg, _delivery, _h3, _cli, _http, _control_tools,
+    _acestep, _comfy, _drawthings, _phosphene, _cosyvoice, _say, _whisper, _llm, _remote_video, _mflux, _h3image,
+    _lora_train, _seedvc, _demucs, _ffmpeg, _delivery, _h3, _cli, _http, _control_tools,
 ]
 
 

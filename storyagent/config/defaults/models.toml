@@ -2,7 +2,7 @@
 #
 #   kind     : a MediaKind value (storyagent/domain/enums.py), e.g. "video.generate"
 #   provider : the runtime/adapter that executes it:
-#              llm | mflux | drawthings | phosphene | acestep | comfy | cosyvoice | seedvc | whisper | h3 | lora_train | ffmpeg
+#              llm | mflux | drawthings | phosphene | acestep | comfy | cosyvoice | seedvc | whisper | h3 | h3image | lora_train | ffmpeg
 #   family   : the underlying model family — the same weights may have several runtimes
 #              (e.g. one model through several runtimes); licence applies per family
 #   heavy    : true => the broker runs at most one heavy job at a time
@@ -102,6 +102,60 @@ steps = 24
 width = 864
 height = 1536
 steps = 50
+
+# H3-Image through its MLX command (provider h3image; paths in [tools.h3image]). Native up to 4096x4096 and up to 16 reference
+# images edited by a sentence: `<Picture 1>` in the prompt is the first entry of `refs`, so write "keep <Picture 1>'s face and
+# clothes" or the identity drifts. The sampler is fixed (6 steps): no steps/guidance. Width/height are multiples of 32 (256-4096).
+# Measured here with ComfyUI stopped: 1024 resident 24 s (~21 GB), 1024 stream 39 s (3 GB), 2048 resident 83 s, 4096 stream ~8 min
+# (7 GB; the resident mode at 4096 is untested), editing 1024x1152 with a reference stream 86 s. Colour comes out grey and flat:
+# grade it afterwards rather than changing the model. Never run beside ComfyUI's big jobs (the broker keeps heavy jobs serial).
+# Licence: MiniMax-H3-Image Community (excludes US/EU/UK/South Korea; revenue over 1M USD or hosted service needs a written grant;
+# commercial UIs show "MiniMax-H3-Image"; its outputs must not be used to train or improve other AI models - so not LoRA datasets).
+# Pick it explicitly (pipeline_models / job model_ref); it is not a default. 4K: pass width/height 4096 and dit_mode = "stream".
+[models."h3-image"]
+kind = "image.generate"
+provider = "h3image"
+version = "0.1.0a4-int8"
+family = "minimax-h3-image"
+heavy = true
+est_memory_gib = 24
+est_seconds = 60
+license_tag = "minimax-h3-image-community"
+commercial_ok = false
+attribution = "MiniMax-H3-Image"
+prompt_profile = "natural_en"
+timeout_sec = 1200
+[models."h3-image".params]
+width = 1024
+height = 1024
+dit_mode = "resident"
+[models."h3-image".tiers.draft]
+width = 1024
+height = 1024
+[models."h3-image".tiers.final]
+width = 2048
+height = 2048
+
+[models."h3-image-edit"]
+kind = "image.edit"
+provider = "h3image"
+version = "0.1.0a4-int8"
+family = "minimax-h3-image"
+heavy = true
+est_memory_gib = 24
+est_seconds = 120
+license_tag = "minimax-h3-image-community"
+commercial_ok = false
+attribution = "MiniMax-H3-Image"
+prompt_profile = "natural_en"
+timeout_sec = 1200
+[models."h3-image-edit".params]
+width = 1024
+height = 1024
+dit_mode = "resident"
+[models."h3-image-edit".tiers.final]
+width = 2048
+height = 2048
 
 # FLUX.2 klein 4B *distilled* through ComfyUI (workflow template media/workflows/flux2_klein_edit.json): composes a
 # keyframe from reference images in 4 steps without CFG - the fast alternative to the 30-step Base model above. Needs

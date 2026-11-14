@@ -86,6 +86,11 @@ hint_key = "launch.hint.drawthings"
 binary = "~/myworkspace/h3.c/h3"
 model_dir = "~/myworkspace/MiniMax-H3"
 
+# H3-Image (MLX): native up to 4096x4096 and up to 16 reference images. Weights and venv are machine assets, not part of this repo.
+[tools.h3image]
+binary = "~/myworkspace/h3-image-mlx/.venv/bin/h3-image-mlx"
+model_dir = "~/myworkspace/h3-image-mlx/models"
+
 [tools.cosyvoice]
 root = "~/cosyvoice"
 python = "~/cosyvoice/venv/bin/python"

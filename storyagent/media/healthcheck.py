@@ -103,6 +103,13 @@ def _check_tools(settings: Settings, run: Runner) -> list[Entry]:
         [] if _exists(tp("h3", "binary"), executable=True) else ["h3 binary"],
         [] if _exists((tp("h3", "model_dir") or Path("/nonexistent")) / "model_index.json") else ["MiniMax-H3 weights"],
     )
+    h3i_models = tp("h3image", "model_dir")
+    h3i_parts = ("diffusion_models", "text_encoders", "vae", "tokenizer.json")
+    entry(
+        "h3image",
+        [] if _exists(tp("h3image", "binary"), executable=True) else ["h3-image-mlx"],
+        [] if h3i_models and all(_exists(h3i_models / n) for n in h3i_parts) else ["H3-Image weights"],
+    )
     tts = settings.models.get(settings.default_models.get("audio.tts", ""))
     cosy_model_dir = (
         Path(str(tts.extra["model_dir"])).expanduser()
