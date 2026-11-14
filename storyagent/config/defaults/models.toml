@@ -111,6 +111,7 @@ steps = 50
 # grade it afterwards rather than changing the model. Never run beside ComfyUI's big jobs (the broker keeps heavy jobs serial).
 # Licence: MiniMax-H3-Image Community (excludes US/EU/UK/South Korea; revenue over 1M USD or hosted service needs a written grant;
 # commercial UIs show "MiniMax-H3-Image"; its outputs must not be used to train or improve other AI models - so not LoRA datasets).
+# Several references: say what each picture supplies and what stays, and describe the new scene in full (docs/MEDIA_CONTRACT.md).
 # Pick it explicitly (pipeline_models / job model_ref); it is not a default. 4K: pass width/height 4096 and dit_mode = "stream".
 [models."h3-image"]
 kind = "image.generate"
