@@ -159,3 +159,14 @@ def test_the_shipped_entries_are_heavy_licensed_and_not_defaults(tmp_path: Path)
     gen, edit = s.models["h3-image"], s.models["h3-image-edit"]
     assert gen.heavy and edit.heavy and not gen.commercial_ok and gen.license_tag == "minimax-h3-image-community"
     assert {s.default_model(k).provider for k in ("image.generate", "image.edit")}.isdisjoint({"h3image"})
+
+
+def test_a_project_shape_is_fitted_to_the_32_pixel_grid(tmp_path: Path) -> None:
+    from storyagent.media.params import resolve_params
+
+    s = make_settings(tmp_path)
+    for ref in ("h3-image", "h3-image-edit"):
+        for frame in ((720, 1280), (1280, 720)):
+            p = resolve_params(s, ref, "draft", frame=frame)
+            assert p["width"] % 32 == 0 and p["height"] % 32 == 0, (ref, frame, p)
+            assert (p["width"] < p["height"]) == (frame[0] < frame[1])

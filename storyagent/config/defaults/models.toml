@@ -125,6 +125,7 @@ commercial_ok = false
 attribution = "MiniMax-H3-Image"
 prompt_profile = "natural_en"
 timeout_sec = 1200
+size_multiple = 32   # the project shape is fitted to this grid; the tool refuses other sizes
 [models."h3-image".params]
 width = 1024
 height = 1024
@@ -149,6 +150,7 @@ commercial_ok = false
 attribution = "MiniMax-H3-Image"
 prompt_profile = "natural_en"
 timeout_sec = 1200
+size_multiple = 32
 [models."h3-image-edit".params]
 width = 1024
 height = 1024
