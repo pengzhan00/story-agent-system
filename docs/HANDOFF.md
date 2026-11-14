@@ -60,7 +60,7 @@ storyagent/
                engine.py 执行;stages.py/media.py/seed.py/shotplan.py 各阶段;progress.py 进度/ETA;flow.py "流程说明"
   media/       contracts(Adapter 协议)、ledger(作业/资产台账)、specs(规格存储)、worker、broker(并发/内存/互斥)、
                assetrefs(asset:/job:/library: 解析)、library、compliance、healthcheck、registry、params(参数分层)
-    adapters/  acestep comfy mflux phosphene cosyvoice seedvc whisper h3 lora_train llm assemble remote_video fake(+_http/_subprocess 公共件)
+    adapters/  acestep comfy mflux h3image phosphene cosyvoice seedvc whisper h3 lora_train llm assemble remote_video fake(+_http/_subprocess 公共件)
     runners/   assemble_episode.py(仅标准库,子进程跑 ffmpeg)
   compose/     timeline.py(纯函数 EDL)、pacing.py(目标时长→结构/镜头时长/QC窗口)、qc.py、export.py(交付包)
   workshop.py  工坊:模块(story script image episode lora song voice video transcript)= 单独可用,或串成流水线
