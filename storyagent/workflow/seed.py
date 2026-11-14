@@ -154,8 +154,14 @@ def _source_hash(shot: dict[str, Any]) -> str:
 def _shot_prompts(ctx: Ctx, shot: dict[str, Any], chars: dict[str, dict[str, Any]], style: dict[str, Any],
                   previous: str, use_llm: bool) -> dict[str, str]:
     payload = shot["render_payload"]
+    if not isinstance(payload.get("subject"), dict):
+        # an imported or hand-made shot has no plan blocks (subject, scene, camera): its own picture prompt is the
+        # whole description, and there is nothing a model could add to it
+        text = str(shot.get("visual_prompt") or "").strip()
+        return {"image_prompt": text, "video_prompt": text,
+                "negative_prompt": str((payload.get("style") or {}).get("negative_prompt", ""))}
     composed = bool(ctx.settings.workflow.get("keyframe_from_references", True))
-    worn = {c["name"]: c.get("costume", "") for c in payload["subject"]["characters"]}
+    worn ={c["name"]: c.get("costume", "") for c in payload["subject"]["characters"]}
     looks = [{"appearance": chars.get(n, {}).get("appearance", ""), "costume": worn.get(n, ""),
               "stable_description": _identity(chars.get(n, {}).get("prompt_template", ""))} for n in shot["characters"]]
     props = payload.get("continuity", {}).get("props", [])
@@ -202,8 +208,10 @@ def _sfx_prompts(ctx: Ctx, shot: dict[str, Any], cues: list[str], use_llm: bool)
         return {}
     payload = shot["render_payload"]
     try:
-        data = ctx.run_agent("sound.cue", {"location": shot["location"], "action": payload["subject"]["action"],
-                                           "time_of_day": payload["scene"]["time_of_day"], "cues": cues})
+        data = ctx.run_agent("sound.cue", {"location": shot["location"],
+                                           "action": (payload.get("subject") or {}).get("action", ""),
+                                           "time_of_day": (payload.get("scene") or {}).get("time_of_day", ""),
+                                           "cues": cues})
     except Exception:  # an LLM hiccup on one shot must not stop the whole stage  # noqa: BLE001
         ctx.extra.setdefault("sfx_prompt_fallbacks", []).append(shot["id"])
         return {}

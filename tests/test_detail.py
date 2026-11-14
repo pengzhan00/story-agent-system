@@ -417,3 +417,22 @@ def test_a_clip_ends_on_the_next_shots_still_only_when_asked_to() -> None:
         assert end(3).id == "asset-key1"                                  # a shot that names its end shot keeps it
     finally:
         media.current_asset = real                                        # type: ignore[assignment]
+
+
+def test_an_imported_shot_without_plan_blocks_keeps_its_own_picture_prompt(tmp_path: Path) -> None:
+    """A shot brought in from outside has no subject / scene / camera blocks: the specs stage used to fail on it
+    with KeyError 'subject'. Its own picture prompt is its description."""
+    engine, _, _ = make_engine(tmp_path, client=Detailing())
+    pid = new_project(engine)
+    for stage in ("analyze", "cast", "script", "scenes", "shotplan"):
+        engine.run_stage(pid, stage, {"visual_prompts": False})
+    shots = engine.store.list_shots(pid)
+    with engine.db.transaction() as conn:
+        for shot in shots:
+            conn.execute("UPDATE shots SET render_payload=?, visual_prompt=? WHERE id=?",
+                         ('{"mode": "i2v", "seconds": 6.0, "keyframe": "KF01"}', f"imported prompt {shot['id']}",
+                          shot["id"]))
+    engine.run_stage(pid, "specs", {})                                              # used to raise KeyError
+    for shot in shots:
+        spec = engine.spec_store.current(pid, "shot.keyframe", str(shot["id"]))
+        assert spec is not None and f"imported prompt {shot['id']}" in spec.prompt
