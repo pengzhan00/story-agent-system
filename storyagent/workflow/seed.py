@@ -12,6 +12,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from storyagent.domain import MediaKind
+from storyagent.media.ledger import Ledger, LedgerError
 from storyagent.media.specs import SpecLocked, SpecRecord, SpecStore
 
 from . import detail, keyframe
@@ -30,6 +31,30 @@ def _voice_param(c: dict[str, Any]) -> Any:
     if ref.startswith("library:"):
         return ref
     return {"audio": ref, "text": c.get("voice_ref_text", ""), "consent": bool(c.get("voice_ref_consent"))}
+
+
+def _character_loras(ctx: Ctx, ledger: Ledger, shot: dict[str, Any],
+                     chars: dict[str, dict[str, Any]]) -> tuple[list[dict[str, Any]], list[str]]:
+    """The trained LoRAs of the characters in a shot (``{path, scale}``) and the trigger words that call them up.
+    A character's ``lora_ref`` is a file path or ``asset:<id>`` of a trained LoRA; the trigger the trainer recorded
+    travels with that asset. The scale is ``[workflow] character_lora_scale`` (1.0 held the face on Krea 2 Turbo and
+    on an adult checkpoint alike)."""
+    scale = float(ctx.settings.workflow.get("character_lora_scale", 1.0))
+    loras: list[dict[str, Any]] = []
+    triggers: list[str] = []
+    for name in shot["characters"]:
+        ref = str(chars.get(name, {}).get("lora_ref") or "").strip()
+        if not ref:
+            continue
+        loras.append({"path": ref, "scale": scale})
+        if ref.startswith("asset:"):
+            try:
+                trigger = str(ledger.get_asset(ref[len("asset:"):]).metadata.get("trigger") or "").strip()
+            except LedgerError:
+                trigger = ""
+            if trigger:
+                triggers.append(trigger)
+    return loras, triggers
 
 
 class Seeder:
@@ -320,10 +345,13 @@ def seed_specs(ctx: Ctx) -> dict[str, Any]:
         changed = have is not None and isinstance(seen, dict) and seen.get("hash") != source
         route = _keyframe_model(ctx, shot)
         model_fields: dict[str, Any] = {"model_ref": route} if route else {}
+        loras, triggers = _character_loras(ctx, specs.ledger, shot, chars)
+        if loras:
+            model_fields["params"] = {"loras": loras}
         if have is not None and not ctx.force() and not carded and not changed:
             if seen is None:
                 ctx.state.put_data(ctx.pid, f"shot_source:{sid}", {"hash": source})
-            if route:
+            if model_fields:
                 seeder.sync(KEYFRAME, sid, MediaKind.IMAGE_GENERATE, **model_fields)
             video = specs.current(ctx.pid, VIDEO, sid)
             if video is not None and video.author == "agent":
@@ -355,7 +383,9 @@ def seed_specs(ctx: Ctx) -> dict[str, Any]:
                                           with_portraits=composed and any(portraits.get(n) for n in shot["characters"]))
         else:
             shown = keyframe.scene_prompt(shown)
-        shot_neg = (keyframe.negative_prompt(prompts["negative_prompt"], language=lang)
+        if triggers:                    # the word that calls a trained face up comes first
+            shown = f"{', '.join(triggers)}, {shown}"
+        shot_neg =(keyframe.negative_prompt(prompts["negative_prompt"], language=lang)
                     if prompts["negative_prompt"] else neg)
         if not shot["characters"]:
             shot_neg = keyframe.scene_negative(shot_neg)

@@ -18,7 +18,9 @@ with the uploaded names. A template that binds ``ref_image`` refuses a job witho
 
 Inputs:  ``prompt`` (text), optional ``negative_prompt``, ``refs``
 Params:  duration (seconds), steps, cfg, sampler_name, scheduler, checkpoint, text_encoder, vae, width, height,
-         ref_megapixels (size the references are scaled to; smaller = faster)
+         ref_megapixels (size the references are scaled to; smaller = faster),
+         loras = [{"path": ..., "scale": 1.0}] (a trained LoRA file; it is copied into ``[tools.comfy] loras_dir`` with
+         ComfyUI's key naming and chained after the template's model node as LoraLoaderModelOnly nodes)
 The template name is ``workflow`` of the model entry; the job seed becomes the sampler seed.
 """
 
@@ -35,6 +37,7 @@ from typing import Any
 from storyagent.domain import MediaKind
 from storyagent.domain.errors import ErrorCode
 
+from .. import lora_files
 from ..contracts import (
     AdapterBase,
     AdapterError,
@@ -86,6 +89,7 @@ SCHEMA: dict[str, dict[str, Any]] = {
     "fps": {"type": "float", "min": 1, "max": 120},
     "batch": {"type": "int", "min": 1, "max": 64},
     "denoise": {"type": "float", "min": 0, "max": 1},
+    "loras": {"type": "list"},
 }
 _FILE_NODES = {
     "CheckpointLoaderSimple": "ckpt_name",
@@ -93,6 +97,7 @@ _FILE_NODES = {
     "VAELoader": "vae_name",
     "UNETLoader": "unet_name",
     "LoraLoader": "lora_name",
+    "LoraLoaderModelOnly": "lora_name",
     "CLIPVisionLoader": "clip_name",
 }
 _PLACEHOLDER = "reference-not-uploaded-yet.png"
@@ -229,7 +234,8 @@ class ComfyAdapter(AdapterBase):
             return issues
         try:
             graph = self._graph(
-                job, tpl, [_PLACEHOLDER] * len(images), [_PLACEHOLDER] * len(audios), [_PLACEHOLDER] * len(videos)
+                job, tpl, [_PLACEHOLDER] * len(images), [_PLACEHOLDER] * len(audios), [_PLACEHOLDER] * len(videos),
+                self._loras(job, ctx),
             )
             for node in graph.values():
                 cls = node["class_type"]
@@ -301,6 +307,54 @@ class ComfyAdapter(AdapterBase):
         node, field = block["consumer"]
         graph[node]["inputs"][field] = prev
 
+    @staticmethod
+    def _loras(job: JobRecord, ctx: JobContext) -> list[tuple[str, float]]:
+        """(file name inside ComfyUI, scale) for each ``params.loras`` entry. A path to a file is exported into
+        ``[tools.comfy] loras_dir`` (trainer naming -> ComfyUI naming); a bare name is taken to be in ComfyUI
+        already."""
+        out: list[tuple[str, float]] = []
+        for entry in job.params.get("loras") or []:
+            fields: dict[str, Any] = entry if isinstance(entry, dict) else {"path": str(entry)}
+            raw = str(fields.get("path") or fields.get("file") or "")
+            scale = float(fields.get("scale", fields.get("weight", 1.0)))
+            if not raw:
+                raise AdapterError(ErrorCode.INVALID_PARAMS, "a LoRA entry needs a path", detail="loras")
+            src = Path(raw).expanduser()
+            if src.is_absolute() or len(src.parts) > 1:
+                folder = ctx.settings.tool_path("comfy", "loras_dir")
+                if folder is None:
+                    raise AdapterError(ErrorCode.MISSING_TOOL, "[tools.comfy] loras_dir is not set", tool="comfy")
+                if not src.is_file():
+                    raise AdapterError(ErrorCode.INVALID_INPUT, f"LoRA file not found: {src}", detail=str(src))
+                try:
+                    out.append((lora_files.export_for_comfy(src, folder), scale))
+                except (OSError, lora_files.LoraFileError) as exc:
+                    raise AdapterError(ErrorCode.INVALID_INPUT, f"LoRA file not usable: {src}",
+                                       detail=str(exc)) from exc
+            else:
+                out.append((raw, scale))
+        return out
+
+    @staticmethod
+    def _attach_loras(graph: dict[str, Any], tpl: dict[str, Any], loras: list[tuple[str, float]]) -> None:
+        """Chain a LoraLoaderModelOnly per LoRA after the template's model node (its LoRA node when it has one, else
+        the checkpoint node) and point everything that took the model from that node at the end of the chain."""
+        bindings: dict[str, Any] = tpl.get("bindings", {})
+        anchor = bindings.get("lora") or bindings.get("checkpoint")
+        if not anchor:
+            raise AdapterError(ErrorCode.INVALID_INPUT, "this workflow has no model node to attach a LoRA to",
+                               detail="no lora/checkpoint binding")
+        head = str((anchor[0] if isinstance(anchor[0], list) else anchor)[0])
+        takers = [n for n in graph.values() if (n.get("inputs") or {}).get("model") == [head, 0]]
+        prev: list[Any] = [head, 0]
+        for i, (name, scale) in enumerate(loras):
+            node_id = f"storyagent_lora_{i}"
+            graph[node_id] = {"class_type": "LoraLoaderModelOnly",
+                              "inputs": {"model": prev, "lora_name": name, "strength_model": scale}}
+            prev = [node_id, 0]
+        for node in takers:
+            node["inputs"]["model"] = prev
+
     def _graph(
         self,
         job: JobRecord,
@@ -308,6 +362,7 @@ class ComfyAdapter(AdapterBase):
         uploaded: list[str] | None = None,
         uploaded_audio: list[str] | None = None,
         uploaded_video: list[str] | None = None,
+        loras: list[tuple[str, float]] | None = None,
     ) -> dict[str, Any]:
         graph = copy.deepcopy(tpl["graph"])
         bindings: dict[str, list[str]] = tpl["bindings"]
@@ -333,6 +388,8 @@ class ComfyAdapter(AdapterBase):
                     graph[node]["inputs"][field] = value
         if uploaded and tpl.get("references"):
             self._chain_references(graph, tpl["references"], uploaded, float(values.get("ref_megapixels", 1.0)))
+        if loras:
+            self._attach_loras(graph, tpl, loras)
         return graph
 
     def submit(self, job: JobRecord, ctx: JobContext) -> str:
@@ -342,7 +399,8 @@ class ComfyAdapter(AdapterBase):
         body = self.client.json(
             "POST",
             "/prompt",
-            json={"prompt": self._graph(job, self.template(job), uploaded, uploaded_audio, uploaded_video)},
+            json={"prompt": self._graph(job, self.template(job), uploaded, uploaded_audio, uploaded_video,
+                                        self._loras(job, ctx))},
         )
         prompt_id = (body or {}).get("prompt_id")
         if not prompt_id:

@@ -102,6 +102,10 @@ offline = true
 
 
 # LoRA training (mflux-train). Paths only; the training recipe lives in models.toml (train_template).
+# ComfyUI's loras folder: a trained LoRA is copied here (with ComfyUI's key naming) when a job asks for it.
+[tools.comfy]
+loras_dir = "~/ComfyUI-Shared/models/loras"
+
 [tools.lora_train]
 command = "~/.local/bin/mflux-train"
 root = "~/myworkspace/flux2-lora"
@@ -206,6 +210,8 @@ detail_scene_types = ["intimate", "action"]
 # `scene_type` is NOT in `adult_scene_types` to that picture model; the adult scenes keep the plan's own model. Empty =
 # off. Needed when the plan's picture model is an adult checkpoint that draws people undressed in any scene.
 sfw_image_model = ""
+# Strength of a character's trained LoRA (`lora_ref` of the character: a path or asset:<id>) on its shots' keyframes.
+character_lora_scale = 1.0
 adult_scene_types = ["intimate"]
 detail_attempts = 2
 detail_min_words = 60
