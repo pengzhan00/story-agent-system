@@ -36,11 +36,38 @@ A film is only as coherent as its outline, and nothing read the outline before. 
 
 A later episode is told how each earlier one ended (its last scene) and the facts fixed so far, not only the synopses. What the checks found and did is the `story_check` of the script stage summary (and `story_check:<episode>` in the workflow data): per part the score, how often the text went back, the scenes written again and what is still open; the Web "工作流" page shows it under "剧情自检". Run parameters: `story_check=false` skips both checks, `story_check=true` reads an existing script again (a plain resume with nothing to write reads nothing), `outline_review_rounds` / `script_review_rounds` override the configuration. A revision a person asked for (`feedback`) is not second-guessed by the reader. The checks cost language-model time only (a few requests per episode); they are judged by a model, so they lower the odds of a hole, they do not prove there is none: read "剧情自检" before spending hours on pictures.
 
+## Readiness: every run is looked at before it starts
+
+`workflow/preflight.py`, `GET /api/projects/{id}/preflight`. The same look for a run to the film (`params.full`) and a run of single stages (`stages`): it covers exactly the stages the run will do. A `block` finding refuses the run (409 `not_ready`, the findings in `detail`); a `warn` is shown and the run goes on. `params.skip_preflight` starts it anyway, `[workflow] preflight = false` switches the refusal off. The worker looks again right before the first media job (`workflow.not_ready`), which also covers runs started from the command line.
+
+What can keep a run from its film, each kind of thing looked at in one place:
+
+| What is missing | Looked at by | Findings |
+|---|---|---|
+| Someone to write (story stages) | `check_llm`: every role the stages use, its backend, its model | `llm_role`, `llm_down`, `llm_model_missing` |
+| Something to make with | `check_media`: a model for the kind, its adapter, its service, its tool and weights | `no_model`, `no_adapter`, `service_down`, `not_installed`, `degraded` |
+| Leave to make it | the content gates of the project's rating | `gate` |
+| Inputs that fit the model | `check_references`: the reference images each picture carries against what its model states it takes (`media/refs.py`); known from the uploaded pictures before the story has specs | `too_many_refs` (refused outright: blocks), `refs_dropped` (only the first are read: told); `values.models` = the models of the same kind that take that many, `_only` when there is none; `detail` = the people concerned |
+| | `check_jobs`: every job the run can build now is shown to the worker's own gate (`media/gate.py`: references, compliance, content, prompt language, parameters, the adapter's `validate`) without being queued, one job per shape (model, what it is for, number of references) | `refused` with the reason the worker would give (`values.what`, `values.count`, `values.error`); a sound effect or music job only warns |
+| Voices | `check_voices` | `voices_auto`, `voice_shared`, `no_voice` |
+| Someone to run it | `check_worker`: a scheduling worker leaves a sign every 10 s (`<home>/run/worker.json`, `media/worker.py`); the API reads its age before a run is queued | `no_worker` (told, not refused: the run waits in the queue until a worker is started) |
+
+Every way work starts meets the same checks:
+
+| Started as | Before it is queued | In the worker |
+|---|---|---|
+| a run to the film (Web "一键做完整部", `params.full`) | API look ahead, 409 `not_ready` | look again before the first media job |
+| a run of single stages (Web stage buttons, the production plan, `stages`) | the same API look ahead for those stages | the same |
+| `storyagent workflow run` | none (it queues directly) | the same |
+| one job (workshop, a spec made again, `media submit`, a retry) | none | `media/gate.py` on that job: it fails at once with the reason |
+
+**Reference images** are stated once per model: `Adapter.reference_rule(kind)` (`ReferenceRule(most, used)`: more than `most` is refused, only `used` are read) or, for a model whose adapter cannot know (a ComfyUI workflow, a `cli` / `http` connector), `max_refs` / `used_refs` in its models.toml entry. Draw Things takes 1, H3-Image 16, mflux reads the first when it generates and all when it edits. A model that states nothing is never reported and never offered as one that takes several (`tests/test_readiness.py` keeps the list of adapters that leave it to the model entry).
+
 ## One run to the film
 
 `params.full` on a resume (`POST .../workflow/runs {"params": {"full": true}}`, CLI `storyagent workflow run --project N --full`, Web "一键做完整部") runs every stage that is not done from where the project stands to the film: the story stages, `produce`, `compose`; with `episodes` / `season`, each episode in turn from its story to its film. It needs the worker.
 
-* **Looked at before it starts** (`workflow/preflight.py`, `GET /api/projects/{id}/preflight`): the language model of every role its story stages use (backend answers, model installed), every media adapter the project's models run on (service running, tool and weights there), the content gates, and the voices. A `block` finding refuses the run (409 `not_ready`, the findings in `detail`; `params.skip_preflight` overrides), a `warn` is shown. The worker looks again right before the first media job (`workflow.not_ready`): a picture service that is not running costs one message, not one failed job per shot after the story was written.
+* **Looked at before it starts**: see "Readiness" below. A picture service that is not running, or a model that cannot take the reference images it would be given, costs one message, not one failed job per shot after the story was written.
 * **Voices**: people without a voice get a library voice by gender, one each (`voices.auto_assign`, consent-flagged voices only), and it is put on their lines; the produce summary lists `voices_given` / `voices_missing`. Someone the library has no voice for speaks with the speech model's automatic voice when it has one (`media/tts.py`; the look ahead says `voice_shared`: everyone sounds alike), else the line is skipped as `no_voice`. Also on its own with `params.auto_voices`.
 * **A few failed assets do not stop the film.** In a full run (`keep_going`, on with `full`) a `produce` that ends with failed jobs is marked failed and keeps its summary (which assets, why), and `compose` still cuts the episode from what exists and reports the rest as warnings; the next full run makes only what failed and cuts again. When nothing at all could be made (and nothing was there to reuse) no film is cut from nothing: the run fails at `produce`. A story stage that fails still stops the run (the next episode is written from this one); an episode whose film could not be cut does not stop the episodes after it, and the run ends failed.
 * Without `full` nothing changed: a failed job fails the run at `produce`. The summary of a failed stage is now kept in both cases.
@@ -78,11 +105,22 @@ Params: `premise`, `acts`, `episode`, `source_text`, `visual_prompts` (false = d
 
 The writing agents (`screenwriter.*`, `reviewer.script`, `workshop.story|script`) are not tuned to one kind of work: the form of the work (`kinds.toml` `writing`), the genre notes (`genres.toml`), the picture frame, the longest spoken line and the shot length reach them as the variables `form_guidance`, `genre_guidance`, `frame_note`, `dialogue_chars`, `shot_sec`.
 
-**Revising with feedback**: `--stage script --param feedback="..."` (optionally `revise_scenes=["1.3","2.1"]`, as `act.scene`) keeps the outline and writes again the shots of the named scenes (every scene when none is named) from the feedback and their current shots (`screenwriter.shots` inputs `feedback`, `current`). The Web "工作流" page offers it under the script review: tick the review issues to apply, add own notes.
+**Revising with feedback**: `--stage script --param feedback="..."` (optionally `revise_scenes=["1.3","2.1"]`, as `act.scene`) keeps the outline and writes again the shots of the named scenes (every scene when none is named) from the feedback and their current shots (`screenwriter.shots` inputs `feedback`, `current`). The Web "工作流" page offers it under the script review: tick the review issues to apply, add own notes; from the page the rewrite is a proposal (`propose=true`), see below.
+
+**A rewrite is read before it reaches the script** (`workflow/revisions.py`, Web "修订预览"). Every rewrite of a written scene is kept with the shots it replaces (`workflow_data` key `revisions:<episode>`, the last 60):
+
+| Where the rewrite comes from | What happens to it |
+|---|---|
+| a revision asked for on the page (`feedback` + `propose=true`; `revision_source` = `review` / `own`) | `pending`: the script, its stage and the stages built on it stay as they are (the stage summary says `proposed`, `kept`) |
+| the logic reader of the script stage, run of single stages (`[workflow] script_review_apply = "confirm"`, the default) | `pending`; the script is not read a second time; `story_check.script.proposed` names the scenes |
+| the logic reader in a run to the film (`full`), or `review_apply=auto` / `script_review_apply = "auto"` | `applied` at once, so the run is not stopped for a person; what it replaced is kept and can be taken back |
+| `feedback` without `propose` (the command line) | written straight into the script, as before |
+
+`GET /api/projects/{id}/revisions?episode=` lists them with both sides as plain text; `POST .../revisions/decide {episode, accept, discard, revert}` puts confirmed ones into the script, drops them, or takes an applied one back. A scene that no longer reads as it did when the rewrite was written (somebody edited it) is never overwritten: the proposal is discarded and reported in `conflicts`. After a change the `script` stage is `stale`, so the next resume writes the shot cards of the changed scenes and does the later stages again (media: only what the change affects). Nothing is decided while a run of the project is active (409).
 
 ## i18n key list for the UI
 
-`workflow.stage.<stage>`, `workflow.status.<pending|queued|running|completed|failed|stale|cancelled>`, `workflow.progress.{stage_of,items,elapsed,eta,eta_unknown,working,queued,outline_check,outline_fix,script_check,script_fix}`, `workflow.error.not_ready` (+ `.remediation`), `api.error.not_ready`, `preflight.<llm_down|llm_model_missing|llm_role|service_down|not_installed|no_adapter|no_model|degraded|gate|voices_auto|voice_shared|no_voice>` (variables `subject`, `detail`), `web.preflight.*`, `web.storycheck.*`, `web.produce.{result,failures,voices_given,voices_missing}`, `web.produce.reason.{still,not_voiced}`, `agent.reviewer.{outline,logic}.*`, run `error_code` → `llm.error.<code>` / `workflow.error.<code>` (+ `.remediation`), API errors `api.error.{shot_locked,nothing_to_do}`. `GET /api/meta` returns `workflow_stages` and `workflow_statuses` with labels.
+`workflow.stage.<stage>`, `workflow.status.<pending|queued|running|completed|failed|stale|cancelled>`, `workflow.progress.{stage_of,items,elapsed,eta,eta_unknown,working,queued,outline_check,outline_fix,script_check,script_fix}`, `workflow.error.not_ready` (+ `.remediation`), `api.error.not_ready`, `preflight.<llm_down|llm_model_missing|llm_role|service_down|not_installed|no_adapter|no_model|degraded|gate|too_many_refs|too_many_refs_only|refs_dropped|refs_dropped_only|refused|voices_auto|voice_shared|no_voice|no_worker>` (variables `subject`, `detail` and the finding's `values`: `limit`, `most`, `count`, `models`, `what` = a `spec.subject.<type>` label, `error`), `preflight.people` (variable `names`, appended to a reference finding), `web.preflight.*`, `web.storycheck.*`, `web.produce.{result,failures,voices_given,voices_missing}`, `web.produce.reason.{still,not_voiced}`, `web.revisions.*` (the revisions page; `web.revisions.source.<review|own|logic>`), `web.storycheck.proposed`, `agent.reviewer.{outline,logic}.*`, run `error_code` → `llm.error.<code>` / `workflow.error.<code>` (+ `.remediation`), API errors `api.error.{shot_locked,nothing_to_do}`. `GET /api/meta` returns `workflow_stages` and `workflow_statuses` with labels.
 
 
 ## Produce and compose

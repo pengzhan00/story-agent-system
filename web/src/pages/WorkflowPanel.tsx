@@ -7,6 +7,7 @@ import { ProgressBar } from "../components/ProgressBar";
 import { ScriptRevise } from "../components/ScriptRevise";
 import { ProducePlan } from "../components/ProducePlan";
 import { ProduceRoadmap } from "../components/ProduceRoadmap";
+import { Revisions } from "../components/Revisions";
 import { SeasonCard } from "../components/SeasonCard";
 import { EpisodePlayer } from "../components/EpisodePlayer";
 import { RunError, RunProgress } from "../components/RunProgress";
@@ -319,6 +320,8 @@ export function WorkflowPanel({ id }: { id: number }) {
       {compose?.status === "completed" && compose.summary ? <EpisodePlayer projectId={id} summary={compose.summary} /> : null}
 
       <StoryCheck summary={stage("script")?.summary} />
+
+      <Revisions id={id} episode={episode} busy={active !== null} refreshKey={`${active?.id ?? ""}:${last?.id ?? ""}:${last?.status ?? ""}`} />
 
       <section className="card stack">
         <h2>{t("web.workflow.stages")}</h2>

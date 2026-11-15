@@ -22,7 +22,15 @@ from typing import Any
 from storyagent.domain import MediaKind
 from storyagent.domain.errors import ErrorCode
 
-from ..contracts import AdapterError, ArtifactSpec, Capabilities, JobContext, JobRecord, ValidationIssue
+from ..contracts import (
+    AdapterError,
+    ArtifactSpec,
+    Capabilities,
+    JobContext,
+    JobRecord,
+    ReferenceRule,
+    ValidationIssue,
+)
 from ._subprocess import Command, SubprocessAdapter
 
 IMAGE_EXT = {".png", ".jpg", ".jpeg", ".webp"}
@@ -56,6 +64,9 @@ class H3ImageAdapter(SubprocessAdapter):
             kinds=(MediaKind.IMAGE_GENERATE, MediaKind.IMAGE_EDIT), heavy=True, supports_cancel=True,
             supports_reattach=False, param_schema=SCHEMA, poll_interval_sec=self.poll_interval_sec,
         )
+
+    def reference_rule(self, kind: MediaKind) -> ReferenceRule | None:
+        return ReferenceRule(most=MAX_REFERENCES)
 
     # -- config -------------------------------------------------------------------------------
     @staticmethod

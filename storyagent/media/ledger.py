@@ -15,7 +15,7 @@ from dataclasses import dataclass, field, replace
 from datetime import datetime
 from typing import Any
 
-from storyagent.config import ConfigError, Settings
+from storyagent.config import ConfigError, ModelSpec, Settings
 from storyagent.db import Database
 from storyagent.domain import JobStatus
 from storyagent.domain.errors import ErrorCode
@@ -133,11 +133,8 @@ class Ledger:
         return (w, h) if w and h else None
 
     # -- enqueue ------------------------------------------------------------------------------
-    def enqueue(
-        self, job: MediaJob, project_settings: Mapping[str, Any] | None = None
-    ) -> tuple[JobRecord, bool]:
-        """Create a queued job. Returns (record, created); an identical active request returns the
-        existing job with ``created=False`` (idempotent double-click / retry-safe)."""
+    def _resolved(self, job: MediaJob, project_settings: Mapping[str, Any] | None) -> tuple[ModelSpec, dict[str, Any]]:
+        """The model a request runs on and its parameters after every layer (model, tier, project, job)."""
         cfg = self.settings_for(job.project_id)
         model_ref = job.model_ref or cfg.default_model(job.kind.value).ref
         model = cfg.model(model_ref)
@@ -147,6 +144,32 @@ class Ledger:
             cfg, model_ref, job.tier,
             project_settings=project_settings, job_params=job.params, frame=self.frame_of(job.project_id),
         )
+        return model, params
+
+    def draft(self, job: MediaJob, project_settings: Mapping[str, Any] | None = None) -> JobRecord:
+        """The record ``enqueue`` would store for this request, without storing anything: same model, same resolved
+        parameters. It is what ``media/gate.py`` is asked about before a run queues its jobs."""
+        model, params = self._resolved(job, project_settings)
+        return JobRecord(
+            id="", project_id=job.project_id, shot_id=job.shot_id, spec_id=job.spec_id,
+            spec_version=job.spec_version, kind=job.kind, provider=model.provider, model_ref=model.ref,
+            tier=job.tier, slot=job.slot, status=JobStatus.QUEUED, priority=job.priority, inputs=dict(job.inputs),
+            params=params, seed=job.seed, idempotency_key="", heavy=bool(model.heavy),
+            est_memory_gib=model.est_memory_gib, est_seconds=0, license_tag=model.license_tag,
+            commercial_ok=bool(model.commercial_ok), attempt=0, max_attempts=1, parent_job_id=None, lease_owner=None,
+            lease_expires_at=None, external_id=None, progress=0.0, progress_msg="", error_code=None,
+            error_message=None, cancel_requested=False, created_at="", started_at=None, finished_at=None,
+            actual_seconds=None, peak_memory_gib=None, depends_on=job.depends_on, pipeline_id=job.pipeline_id,
+            pipeline_step=job.pipeline_step,
+        )
+
+    def enqueue(
+        self, job: MediaJob, project_settings: Mapping[str, Any] | None = None
+    ) -> tuple[JobRecord, bool]:
+        """Create a queued job. Returns (record, created); an identical active request returns the
+        existing job with ``created=False`` (idempotent double-click / retry-safe)."""
+        model, params = self._resolved(job, project_settings)
+        model_ref = model.ref
         key = job.idempotency_key or digest({
             "p": job.project_id, "s": job.shot_id, "spec": [job.spec_id, job.spec_version],
             "k": job.kind.value, "slot": job.slot, "m": model_ref, "t": job.tier.value,

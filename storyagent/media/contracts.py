@@ -212,6 +212,22 @@ class Capabilities:
 
 
 @dataclass(frozen=True)
+class ReferenceRule:
+    """Reference images a model takes for one kind of job. ``most``: more than this and the job is refused (``None`` =
+    no such limit). ``used``: how many of the given ones are actually read, the rest are dropped without an error
+    (``None`` = all of them)."""
+
+    most: int | None = None
+    used: int | None = None
+
+    @property
+    def room(self) -> int | None:
+        """How many reference images make a difference (``None`` = any number)."""
+        counts = [n for n in (self.most, self.used) if n is not None]
+        return min(counts) if counts else None
+
+
+@dataclass(frozen=True)
 class HealthReport:
     state: HealthState
     detail: str = ""
@@ -255,6 +271,12 @@ class AdapterBase:
 
     def validate(self, job: JobRecord, ctx: JobContext) -> list[ValidationIssue]:
         return []
+
+    def reference_rule(self, kind: MediaKind) -> ReferenceRule | None:
+        """What a job of ``kind`` may carry as reference images; ``None`` = this adapter states nothing (it depends on
+        the model entry: a ComfyUI workflow, a connector; ``max_refs`` / ``used_refs`` in models.toml say it there).
+        One statement, read everywhere a model is matched to what a job carries (``media/refs.py``)."""
+        return None
 
     def cancel(self, external_id: str, job: JobRecord, ctx: JobContext) -> None:
         return None

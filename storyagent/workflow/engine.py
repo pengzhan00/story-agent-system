@@ -159,6 +159,7 @@ class WorkflowEngine:
             dict(params or {}), progress or (lambda *_: None), cancelled or (lambda: False), self.spec_store, stage,
             media_wait=self.waiting_on_media, adapters=self.adapters,
         )
+        before = next(s for s in self.state.stages(project_id, episode) if s["stage"] == stage)
         self.state.set_stage(project_id, stage, "running", episode=episode)
         if progress:
             progress(stage, 0, 0, "")           # the stage is visibly running before its first item completes
@@ -183,6 +184,11 @@ class WorkflowEngine:
             self.state.set_stage(project_id, stage, "failed", error_code="internal", error_message=str(exc),
                                  episode=episode)
             raise
+        if summary.get("kept") and before["status"] in ("completed", "stale", "failed"):
+            # the stage changed nothing (a rewrite waits as a proposal): it stands as it stood, nothing goes stale
+            self.state.set_stage(project_id, stage, before["status"], error_code=before["error_code"],
+                                 error_message=before["error_message"], episode=episode, outdate=False)
+            return summary
         self.state.set_stage(project_id, stage, "completed", summary=summary, episode=episode)
         return summary
 

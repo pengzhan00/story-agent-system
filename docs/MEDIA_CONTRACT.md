@@ -37,6 +37,7 @@ class Adapter(Protocol):
     def capabilities(self) -> Capabilities      # kinds, heavy, supports_cancel/reattach, param_schema, poll_interval_sec
     def health(self) -> HealthReport             # ok | missing_model | missing_tool | not_running | degraded | ...
     def validate(self, job, ctx) -> list[ValidationIssue]
+    def reference_rule(self, kind) -> ReferenceRule | None   # reference images it takes: most (refused beyond), used (read)
     def submit(self, job, ctx) -> str            # external id
     def poll(self, external_id, job, ctx) -> Progress   # running | succeeded | failed(+AdapterError)
     def fetch(self, external_id, job, ctx) -> list[ArtifactSpec]

@@ -26,6 +26,31 @@ def _join(parts: list[object], sep: str = " · ") -> str:
     return sep.join(str(p) for p in parts if p)
 
 
+def shot_lines(shot: dict[str, Any], t: Translate, *, plain: bool = False) -> list[str]:
+    """One shot as lines of text: its heading, what happens, what is said. ``plain`` leaves the Markdown marks out
+    (for a page that shows the text as it is)."""
+    bold, soft, item = ("", "", "") if plain else ("**", "*", "- ")
+    seconds = t("script.text.seconds", n=shot["duration_sec"]) if shot.get("duration_sec") else ""
+    out = [bold + _join([t("script.text.shot", n=shot.get("shot_number", "")),
+                         shot.get("camera_angle"), shot.get("camera_movement"), seconds]) + bold]
+    if shot.get("action"):
+        out.append(str(shot["action"]))
+    if shot.get("narration"):
+        out.append(f"{soft}{t('script.text.narration')}:{soft} {shot['narration']}")
+    for d in shot.get("dialogue", []):
+        if isinstance(d, dict) and d.get("line"):
+            who = str(d.get("character", ""))
+            mood = f" ({d['emotion']})" if d.get("emotion") else ""
+            out.append(f"{item}{bold}{who}{bold}{mood}: {d['line']}")
+    return out
+
+
+def shots_text(shots: list[dict[str, Any]], t: Translate) -> str:
+    """The shots of one scene as plain text, a blank line between shots: for reading a rewrite next to what it
+    replaces."""
+    return "\n\n".join("\n".join(shot_lines(shot, t, plain=True)) for shot in shots)
+
+
 def render(title: str, synopsis: str, acts: list[dict[str, Any]], t: Translate, *, heading: str = "") -> str:
     out: list[str] = [f"# {heading or title}"]
     if heading and title and title != heading:
@@ -43,16 +68,5 @@ def render(title: str, synopsis: str, acts: list[dict[str, Any]], t: Translate, 
             if scene.get("narration"):
                 out.append(f"*{t('script.text.narration')}:* {scene['narration']}")
             for shot in scene.get("shots", []):
-                seconds = t("script.text.seconds", n=shot["duration_sec"]) if shot.get("duration_sec") else ""
-                out += ["", "**" + _join([t("script.text.shot", n=shot.get("shot_number", "")),
-                                          shot.get("camera_angle"), shot.get("camera_movement"), seconds]) + "**"]
-                if shot.get("action"):
-                    out.append(str(shot["action"]))
-                if shot.get("narration"):
-                    out.append(f"*{t('script.text.narration')}:* {shot['narration']}")
-                for d in shot.get("dialogue", []):
-                    if isinstance(d, dict) and d.get("line"):
-                        who = str(d.get("character", ""))
-                        mood = f" ({d['emotion']})" if d.get("emotion") else ""
-                        out.append(f"- **{who}**{mood}: {d['line']}")
+                out += ["", *shot_lines(shot, t)]
     return "\n".join(out) + "\n"

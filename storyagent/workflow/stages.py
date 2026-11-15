@@ -38,7 +38,7 @@ from storyagent.i18n import LocaleError, get_catalog
 from storyagent.projects import Project, ProjectStore
 from storyagent.story import StoryStore
 
-from . import coherence
+from . import coherence, revisions
 from .framing import fix_framing
 from .grammar import run_check
 from .shotplan import build_shot_rows
@@ -535,6 +535,9 @@ def script(ctx: Ctx) -> dict[str, Any]:
     revise = {str(x) for x in ctx.params.get("revise_scenes") or []}
     if feedback and not (existing and existing["acts"]):
         raise StageError("needs_stage", "there is no script to revise yet", stage="script")
+    # ``propose``: the rewrite is not put into the script; it waits to be read next to what it would replace and is
+    # taken or left by a person (``workflow/revisions.py``). The script and the stages built on it stay as they are.
+    propose = bool(feedback) and bool(ctx.params.get("propose"))
 
     # what the episodes before this one showed and fixed: every writer and reader of this episode is told
     facts_of = {int(s["episode_no"]): (ctx.state.get_data(ctx.pid, f"story:{s['episode_no']}") or {}).get("facts")
@@ -587,8 +590,9 @@ def script(ctx: Ctx) -> dict[str, Any]:
     facts = coherence.facts_text((ctx.state.get_data(ctx.pid, f"story:{episode}") or {}).get("facts"))
     factor = int(ctx.params.get("shot_count_factor") or MAX_SHOT_FACTOR)
 
-    def write_scene(index: int, notes: str) -> None:
-        """Write (or, with ``notes``, write again) the shots of one scene, told the whole story before it."""
+    def write_scene(index: int, notes: str, keep: bool = True) -> list[dict[str, Any]]:
+        """Write (or, with ``notes``, write again) the shots of one scene, told the whole story before it. ``keep``
+        puts them into the script; without it they are only returned (a proposal)."""
         act, scene = scenes[index]
         before = scenes[index - 1][1] if index else {}
         following = scenes[index + 1][1].get("beat", "") if index + 1 < len(scenes) else ""
@@ -612,17 +616,30 @@ def script(ctx: Ctx) -> dict[str, Any]:
         for i, shot in enumerate(shots, start=1):
             shot["shot_number"] = i
         fix_framing(shots, ctx.settings.grammar, new_place=scene.get("location") != before.get("location"))
-        scene["shots"] = shots
-        ctx.store.update_script_scene(ctx.pid, episode, act["number"], scene["number"], {"shots": shots})
+        if keep:
+            scene["shots"] = shots
+            ctx.store.update_script_scene(ctx.pid, episode, act["number"], scene["number"], {"shots": shots})
+        return shots
 
     wrote = 0
+    proposed: list[str] = []
     for index, (act, scene) in enumerate(scenes):
-        ctx.step(index, len(scenes), f"{act['number']}.{scene['number']}")
-        revising = bool(feedback) and (not revise or f"{act['number']}.{scene['number']}" in revise)
+        name = f"{act['number']}.{scene['number']}"
+        ctx.step(index, len(scenes), name)
+        revising = bool(feedback) and (not revise or name in revise)
         if scene.get("shots") and not ctx.force() and not revising:
+            continue
+        if propose and scene.get("shots"):
+            if revisions.propose(ctx.state, ctx.pid, episode, scene=name, notes=feedback,
+                                 source=str(ctx.params.get("revision_source") or "own"),
+                                 before=list(scene["shots"]), after=write_scene(index, feedback, keep=False)):
+                proposed.append(name)
             continue
         write_scene(index, feedback if revising else "")
         wrote += 1
+    if propose:
+        ctx.step(len(scenes), len(scenes), "done")
+        return {"episode": episode, "proposed": proposed, "kept": True}
 
     # the script is read once more for story logic, and the scenes with a serious problem are written again with
     # the reader's notes: a fresh script only (a revision asked for by a person is theirs to judge), or on request
@@ -630,7 +647,13 @@ def script(ctx: Ctx) -> dict[str, Any]:
     if rounds > 0 and ((wrote and not feedback) or ctx.params.get("story_check") is True):
         most = int(ctx.settings.workflow.get("script_review_max_scenes", 4))
         where = {f"{a['number']}.{sc['number']}": n for n, (a, sc) in enumerate(scenes)}
+        # a run to the film applies the reader's rewrites itself (it is not stopped for a person) and keeps what
+        # they replaced; otherwise they wait as proposals to be read and taken or left
+        how = ctx.params.get("review_apply") or (
+            "auto" if ctx.params.get("full") else ctx.settings.workflow.get("script_review_apply", "confirm"))
+        auto = str(how) == "auto"
         rewritten: list[str] = []
+        waiting: list[str] = []
         review: dict[str, Any] = {}
         for attempt in range(rounds + 1):
             ctx.step(len(scenes), len(scenes), f"workflow.progress.script_check|{attempt + 1}")
@@ -644,9 +667,15 @@ def script(ctx: Ctx) -> dict[str, Any]:
                 break
             for key in sorted(by_scene, key=lambda k: where[k])[:most]:
                 ctx.step(len(scenes), len(scenes), f"workflow.progress.script_fix|{key}")
-                write_scene(where[key], coherence.notes_text(by_scene[key]))
-                rewritten.append(key)
-        checks["script"] = coherence.summary_of(review, attempt, rewritten)
+                notes = coherence.notes_text(by_scene[key])
+                old = list(scenes[where[key]][1].get("shots") or [])
+                new = write_scene(where[key], notes, keep=auto)
+                revisions.propose(ctx.state, ctx.pid, episode, scene=key, source="logic", notes=notes, before=old,
+                                  after=new, status=revisions.APPLIED if auto else revisions.PENDING)
+                (rewritten if auto else waiting).append(key)
+            if not auto:
+                break                   # nothing went into the script: reading it again would find the same
+        checks["script"] = {**coherence.summary_of(review, attempt, rewritten), "proposed": waiting}
         ctx.state.put_data(ctx.pid, f"story_check:{episode}", checks)
     from .detail import detail_pass
 
@@ -660,7 +689,8 @@ def script(ctx: Ctx) -> dict[str, Any]:
     ctx.step(len(scenes), len(scenes), "done")
     return {"episode": episode, "acts": len(outline["acts"]), "scenes": len(scenes),
             "shots": sum(len(sc.get("shots", [])) for _, sc in scenes), "unknown_speakers": unknown,
-            "new_characters": introduced, "story_check": checks, **detailed}
+            "new_characters": introduced, "story_check": checks,
+            "revisions_pending": len(revisions.pending(ctx.state, ctx.pid, episode)), **detailed}
 
 
 def scenes(ctx: Ctx) -> dict[str, Any]:

@@ -20,19 +20,17 @@ import time
 import traceback
 from collections.abc import Callable, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
-from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from storyagent import content
 from storyagent.config import Settings
 from storyagent.config.reload import fingerprint
 from storyagent.db import Database
 from storyagent.domain.errors import ErrorCode
 from storyagent.util import new_id
 
-from . import compliance
-from .assetrefs import RefError, Resolver
+from . import compliance, gate
+from .assetrefs import Resolver
 from .broker import CaffeinateGuard, select_next, system_available_gib
 from .contracts import (
     Adapter,
@@ -43,9 +41,7 @@ from .contracts import (
 )
 from .ledger import Ledger, NewAsset
 from .llm_resident import ResidentLLMProbe, build_probes
-from .params import validate_params
 from .probe import probe
-from .prompts import language_issues
 from .registry import AdapterRegistry
 
 if TYPE_CHECKING:
@@ -57,6 +53,23 @@ _MEDIA_EXT = {
     ".mp4", ".mov", ".mkv", ".webm", ".wav", ".mp3", ".m4a", ".flac", ".ogg", ".png", ".jpg", ".jpeg", ".webp",
 }
 _IMAGE_EXT = {".png", ".jpg", ".jpeg", ".webp"}
+BEAT_FILE = ("run", "worker.json")      # under the home folder: the sign that a worker is scheduling
+BEAT_EVERY = 10.0                       # seconds between two signs
+
+
+def beat_path(settings: Settings) -> Path:
+    return Path(settings.home).joinpath(*BEAT_FILE)
+
+
+def worker_age(settings: Settings, now: float | None = None) -> float | None:
+    """Seconds since a worker of this installation last said it is scheduling; ``None`` = none has said so. The API
+    and the worker share no process and no call: this small file next to the database is how the API can tell a run
+    it queues will be picked up (``workflow/preflight.py``)."""
+    try:
+        said = float(json.loads(beat_path(settings).read_text()).get("at", 0))
+    except (OSError, ValueError, AttributeError):
+        return None
+    return max((now if now is not None else time.time()) - said, 0.0)
 _TRANSIENT_POLL_FAILURES = 3
 
 
@@ -95,6 +108,7 @@ class Worker:
         self._beat = float(settings.runtime.get("heartbeat_seconds", 15))
         self._external_checked = 0.0
         self._external_running: set[str] = set()
+        self._said = 0.0
 
     # -- scheduling ---------------------------------------------------------------------------
     def tick(self) -> int:
@@ -236,6 +250,18 @@ class Worker:
     def _idle(self) -> bool:
         return all(f.done() for f in self._futures.values()) and all(f.done() for f in self._wf_futures.values())
 
+    def say_alive(self) -> None:
+        """Leave the sign that this worker is scheduling (at most every ``BEAT_EVERY`` seconds; never fails a pass)."""
+        if time.monotonic() - self._said < BEAT_EVERY:
+            return
+        self._said = time.monotonic()
+        try:
+            path = beat_path(self.settings)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps({"owner": self.owner, "at": time.time()}))
+        except OSError:
+            log.debug("worker sign not written", exc_info=True)
+
     def run_forever(
         self, stop: threading.Event | None = None,
         reload: Callable[[], tuple[Settings, AdapterRegistry]] | None = None,
@@ -248,6 +274,7 @@ class Worker:
         with CaffeinateGuard(bool(self.settings.runtime.get("caffeinate", True))):
             while not stop.is_set():
                 try:
+                    self.say_alive()
                     self.tick()
                     if reload is not None and self._idle():
                         now = fingerprint(self.settings.config_dir)
@@ -367,7 +394,6 @@ class Worker:
         if adapter is None:
             raise AdapterError(ErrorCode.MISSING_TOOL, f"no adapter for provider {job.provider}", tool=job.provider)
         slug, project_settings, project_rating = self._project(job.project_id)
-        rating = content.job_rating(s, project_rating, job.model_ref)
         work_dir.mkdir(parents=True, exist_ok=True)
         graph_node = self.db.conn.execute(
             "SELECT n.node_id,r.plan FROM control_nodes n JOIN control_runs r ON r.id=n.run_id WHERE n.job_id=?",
@@ -389,33 +415,14 @@ class Worker:
 
             log_event("resource_snapshot", snapshot=memory_snapshot())
 
-        try:  # asset:/library: references become plain paths; adapters never see them
-            inputs, params, resolved = self.resolver.resolve(job.inputs, job.params)
-        except RefError as exc:
-            raise AdapterError(ErrorCode.INVALID_INPUT, str(exc), detail=str(exc)) from exc
-        if resolved:
-            job = replace(job, inputs=inputs, params=params)
-            log_event("refs_resolved", refs=resolved.assets, sha256=resolved.sha256)
-            for aid in resolved.assets.values():
-                rating = s.content.higher(rating, led.get_asset(aid).rating)
-        ctx = JobContext(s, job, work_dir, log_event, project_settings)
+        # 1) gates: references, compliance, content, parameters, the adapter's own validation (media/gate.py; the
+        #    look ahead of a run asks the same function before anything is queued)
+        checked = gate.check(s, self.db, led, adapter, self.resolver, job, work_dir,
+                             project_settings=project_settings, project_rating=project_rating, log=log_event)
+        job, ctx, rating = checked.job, checked.ctx, checked.rating
         caps = adapter.capabilities()
-
-        # 1) gates: compliance, parameters, adapter-specific validation
-        issues = compliance.check_job(s, job, project_settings) + compliance.check_remote(s, job, project_settings)
-        notice = compliance.license_notice(s, job, project_settings)
-        if notice:
-            log_event("license_notice", "warning", **notice)
-        issues += content.gate_issues(s, self.db, job, job.project_id, rating)
-        picked = s.models.get(job.model_ref)
-        if picked is not None:
-            issues += language_issues(picked.prompt_language, job.kind.value, job.inputs)
-        p_issues, warnings = validate_params(job.params, caps.param_schema, strict=s.strict_params)
-        issues += p_issues + adapter.validate(job, ctx)
-        for w in warnings:
-            log_event("param_warning", "warning", message=w)
-        if issues:
-            first = issues[0]
+        if checked.issues:
+            first = checked.issues[0]
             raise AdapterError(first.code, first.message, **dict(first.params))
 
         # 2) optionally free memory held by resident LLMs

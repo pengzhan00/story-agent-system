@@ -402,19 +402,26 @@ def test_the_queue_lists_the_story_runs_of_every_project(client: TestClient, fse
     assert [r["project_name"] for r in client.get("/api/workflow/runs").json()] == ["Rain"]
 
 
-def test_a_full_run_is_looked_at_before_it_starts_and_refused_while_something_is_missing(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch,
+def test_a_run_is_looked_at_before_it_starts_and_refused_while_something_is_missing(
+    client: TestClient, fsettings: Settings, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from storyagent.workflow import preflight
 
     down = preflight.Finding("service_down", "block", "comfy", "krea-2")
     note = preflight.Finding("voices_auto", "warn", "Lin Wan", "3")
     found = [down, note]
-    monkeypatch.setattr(preflight, "look_ahead", lambda *a, **kw: list(found))
+
+    def look(*a: Any, stages: list[str], **kw: Any) -> list[preflight.Finding]:
+        # the picture service matters to a run that makes pictures, whichever way it was started
+        return [f for f in found if f is not down or "produce" in stages]
+
+    monkeypatch.setattr(preflight, "look_ahead", look)
+    monkeypatch.setitem(fsettings.workflow, "preflight", True)           # the test rig queues runs unseen otherwise
     pid = new_project(client)
     look = client.get(f"/api/projects/{pid}/preflight").json()
     assert look["ready"] is False and look["stages"][0] == "analyze" and look["stages"][-2:] == ["produce", "compose"]
-    assert look["findings"] == [down.to_dict(), note.to_dict()]
+    idle = preflight.Finding("no_worker", "warn")                          # no worker runs next to this test
+    assert look["findings"] == [down.to_dict(), note.to_dict(), idle.to_dict()]
     refused = client.post(f"/api/projects/{pid}/workflow/runs", json={"params": {"full": True}})
     assert refused.status_code == 409 and refused.json()["error"]["code"] == "not_ready"
     assert refused.json()["error"]["detail"] == [down.to_dict()]            # only what blocks
@@ -423,6 +430,15 @@ def test_a_full_run_is_looked_at_before_it_starts_and_refused_while_something_is
     plain = started(client, pid)
     assert plain["stages"][-1] == "specs"
     client.post(f"/api/workflow/runs/{plain['id']}/cancel")
+    # a run of single stages is looked at the same way: the one that makes pictures is refused too
+    step = client.post(f"/api/projects/{pid}/workflow/runs", json={"stages": ["produce"]})
+    assert step.status_code == 409 and step.json()["error"]["detail"] == [down.to_dict()]
+    asked = client.get(f"/api/projects/{pid}/preflight?stages=produce").json()
+    assert asked["stages"] == ["produce"] and asked["ready"] is False
+    forced = client.post(f"/api/projects/{pid}/workflow/runs",
+                         json={"stages": ["produce"], "params": {"skip_preflight": True}})
+    assert forced.status_code == 201, forced.text
+    client.post(f"/api/workflow/runs/{forced.json()['id']}/cancel")
     # with only notes left the full run starts, and it covers the media and the film
     found.remove(down)
     assert client.get(f"/api/projects/{pid}/preflight").json()["ready"] is True

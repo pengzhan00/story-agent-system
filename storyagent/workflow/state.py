@@ -91,8 +91,10 @@ class WorkflowState:
 
     def set_stage(
         self, project_id: int, stage: str, status: str, *, summary: dict[str, Any] | None = None,
-        error_code: str | None = None, error_message: str | None = None, episode: int = 1,
+        error_code: str | None = None, error_message: str | None = None, episode: int = 1, outdate: bool = True,
     ) -> None:
+        """``outdate=False``: the stage is put back as it was after a run that changed nothing (a rewrite kept as a
+        proposal), so the stages built on it are not made stale."""
         if stage not in STAGES:
             raise WorkflowStateError(f"unknown stage {stage!r}")
         now = now_iso()
@@ -113,7 +115,7 @@ class WorkflowState:
                     " error_message=? WHERE project_id=? AND stage=? AND season=? AND episode=?",
                     (status, now, json.dumps(summary, ensure_ascii=False) if summary is not None else None,
                      error_code, error_message, *key))
-            if status == "completed":
+            if status == "completed" and outdate:
                 # a series stage outdates the later stages of every episode, an episode stage only its own
                 where, extra = (("", ()) if stage in SERIES_STAGES else
                                 (" AND season=?", (season,)) if stage in SEASON_STAGES else (" AND episode=?", (ep,)))

@@ -842,15 +842,18 @@ class AutoVoicesOut(Strict):
 
 class PreflightFinding(Strict):
     code: str = Field(description="llm_down | llm_model_missing | llm_role | service_down | not_installed | no_adapter"
-                                  " | no_model | degraded | gate | voices_auto | no_voice (i18n preflight.<code>)")
-    level: str = Field(description="block = a full run is not started; warn = shown, the run goes on")
+                                  " | no_model | degraded | gate | too_many_refs(_only) | refs_dropped(_only) | refused"
+                                  " | voices_auto | voice_shared | no_voice | no_worker (i18n preflight.<code>)")
+    level: str = Field(description="block = the run is not started; warn = shown, the run goes on")
     subject: str = Field(description="the service, model, role, kind or people it is about")
     detail: str
+    values: dict[str, str] = Field(description="further {placeholders} of the message: limit, most, count, models "
+                                               "(the models that take that many references), what, error")
 
 
 class PreflightOut(Strict):
     ready: bool = Field(description="no blocking finding")
-    stages: list[str] = Field(description="what a full run would do now, in order")
+    stages: list[str] = Field(description="what the run would do now, in order")
     findings: list[PreflightFinding]
 
 
@@ -926,6 +929,41 @@ class ReviewIssue(Strict):
     where: str = ""
     problem: str = ""
     fix: str = ""
+
+
+class RevisionOut(Strict):
+    id: str
+    episode: int
+    scene: str = Field(description='"act.scene"')
+    source: str = Field(description="review (the review's notes) | own (the editor's words) | logic (the logic "
+                                    "reader of the script stage)")
+    status: str = Field(description="pending (not in the script) | applied (in the script, can be taken back) | "
+                                    "discarded | reverted")
+    notes: str = Field(description="what the rewrite was asked to mend")
+    before_text: str = Field(description="the shots it replaces, as text in the reader's language")
+    after_text: str = Field(description="the rewritten shots")
+    created_at: str
+    decided_at: str | None
+
+
+class RevisionsOut(Strict):
+    episode: int
+    items: list[RevisionOut] = Field(description="newest first")
+
+
+class RevisionDecision(BaseModel):
+    episode: int = 1
+    accept: list[str] = Field(default_factory=list, description="ids of pending proposals to put into the script")
+    discard: list[str] = Field(default_factory=list, description="ids of pending proposals to drop")
+    revert: list[str] = Field(default_factory=list, description="ids of applied proposals to take back")
+
+
+class RevisionDecided(Strict):
+    applied: list[str] = Field(description='the scenes ("act.scene") whose rewrite went into the script')
+    discarded: list[str]
+    reverted: list[str] = Field(description="the scenes whose old shots were put back")
+    conflicts: list[str] = Field(description="scenes that no longer read as they did when the rewrite was written: "
+                                             "nothing was overwritten, the proposal was discarded")
 
 
 class ScriptReviewOut(Strict):

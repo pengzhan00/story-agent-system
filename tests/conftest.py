@@ -89,6 +89,9 @@ caffeinate = false
 memory_budget_gib = 64
 check_system_memory = false
 max_concurrent_jobs = 0
+
+[workflow]
+preflight = false       # API tests queue runs without asking this machine's language models (see test_api_story)
 """
 
 

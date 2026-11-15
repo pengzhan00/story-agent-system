@@ -108,6 +108,12 @@ fieldset { border: none; padding: 0; margin: 0; min-width: 0; } fieldset:disable
 .job-live { display: flex; flex-direction: column; gap: 4px; }
 .history { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .diff { width: 100%; font-size: 0.85rem; } .diff th { width: 110px; } .diff .del { color: var(--bad); } .diff .add { color: var(--ok); }
+/* a rewrite next to what it replaces: two columns that become one on a narrow screen */
+.revision-pair { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); align-items: start; }
+@media (max-width: 800px) { .revision-pair { grid-template-columns: 1fr; } }
+.revision-text { padding: 8px 10px; max-height: 320px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--track); border: 1px solid var(--line); border-radius: 8px; }
+.revision-text .del { text-decoration: line-through; }
+.prewrap { white-space: pre-wrap; margin: 0; }
 details > summary { cursor: pointer; }
 
 input[type="number"] { width: 5.5rem; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }

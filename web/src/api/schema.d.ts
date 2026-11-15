@@ -2001,8 +2001,10 @@ export interface paths {
         };
         /**
          * Get Preflight
-         * @description Before a run that goes all the way to the film: the stages it would do and what is missing for them (a
-         *     language model that is not installed, a media service that is not running, people without a voice). Read only.
+         * @description Before a run: the stages it would do and what is missing for them (a language model that is not installed, a
+         *     media service that is not running, a model that does not take the reference images it would be given, people
+         *     without a voice). Without ``stages`` it is the run to the film; ``stages=produce`` (comma separated) is a run of
+         *     those stages only. Read only.
          */
         get: operations["get_preflight_api_projects__project_id__preflight_get"];
         put?: never;
@@ -2120,6 +2122,51 @@ export interface paths {
         get: operations["board_api_projects__project_id__review_board_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Revisions
+         * @description The rewrites of written scenes of one episode, newest first, each with the shots it replaces and the shots it
+         *     proposes as text: the ones that wait to be confirmed (``pending``) and the ones already in the script
+         *     (``applied``; a run to the film applies the logic reader's rewrites itself).
+         */
+        get: operations["list_revisions_api_projects__project_id__revisions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/revisions/decide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decide Revisions
+         * @description Put confirmed rewrites into the script (``accept``), drop them (``discard``) or take an applied one back
+         *     (``revert``). A scene that was edited since the rewrite was written is not overwritten (``conflicts``). When the
+         *     script changed, its stage becomes stale: the next resume writes the shot cards of the changed scenes and does the
+         *     stages built on the script again. 409 ``conflict`` while a run of the project is active.
+         */
+        post: operations["decide_revisions_api_projects__project_id__revisions_decide_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2637,9 +2684,9 @@ export interface paths {
         /**
          * Start Run
          * @description Queue a run; the worker executes it. Without ``stages`` the run resumes where the project stopped; with
-         *     ``params.full`` such a run goes on to the media and the film (``produce``, ``compose``), and is refused
-         *     (409 ``not_ready``, the findings in ``detail``) while something it needs is missing, unless
-         *     ``params.skip_preflight``.
+         *     ``params.full`` such a run goes on to the media and the film (``produce``, ``compose``). Any run, to the film or
+         *     of single stages, is refused (409 ``not_ready``, the findings in ``detail``) while something its stages need is
+         *     missing, unless ``params.skip_preflight`` (or ``[workflow] preflight = false``).
          */
         post: operations["start_run_api_projects__project_id__workflow_runs_post"];
         delete?: never;
@@ -5600,14 +5647,14 @@ export interface components {
         PreflightFinding: {
             /**
              * Code
-             * @description llm_down | llm_model_missing | llm_role | service_down | not_installed | no_adapter | no_model | degraded | gate | voices_auto | no_voice (i18n preflight.<code>)
+             * @description llm_down | llm_model_missing | llm_role | service_down | not_installed | no_adapter | no_model | degraded | gate | too_many_refs(_only) | refs_dropped(_only) | refused | voices_auto | voice_shared | no_voice | no_worker (i18n preflight.<code>)
              */
             code: string;
             /** Detail */
             detail: string;
             /**
              * Level
-             * @description block = a full run is not started; warn = shown, the run goes on
+             * @description block = the run is not started; warn = shown, the run goes on
              */
             level: string;
             /**
@@ -5615,6 +5662,13 @@ export interface components {
              * @description the service, model, role, kind or people it is about
              */
             subject: string;
+            /**
+             * Values
+             * @description further {placeholders} of the message: limit, most, count, models (the models that take that many references), what, error
+             */
+            values: {
+                [key: string]: string;
+            };
         };
         /** PreflightOut */
         PreflightOut: {
@@ -5627,7 +5681,7 @@ export interface components {
             ready: boolean;
             /**
              * Stages
-             * @description what a full run would do now, in order
+             * @description what the run would do now, in order
              */
             stages: string[];
         };
@@ -6457,6 +6511,100 @@ export interface components {
             shot: number;
             /** Shot Id */
             shot_id: number;
+        };
+        /** RevisionDecided */
+        RevisionDecided: {
+            /**
+             * Applied
+             * @description the scenes ("act.scene") whose rewrite went into the script
+             */
+            applied: string[];
+            /**
+             * Conflicts
+             * @description scenes that no longer read as they did when the rewrite was written: nothing was overwritten, the proposal was discarded
+             */
+            conflicts: string[];
+            /** Discarded */
+            discarded: string[];
+            /**
+             * Reverted
+             * @description the scenes whose old shots were put back
+             */
+            reverted: string[];
+        };
+        /** RevisionDecision */
+        RevisionDecision: {
+            /**
+             * Accept
+             * @description ids of pending proposals to put into the script
+             */
+            accept?: string[];
+            /**
+             * Discard
+             * @description ids of pending proposals to drop
+             */
+            discard?: string[];
+            /**
+             * Episode
+             * @default 1
+             */
+            episode: number;
+            /**
+             * Revert
+             * @description ids of applied proposals to take back
+             */
+            revert?: string[];
+        };
+        /** RevisionOut */
+        RevisionOut: {
+            /**
+             * After Text
+             * @description the rewritten shots
+             */
+            after_text: string;
+            /**
+             * Before Text
+             * @description the shots it replaces, as text in the reader's language
+             */
+            before_text: string;
+            /** Created At */
+            created_at: string;
+            /** Decided At */
+            decided_at: string | null;
+            /** Episode */
+            episode: number;
+            /** Id */
+            id: string;
+            /**
+             * Notes
+             * @description what the rewrite was asked to mend
+             */
+            notes: string;
+            /**
+             * Scene
+             * @description "act.scene"
+             */
+            scene: string;
+            /**
+             * Source
+             * @description review (the review's notes) | own (the editor's words) | logic (the logic reader of the script stage)
+             */
+            source: string;
+            /**
+             * Status
+             * @description pending (not in the script) | applied (in the script, can be taken back) | discarded | reverted
+             */
+            status: string;
+        };
+        /** RevisionsOut */
+        RevisionsOut: {
+            /** Episode */
+            episode: number;
+            /**
+             * Items
+             * @description newest first
+             */
+            items: components["schemas"]["RevisionOut"][];
         };
         /** RunBody */
         RunBody: {
@@ -12477,6 +12625,8 @@ export interface operations {
             query?: {
                 episode?: number;
                 episodes?: string;
+                stages?: string;
+                tier?: string;
             };
             header?: never;
             path: {
@@ -12798,6 +12948,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReviewShotOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_revisions_api_projects__project_id__revisions_get: {
+        parameters: {
+            query?: {
+                episode?: number;
+            };
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevisionsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decide_revisions_api_projects__project_id__revisions_decide_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RevisionDecision"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevisionDecided"];
                 };
             };
             /** @description Validation Error */

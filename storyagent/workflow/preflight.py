@@ -6,20 +6,50 @@ ahead a picture service that was never started is found out after the story is w
 ready, and whether the people of the story have a voice. A ``block`` finding stops a full run before it starts (the
 answer says what to start or install); a ``warn`` finding is shown and the run goes on.
 
-Findings carry a code (i18n ``preflight.<code>``), the thing it is about and a detail; nothing here starts, stops or
-installs anything.
+Findings carry a code (i18n ``preflight.<code>``), the thing it is about, a detail and named values for the message;
+nothing here starts, stops or installs anything.
+
+What can keep a run from its film, each kind of thing in one place (no two checks look at the same thing):
+
+==================  =======================================================  =====================================
+what is missing     looked at by                                             findings
+==================  =======================================================  =====================================
+someone to write    ``check_llm``: the role, its backend, its model           ``llm_role`` ``llm_down``
+                                                                              ``llm_model_missing``
+something to make   ``check_media``: a model for the kind, its adapter, its   ``no_model`` ``no_adapter``
+with                service, its weights                                      ``service_down`` ``not_installed``
+                                                                              ``degraded``
+leave to make it    the content gates of the project's rating                 ``gate``
+inputs that fit     ``check_references``: what each model states it takes     ``too_many_refs`` ``refs_dropped``
+                    (``media/refs.py``), known before the story is drawn      (``_only``: no other model takes them)
+                    ``check_jobs``: the worker's own gate (``media/gate.py``) ``refused``
+                    asked about every job that can be built now
+voices              ``check_voices``                                          ``voices_auto`` ``voice_shared``
+                                                                              ``no_voice``
+someone to run it   ``check_worker``: the sign a scheduling worker leaves     ``no_worker`` (told: the run waits in
+                    (``media/worker.py``), looked at before a run is queued   the queue until one is started)
+==================  =======================================================  =====================================
+
+Every way work starts goes through the same checks: a run to the film and a run of single stages are looked at
+before they are queued (the API refuses with ``not_ready``) and again by the worker before the first media job; a
+single job (the workshop, a spec made again by hand, the command line) meets ``media/gate.py`` in the worker.
 """
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
 from typing import Any
 
 from storyagent.agents.registry import load_specs
 from storyagent.config import ConfigError, Settings
+from storyagent.db import Database
 from storyagent.domain import MediaKind
 from storyagent.llm import LLMError, LLMRouter
-from storyagent.media.contracts import HealthState
+from storyagent.media import gate, refs
+from storyagent.media.assetrefs import Resolver
+from storyagent.media.contracts import HealthState, MediaJob
+from storyagent.media.ledger import Ledger
 from storyagent.media.registry import AdapterRegistry
 from storyagent.media.specs import SpecRecord
 from storyagent.media.tts import automatic_voice
@@ -32,6 +62,9 @@ MEDIA_STAGES = ("produce", "compose")
 USUAL_KINDS = (MediaKind.IMAGE_GENERATE, MediaKind.AUDIO_TTS, MediaKind.AUDIO_MUSIC, MediaKind.AUDIO_SFX,
                MediaKind.VIDEO_GENERATE)
 OPTIONAL_KINDS = {MediaKind.AUDIO_SFX.value, MediaKind.AUDIO_MUSIC.value, MediaKind.IMAGE_EDIT.value}
+# a film stands without these: a job of this kind that would be refused is told, it does not stop the run
+SPARE_KINDS = {MediaKind.AUDIO_SFX.value, MediaKind.AUDIO_MUSIC.value}
+NAMED = 6                   # how many names a finding spells out
 
 
 @dataclass(frozen=True)
@@ -40,9 +73,22 @@ class Finding:
     level: str
     subject: str = ""
     detail: str = ""
+    values: dict[str, str] = field(default_factory=dict)     # further {placeholders} of the message
 
-    def to_dict(self) -> dict[str, str]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+@dataclass(frozen=True)
+class RefUse:
+    """One thing to make that carries reference images: which model will make it and how many it is given."""
+
+    spec_id: str
+    subject_type: str
+    kind: str
+    model_ref: str
+    count: int
+    name: str = ""          # who it is, for a person to read (a character's name)
 
 
 def blocking(findings: Iterable[Finding]) -> list[Finding]:
@@ -160,6 +206,93 @@ def check_media(cfg: Settings, registry: AdapterRegistry, specs: Sequence[SpecRe
             elif state is HealthState.DEGRADED:
                 out.append(Finding("degraded", WARN, provider, missing))
     return out
+
+
+def check_references(cfg: Settings, registry: AdapterRegistry, uses: Sequence[RefUse]
+                     ) -> tuple[list[Finding], set[str]]:
+    """Reference images against what each model states it takes (``media/refs.py``): more than it accepts and the job
+    can only be refused (``too_many_refs``, stops the run); more than it reads and the rest is silently dropped
+    (``refs_dropped``, told). Each finding names the models of the same kind that take that many (``values.models``;
+    the ``_only`` code when there is none) and the people whose pictures are too many (``detail``). Also returns the
+    specs that can only be refused, so the job check does not say it a second time."""
+    groups: dict[tuple[str, str], list[RefUse]] = {}
+    for use in uses:
+        groups.setdefault((use.model_ref, use.kind), []).append(use)
+    out: list[Finding] = []
+    refused_ids: set[str] = set()
+    for (ref, kind), group in sorted(groups.items()):
+        rule = refs.rule_of(cfg, registry, ref, kind)
+        if rule is None:
+            continue
+        refused = [u for u in group if rule.most is not None and u.count > rule.most]
+        dropped = [u for u in group if rule.used is not None and u.count > rule.used and u not in refused]
+        refused_ids |= {u.spec_id for u in refused}
+        for code, level, hit, limit in (("too_many_refs", BLOCK, refused, rule.most),
+                                        ("refs_dropped", WARN, dropped, rule.used)):
+            if not hit:
+                continue
+            most = max(u.count for u in hit)
+            roomy = refs.roomy_models(cfg, registry, kind, most, exclude=ref)
+            people = list(dict.fromkeys(u.name for u in hit if u.name))
+            out.append(Finding(
+                code if roomy else f"{code}_only", level, ref, ", ".join(people[:NAMED]),
+                {"limit": str(limit), "count": str(len(hit)), "most": str(most),
+                 "models": ", ".join(m.text() for m in roomy[:4])}))
+    return out, refused_ids
+
+
+def check_jobs(
+    settings: Settings, db: Database, ledger: Ledger, registry: AdapterRegistry,
+    jobs: Sequence[tuple[SpecRecord, MediaJob]], *, project_settings: Mapping[str, Any], project_rating: str,
+    skip_providers: Iterable[str] = (),
+) -> list[Finding]:
+    """The jobs a run is about to queue, shown to the worker's own gate (``media/gate.py``) without queueing them:
+    whatever the worker would refuse (a size the tool does not draw, a parameter out of range, a reference that is
+    gone, a licence not acknowledged) is a ``refused`` finding with the reason the worker would give. One job is
+    asked for each shape (model, what it is for, how many references): jobs of one shape are refused alike.
+    ``skip_providers``: services already known to be down, whose answer would only repeat that."""
+    resolver = Resolver(settings, ledger)
+    scratch = Path(settings.home) / "tmp" / "preflight"       # never created: a check only reads
+    down = set(skip_providers)
+    shapes: dict[tuple[str, str, str, int], list[Any]] = {}
+    for spec, job in jobs:
+        try:
+            rec = ledger.draft(job, project_settings)
+        except ConfigError:
+            continue                                            # no model for the kind: check_media says so
+        if rec.provider in down or registry.get(rec.provider) is None:
+            continue
+        shape = (rec.model_ref, rec.kind.value, spec.subject_type, len(rec.inputs.get("refs") or []))
+        shapes.setdefault(shape, []).append(rec)
+    out: list[Finding] = []
+    for (model_ref, kind, subject, _), recs in sorted(shapes.items()):
+        adapter = registry.get(recs[0].provider)
+        if adapter is None:
+            continue
+        level = WARN if kind in SPARE_KINDS else BLOCK
+        try:
+            issues = gate.check(settings, db, ledger, adapter, resolver, recs[0], scratch,
+                                project_settings=project_settings, project_rating=project_rating).issues
+        except Exception as exc:  # noqa: BLE001 - a gate that throws would fail the job the same way
+            out.append(Finding("refused", level, model_ref, str(exc),
+                               {"count": str(len(recs)), "what": subject, "error": "exception"}))
+            continue
+        if issues:
+            first = issues[0]
+            out.append(Finding("refused", level, model_ref, first.message,
+                               {"count": str(len(recs)), "what": subject, "error": first.code.value}))
+    return out
+
+
+WORKER_QUIET = 60.0         # seconds without a sign after which no worker is taken to be running
+
+
+def check_worker(age: float | None) -> list[Finding]:
+    """``age`` = seconds since a worker last said it is scheduling (``media.worker.worker_age``; ``None`` = never).
+    A run queued without a worker is not lost, it waits: told, not refused."""
+    if age is not None and age <= WORKER_QUIET:
+        return []
+    return [Finding("no_worker", WARN, "", "" if age is None else str(int(age)))]
 
 
 def check_voices(characters: Sequence[dict[str, Any]], default_voice: str, library_voices: int,

@@ -3,26 +3,30 @@ from __future__ import annotations
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, Request
 from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
 
+from storyagent import script_text
 from storyagent import voices as voices_mod
+from storyagent.agents import AgentRunner
 from storyagent.compose.export import ExportError, build_package
 from storyagent.content import plan_gates, project_rating
 from storyagent.domain import QualityTier
 from storyagent.llm import LLMError, LLMRouter
 from storyagent.media.registry import default_registry
+from storyagent.media.worker import worker_age
 from storyagent.pipelines import project_settings_for
-from storyagent.workflow import STAGES, WorkflowEngine, WorkflowStateError, preflight
-from storyagent.workflow.media import PHASES, default_voice_of, up_to_date
+from storyagent.workflow import STAGES, WorkflowEngine, WorkflowStateError, preflight, revisions
+from storyagent.workflow.media import default_voice_of, inputs_fit, to_make, uploaded_reference_uses
 from storyagent.workflow.plan import produce_plan, totals, video_summary
 from storyagent.workflow.series import series_board
+from storyagent.workflow.stages import Ctx, StageError
 from storyagent.workflow.tiering import policy_from
 
-from .context import ApiContext, ctx_of
+from .context import ApiContext, ctx_of, translator_of
 from .errors import ApiError
 from .schemas import (
     AutoVoicesOut,
@@ -32,6 +36,10 @@ from .schemas import (
     PreflightFinding,
     PreflightOut,
     ProducePlanOut,
+    RevisionDecided,
+    RevisionDecision,
+    RevisionOut,
+    RevisionsOut,
     ScriptReviewOut,
     SeriesBoardOut,
     VideoSummary,
@@ -62,45 +70,73 @@ def get_workflow(project_id: int, request: Request, episode: int = 1) -> Workflo
                        active_run=active, recent_runs=runs, episode=episode)
 
 
-def look_ahead(ctx: ApiContext, project_id: int, params: dict[str, Any]) -> tuple[list[str], list[preflight.Finding]]:
-    """What a full run of this project would do now, and whether everything it needs is there (read only)."""
+def look_ahead(ctx: ApiContext, project_id: int, stages: list[str] | None, params: dict[str, Any]
+               ) -> tuple[list[str], list[preflight.Finding]]:
+    """What this run of the project would do now (``stages`` ``None`` = a resume; with ``params.full`` to the film),
+    and whether everything it needs is there. The same look for a run to the film and a run of single stages; read
+    only."""
     project = ctx.projects.get(project_id)
-    stages = preflight.run_stages(ctx.workflow.plan(project_id, None, {**params, "full": True}))
+    planned = preflight.run_stages(ctx.workflow.plan(project_id, stages, params))
     cfg = project_settings_for(ctx.settings, ctx.db, project_id)    # the models of the project's pipeline plan
-    specs = None
-    if not any(s not in preflight.MEDIA_STAGES for s in stages):    # the story stands: what is left is known
-        specs = [s for s in ctx.specs.list_current(project_id) if any(s.subject_type in p for p in PHASES)
-                 and not up_to_date(ctx.ledger, s, cfg)]
+    registry = default_registry(cfg)
+    tier = QualityTier(str(params.get("tier") or cfg.workflow.get("tier", "draft")))
+    # the produce stage as the worker will see it, to ask what it would make (nothing is run through it)
+    stage = Ctx(settings=cfg, db=ctx.db, store=ctx.story, state=ctx.workflow, agents=cast(AgentRunner, None),
+                projects=ctx.projects, project=project, params=dict(params), spec_store=ctx.specs)
+    todo = None
+    if not any(s not in preflight.MEDIA_STAGES for s in planned):   # the story stands: what is left is known
+        todo = []
+        if "produce" in planned:
+            try:
+                todo = to_make(stage, ctx.ledger, ctx.specs.list_current(project_id), tier)
+            except StageError:
+                todo = []                                           # the stage itself says what it is missing
     rating = project_rating(ctx.db, project_id)
+    people = ctx.story.list_characters(project_id)
     found = preflight.look_ahead(
-        ctx.settings, cfg, LLMRouter(ctx.settings, ctx.db), default_registry(cfg), project_id=project_id,
-        project_settings=project.settings, stages=stages, specs=specs,
-        characters=ctx.story.list_characters(project_id), default_voice=default_voice_of(cfg, project.settings),
+        ctx.settings, cfg, LLMRouter(ctx.settings, ctx.db), registry, project_id=project_id,
+        project_settings=project.settings, stages=planned, specs=todo,
+        characters=people, default_voice=default_voice_of(cfg, project.settings),
         library_voices=sum(1 for v in ctx.library.list(role="voice") if v.meta.get("consent")),
         gates=plan_gates(ctx.settings, ctx.db, project_id, rating), tools=preflight.tool_states(cfg))
-    return stages, found
+    if "produce" in planned and todo is None:
+        # no specs yet: the pictures people uploaded for the characters are already known
+        found += preflight.check_references(cfg, registry, uploaded_reference_uses(cfg, people))[0]
+    elif todo:
+        found += inputs_fit(stage, ctx.ledger, registry, todo, tier,
+                            down={f.subject for f in preflight.blocking(found)})
+    found += preflight.check_worker(worker_age(ctx.settings))
+    return planned, found
 
 
 @router.get("/projects/{project_id}/preflight", response_model=PreflightOut)
-def get_preflight(project_id: int, request: Request, episode: int = 1, episodes: str = "") -> PreflightOut:
-    """Before a run that goes all the way to the film: the stages it would do and what is missing for them (a
-    language model that is not installed, a media service that is not running, people without a voice). Read only."""
+def get_preflight(project_id: int, request: Request, episode: int = 1, episodes: str = "", stages: str = "",
+                  tier: str = "") -> PreflightOut:
+    """Before a run: the stages it would do and what is missing for them (a language model that is not installed, a
+    media service that is not running, a model that does not take the reference images it would be given, people
+    without a voice). Without ``stages`` it is the run to the film; ``stages=produce`` (comma separated) is a run of
+    those stages only. Read only."""
     ctx = ctx_of(request)
+    names = [s.strip() for s in stages.split(",") if s.strip()]
+    params: dict[str, Any] = {"episodes": episodes} if episodes.strip() else {"episode": episode}
+    if tier:
+        params["tier"] = tier
+    if not names:
+        params["full"] = True
     try:
-        which: dict[str, Any] = {"episodes": episodes} if episodes.strip() else {"episode": episode}
-        stages, found = look_ahead(ctx, project_id, which)
-    except WorkflowStateError as exc:
+        planned, found = look_ahead(ctx, project_id, names or None, params)
+    except (WorkflowStateError, ValueError) as exc:
         raise ApiError(422, "invalid", str(exc)) from exc
-    return PreflightOut(ready=not preflight.blocking(found), stages=stages,
+    return PreflightOut(ready=not preflight.blocking(found), stages=planned,
                         findings=[PreflightFinding(**f.to_dict()) for f in found])
 
 
 @router.post("/projects/{project_id}/workflow/runs", response_model=WorkflowRunOut, status_code=201)
 def start_run(project_id: int, body: WorkflowRunCreate, request: Request) -> WorkflowRunOut:
     """Queue a run; the worker executes it. Without ``stages`` the run resumes where the project stopped; with
-    ``params.full`` such a run goes on to the media and the film (``produce``, ``compose``), and is refused
-    (409 ``not_ready``, the findings in ``detail``) while something it needs is missing, unless
-    ``params.skip_preflight``."""
+    ``params.full`` such a run goes on to the media and the film (``produce``, ``compose``). Any run, to the film or
+    of single stages, is refused (409 ``not_ready``, the findings in ``detail``) while something its stages need is
+    missing, unless ``params.skip_preflight`` (or ``[workflow] preflight = false``)."""
     ctx = ctx_of(request)
     if ctx.projects.get(project_id).status == "trashed":
         raise ApiError(409, "conflict", "the project is in the recycle bin; restore it first")
@@ -111,14 +147,50 @@ def start_run(project_id: int, body: WorkflowRunCreate, request: Request) -> Wor
         raise ApiError(422, "invalid", str(exc)) from exc
     if not plan:
         raise ApiError(409, "nothing_to_do", "every stage is already completed")
-    if body.stages is None and params.get("full") and not params.get("skip_preflight"):
-        stopped = preflight.blocking(look_ahead(ctx, project_id, params)[1])
+    if ctx.settings.workflow.get("preflight", True) and not params.get("skip_preflight"):
+        try:
+            stopped = preflight.blocking(look_ahead(ctx, project_id, body.stages, params)[1])
+        except ValueError as exc:                   # e.g. a tier that does not exist
+            raise ApiError(422, "invalid", str(exc)) from exc
         if stopped:
             raise ApiError(409, "not_ready", [f.to_dict() for f in stopped])
     if body.stages is None:
         params["resume"] = True                 # every episode picks up where it stopped when the worker gets to it
     stages = [s for s in STAGES if any(s == name for _, name in plan)]
     return run_out(ctx.workflow.enqueue(project_id, stages, params))
+
+
+@router.get("/projects/{project_id}/revisions", response_model=RevisionsOut)
+def list_revisions(project_id: int, request: Request, episode: int = 1) -> RevisionsOut:
+    """The rewrites of written scenes of one episode, newest first, each with the shots it replaces and the shots it
+    proposes as text: the ones that wait to be confirmed (``pending``) and the ones already in the script
+    (``applied``; a run to the film applies the logic reader's rewrites itself)."""
+    ctx = ctx_of(request)
+    ctx.projects.get(project_id)
+    t = translator_of(request)
+    return RevisionsOut(episode=episode, items=[
+        RevisionOut(id=r["id"], episode=episode, scene=r["scene"], source=r["source"], status=r["status"],
+                    notes=r["notes"], before_text=script_text.shots_text(r["before"], t),
+                    after_text=script_text.shots_text(r["after"], t), created_at=r["created_at"],
+                    decided_at=r.get("decided_at"))
+        for r in revisions.listed(ctx.workflow, project_id, episode)])
+
+
+@router.post("/projects/{project_id}/revisions/decide", response_model=RevisionDecided)
+def decide_revisions(project_id: int, body: RevisionDecision, request: Request) -> RevisionDecided:
+    """Put confirmed rewrites into the script (``accept``), drop them (``discard``) or take an applied one back
+    (``revert``). A scene that was edited since the rewrite was written is not overwritten (``conflicts``). When the
+    script changed, its stage becomes stale: the next resume writes the shot cards of the changed scenes and does the
+    stages built on the script again. 409 ``conflict`` while a run of the project is active."""
+    ctx = ctx_of(request)
+    ctx.projects.get(project_id)
+    if any(r["status"] in ("queued", "running") for r in ctx.workflow.list_runs(project_id, 6)):
+        raise ApiError(409, "conflict", "a run of this project is active; decide when it has finished")
+    done = revisions.decide(ctx.story, ctx.workflow, project_id, body.episode, accept=set(body.accept),
+                            discard=set(body.discard), revert=set(body.revert))
+    if done["applied"] or done["reverted"]:
+        ctx.workflow.set_stage(project_id, "script", "stale", episode=body.episode)
+    return RevisionDecided(**done)
 
 
 @router.get("/projects/{project_id}/series", response_model=SeriesBoardOut)

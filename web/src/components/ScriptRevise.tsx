@@ -39,7 +39,11 @@ export function ScriptRevise({ id, episode, issues }: { id: number; episode: num
       return next;
     });
   const go = () =>
-    start.mutate({ stages: ["script"], params: { episode, feedback, ...(scenes.length > 0 && !general && own.trim() === "" ? { revise_scenes: scenes } : {}) } });
+    start.mutate({
+      stages: ["script"],
+      // the rewrite is a proposal: it is listed next to what it replaces and goes into the script once confirmed
+      params: { episode, feedback, propose: true, revision_source: chosen.length > 0 ? "review" : "own", ...(scenes.length > 0 && !general && own.trim() === "" ? { revise_scenes: scenes } : {}) },
+    });
   return (
     <div className="stack">
       <strong>{t("web.revise.title")}</strong>

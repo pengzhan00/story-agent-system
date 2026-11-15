@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import re
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Collection, Mapping, Sequence
 from typing import Any
 
 from storyagent.compose.pacing import duration_window
@@ -32,6 +32,7 @@ from storyagent.i18n import get_catalog
 from storyagent.media.compliance import visible_marks
 from storyagent.media.contracts import AssetRecord, JobRecord, MediaJob
 from storyagent.media.ledger import Ledger, LedgerError
+from storyagent.media.refs import IMAGE_KINDS
 from storyagent.media.specs import SpecRecord, SpecStore, shot_id_of
 from storyagent.media.tts import automatic_voice
 from storyagent.story import StoryStore
@@ -493,11 +494,84 @@ def keyframe_edit_model(settings: Settings, spec: SpecRecord, modes: dict[str, s
     if not any(d.get("subject_type") in ("character.portrait", "scene.keyframe") for d in spec.depends_on):
         return ""
     try:
-        if spec.model_ref and settings.model(spec.model_ref).kind == MediaKind.IMAGE_EDIT.value:
-            return spec.model_ref
-        return settings.default_model(MediaKind.IMAGE_EDIT.value).ref
+        model = (settings.model(spec.model_ref) if spec.model_ref and settings.model(
+            spec.model_ref).kind == MediaKind.IMAGE_EDIT.value else settings.default_model(MediaKind.IMAGE_EDIT.value))
     except ConfigError:
         return ""
+    try:
+        most = int(model.extra.get("max_people") or 0)
+    except (TypeError, ValueError):
+        most = 0
+    if most and sum(1 for d in spec.depends_on if d.get("subject_type") == "character.portrait") > most:
+        return ""                     # more people than the edit model places: the picture model draws the shot
+    return model.ref
+
+
+def reference_uses(settings: Settings, specs: Sequence[SpecRecord], modes: dict[str, str],
+                   names: Mapping[tuple[str, str], str] | None = None) -> list[preflight.RefUse]:
+    """Every picture among ``specs`` that will carry reference images, with the model that will make it and how many:
+    the spec's own (the pictures a person uploaded for a character or a place), and for a shot keyframe composed from
+    references also the portraits and the scene image it depends on (they need not exist yet)."""
+    out: list[preflight.RefUse] = []
+    for spec in specs:
+        if spec.kind.value not in IMAGE_KINDS:
+            continue
+        kind, count = spec.kind.value, len(spec.refs)
+        edit_ref = keyframe_edit_model(settings, spec, modes)
+        if edit_ref:
+            kind = MediaKind.IMAGE_EDIT.value
+            count += sum(1 for d in spec.depends_on
+                         if d.get("subject_type") in ("character.portrait", "scene.keyframe"))
+        try:
+            model_ref = edit_ref or spec.model_ref or settings.default_model(kind).ref
+        except ConfigError:
+            continue
+        if count:
+            out.append(preflight.RefUse(spec.id, spec.subject_type, kind, model_ref, count,
+                                        (names or {}).get((spec.subject_type, spec.subject_id), "")))
+    return out
+
+
+def uploaded_reference_uses(settings: Settings, characters: Sequence[Mapping[str, Any]]) -> list[preflight.RefUse]:
+    """Before the story has specs: the portraits of the people that have uploaded pictures, as they will be made."""
+    try:
+        model_ref = settings.default_model(MediaKind.IMAGE_GENERATE.value).ref
+    except ConfigError:
+        return []
+    return [preflight.RefUse(f"character:{c['id']}", "character.portrait", MediaKind.IMAGE_GENERATE.value, model_ref,
+                             len(c.get("ref_images") or []), str(c["name"]))
+            for c in characters if c.get("ref_images")]
+
+
+def planned_jobs(ctx: Ctx, ledger: Ledger, specs: list[SpecRecord], tier: QualityTier
+                 ) -> list[tuple[SpecRecord, MediaJob]]:
+    """The jobs ``produce`` would queue as things stand, every phase, without queueing them. A clip whose keyframe
+    does not exist yet is not among them, and a shot keyframe is only when it can be built the way it will be made
+    (composed from portraits that exist, or drawn from words)."""
+    modes = scene_modes(ctx.store, ctx.pid)
+    out: list[tuple[SpecRecord, MediaJob]] = []
+    for phase in PHASES:
+        for spec, job in _plan_phase(ctx, ledger, specs, phase, [], tier, {"reused": 0}):
+            composed = bool(keyframe_edit_model(ctx.settings, spec, modes))
+            if spec.subject_type == "shot.keyframe" and composed != (job.kind is MediaKind.IMAGE_EDIT):
+                continue
+            out.append((spec, job))
+    return out
+
+
+def inputs_fit(ctx: Ctx, ledger: Ledger, registry: Any, todo: Sequence[SpecRecord], tier: QualityTier, *,
+               down: Collection[str] = ()) -> list[preflight.Finding]:
+    """Whether what is about to be made fits the models that will make it: the reference images against what each
+    model states it takes, then every job that can be built now against the worker's own gate (see
+    ``preflight.check_references`` / ``check_jobs``). ``down``: providers already found not ready."""
+    names = {("character.portrait", str(c["id"])): str(c["name"]) for c in ctx.store.list_characters(ctx.pid)}
+    uses = reference_uses(ctx.settings, todo, scene_modes(ctx.store, ctx.pid), names)
+    found, refused = preflight.check_references(ctx.settings, registry, uses)
+    wanted = {s.id for s in todo} - refused
+    jobs = [(s, j) for s, j in planned_jobs(ctx, ledger, ctx.spec_store.list_current(ctx.pid), tier) if s.id in wanted]
+    return found + preflight.check_jobs(ledger.settings, ctx.db, ledger, registry, jobs,
+                                        project_settings=ctx.project.settings, project_rating=ctx.project.rating,
+                                        skip_providers=down)
 
 
 def clip_seconds(settings: Settings, ledger: Ledger, tier: QualityTier) -> float:
@@ -521,7 +595,7 @@ def video_picks(
     return {str(i) for i in video_shots(episodes, policy)}
 
 
-def _to_make(ctx: Ctx, ledger: Ledger, specs: list[SpecRecord], tier: QualityTier) -> list[SpecRecord]:
+def to_make(ctx: Ctx, ledger: Ledger, specs: list[SpecRecord], tier: QualityTier) -> list[SpecRecord]:
     """The specs this run will turn into media: asked for (``only``/``shots``/``skip``), picked for a clip, and not
     already made from their current version."""
     out: list[SpecRecord] = []
@@ -595,12 +669,13 @@ def produce(ctx: Ctx) -> dict[str, Any]:
     failures: list[dict[str, Any]] = []
     only = _only(ctx, specs)
     total_planned = sum(1 for s in specs if any(s.subject_type in p for p in PHASES) and (not only or s.id in only))
-    todo = _to_make(ctx, ledger, specs, tier)
+    todo = to_make(ctx, ledger, specs, tier)
     if ctx.adapters is not None and todo and not ctx.params.get("skip_preflight"):
         # a service that is not running is found before the first job, not as one failed job per shot
-        stopped = preflight.blocking(
-            preflight.check_media(ctx.settings, ctx.adapters, todo, ctx.project.settings, compose=False,
-                                  tools=preflight.tool_states(ctx.settings)))
+        found = preflight.check_media(ctx.settings, ctx.adapters, todo, ctx.project.settings, compose=False,
+                                      tools=preflight.tool_states(ctx.settings))
+        found += inputs_fit(ctx, ledger, ctx.adapters, todo, tier, down={f.subject for f in preflight.blocking(found)})
+        stopped = preflight.blocking(found)
         if stopped:
             raise StageError("not_ready", "; ".join(f"{f.subject}: {f.code} {f.detail}".strip() for f in stopped),
                              services=", ".join(sorted({f.subject for f in stopped})),

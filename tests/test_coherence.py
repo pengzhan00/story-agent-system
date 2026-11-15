@@ -191,7 +191,8 @@ def test_a_scene_with_a_serious_slip_is_written_again_with_the_readers_notes(tmp
             "fix": "she only asks who sent it"}
     client.script_findings = [[slip, {"severity": "medium", "where": "2.1", "problem": "a small slip"},
                                {"severity": "high", "where": "whole", "problem": "no scene to rewrite"}]]
-    engine, out = _run_script(tmp_path, client)
+    # as a run to the film does it: the rewrite goes into the script at once (tests/test_revisions.py: the other way)
+    engine, out = _run_script(tmp_path, client, review_apply="auto")
     shots = [p for p, c in zip(client.prompts, client.calls, strict=True) if c == "shots"]
     assert len(shots) == 5                                           # four scenes and the one written again
     assert "[1.2.1] she names the sender before 2.2 reveals him -> she only asks who sent it" in shots[4]

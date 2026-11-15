@@ -3,12 +3,13 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ReadyCheck } from "../src/components/Findings";
 import { FullRun, ProduceResult, StoryCheck } from "../src/components/FullRun";
 import { I18nProvider } from "../src/i18n";
 
 const en = JSON.parse(readFileSync(join(__dirname, "..", "..", "storyagent", "locales", "en.json"), "utf-8")) as Record<string, string>;
 const say = (key: string, vars: Record<string, string | number> = {}) =>
-  Object.entries(vars).reduce((text, [k, v]) => text.replace(`{${k}}`, String(v)), en[key]!);
+  Object.entries(vars).reduce((text, [k, v]) => text.replaceAll(`{${k}}`, String(v)), en[key]!);
 
 const down = { code: "service_down", level: "block", subject: "comfy", detail: "krea-2" };
 const voices = { code: "voices_auto", level: "warn", subject: "Lin Wan", detail: "3" };
@@ -93,6 +94,36 @@ describe("one click to the film", () => {
     fireEvent.click(await screen.findByText(en["web.preflight.check"]!));
     expect(await screen.findByText(en["web.preflight.blocked"]!)).toBeTruthy();
     expect(screen.getByText(say("preflight.service_down", { subject: "comfy", detail: "krea-2" }))).toBeTruthy();
+  });
+});
+
+describe("the readiness check of a run of single stages", () => {
+  const refs = {
+    code: "too_many_refs", level: "block", subject: "flux-draw", detail: "Lin Wan",
+    values: { limit: "1", count: "24", most: "3", models: "h3-image (16)" },
+  };
+  const refused = {
+    code: "refused", level: "block", subject: "flux-draw", detail: "width must be a multiple of 16",
+    values: { count: "2", what: "character.portrait", error: "invalid_params" },
+  };
+
+  it("asks about the stages it will run and names the models that take several reference images", async () => {
+    preflight = { ready: false, stages: ["produce"], findings: [refs, refused] };
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { mutations: { retry: false } } })}>
+        <I18nProvider>
+          <ReadyCheck id={4} query="stages=produce&tier=draft" />
+        </I18nProvider>
+      </QueryClientProvider>,
+    );
+    fireEvent.click(await screen.findByText(en["web.preflight.check"]!));
+    expect(await screen.findByText(en["web.preflight.blocked"]!)).toBeTruthy();
+    expect(got[0]).toContain("/api/projects/4/preflight?stages=produce&tier=draft");
+    const sentence = say("preflight.too_many_refs", { subject: "flux-draw", ...refs.values });
+    expect(screen.getByText(`${sentence} ${say("preflight.people", { names: "Lin Wan" })}`)).toBeTruthy();
+    expect(sentence).toContain("h3-image (16)");
+    const what = en["spec.subject.character.portrait"]!;
+    expect(screen.getByText(say("preflight.refused", { subject: "flux-draw", detail: refused.detail, count: "2", what }))).toBeTruthy();
   });
 });
 

@@ -39,6 +39,7 @@ from ..contracts import (
     JobContext,
     JobRecord,
     Progress,
+    ReferenceRule,
     ValidationIssue,
 )
 from ..probe import find_tool
@@ -88,6 +89,9 @@ class DrawThingsAdapter(AdapterBase):
         return Capabilities(kinds=(MediaKind.IMAGE_GENERATE, MediaKind.IMAGE_EDIT, _VIDEO),
                             heavy=True, supports_cancel=True,
                             supports_reattach=False, param_schema=SCHEMA, poll_interval_sec=self.poll_interval_sec)
+
+    def reference_rule(self, kind: MediaKind) -> ReferenceRule | None:
+        return ReferenceRule(most=1)    # the HTTP API takes one init image (see ``validate``)
 
     def health(self) -> HealthReport:
         try:

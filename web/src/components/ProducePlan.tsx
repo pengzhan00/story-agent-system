@@ -5,6 +5,7 @@ import type { PlannedTask } from "../api/types";
 import { useT } from "../i18n";
 import { duration } from "../lib/format";
 import { ErrorNote } from "./ErrorNote";
+import { ReadyCheck } from "./Findings";
 import { PlanTaskEditor } from "./PlanTaskEditor";
 
 const PHASES = [1, 2, 3];
@@ -71,6 +72,7 @@ export function ProducePlan({ id, onClose, defaultTier = "draft" }: { id: number
       </div>
       <p className="muted small">{t("web.plan.intro")}</p>
       <ErrorNote error={plan.error ?? start.error} />
+      <ReadyCheck id={id} query={`stages=produce&tier=${tier}`} />
       {gates.length > 0 ? (
         <div role="alert" className="stack">
           <strong className="bad">{t("web.plan.gates_title")}</strong>

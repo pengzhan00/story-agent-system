@@ -20,7 +20,15 @@ from typing import Any
 from storyagent.domain import MediaKind
 from storyagent.domain.errors import ErrorCode
 
-from ..contracts import AdapterError, ArtifactSpec, Capabilities, JobContext, JobRecord, ValidationIssue
+from ..contracts import (
+    AdapterError,
+    ArtifactSpec,
+    Capabilities,
+    JobContext,
+    JobRecord,
+    ReferenceRule,
+    ValidationIssue,
+)
 from ._subprocess import Command, SubprocessAdapter
 
 IMAGE_EXT = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
@@ -55,6 +63,10 @@ class MfluxAdapter(SubprocessAdapter):
             kinds=(MediaKind.IMAGE_GENERATE, MediaKind.IMAGE_EDIT), heavy=False, supports_cancel=True,
             supports_reattach=False, param_schema=SCHEMA, poll_interval_sec=self.poll_interval_sec,
         )
+
+    def reference_rule(self, kind: MediaKind) -> ReferenceRule | None:
+        # generate reads the first image as the init image and drops the rest; edit reads every image it is given
+        return ReferenceRule() if kind is MediaKind.IMAGE_EDIT else ReferenceRule(used=1)
 
     # -- config -------------------------------------------------------------------------------
     @staticmethod

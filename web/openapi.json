@@ -5323,7 +5323,7 @@
       "PreflightFinding": {
         "properties": {
           "code": {
-            "description": "llm_down | llm_model_missing | llm_role | service_down | not_installed | no_adapter | no_model | degraded | gate | voices_auto | no_voice (i18n preflight.<code>)",
+            "description": "llm_down | llm_model_missing | llm_role | service_down | not_installed | no_adapter | no_model | degraded | gate | too_many_refs(_only) | refs_dropped(_only) | refused | voices_auto | voice_shared | no_voice | no_worker (i18n preflight.<code>)",
             "title": "Code",
             "type": "string"
           },
@@ -5332,7 +5332,7 @@
             "type": "string"
           },
           "level": {
-            "description": "block = a full run is not started; warn = shown, the run goes on",
+            "description": "block = the run is not started; warn = shown, the run goes on",
             "title": "Level",
             "type": "string"
           },
@@ -5340,13 +5340,22 @@
             "description": "the service, model, role, kind or people it is about",
             "title": "Subject",
             "type": "string"
+          },
+          "values": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "further {placeholders} of the message: limit, most, count, models (the models that take that many references), what, error",
+            "title": "Values",
+            "type": "object"
           }
         },
         "required": [
           "code",
           "level",
           "subject",
-          "detail"
+          "detail",
+          "values"
         ],
         "title": "PreflightFinding",
         "type": "object"
@@ -5366,7 +5375,7 @@
             "type": "boolean"
           },
           "stages": {
-            "description": "what a full run would do now, in order",
+            "description": "what the run would do now, in order",
             "items": {
               "type": "string"
             },
@@ -7259,6 +7268,177 @@
           "resolved_notes"
         ],
         "title": "ReviewShotOut",
+        "type": "object"
+      },
+      "RevisionDecided": {
+        "properties": {
+          "applied": {
+            "description": "the scenes (\"act.scene\") whose rewrite went into the script",
+            "items": {
+              "type": "string"
+            },
+            "title": "Applied",
+            "type": "array"
+          },
+          "conflicts": {
+            "description": "scenes that no longer read as they did when the rewrite was written: nothing was overwritten, the proposal was discarded",
+            "items": {
+              "type": "string"
+            },
+            "title": "Conflicts",
+            "type": "array"
+          },
+          "discarded": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Discarded",
+            "type": "array"
+          },
+          "reverted": {
+            "description": "the scenes whose old shots were put back",
+            "items": {
+              "type": "string"
+            },
+            "title": "Reverted",
+            "type": "array"
+          }
+        },
+        "required": [
+          "applied",
+          "discarded",
+          "reverted",
+          "conflicts"
+        ],
+        "title": "RevisionDecided",
+        "type": "object"
+      },
+      "RevisionDecision": {
+        "properties": {
+          "accept": {
+            "description": "ids of pending proposals to put into the script",
+            "items": {
+              "type": "string"
+            },
+            "title": "Accept",
+            "type": "array"
+          },
+          "discard": {
+            "description": "ids of pending proposals to drop",
+            "items": {
+              "type": "string"
+            },
+            "title": "Discard",
+            "type": "array"
+          },
+          "episode": {
+            "default": 1,
+            "title": "Episode",
+            "type": "integer"
+          },
+          "revert": {
+            "description": "ids of applied proposals to take back",
+            "items": {
+              "type": "string"
+            },
+            "title": "Revert",
+            "type": "array"
+          }
+        },
+        "title": "RevisionDecision",
+        "type": "object"
+      },
+      "RevisionOut": {
+        "properties": {
+          "after_text": {
+            "description": "the rewritten shots",
+            "title": "After Text",
+            "type": "string"
+          },
+          "before_text": {
+            "description": "the shots it replaces, as text in the reader's language",
+            "title": "Before Text",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "episode": {
+            "title": "Episode",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "notes": {
+            "description": "what the rewrite was asked to mend",
+            "title": "Notes",
+            "type": "string"
+          },
+          "scene": {
+            "description": "\"act.scene\"",
+            "title": "Scene",
+            "type": "string"
+          },
+          "source": {
+            "description": "review (the review's notes) | own (the editor's words) | logic (the logic reader of the script stage)",
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "description": "pending (not in the script) | applied (in the script, can be taken back) | discarded | reverted",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "episode",
+          "scene",
+          "source",
+          "status",
+          "notes",
+          "before_text",
+          "after_text",
+          "created_at",
+          "decided_at"
+        ],
+        "title": "RevisionOut",
+        "type": "object"
+      },
+      "RevisionsOut": {
+        "properties": {
+          "episode": {
+            "title": "Episode",
+            "type": "integer"
+          },
+          "items": {
+            "description": "newest first",
+            "items": {
+              "$ref": "#/components/schemas/RevisionOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "episode",
+          "items"
+        ],
+        "title": "RevisionsOut",
         "type": "object"
       },
       "RunBody": {
@@ -18244,7 +18424,7 @@
     },
     "/api/projects/{project_id}/preflight": {
       "get": {
-        "description": "Before a run that goes all the way to the film: the stages it would do and what is missing for them (a\nlanguage model that is not installed, a media service that is not running, people without a voice). Read only.",
+        "description": "Before a run: the stages it would do and what is missing for them (a language model that is not installed, a\nmedia service that is not running, a model that does not take the reference images it would be given, people\nwithout a voice). Without ``stages`` it is the run to the film; ``stages=produce`` (comma separated) is a run of\nthose stages only. Read only.",
         "operationId": "get_preflight_api_projects__project_id__preflight_get",
         "parameters": [
           {
@@ -18273,6 +18453,26 @@
             "schema": {
               "default": "",
               "title": "Episodes",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "stages",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Stages",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tier",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Tier",
               "type": "string"
             }
           }
@@ -18765,6 +18965,112 @@
         "summary": "Board",
         "tags": [
           "review"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/revisions": {
+      "get": {
+        "description": "The rewrites of written scenes of one episode, newest first, each with the shots it replaces and the shots it\nproposes as text: the ones that wait to be confirmed (``pending``) and the ones already in the script\n(``applied``; a run to the film applies the logic reader's rewrites itself).",
+        "operationId": "list_revisions_api_projects__project_id__revisions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "episode",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "title": "Episode",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevisionsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Revisions",
+        "tags": [
+          "workflow"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/revisions/decide": {
+      "post": {
+        "description": "Put confirmed rewrites into the script (``accept``), drop them (``discard``) or take an applied one back\n(``revert``). A scene that was edited since the rewrite was written is not overwritten (``conflicts``). When the\nscript changed, its stage becomes stale: the next resume writes the shot cards of the changed scenes and does the\nstages built on the script again. 409 ``conflict`` while a run of the project is active.",
+        "operationId": "decide_revisions_api_projects__project_id__revisions_decide_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevisionDecision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevisionDecided"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Decide Revisions",
+        "tags": [
+          "workflow"
         ]
       }
     },
@@ -20880,7 +21186,7 @@
         ]
       },
       "post": {
-        "description": "Queue a run; the worker executes it. Without ``stages`` the run resumes where the project stopped; with\n``params.full`` such a run goes on to the media and the film (``produce``, ``compose``), and is refused\n(409 ``not_ready``, the findings in ``detail``) while something it needs is missing, unless\n``params.skip_preflight``.",
+        "description": "Queue a run; the worker executes it. Without ``stages`` the run resumes where the project stopped; with\n``params.full`` such a run goes on to the media and the film (``produce``, ``compose``). Any run, to the film or\nof single stages, is refused (409 ``not_ready``, the findings in ``detail``) while something its stages need is\nmissing, unless ``params.skip_preflight`` (or ``[workflow] preflight = false``).",
         "operationId": "start_run_api_projects__project_id__workflow_runs_post",
         "parameters": [
           {
