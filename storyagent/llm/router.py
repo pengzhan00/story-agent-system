@@ -111,9 +111,10 @@ class LLMRouter:
             self._models[backend] = self.client(backend).list_models()
         return self._models[backend]
 
-    def check_role(self, role: str) -> tuple[str, str]:
-        """Fail early with a useful message when the model a role names is not installed on its backend."""
-        backend, model, _ = self.resolve(role)
+    def check_role(self, role: str, project_id: int | None = None) -> tuple[str, str]:
+        """Fail early with a useful message when the model a role names (for this project, when given) is not
+        installed on its backend."""
+        backend, model, _ = self.resolve(role, project_id=project_id)
         have = self.available(backend, refresh=True)
         if have and model not in have and not any(m.split(":")[0] == model.split(":")[0] and ":" not in model
                                                   for m in have):

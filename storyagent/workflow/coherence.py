@@ -25,8 +25,11 @@ from typing import Any
 
 SEVERE = "high"
 _WHERE = re.compile(r"(\d+)\s*[.\-/:：,，]\s*(\d+)")
+# "Act 2 / Scene 1", or the Chinese form "<nth> 2 <act> <nth> 1 <scene>" (the three words as escapes: no CJK in code)
+_NTH, _ACT, _SCENE = chr(0x7B2C), chr(0x5E55), chr(0x573A)
 _WHERE_WORDS = re.compile(
-    r"(?:act|幕)\D{0,3}(\d+)\D{0,12}?(?:scene|场)\D{0,3}(\d+)|第\s*(\d+)\s*幕\D{0,6}第\s*(\d+)\s*场", re.IGNORECASE)
+    r"act\D{0,3}(\d+)\D{0,12}?scene\D{0,3}(\d+)|" + _NTH + r"\s*(\d+)\s*" + _ACT + r"\D{0,6}?(\d+)\s*" + _SCENE,
+    re.IGNORECASE)
 SO_FAR_CHARS = 3200        # the story so far given to a shot writer is cut to this (the latest scenes are kept whole)
 BEAT_CHARS = 260
 

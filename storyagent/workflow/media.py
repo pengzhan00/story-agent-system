@@ -36,6 +36,7 @@ from storyagent.media.specs import SpecRecord, SpecStore, shot_id_of
 from storyagent.media.tts import automatic_voice
 from storyagent.story import StoryStore
 
+from . import preflight
 from .stages import Ctx, StageError, WorkflowCancelled
 from .tiering import policy_from, video_shots
 from .video_mode import prepare_video, shot_mode
@@ -520,11 +521,12 @@ def video_picks(
     return {str(i) for i in video_shots(episodes, policy)}
 
 
-def _expected_seconds(ctx: Ctx, ledger: Ledger, specs: list[SpecRecord], tier: QualityTier) -> float:
-    total = 0.0
+def _to_make(ctx: Ctx, ledger: Ledger, specs: list[SpecRecord], tier: QualityTier) -> list[SpecRecord]:
+    """The specs this run will turn into media: asked for (``only``/``shots``/``skip``), picked for a clip, and not
+    already made from their current version."""
+    out: list[SpecRecord] = []
     skip = {str(x) for x in ctx.params.get("skip", [])}
     only = _only(ctx, specs)
-    modes = scene_modes(ctx.store, ctx.pid)
     picks = video_picks(ctx.settings, ctx.store, ledger, ctx.pid, ctx.project.settings, tier)
     for spec in specs:
         if spec.subject_type in skip or not any(spec.subject_type in p for p in PHASES):
@@ -546,6 +548,14 @@ def _expected_seconds(ctx: Ctx, ledger: Ledger, specs: list[SpecRecord], tier: Q
                        end_keyframe=end_keyframe) \
                 and not ctx.force():
             continue
+        out.append(spec)
+    return out
+
+
+def _expected_seconds(ctx: Ctx, ledger: Ledger, todo: list[SpecRecord], tier: QualityTier) -> float:
+    total = 0.0
+    modes = scene_modes(ctx.store, ctx.pid)
+    for spec in todo:
         kind = spec.kind.value
         edit_ref = keyframe_edit_model(ctx.settings, spec, modes)
         try:
@@ -559,9 +569,25 @@ def _expected_seconds(ctx: Ctx, ledger: Ledger, specs: list[SpecRecord], tier: Q
     return total
 
 
+def give_voices(ctx: Ctx, ledger: Ledger) -> dict[str, list[str]]:
+    """A run that goes all the way to the film (``full``, or ``auto_voices``): a person without a voice gets one from
+    the library (by gender, one each, consent-flagged only; see ``voices.auto_assign``) and it is put on their lines,
+    so the film is spoken and not only subtitled. A voice somebody chose is never changed."""
+    if not ctx.params.get("auto_voices", ctx.params.get("full")):
+        return {}
+    from storyagent import voices
+    from storyagent.media.library import Library
+
+    done = voices.auto_assign(ctx.store, Library(ctx.db, ctx.settings, ledger), ctx.spec_store, ctx.pid,
+                              adults_only=ctx.settings.content.policy(ctx.project.rating).gates)
+    return {"voices_given": [a.character for a in done.assigned],
+            "voices_missing": [a.character for a in done.unresolved]}
+
+
 def produce(ctx: Ctx) -> dict[str, Any]:
     ledger = _ledger(ctx)
     tier = QualityTier(str(ctx.params.get("tier") or ctx.settings.workflow.get("tier", "draft")))
+    voices = give_voices(ctx, ledger)
     specs = ctx.spec_store.list_current(ctx.pid)
     skipped: list[dict[str, Any]] = []
     made = failed = 0
@@ -569,7 +595,16 @@ def produce(ctx: Ctx) -> dict[str, Any]:
     failures: list[dict[str, Any]] = []
     only = _only(ctx, specs)
     total_planned = sum(1 for s in specs if any(s.subject_type in p for p in PHASES) and (not only or s.id in only))
-    ctx.hint_weight(_expected_seconds(ctx, ledger, specs, tier))
+    todo = _to_make(ctx, ledger, specs, tier)
+    if ctx.adapters is not None and todo and not ctx.params.get("skip_preflight"):
+        # a service that is not running is found before the first job, not as one failed job per shot
+        stopped = preflight.blocking(
+            preflight.check_media(ctx.settings, ctx.adapters, todo, ctx.project.settings, compose=False))
+        if stopped:
+            raise StageError("not_ready", "; ".join(f"{f.subject}: {f.code} {f.detail}".strip() for f in stopped),
+                             services=", ".join(sorted({f.subject for f in stopped})),
+                             findings=[f.to_dict() for f in stopped])
+    ctx.hint_weight(_expected_seconds(ctx, ledger, todo, tier))
     ctx.step(0, max(total_planned, 1), "")
     done_before = 0
     for number, phase in enumerate(PHASES, 1):
@@ -596,7 +631,7 @@ def produce(ctx: Ctx) -> dict[str, Any]:
         done_before += len(plan)
     ctx.step(total_planned, max(total_planned, 1), "")
     summary = {"made": made, "reused": counts["reused"], "failed": failed, "skipped": len(skipped), "tier": tier.value,
-               "failures": failures[:20], "skipped_detail": skipped[:40]}
+               "failures": failures[:20], "skipped_detail": skipped[:40], **voices}
     if failed:
         raise StageError("produce_failed", f"{failed} media jobs failed", count=failed, summary=summary)
     return summary

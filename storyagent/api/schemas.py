@@ -840,6 +840,20 @@ class AutoVoicesOut(Strict):
     unresolved: list[VoiceAssignedOut]
 
 
+class PreflightFinding(Strict):
+    code: str = Field(description="llm_down | llm_model_missing | llm_role | service_down | not_installed | no_adapter"
+                                  " | no_model | degraded | gate | voices_auto | no_voice (i18n preflight.<code>)")
+    level: str = Field(description="block = a full run is not started; warn = shown, the run goes on")
+    subject: str = Field(description="the service, model, role, kind or people it is about")
+    detail: str
+
+
+class PreflightOut(Strict):
+    ready: bool = Field(description="no blocking finding")
+    stages: list[str] = Field(description="what a full run would do now, in order")
+    findings: list[PreflightFinding]
+
+
 class ProducePlanOut(Strict):
     tier: str
     gates: list[PlanGate] = Field(description="what stops every job of the project before it starts; empty = none")

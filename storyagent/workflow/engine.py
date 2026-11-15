@@ -60,6 +60,7 @@ class WorkflowEngine:
         self.agents = agents or AgentRunner(settings, self.router)
         self.store, self.state, self.projects = StoryStore(db), WorkflowState(db), ProjectStore(db, settings)
         self.spec_store = spec_store or SpecStore(db, settings, Ledger(db, settings))
+        self.adapters: Any = None      # the worker's adapter registry: lets `produce` see what is not running
         self._media_waiters: dict[object, set[str]] = {}
         self._media_wait_lock = threading.Lock()
 
@@ -156,7 +157,7 @@ class WorkflowEngine:
             settings_for(self.settings, project.pipeline, project.settings.get("pipeline_models")), self.db, self.store,
             self.state, self.agents_for(project), self.projects, project,
             dict(params or {}), progress or (lambda *_: None), cancelled or (lambda: False), self.spec_store, stage,
-            media_wait=self.waiting_on_media,
+            media_wait=self.waiting_on_media, adapters=self.adapters,
         )
         self.state.set_stage(project_id, stage, "running", episode=episode)
         if progress:
@@ -172,8 +173,10 @@ class WorkflowEngine:
             raise
         except (StageError, AgentSpecError) as exc:
             code = exc.code if isinstance(exc, StageError) else "agent_spec"
+            # what the stage did get done (which jobs failed, what was skipped) stays readable on the failed stage
+            done = exc.params.get("summary") if isinstance(exc, StageError) else None
             self.state.set_stage(project_id, stage, "failed", error_code=f"workflow.{code}", error_message=str(exc),
-                                 episode=episode)
+                                 summary=done if isinstance(done, dict) else None, episode=episode)
             raise
         except Exception as exc:
             log.exception("workflow stage %s failed", stage)
@@ -197,10 +200,26 @@ class WorkflowEngine:
         plan, several = self.plan(project_id, stages, params)
         first = self.state.episodes_for(project_id, params)[0]
         out: dict[str, dict[str, Any]] = {}
+        # a full run is left alone for hours: a few failed pictures do not stop the film (the cut uses what there
+        # is and reports the rest), and an episode whose film could not be cut does not stop the episodes after it.
+        # A story stage that fails still stops the run: the next episode is written from this one.
+        keep_going = bool(params.get("keep_going", params.get("full")))
+        uncut: list[StageError] = []
         for ep, stage in plan:
             sink = _EpisodeProgress(progress, ep, several) if progress else None
-            out[stage_key(stage, ep) if several and ep else stage] = self.run_stage(
-                project_id, stage, {**params, "episode": ep or first}, progress=sink, cancelled=cancelled)
+            key = stage_key(stage, ep) if several and ep else stage
+            try:
+                out[key] = self.run_stage(
+                    project_id, stage, {**params, "episode": ep or first}, progress=sink, cancelled=cancelled)
+            except StageError as exc:
+                if not keep_going or exc.code not in ("produce_failed", "compose_failed"):
+                    raise
+                if exc.code == "compose_failed":
+                    uncut.append(exc)
+                done = exc.params.get("summary")
+                out[key] = dict(done) if isinstance(done, dict) else {}   # some jobs failed, the rest is made
+        if uncut:
+            raise uncut[0]                        # an episode did not get its film: the run says so
         return out
 
     # -- queue execution (called by the worker) -------------------------------------------------------

@@ -184,6 +184,8 @@ class Worker:
             from storyagent.workflow import WorkflowEngine  # deferred: the LLM layer is only built when a run exists
 
             self._workflow = WorkflowEngine(self.settings, self.db)
+        if self._workflow.adapters is None:
+            self._workflow.adapters = self.registry
         return self._workflow
 
     def _tick_workflow(self) -> int:

@@ -75,6 +75,7 @@ class Ctx:
     stage: str = ""
     extra: dict[str, Any] = field(default_factory=dict)
     media_wait: Callable[[set[str]], AbstractContextManager[None]] = lambda _: nullcontext()
+    adapters: Any = None           # the worker's adapter registry (None when a stage runs without a worker)
 
     @property
     def pid(self) -> int:
@@ -486,13 +487,13 @@ def _settled_outline(
         return outline, {}
     versions: list[tuple[dict[str, Any], dict[str, Any]]] = []
     for attempt in range(rounds + 1):
-        ctx.step(0, 1, f"outline check {attempt + 1}")
+        ctx.step(0, 1, f"workflow.progress.outline_check|{attempt + 1}")
         review = read(outline)
         versions.append((outline, review))
         notes = [i for i in review["issues"] if str(i.get("severity") or "").lower() in ("high", "medium")]
         if not coherence.severe(review["issues"]) or write is None or attempt == rounds:
             break
-        ctx.step(0, 1, f"outline fix {attempt + 1}")
+        ctx.step(0, 1, f"workflow.progress.outline_fix|{attempt + 1}")
         outline = write(coherence.notes_text(notes), dump(outline))
         _renumber(outline)
     best, review = min(versions, key=lambda v: (len(coherence.severe(v[1]["issues"])), -float(v[1]["score"])))
@@ -632,7 +633,7 @@ def script(ctx: Ctx) -> dict[str, Any]:
         rewritten: list[str] = []
         review: dict[str, Any] = {}
         for attempt in range(rounds + 1):
-            ctx.step(len(scenes), len(scenes), f"story check {attempt + 1}")
+            ctx.step(len(scenes), len(scenes), f"workflow.progress.script_check|{attempt + 1}")
             review = _read_script(ctx, outline, chars, facts, earlier)
             by_scene: dict[str, list[dict[str, Any]]] = {}
             for issue in coherence.severe(review["issues"]):
@@ -642,7 +643,7 @@ def script(ctx: Ctx) -> dict[str, Any]:
             if not by_scene or attempt == rounds:
                 break
             for key in sorted(by_scene, key=lambda k: where[k])[:most]:
-                ctx.step(len(scenes), len(scenes), f"story fix {key}")
+                ctx.step(len(scenes), len(scenes), f"workflow.progress.script_fix|{key}")
                 write_scene(where[key], coherence.notes_text(by_scene[key]))
                 rewritten.append(key)
         checks["script"] = coherence.summary_of(review, attempt, rewritten)

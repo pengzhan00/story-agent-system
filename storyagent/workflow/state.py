@@ -161,12 +161,15 @@ class WorkflowState:
     ) -> list[tuple[int, str]]:
         """What a run does, in order: (episode, stage) pairs. Series and season stages (analyze, cast, outline) appear
         once, with episode 0.
-        Without ``requested`` (or with ``params.resume``) each episode resumes where it stopped."""
+        Without ``requested`` (or with ``params.resume``) each episode resumes where it stopped; with
+        ``params.full`` such a run does not stop at the story: it goes on to ``produce`` and ``compose``, each
+        episode in turn from where it stands to its film."""
         params = params or {}
         resume = requested is None or bool(params.get("resume"))
+        full = resume and bool(params.get("full"))
         out: list[tuple[int, str]] = []
         for ep in self.episodes_for(project_id, params):
-            for stage in self.pending_stages(project_id, None if resume else requested, ep):
+            for stage in self.pending_stages(project_id, None if resume else requested, ep, full=full):
                 if stage in SERIES_STAGES or stage in SEASON_STAGES:
                     # kept once per series / season: once per run (a run's outline is the first episode's season)
                     if (0, stage) not in out:
@@ -175,9 +178,11 @@ class WorkflowState:
                     out.append((ep, stage))
         return out
 
-    def pending_stages(self, project_id: int, requested: list[str] | None = None, episode: int = 1) -> list[str]:
+    def pending_stages(self, project_id: int, requested: list[str] | None = None, episode: int = 1, *,
+                       full: bool = False) -> list[str]:
         """``requested`` in pipeline order; ``None`` = resume: every story stage of ``episode`` that is not completed
-        (stale included). Producing media and composing only run when requested."""
+        (stale included). Producing media and composing only run when requested, or in a ``full`` resume (then they
+        are pending like any other stage; a ``produce`` that ended with failed jobs is "failed", so it runs again)."""
         if requested:
             return [s for s in STAGES if s in requested]
         done = {s["stage"] for s in self.stages(project_id, episode) if s["status"] == "completed"}
@@ -185,7 +190,11 @@ class WorkflowState:
         planned = self.db.conn.execute(
             "SELECT planned_episodes FROM seasons WHERE project_id=? AND number=?", (project_id, season)).fetchone()
         outlined = planned is not None and int(planned["planned_episodes"]) > 1      # a planned season: outline first
-        return [s for s in STAGES if (s in DEFAULT_STAGES or (s == "outline" and outlined)) and s not in done]
+        wanted = DEFAULT_STAGES + (("produce", "compose") if full else ())
+        out = [s for s in STAGES if (s in wanted or (s == "outline" and outlined)) and s not in done]
+        if full and "produce" in out and "compose" not in out:
+            out.append("compose")             # new media: the film is cut again (it would go stale anyway)
+        return out
 
     # -- data ---------------------------------------------------------------------------------
     def get_data(self, project_id: int, key: str, default: Any = None) -> Any:

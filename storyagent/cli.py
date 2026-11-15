@@ -1208,6 +1208,10 @@ def _cmd_workflow_run(s: Settings, a: argparse.Namespace) -> int:
     if unknown:
         raise CliError("cli.error.bad_kv", 2, item=",".join(unknown))
     params = _kv(a.param or [])
+    if a.full:
+        if a.stage:
+            raise CliError("cli.error.bad_kv", 2, item="--full --stage")
+        params["full"] = True
     try:
         plan = state.plan(a.project, a.stage, params)
     except WorkflowStateError as exc:
@@ -1633,6 +1637,8 @@ def build_parser() -> argparse.ArgumentParser:
     wp.add_argument("--stage", action="append", choices=list(STAGES), help="repeat; omit to resume the project")
     wp.add_argument("--param", action="append", metavar="K=V", help="e.g. episode=2, source_text=..., acts=3")
     wp.add_argument("--force", action="store_true", help="redo stages even if their output exists")
+    wp.add_argument("--full", action="store_true",
+                    help="go all the way: story, then media (produce) and the film (compose); needs a worker")
     wp.add_argument("--inline", action="store_true", help="run here instead of waiting for a worker")
     wp.add_argument("--no-wait", action="store_true", help="queue it and return")
     wp.add_argument("--interval", type=float, default=1.0)
