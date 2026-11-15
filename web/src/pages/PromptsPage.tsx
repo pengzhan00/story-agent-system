@@ -13,6 +13,8 @@ const STAGE_OF: Record<string, string> = {
   "character.design": "cast",
   "screenwriter.outline": "script",
   "screenwriter.adapt": "script",
+  "reviewer.outline": "script",
+  "reviewer.logic": "script",
   "scene.design": "scenes",
   "composer.bgm": "music",
   "composer.theme": "music",

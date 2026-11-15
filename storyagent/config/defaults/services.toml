@@ -245,6 +245,15 @@ detail_sequence_words = ["then", "simultaneously", "afterwards", "after that", "
 detail_main_max_words = 40
 video_min_per_episode = 2
 video_budget_hours = 0
+# Keeping the story in one piece (docs/WORKFLOW.md "Story coherence"). The outline is read before any shot is written
+# (plain checks + the `reviewer.outline` agent) and sent back to the writer with the holes found, at most this many
+# times; the version with the fewest serious problems is kept. 0 = read and report only.
+outline_review_rounds = 2
+# After the shots are written the script is read once more for story logic (`reviewer.logic`); the scenes with a
+# serious problem are written again with the reader's notes, at most `script_review_max_scenes` scenes per round.
+# 0 = off. The run parameter `story_check=false` skips both checks, `story_check=true` reads an existing script again.
+script_review_rounds = 1
+script_review_max_scenes = 4
 # The produce stage turns every spec into media. Quality tier for the first pass (draft | preview | final).
 tier = "draft"
 # Optional shared library voice for characters without their own. Empty uses the TTS model's automatic voice

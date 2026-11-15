@@ -27,15 +27,18 @@ from dataclasses import dataclass, field
 from functools import partial
 from typing import Any
 
+from storyagent import script_text
 from storyagent.agents import AgentRunner
 from storyagent.agents.craft import resolve_kind, shot_bounds, writing_vars
 from storyagent.agents.runner import language_name
 from storyagent.compose.pacing import PacingError, fit_durations, structure_for, target_for
 from storyagent.config import Settings
 from storyagent.db import Database
+from storyagent.i18n import LocaleError, get_catalog
 from storyagent.projects import Project, ProjectStore
 from storyagent.story import StoryStore
 
+from . import coherence
 from .framing import fix_framing
 from .grammar import run_check
 from .shotplan import build_shot_rows
@@ -439,14 +442,76 @@ def _introduce_characters(
 
 def _write_shots(
     ctx: Ctx, outline: dict[str, Any], act: dict[str, Any], scene: dict[str, Any], chars: list[dict[str, Any]],
-    previous: str, next_beat: str, feedback: str, capped: bool, count: int, current: str, next_shot: str = "(none)",
+    previous: str, next_beat: str, feedback: str, capped: bool, told: dict[str, str], count: int, current: str,
+    next_shot: str = "(none)",
 ) -> list[dict[str, Any]]:
-    """One request to the shot writer for a scene, its answer cleaned; ``capped`` keeps at most ``count`` shots."""
+    """One request to the shot writer for a scene, its answer cleaned; ``capped`` keeps at most ``count`` shots.
+    ``told`` is what the writer knows of the rest of the story (``story_so_far``, ``last_lines``, ``facts``)."""
     data = ctx.run_agent("screenwriter.shots", {
         "title": outline["title"], "act_title": act.get("title", ""), "scene": scene,
         "characters": _character_brief(chars), "shots_per_scene": count, "previous": previous,
-        "next_beat": next_beat, "next_shot": next_shot, "feedback": feedback, "current": current})
+        "next_beat": next_beat, "next_shot": next_shot, "feedback": feedback, "current": current, **told})
     return _clean_shots(data["shots"], scene, cap=count if capped else None)
+
+
+def _rounds(ctx: Ctx, name: str, default: int) -> int:
+    """How often a text may be sent back: run parameter > ``[workflow]``; ``story_check=false`` switches it off."""
+    if ctx.params.get("story_check") is False:
+        return -1
+    value = ctx.params.get(name)
+    return int(value if value is not None else ctx.settings.workflow.get(name, default))
+
+
+def _read_outline(ctx: Ctx, outline: dict[str, Any], chars: list[dict[str, Any]], premise: str, episode: int,
+                  earlier: str, brief_ep: str, single: bool) -> dict[str, Any]:
+    """Does the outline hold together: the checks plain code can make plus the outline reader's."""
+    closed = episode == 1 or ctx.params.get("auto_cast") is False
+    found = coherence.outline_problems(outline, [c["name"] for c in chars], must_use_all=single, closed_cast=closed)
+    review = ctx.run_agent("reviewer.outline", {
+        "premise": premise, "outline": coherence.outline_text(outline), "characters": _character_brief(chars),
+        "earlier": earlier or "(none)", "episode_brief": brief_ep or "(none)"})
+    issues = found + [{**dict(i), "lens": "story"} for i in review.get("issues") or []]
+    return {"score": float(review.get("score") or 0), "summary": str(review.get("summary") or ""), "issues": issues}
+
+
+def _settled_outline(
+    ctx: Ctx, outline: dict[str, Any], write: Callable[[str, str], dict[str, Any]] | None,
+    read: Callable[[dict[str, Any]], dict[str, Any]],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """The outline after its holes were sent back to the writer (at most ``outline_review_rounds`` times), with what
+    the last reading still found. Of all the versions the one with the fewest serious problems is kept (then the
+    best score), so a rewrite that made things worse is thrown away."""
+    rounds = _rounds(ctx, "outline_review_rounds", 2)
+    if rounds < 0:
+        return outline, {}
+    versions: list[tuple[dict[str, Any], dict[str, Any]]] = []
+    for attempt in range(rounds + 1):
+        ctx.step(0, 1, f"outline check {attempt + 1}")
+        review = read(outline)
+        versions.append((outline, review))
+        notes = [i for i in review["issues"] if str(i.get("severity") or "").lower() in ("high", "medium")]
+        if not coherence.severe(review["issues"]) or write is None or attempt == rounds:
+            break
+        ctx.step(0, 1, f"outline fix {attempt + 1}")
+        outline = write(coherence.notes_text(notes), dump(outline))
+        _renumber(outline)
+    best, review = min(versions, key=lambda v: (len(coherence.severe(v[1]["issues"])), -float(v[1]["score"])))
+    return best, coherence.summary_of(review, len(versions) - 1)
+
+
+def _read_script(ctx: Ctx, outline: dict[str, Any], chars: list[dict[str, Any]], facts: str, earlier: str
+                 ) -> dict[str, Any]:
+    """The written script read for story logic only (``reviewer.logic``): lines against the facts and the story so
+    far, things told twice, a beat the shots do not show."""
+    try:
+        labels = get_catalog(ctx.project.content_language)
+    except LocaleError:                 # a content language the interface has no texts for
+        labels = get_catalog("en")
+    text = script_text.render(outline["title"], outline.get("synopsis", ""), outline["acts"], labels.t)
+    review = ctx.run_agent("reviewer.logic", {
+        "script": text, "facts": facts, "characters": _character_brief(chars), "earlier": earlier or "(none)"})
+    return {"score": float(review.get("score") or 0), "summary": str(review.get("summary") or ""),
+            "issues": [{**dict(i), "lens": "story"} for i in review.get("issues") or []]}
 
 
 def script(ctx: Ctx) -> dict[str, Any]:
@@ -470,55 +535,72 @@ def script(ctx: Ctx) -> dict[str, Any]:
     if feedback and not (existing and existing["acts"]):
         raise StageError("needs_stage", "there is no script to revise yet", stage="script")
 
+    # what the episodes before this one showed and fixed: every writer and reader of this episode is told
+    facts_of = {int(s["episode_no"]): (ctx.state.get_data(ctx.pid, f"story:{s['episode_no']}") or {}).get("facts")
+                for s in ctx.store.list_scripts(ctx.pid) if int(s["episode_no"]) < episode}
+    earlier = coherence.earlier_episodes(ctx.store.list_scripts(ctx.pid), episode, facts_of)
+    checks: dict[str, Any] = dict(ctx.state.get_data(ctx.pid, f"story_check:{episode}") or {})
+
     if existing and existing["acts"] and (feedback or not ctx.force()):
         outline = {"title": existing["title"], "synopsis": existing["synopsis"], "acts": existing["acts"]}
     else:
         brief = _character_brief(chars)
         source = str(ctx.params.get("source_text") or "").strip()
         ctx.step(0, 1, "outline")
+        season = next((s for s in ctx.store.list_seasons(ctx.pid) if s["number"] == ctx.season_of(episode)), None)
+        single = episode == 1 and int((season or {}).get("planned_episodes") or 0) <= 1    # one piece, not a series
+        brief_ep = _episode_brief(ctx, episode)
+        write_outline: Callable[[str, str], dict[str, Any]] | None = None
         if source:
+            # an adaptation is read, never re-invented: its holes are reported, not rewritten
+            premise = source[:4000]
             outline = ctx.run_agent("screenwriter.adapt", {"source": source[:24000], "acts": acts_n,
                                                            "scenes_per_act": per_act, "characters": brief})
         else:
             premise = _premise(ctx)
-            brief_ep = _episode_brief(ctx, episode)
             if brief_ep:
                 premise += "\n\n" + brief_ep
-            if episode > 1:
-                before = [s["synopsis"] for s in ctx.store.list_scripts(ctx.pid) if s["episode_no"] < episode]
-                premise += f"\n\nThis is episode {episode} of a series. Earlier episodes: {' / '.join(before)}"
-            outline = ctx.run_agent("screenwriter.outline", {
-                "premise": premise, "genre": plan.get("genre", ctx.project.genre), "tone": plan.get("tone", ""),
-                "acts": acts_n, "scenes_per_act": per_act, "characters": brief, "plan": plan.get("summary", ""),
-                "shots_per_scene": shots_n})
+            if earlier:
+                premise += f"\n\nThis is episode {episode} of a series.\n{earlier}"
+
+            def write_outline(notes: str, current: str) -> dict[str, Any]:
+                return ctx.run_agent("screenwriter.outline", {
+                    "premise": premise, "genre": plan.get("genre", ctx.project.genre), "tone": plan.get("tone", ""),
+                    "acts": acts_n, "scenes_per_act": per_act, "characters": brief, "plan": plan.get("summary", ""),
+                    "shots_per_scene": shots_n, "feedback": notes, "current": current})
+
+            outline = write_outline("(none)", "(none)")
         _renumber(outline)
+        outline, read = _settled_outline(
+            ctx, outline, write_outline,
+            lambda o: _read_outline(ctx, o, chars, premise, episode, earlier, brief_ep, single))
         ctx.store.save_script(ctx.pid, episode, title=outline["title"], synopsis=outline.get("synopsis", ""),
                               acts=outline["acts"])
+        ctx.state.put_data(ctx.pid, f"story:{episode}", {
+            k: outline.get(k) or [] for k in ("facts", "threads", "set_pieces")})
+        checks = {"outline": read} if read else {}
+        ctx.state.put_data(ctx.pid, f"story_check:{episode}", checks)
 
     scenes = [(act, sc) for act in outline["acts"] for sc in act.get("scenes", [])]
     names = [c["name"] for c in chars]
-    previous = ""
-    place: Any = None            # where the scene before this one took place
-    done = 0
-    for index, (act, scene) in enumerate(scenes):
-        ctx.step(done, len(scenes), f"{act['number']}.{scene['number']}")
-        following = scenes[index + 1][1].get("beat", "") if index + 1 < len(scenes) else ""
-        revising = bool(feedback) and (not revise or f"{act['number']}.{scene['number']}" in revise)
-        if scene.get("shots") and not ctx.force() and not revising:
-            previous = scene.get("beat", "")
-            place = scene.get("location")
-            done += 1
-            continue
-        in_scene = _scene_shot_count(scene, shots_n, int(ctx.params.get("shot_count_factor") or MAX_SHOT_FACTOR))
-        shots: list[dict[str, Any]] = []
-        asked = bool(scene.get("shot_count"))      # only a number the outline asked for is chased, revising or not
+    facts = coherence.facts_text((ctx.state.get_data(ctx.pid, f"story:{episode}") or {}).get("facts"))
+    factor = int(ctx.params.get("shot_count_factor") or MAX_SHOT_FACTOR)
 
-        write = partial(_write_shots, ctx, outline, act, scene, chars, previous or "(start)",
-                        following or "(this is the last scene)", feedback if revising else "(none)", asked)
+    def write_scene(index: int, notes: str) -> None:
+        """Write (or, with ``notes``, write again) the shots of one scene, told the whole story before it."""
+        act, scene = scenes[index]
+        before = scenes[index - 1][1] if index else {}
+        following = scenes[index + 1][1].get("beat", "") if index + 1 < len(scenes) else ""
+        in_scene = _scene_shot_count(scene, shots_n, factor)
+        asked = bool(scene.get("shot_count"))      # only a number the outline asked for is chased, revising or not
+        told = {"story_so_far": coherence.story_so_far(scenes, index, earlier),
+                "last_lines": coherence.last_lines(scenes, index), "facts": facts}
+        write = partial(_write_shots, ctx, outline, act, scene, chars, before.get("beat") or "(start)",
+                        following or "(this is the last scene)", notes or "(none)", asked, told)
         # a long set piece starts with a few shots and goes on one shot at a time: a model writes each move in far
         # more detail when it has only one to write
         first = min(in_scene, FIRST_SHOTS) if asked else in_scene
-        shots = write(first, dump(scene["shots"]) if revising and scene.get("shots") else "(none)")
+        shots = write(first, dump(scene["shots"]) if notes and scene.get("shots") else "(none)")
         # a writer that gave fewer than the outline asked for is asked for the rest one shot at a time: one move per
         # request is far easier to write well than a long list, and each sees the shots before it
         for number in range(len(shots) + 1, in_scene + 1) if asked else ():
@@ -528,12 +610,43 @@ def script(ctx: Ctx) -> dict[str, Any]:
             shots.append(more[0])
         for i, shot in enumerate(shots, start=1):
             shot["shot_number"] = i
-        fix_framing(shots, ctx.settings.grammar, new_place=scene.get("location") != place)
-        place = scene.get("location")
+        fix_framing(shots, ctx.settings.grammar, new_place=scene.get("location") != before.get("location"))
         scene["shots"] = shots
         ctx.store.update_script_scene(ctx.pid, episode, act["number"], scene["number"], {"shots": shots})
-        previous = scene.get("beat", "")
-        done += 1
+
+    wrote = 0
+    for index, (act, scene) in enumerate(scenes):
+        ctx.step(index, len(scenes), f"{act['number']}.{scene['number']}")
+        revising = bool(feedback) and (not revise or f"{act['number']}.{scene['number']}" in revise)
+        if scene.get("shots") and not ctx.force() and not revising:
+            continue
+        write_scene(index, feedback if revising else "")
+        wrote += 1
+
+    # the script is read once more for story logic, and the scenes with a serious problem are written again with
+    # the reader's notes: a fresh script only (a revision asked for by a person is theirs to judge), or on request
+    rounds = _rounds(ctx, "script_review_rounds", 1)
+    if rounds > 0 and ((wrote and not feedback) or ctx.params.get("story_check") is True):
+        most = int(ctx.settings.workflow.get("script_review_max_scenes", 4))
+        where = {f"{a['number']}.{sc['number']}": n for n, (a, sc) in enumerate(scenes)}
+        rewritten: list[str] = []
+        review: dict[str, Any] = {}
+        for attempt in range(rounds + 1):
+            ctx.step(len(scenes), len(scenes), f"story check {attempt + 1}")
+            review = _read_script(ctx, outline, chars, facts, earlier)
+            by_scene: dict[str, list[dict[str, Any]]] = {}
+            for issue in coherence.severe(review["issues"]):
+                key = coherence.scene_of(issue.get("where"))
+                if key in where:
+                    by_scene.setdefault(str(key), []).append(issue)
+            if not by_scene or attempt == rounds:
+                break
+            for key in sorted(by_scene, key=lambda k: where[k])[:most]:
+                ctx.step(len(scenes), len(scenes), f"story fix {key}")
+                write_scene(where[key], coherence.notes_text(by_scene[key]))
+                rewritten.append(key)
+        checks["script"] = coherence.summary_of(review, attempt, rewritten)
+        ctx.state.put_data(ctx.pid, f"story_check:{episode}", checks)
     from .detail import detail_pass
 
     detailed = detail_pass(ctx, episode, scenes)
@@ -546,7 +659,7 @@ def script(ctx: Ctx) -> dict[str, Any]:
     ctx.step(len(scenes), len(scenes), "done")
     return {"episode": episode, "acts": len(outline["acts"]), "scenes": len(scenes),
             "shots": sum(len(sc.get("shots", [])) for _, sc in scenes), "unknown_speakers": unknown,
-            "new_characters": introduced, **detailed}
+            "new_characters": introduced, "story_check": checks, **detailed}
 
 
 def scenes(ctx: Ctx) -> dict[str, Any]:

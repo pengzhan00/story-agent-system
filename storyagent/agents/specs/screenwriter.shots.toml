@@ -5,7 +5,8 @@ max_tokens = 6000
 schema = "scene_shots"
 inputs = ["language", "title", "act_title", "scene", "characters", "shots_per_scene", "previous", "next_beat",
           "feedback", "current",
-          "form_guidance", "genre_guidance", "dialogue_chars", "shot_sec", "frame_note", "next_shot"]
+          "form_guidance", "genre_guidance", "dialogue_chars", "shot_sec", "frame_note", "next_shot",
+          "story_so_far", "last_lines", "facts"]
 system = """You are a professional screenwriter and storyboard artist. You break one scene into shots with the dialogue
 spoken in each. At most $dialogue_chars characters of spoken text per line, 1-3 lines per shot, none in purely visual
 shots. Write all story content in $language.
@@ -34,7 +35,18 @@ Act: $act_title
 Scene to break down: $scene
 
 Characters (use these names exactly): $characters
+The story so far, scene by scene (this is all the viewer has seen):
+$story_so_far
+The last lines spoken before this scene (never say them again; when this scene carries the talk on, pick up from them):
+$last_lines
+What is true in this story (the writer's fixed facts; a secret among them is not said out loud before the scene whose
+beat reveals it):
+$facts
 What happened just before: $previous
+The scene belongs to that story: nothing said or done in it contradicts the story so far or the facts; people know
+only what they have seen or been told on screen, or what the facts say they knew already; nobody mentions a thing that
+has not happened yet; what the viewer has already been told is not explained a second time; a person keeps the name,
+the wound, the object and the clothes they had when they were last seen unless this scene shows the change.
 What the NEXT scene covers (it is shown there, never here): $next_beat
 Everything in these shots happens inside this scene's `beat` and stops where the beat stops. When the beat is short for
 the number of shots, spread its moves over all of them in smaller steps, with reactions and inserts; never carry on

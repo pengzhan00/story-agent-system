@@ -7,6 +7,12 @@
     "type": "string"
    }
   },
+  "facts": {
+   "type": "array",
+   "items": {
+    "type": "string"
+   }
+  },
   "title": {
    "type": "string",
    "minLength": 1
@@ -84,6 +90,30 @@
     ]
    },
    "minItems": 1
+  },
+  "threads": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "setup": {
+      "type": "string"
+     },
+     "setup_scene": {
+      "type": "string"
+     },
+     "payoff": {
+      "type": "string"
+     },
+     "payoff_scene": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "setup",
+     "payoff_scene"
+    ]
+   }
   }
  },
  "required": [
