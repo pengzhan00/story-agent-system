@@ -44,6 +44,24 @@ def test_params_patch_merges_while_params_replaces(store: SpecStore) -> None:
     assert store.edit(1, PORTRAIT, "7", params={"z": 0}).params == {"z": 0}
 
 
+def test_legacy_provider_reference_can_be_repaired_without_rewriting_history(store: SpecStore) -> None:
+    """Imported service names need an explicit model correction, never an implicit provider alias."""
+    with pytest.raises(ConfigError, match="unknown model ref"):
+        store.create(1, PORTRAIT, "7", MediaKind.VIDEO_GENERATE, model_ref="phosphene")
+    original = make_portrait(store, params={"mode": "a2v", "audio_start": 84.0}, author="agent")
+    # Reproduce a historical direct-to-database import that bypassed create() validation.
+    store.db.conn.execute("UPDATE gen_specs SET model_ref='phosphene' WHERE id=?", (original.id,))
+    with pytest.raises(ConfigError, match="unknown model ref"):
+        store.edit(1, PORTRAIT, "7", params_patch={"seconds": 10})
+    repaired = store.edit(1, PORTRAIT, "7", model_ref="fake-video", author="agent",
+                          note="repair imported provider name")
+    assert (repaired.version, repaired.parent_version) == (2, 1)
+    assert repaired.params == original.params
+    assert repaired.prompt == original.prompt
+    assert store.get(original.id).model_ref == "phosphene"
+    assert store.edit(1, PORTRAIT, "7", model_ref="fake-video").id == repaired.id
+
+
 def test_create_twice_and_bad_input(store: SpecStore) -> None:
     make_portrait(store)
     with pytest.raises(SpecError, match="already exists"):
