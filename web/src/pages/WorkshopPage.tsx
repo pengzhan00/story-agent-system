@@ -444,8 +444,11 @@ function KindPanel({
 }
 
 function JobCard({
-  item, modules, onUse, onAgain,
+  item, modules, onUse, onAgain, selected, onSelect, selectionDisabled,
 }: {
+  selected?: boolean;
+  onSelect?: () => void;
+  selectionDisabled?: boolean;
   item: WorkshopHistoryItem;
   modules: WorkshopModule[];
   onUse: (target: { module: string; kind: string; field: string }, assetId: string) => void;
@@ -462,6 +465,8 @@ function JobCard({
   return (
     <li className="card stack">
       <div className="row">
+        {onSelect ? <input type="checkbox" aria-label={t("web.jobs.select_job", { id: j.id })}
+          checked={selected ?? false} disabled={active || selectionDisabled} onChange={onSelect} /> : null}
         <StatusChip status={j.status} group="status" />
         <strong>{t(`media.kind.${j.kind}`)}</strong>
         <span className="muted small">{j.model_ref}</span>
@@ -516,7 +521,7 @@ function JobCard({
   );
 }
 
-function History({
+export function History({
   module, modules, onUse, onAgain,
 }: {
   module: string;
@@ -526,14 +531,38 @@ function History({
 }) {
   const t = useT();
   const hist = useWorkshopHistory(module);
+  const { removeHistory } = useJobActions();
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const eligible = (hist.data ?? []).filter(({ job }) => job.status !== "queued" && job.status !== "running");
+  const chosen = eligible.filter(({ job }) => selected.has(job.id)).map(({ job }) => job.id);
+  const toggle = (id: string) => setSelected((previous) => {
+    const next = new Set(previous);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
   return (
     <section className="stack">
       <h2>{t("web.workshop.history")}</h2>
       <ErrorNote error={hist.error} />
+      <ErrorNote error={removeHistory.error} />
+      {eligible.length ? <div className="row small">
+        <label className="row"><input type="checkbox" aria-label={t("web.jobs.select_page")}
+          checked={chosen.length === eligible.length} disabled={removeHistory.isPending}
+          onChange={() => setSelected(chosen.length === eligible.length ? new Set() : new Set(eligible.map(({ job }) => job.id)))} />
+          {t("web.jobs.select_page")}</label>
+        <span>{t("web.jobs.selected_n", { n: chosen.length })}</span>
+        <button disabled={!chosen.length || removeHistory.isPending} onClick={() => {
+          if (window.confirm(t("web.jobs.remove_confirm", { n: chosen.length }))) {
+            removeHistory.mutate(chosen, { onSuccess: () => setSelected(new Set()) });
+          }
+        }}>{t("web.jobs.remove_selected")}</button>
+        <span className="muted">{t("web.jobs.remove_hint")}</span>
+      </div> : null}
       {hist.data && hist.data.length === 0 ? <p className="empty">{t("web.workshop.no_history")}</p> : null}
       <ul className="stack plain">
         {hist.data?.map((i) => (
-          <JobCard key={i.job.id} item={i} modules={modules} onUse={onUse} onAgain={onAgain} />
+          <JobCard key={i.job.id} item={i} modules={modules} onUse={onUse} onAgain={onAgain}
+            selected={selected.has(i.job.id)} onSelect={() => toggle(i.job.id)} selectionDisabled={removeHistory.isPending} />
         ))}
       </ul>
     </section>

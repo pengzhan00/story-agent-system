@@ -341,3 +341,17 @@ def test_packaged_creative_models_all_have_workshop_input_contracts():
     creative_kinds = {m.kind for m in settings.models.values()} - {MediaKind.COMPOSE_DELIVER.value}
     for kind in creative_kinds:
         assert kind_spec(kind).kind.value == kind
+
+
+def test_removed_workshop_history_stays_hidden_and_keeps_assets(api: TestClient, wsettings: Settings) -> None:
+    [job] = api.post("/api/workshop/run", json={"kind": "image.generate", "inputs": {"prompt": "x"},
+                                              "model_ref": "fake-image"}).json()
+    drain(wsettings)
+    [item] = api.get("/api/workshop/history?module=image").json()
+    asset = item["assets"][0]
+    removed = api.post("/api/jobs/history/remove", json={"ids": [job["id"]]})
+    assert removed.status_code == 200 and removed.json()["removed"] == 1
+    assert api.get("/api/workshop/history?module=image").json() == []
+    assert api.get(f"/api/jobs/{job['id']}").status_code == 200
+    assert (wsettings.home / asset["path"]).is_file()
+    assert api.get(f"/api/assets/{asset['id']}").status_code == 200

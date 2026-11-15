@@ -441,5 +441,6 @@ class Workshop:
 
     # -- history -------------------------------------------------------------------------------
     def history(self, kinds: Sequence[str] | None, limit: int = 40) -> list[tuple[JobRecord, list[Any]]]:
-        jobs = self.ledger.list_jobs(standalone=True, kinds=kinds, limit=limit)
+        """Follow the shared job-history removal flag; clearing a list never deletes its generated assets."""
+        jobs = self.ledger.list_jobs(standalone=True, kinds=kinds, limit=limit, include_removed=False)
         return [(j, self.ledger.list_assets(job_id=j.id)) for j in jobs]

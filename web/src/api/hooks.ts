@@ -206,7 +206,10 @@ export function useJobActions() {
     front: useMutation({ mutationFn: (ids: string[]) => post(`/api/jobs/priority`, { ids, move: "first" }), onSuccess: done }),
     removeHistory: useMutation({
       mutationFn: (ids: string[]) => post<{ removed: number }>("/api/jobs/history/remove", { ids }),
-      onSuccess: done,
+      onSuccess: () => {
+        void done();
+        void qc.invalidateQueries({ queryKey: ["workshop"] });
+      },
     }),
   };
 }
