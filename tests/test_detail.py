@@ -48,7 +48,7 @@ def test_an_english_only_model_is_not_sent_chinese_but_a_sound_clip_may_carry_a_
     from storyagent.media.prompts import language_issues
 
     [issue] = language_issues("en", "image.generate", {"prompt": "a street, 背靠背", "negative_prompt": ""})
-    assert "背靠背" in issue.message and issue.code.value == "invalid_input"
+    assert "背靠背" in issue.message and issue.code.value == "prompt_language"
     assert language_issues("en", "image.generate", {"prompt": "a street", "negative_prompt": "blur"}) == []
     assert language_issues("", "image.generate", {"prompt": "街道"}) == []                  # a model that reads Chinese
     assert language_issues("en", "video.av", {"prompt": "DIALOGUE in Mandarin: 你好"}) == []   # speech is legitimate
@@ -436,3 +436,18 @@ def test_an_imported_shot_without_plan_blocks_keeps_its_own_picture_prompt(tmp_p
     for shot in shots:
         spec = engine.spec_store.current(pid, "shot.keyframe", str(shot["id"]))
         assert spec is not None and f"imported prompt {shot['id']}" in spec.prompt
+
+
+def test_english_prompt_allows_explicit_sign_lettering_but_not_untranslated_instructions() -> None:
+    from storyagent.media.prompts import language_issues
+
+    for quote in ("'悦来客栈'", '"悦来客栈"', '“悦来客栈”', '「悦来客栈」'):
+        prompt = f"A street with a wooden signboard that clearly says {quote}. Soft natural daylight."
+        assert language_issues("en", "image.generate", {"prompt": prompt}) == []
+        [issue] = language_issues("en", "image.generate", {"prompt": prompt + " 女孩走过街道"})
+        assert issue.params["detail"] == "女孩走过街道"
+    assert language_issues("en", "image.generate", {"prompt": "The inn's sign reads '悦来客栈'."}) == []
+    assert language_issues("en", "image.edit", {"prompt": 'Replace the text "悦来客栈" with a blank sign.'}) == []
+    for prompt in ('a street, "背靠背"', '"女孩走过街道"', "a person says '向左走'", "a sign that reads '招牌\n走路'"):
+        assert language_issues("en", "image.generate", {"prompt": prompt})
+    assert language_issues("en", "image.generate", {"prompt": "a street", "negative_prompt": 'text "中文"'})

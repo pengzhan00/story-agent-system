@@ -2836,5 +2836,7 @@
   "web.workflow.source_music_listen": "试听完整原曲",
   "web.workflow.source_music_clear": "改回生成音频",
   "web.plan.reason.source_music": "已采用完整原曲",
-  "web.produce.reason.source_music": "已采用完整原曲"
+  "web.produce.reason.source_music": "已采用完整原曲",
+  "error.prompt_language": "模型要求英文场景描述，以下文字尚未翻译：{detail}",
+  "error.prompt_language.remediation": "请将场景描述翻译为英文。画面内的招牌文字可保留，用英文说明用途并加引号，例如：a sign that reads \"悦来客栈\"。"
 }

@@ -5,6 +5,7 @@ lyrics separately; most others take free text). Adding a dialect = one function 
 """
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Mapping
 from typing import Any
 
@@ -56,23 +57,37 @@ PROFILES: dict[str, Callable[[str, Mapping[str, Any] | None], str]] = {
 }
 
 
-# Kinds whose prompt never holds speech: Chinese in it is a leak from the story text, not a spoken line (the sound
-# clips legitimately carry a Mandarin line in their prompt, so they are only warned about at enqueue time).
+# English scene instructions may contain literal lettering (for example a sign that reads "悦来客栈").
+# Only explicitly attributed lettering in the positive prompt is exempt, never arbitrary quoted prose.
+_LETTERING_CUE = re.compile(
+    r"\b(?:sign(?:board)?|poster|label|caption|title|lettering|inscription|text|words?)"
+    r"(?:\s+(?:that|which))?(?:\s+(?:clearly|visibly))?"
+    r"(?:\s+(?:says?|reads?|reading|saying|written|spelling|showing|displaying))?\s*[:=]?\s*$", re.I)
+_LITERAL = re.compile(r"(?<!\w)'([^'\n]+)'(?!\w)|\"([^\"\n]+)\"|“([^”\n]+)”|‘([^’\n]+)’|「([^」\n]+)」|『([^』\n]+)』")
+
+
+def _scene_instructions(text: str) -> str:
+    def remove_lettering(match: re.Match[str]) -> str:
+        return " " if _LETTERING_CUE.search(text[:match.start()]) else match.group(0)
+
+    return _LITERAL.sub(remove_lettering, text)
+
+
 _STRICT_KINDS = frozenset({"image.generate", "image.edit", "video.generate"})
 
 
 def language_issues(prompt_language: str, kind: str, inputs: Mapping[str, Any]) -> list[ValidationIssue]:
-    """An English-only picture or video model must not be sent Chinese words: it draws something else (a leaked word
-    turned a clothed street scene into a naked one), so the job stops here and says which words."""
+    """Reject untranslated scene instructions, while retaining explicitly quoted in-scene lettering."""
     if prompt_language != "en" or kind not in _STRICT_KINDS:
         return []
     found: list[str] = []
     for key in ("prompt", "negative_prompt"):
-        found += cjk_words(str(inputs.get(key) or ""))
+        text = str(inputs.get(key) or "")
+        found += cjk_words(_scene_instructions(text) if key == "prompt" else text)
     if not found:
         return []
     words = ", ".join(dict.fromkeys(found[:5]))
-    return [ValidationIssue(ErrorCode.INVALID_INPUT, f"the prompt contains Chinese ({words}) but the model reads "
+    return [ValidationIssue(ErrorCode.PROMPT_LANGUAGE, f"the prompt contains Chinese ({words}) but the model reads "
                             "English only: write the prompt in English", {"detail": words})]
 
 

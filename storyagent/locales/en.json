@@ -2836,5 +2836,7 @@
   "web.workflow.source_music_listen": "Listen to original soundtrack",
   "web.workflow.source_music_clear": "Switch back to generated audio",
   "web.plan.reason.source_music": "complete original soundtrack selected",
-  "web.produce.reason.source_music": "complete original soundtrack selected"
+  "web.produce.reason.source_music": "complete original soundtrack selected",
+  "error.prompt_language": "Untranslated scene instructions for an English-prompt model: {detail}",
+  "error.prompt_language.remediation": "Translate the scene instructions into English. Literal lettering can remain in quotes after an English cue such as: a sign that reads \"悦来客栈\"."
 }

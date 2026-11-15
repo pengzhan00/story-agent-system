@@ -468,3 +468,20 @@ def test_pause_does_not_hide_a_claim_that_is_becoming_inflight(
         worker.resume()
         worker.drain(5)
         worker.shutdown()
+
+
+def test_language_gate_preserves_sign_lettering_but_explains_untranslated_scene(
+    fsettings: Settings, fdb: Database,
+) -> None:
+    models = {**fsettings.models, "fake-video": replace(fsettings.model("fake-video"), prompt_language="en")}
+    settings = replace(fsettings, models=models)
+    worker, ledger, _ = make(settings, fdb)
+    allowed = submit(ledger, prompt='A street sign that reads "悦来客栈".', fake_steps=1)
+    blocked = submit(ledger, prompt='A street sign that reads "悦来客栈". 女孩向前走', fake_steps=1)
+    assert worker.drain(10)
+    assert ledger.get_job(allowed.id).status is JobStatus.COMPLETED
+    assert not any(e["event"] == "prompt_language" for e in ledger.events(allowed.id))
+    failed = ledger.get_job(blocked.id)
+    assert failed.status is JobStatus.FAILED_VALIDATION
+    assert failed.error_code == "prompt_language"
+    assert failed.error_params["detail"] == "女孩向前走"
