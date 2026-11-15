@@ -592,6 +592,8 @@ def _music_fields(data: dict[str, Any], kind: str, scene_ref: str = "") -> dict[
 
 
 def music(ctx: Ctx) -> dict[str, Any]:
+    if ctx.project.settings.get("source_music"):
+        return {"created": 0, "preserved_source_music": ctx.project.settings["source_music"]}
     plan = _plan(ctx)
     title = plan.get("project_name", ctx.project.name)
     episode = int(ctx.params.get("episode") or 1)
@@ -616,7 +618,9 @@ def music(ctx: Ctx) -> dict[str, Any]:
         ctx.step(i, total, kind)
         if kind == "theme":
             data = ctx.run_agent("composer.theme", {"title": title, "genre": plan.get("genre", ""),
-                                                    "tone": plan.get("tone", ""), "subject": spec["subject"],
+                                                    "tone": plan.get("tone", ""),
+                                                    "subject": {"description": spec["subject"],
+                                                                "requested_duration_sec": ctx.target_sec()},
                                                     "mood": spec["mood"], "vocal": spec["vocal"]})
             ctx.store.create_music(ctx.pid, _music_fields(data, "theme"))
         else:

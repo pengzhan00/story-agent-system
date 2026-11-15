@@ -236,3 +236,26 @@ def test_room_tone_music_cues_swell_j_cut_and_dissolve_render_together(tmp_path:
     assert "dissolve_unavailable" not in {w["code"] for w in main.metadata["warnings"]}
     # in the last scene nobody speaks (the music cue and the room tone are all there is) and it is not silent
     assert mean_volume(ff, film, tl["segments"][2]["start"] + 1.0, 1.5) > -80.0
+
+
+def test_original_soundtrack_keeps_its_tail_without_looping_or_ducking(tmp_path: Path) -> None:
+    from storyagent.media.runners.assemble_episode import audio_cmd
+
+    ff = ffmpeg_of(tmp_path)
+    source, dest = tmp_path / "original.wav", tmp_path / "render.wav"
+    # Three silent seconds then a final tone: a shortened/looped opening loses this tail.
+    subprocess.run([ff, "-y", "-loglevel", "error", "-f", "lavfi", "-i",
+                    "aevalsrc=if(gte(t\\,3)\\,0.2*sin(2*PI*440*t)\\,0):s=48000:d=4", str(source)], check=True)
+    timeline = {"total_sec": 4.5, "audio": {"preserve_source_music": True, "rate": 48000,
+                "codec": "pcm_s16le", "bitrate": "192k"},
+                "music": [{"primary": True, "path": str(source), "duration": 4.0}]}
+    subprocess.run(audio_cmd(ff, timeline, dest), check=True)
+    import array
+
+    raw = subprocess.run([ff, "-loglevel", "error", "-i", str(dest), "-ac", "1", "-f", "s16le", "-"],
+                         check=True, capture_output=True).stdout
+    samples = array.array("h", raw)
+    assert len(samples) / 48000 == pytest.approx(4.5, abs=0.01)
+    assert max(abs(x) for x in samples[:48000 * 2]) == 0
+    assert max(abs(x) for x in samples[48000 * 3:48000 * 4]) > 3000
+    assert max(abs(x) for x in samples[48000 * 4:]) == 0

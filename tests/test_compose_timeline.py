@@ -197,3 +197,19 @@ def test_a_dissolve_marks_the_shot_before_a_scene_change_and_wins_over_the_fade(
     assert all("fade_out" not in s and "fade_in" not in s for s in t["segments"])
     assert [s["start"] for s in t["segments"]] == [s["start"] for s in build(shots)["segments"]]    # timing unchanged
     assert build(shots, scene_fade_sec=0.3)["segments"][1]["fade_out"] == 0.3
+
+
+def test_complete_original_song_controls_picture_clock_and_replaces_generated_audio() -> None:
+    source = AssetRef("original", "audio.music", 241.478667)
+    shots = [ShotInput(1, "a", 75, video=clip("v", 4), video_audio=True,
+                       lines=[("unwanted dub", voice("dub", 2))], sfx=[(voice("fx", 1), 0)]),
+             ShotInput(2, "b", 75, image=AssetRef("still", "image.generate"))]
+    t = build_timeline(TimelineInput(shots, PROFILE, MIX, source_music=source,
+                                    bgm=AssetRef("short_generated", "audio.music", 150)))
+    assert 241.478667 <= t["total_sec"] < 241.480
+    assert t["speech"] == t["sfx"] == []
+    assert t["music"] == [{"asset": "asset:original", "start": 0.0, "duration": 241.478667,
+                            "loop": False, "gain": 1.0, "primary": True}]
+    assert "no_bgm" not in {w["code"] for w in t["warnings"]}
+    assert t["audio"]["preserve_source_music"] is True
+    assert t["music_swell"] is t["room_tone"] is None

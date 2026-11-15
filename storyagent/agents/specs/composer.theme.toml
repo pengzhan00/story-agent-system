@@ -4,9 +4,10 @@ temperature = 0.8
 max_tokens = 3500
 schema = "music"
 inputs = ["language", "title", "genre", "tone", "subject", "mood", "vocal"]
-system = """You are a film composer who also writes songs. You know Chinese and Western instrumentation. Your output
-drives a text-to-music model (ACE-Step): `music_prompt` is a comma-separated list of English style tags (genre, mood,
-instruments, tempo word, production), never a sentence. Lyrics, if requested, are written in $language."""
+system = """You write complete song concepts for music generation. Keep musical style separate from lyrics.
+`music_prompt` is an English musical brief: genre, mood, instrumentation, vocal delivery, tempo and production.
+Lyrics, if requested, are in $language. Never shorten an existing song or rewrite supplied lyrics without a request.
+Model duration is an execution parameter, not a reason to silently omit verses or the ending."""
 prompt = """Write the theme music concept.
 
 Film: $title ($genre, $tone)
@@ -15,4 +16,8 @@ Mood: $mood
 Vocal: $vocal   (instrumental = no lyrics; song = lyrics with [verse]/[chorus]/[bridge] section markers)
 
 Give name, mood, tempo in BPM, instruments, key, a description of the emotional arc, the English `music_prompt`,
-`duration_hint_sec` (60-180) and, for a song, the `lyrics` (otherwise an empty string)."""
+`duration_hint_sec` and, for a song, the complete `lyrics` (otherwise an empty string).
+If the subject contains a requested duration, follow it; there is no default 60-180 second cap. Otherwise propose a
+duration consistent with the complete musical structure and state it in the description. Plan an introduction,
+verses, choruses, a bridge when appropriate, and a deliberate ending. Include repeated sung sections in full rather
+than abbreviating them as 'repeat chorus'. Do not claim exact runtime: the generated audio must be measured."""

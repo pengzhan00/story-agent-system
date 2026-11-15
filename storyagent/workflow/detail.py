@@ -233,7 +233,7 @@ def prompts_from_detail(card: Mapping[str, Any], style: str = "", per_person: bo
             f"Rhythm: {motion['rhythm']}." if motion.get("rhythm") else "",
             f"Small motions: {motion['secondary']}." if motion.get("secondary") else "",
             f"Camera: {cam['movement']}." if cam.get("movement") else "",
-            "Everyone keeps the same clothes and stays in the same place in the room."]
+            "Maintain character identity, clothing and scene continuity in one unbroken shot."]
     return {"image_prompt": " ".join(x for x in parts if x), "video_prompt": " ".join(x for x in clip if x),
             "negative_prompt": str(card.get("negative", ""))}
 

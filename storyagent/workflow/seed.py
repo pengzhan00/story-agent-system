@@ -187,7 +187,8 @@ def _shot_prompts(ctx: Ctx, shot: dict[str, Any], chars: dict[str, dict[str, Any
                 "negative_prompt": str((payload.get("style") or {}).get("negative_prompt", ""))}
     composed = bool(ctx.settings.workflow.get("keyframe_from_references", True))
     worn ={c["name"]: c.get("costume", "") for c in payload["subject"]["characters"]}
-    looks = [{"appearance": chars.get(n, {}).get("appearance", ""), "costume": worn.get(n, ""),
+    labels = {name: label for label, name, _ in labelled_identities(shot["characters"], chars, keep_missing=True)}
+    looks = [{"label": labels[n], "appearance": chars.get(n, {}).get("appearance", ""), "costume": worn.get(n, ""),
               "stable_description": _identity(chars.get(n, {}).get("prompt_template", ""))} for n in shot["characters"]]
     props = payload.get("continuity", {}).get("props", [])
     base_style = keyframe.clean(str(style.get("visual_style", "")))
@@ -216,7 +217,10 @@ def _shot_prompts(ctx: Ctx, shot: dict[str, Any], chars: dict[str, dict[str, Any
         return fallback
     try:
         keys = ("subject", "scene", "camera", "story", "staging")
-        data = ctx.run_agent("shot.visual", {"shot": {k: payload[k] for k in keys if k in payload},
+        context = {"mode": payload.get("mode", "auto"),
+                   "duration_sec": payload.get("seconds") or payload["camera"].get("duration_sec")}
+        visual_shot = {**{k: payload[k] for k in keys if k in payload}, "generation_context": context}
+        data = ctx.run_agent("shot.visual", {"shot": visual_shot,
                                              "characters": looks, "props": props, "scene": shot["location"],
                                              "style": base_style,
                                              "tool_notes": keyframe.guide(with_references=composed),

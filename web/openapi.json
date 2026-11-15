@@ -6016,6 +6016,18 @@
             ],
             "title": "Models"
           },
+          "source_music": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "asset:<id> of this project's complete original soundtrack; preserve it, skip generated music/speech and keep visuals at least as long; null = normal production",
+            "title": "Source Music"
+          },
           "target_sec": {
             "anyOf": [
               {

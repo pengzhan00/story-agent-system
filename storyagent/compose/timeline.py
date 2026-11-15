@@ -18,7 +18,8 @@ changes while the last line is still being said) at a cut inside one scene; a cr
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from math import ceil
 from typing import Any
 
 GAP_SEC = 0.25          # silence between two lines of one shot
@@ -90,6 +91,7 @@ class TimelineInput:
     dissolve_sec: float = 0.0                   # cross-dissolve at a change of scene (0 = none; wins over the fade)
     j_cut_sec: float = 0.0                      # a line is heard this long before its picture, inside a scene (0 = off)
     l_cut_sec: float = 0.0                      # the last line runs this long over the next picture (0 = off)
+    source_music: AssetRef | None = None       # authoritative complete song: no looping, ducking or shortening
 
 
 Timeline = dict[str, Any]
@@ -108,6 +110,16 @@ def _fit_video(clip: float | None, target: float, max_slowdown: float) -> dict[s
 
 
 def build_timeline(inp: TimelineInput) -> Timeline:
+    original = inp.source_music
+    if original is not None:
+        if not original.duration_sec or original.duration_sec <= 0 or not inp.shots:
+            raise ValueError("source_music needs a measured duration and at least one visual shot")
+        picture_time = max(float(original.duration_sec or 0) - sum(c.sec for c in inp.intro_cards), MIN_SHOT_SEC)
+        planned_time = sum(max(s.planned_sec, MIN_SHOT_SEC) for s in inp.shots)
+        scale = picture_time / planned_time
+        inp = replace(inp, shots=[replace(s, planned_sec=max(s.planned_sec, MIN_SHOT_SEC) * scale,
+                                         lines=[], sfx=[], video_audio=False) for s in inp.shots],
+                      bgm=None, music_cues=(), j_cut_sec=0, l_cut_sec=0)
     mix, prof = inp.mix, inp.profile
     lead = float(mix.get("lead_in_sec", 0.4))
     max_slow = float(mix.get("max_slowdown", 2.2))
@@ -202,6 +214,14 @@ def build_timeline(inp: TimelineInput) -> Timeline:
         elif fade > 0:                    # dip through black at a change of scene (timing is unchanged)
             before["fade_out"] = fade
             after["fade_in"] = fade
+    if original is not None and cursor < float(original.duration_sec or 0):
+        # Extend the last picture rather than discarding the song's ending. Cards remain after the song.
+        extra = ceil(float(original.duration_sec or 0) * 1000) / 1000 - cursor
+        last = segments[-1]
+        last["duration"] = round(float(last["duration"]) + extra, 3)
+        if last["source"]["type"] == "video":
+            last["source"].update(_fit_video(meta[-1]["clip"], last["duration"], max_slow))
+        cursor += extra
     add_cards(inp.outro_cards)
 
     label_block: dict[str, Any] | None = None
@@ -215,15 +235,21 @@ def build_timeline(inp: TimelineInput) -> Timeline:
     total = round(cursor, 3)
     if label_block is not None:
         label_block["total"] = total
-    music = _music(inp, mix, meta, segments, total, warnings)
+    music = [] if original is not None else _music(inp, mix, meta, segments, total, warnings)
+    if original is not None:
+        music = [{"asset": original.ref, "start": 0.0, "duration": original.duration_sec,
+                  "loop": False, "gain": 1.0, "primary": True}]
     swell = _swell(mix, speech, total) if music else None
     tone = _room_tone(mix, meta, segments)
+    if original is not None:
+        swell, tone = None, None
     return {
         "version": 1, "title": inp.title, "total_sec": total,
         "video": {"width": int(prof["width"]), "height": int(prof["height"]), "fps": int(prof["fps"]),
                   "codec": prof.get("video_codec", "libx264"), "crf": int(prof.get("crf", 18)),
                   "pix_fmt": prof.get("pix_fmt", "yuv420p")},
         "audio": {"codec": prof.get("audio_codec", "aac"), "bitrate": prof.get("audio_bitrate", "192k"),
+                  "preserve_source_music": original is not None,
                   "rate": int(prof.get("audio_rate", 48000)), "voice_gain": float(mix.get("voice_gain", 1.0)),
                   "sfx_gain": float(mix.get("sfx_gain", 0.5)),
                   "loudnorm": {"i": float(mix.get("loudnorm_i", -16.0)), "tp": float(mix.get("loudnorm_tp", -1.5)),

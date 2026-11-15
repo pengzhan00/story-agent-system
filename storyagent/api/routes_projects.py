@@ -91,7 +91,8 @@ def estimate_existing_project(project_id: int, request: Request) -> EstimateOut:
         answers["episode_sec"] = project.settings["target_sec"]
     brief = resolve_brief(ctx.settings, project.kind, answers)
     return EstimateOut(brief=brief, **estimate(ctx.settings, ctx.ledger, brief, project.pipeline,
-                                             models=project.settings.get("pipeline_models")))
+                                             models=project.settings.get("pipeline_models"),
+                                             source_music=bool(project.settings.get("source_music"))))
 
 
 TEXT_KINDS = ("text.story", "text.script", "text.asr", "upload.text")

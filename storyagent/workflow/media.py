@@ -180,6 +180,14 @@ def default_voice_of(settings: Settings, project_settings: dict[str, Any] | None
     return own or str(settings.workflow.get("default_voice", "")).strip()
 
 
+def video_sound_of(project: dict[str, Any] | None) -> bool:
+    return bool((project or {}).get("video_with_sound")) and not (project or {}).get("source_music")
+
+
+def uses_original_music(project: dict[str, Any] | None, spec: SpecRecord) -> bool:
+    return bool((project or {}).get("source_music")) and spec.kind.value.startswith("audio.")
+
+
 def _end_frame(story: StoryStore, specs: SpecStore, ledger: Ledger, project_id: int, shot_id: int,
                first: AssetRecord, chain: bool = False) -> AssetRecord | None:
     """What keyframe this clip ends on. The shot's ``end_shot_id``: ``0`` = cut free (first frame only),
@@ -244,6 +252,9 @@ def _plan_phase(
     for spec in specs:
         if spec.subject_type not in types or spec.subject_type in skip or (only and spec.id not in only):
             continue
+        if uses_original_music(ctx.project.settings, spec):
+            skipped.append({"subject": spec.subject_type, "id": spec.subject_id, "reason": "source_music"})
+            continue
         if spec.subject_type in SHOT_SUBJECTS and spec.subject_id.partition("#")[0] not in live_shots:
             # a re-plan removed this shot: its old spec stays as history but there is nothing to make
             skipped.append({"subject": spec.subject_type, "id": spec.subject_id, "reason": "shot_gone"})
@@ -265,7 +276,7 @@ def _plan_phase(
             if first is not None:
                 end_keyframe = _end_frame(ctx.store, store, ledger, ctx.pid, int(spec.subject_id), first)
         if up_to_date(ledger, spec, ctx.settings,
-                       video_with_sound=bool(ctx.project.settings.get("video_with_sound")),
+                       video_with_sound=video_sound_of(ctx.project.settings),
                        end_keyframe=end_keyframe) \
                 and not ctx.force():
             counts["reused"] += 1
@@ -307,7 +318,7 @@ def _plan_phase(
                              chain=bool(ctx.settings.workflow.get("video_chain_end", False)))
             model = (ctx.settings.model(spec.model_ref) if spec.model_ref
                      else ctx.settings.default_model(spec.kind.value))
-            if ctx.project.settings.get("video_with_sound") and mode != "a2v":
+            if video_sound_of(ctx.project.settings) and mode != "a2v":
                 model = ctx.settings.model(sound_video_model(ledger.settings_for(spec.project_id)))
             if model.provider == "h3":
                 # h3 reads the first ref image as the first frame and inputs.last_frame as the end frame.
@@ -326,7 +337,7 @@ def _plan_phase(
             key = store.current(spec.project_id, "shot.keyframe", spec.subject_id)
             frame = current_asset(ledger, key) if key else None
             job = prepare_video(ctx.settings, job, shot["render_payload"], frame, ctx.project.settings)
-            if job.kind is not MediaKind.VIDEO_LIPSYNC and ctx.project.settings.get("video_with_sound"):
+            if job.kind is not MediaKind.VIDEO_LIPSYNC and video_sound_of(ctx.project.settings):
                 job = shot_with_sound(store, spec, job, sound_video_model(ledger.settings_for(spec.project_id)))
         if spec.subject_type == "shot.keyframe":
             job = keyframe_from_references(ctx, ledger, spec, job)
@@ -437,7 +448,7 @@ def job_preparer(
             if frame is None:
                 return job
             job = MediaJob(**{**job.__dict__, "inputs": {**job.inputs, "refs": [f"asset:{frame.id}"]}})
-            return shot_with_sound(spec_store, spec, job) if (project_settings or {}).get("video_with_sound") else job
+            return shot_with_sound(spec_store, spec, job) if video_sound_of(project_settings) else job
         if spec.subject_type == "dialogue.line" and not spec.params.get("voice_ref"):
             voice = default_voice_of(settings, project_settings)
             if voice:
@@ -518,6 +529,8 @@ def _expected_seconds(ctx: Ctx, ledger: Ledger, specs: list[SpecRecord], tier: Q
     for spec in specs:
         if spec.subject_type in skip or not any(spec.subject_type in p for p in PHASES):
             continue
+        if uses_original_music(ctx.project.settings, spec):
+            continue
         if only and spec.id not in only:
             continue
         if spec.subject_type == "shot.video" and spec.subject_id not in picks and spec.id not in only:
@@ -529,7 +542,7 @@ def _expected_seconds(ctx: Ctx, ledger: Ledger, specs: list[SpecRecord], tier: Q
             if first is not None:
                 end_keyframe = _end_frame(ctx.store, ctx.spec_store, ledger, ctx.pid, int(spec.subject_id), first)
         if up_to_date(ledger, spec, ctx.settings,
-                       video_with_sound=bool(ctx.project.settings.get("video_with_sound")),
+                       video_with_sound=video_sound_of(ctx.project.settings),
                        end_keyframe=end_keyframe) \
                 and not ctx.force():
             continue
@@ -651,6 +664,11 @@ def episode_music(ctx: Ctx, episode: int) -> list[MusicCue]:
 
 def build_episode_timeline(ctx: Ctx, episode: int) -> dict[str, Any]:
     ledger, store = _ledger(ctx), ctx.spec_store
+    original = None
+    if source := ctx.project.settings.get("source_music"):
+        original = ledger.get_asset(str(source)[6:])
+        if original.project_id != ctx.pid or original.trashed_at or not original.duration_sec:
+            raise StageError("compose_failed", "original soundtrack is unavailable")
     ep = next((e for e in ctx.store.list_episodes(ctx.pid) if e["number"] == episode), None)
     if ep is None:
         raise StageError("needs_stage", "run the shotplan stage first", stage="shotplan")
@@ -702,7 +720,7 @@ def build_episode_timeline(ctx: Ctx, episode: int) -> dict[str, Any]:
         title=ctx.project.name, label=label, metadata=metadata, intro_cards=intro, outro_cards=outro,
         scene_fade_sec=float(opts.get("scene_fade_sec", 0) or 0), music_cues=music_cues,
         dissolve_sec=float(opts.get("dissolve_sec", 0) or 0), j_cut_sec=float(opts.get("j_cut_sec", 0) or 0),
-        l_cut_sec=float(opts.get("l_cut_sec", 0) or 0)))
+        l_cut_sec=float(opts.get("l_cut_sec", 0) or 0), source_music=_asset_ref(original, "audio.music")))
 
 
 def compliance_marks(ctx: Ctx) -> tuple[dict[str, Any] | None, dict[str, str]]:

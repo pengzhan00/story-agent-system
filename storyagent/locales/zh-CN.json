@@ -2753,5 +2753,11 @@
   "web.control.assemble_locked": "按原音频时长装配成片",
   "web.control.freeze_tail": "允许最后一个非口型镜头延展静帧最多 1 秒",
   "web.control.assembly_parts": "装配片段时长（秒）",
-  "web.workflow.target_unlimited": "不限时长（按内容）"
+  "web.workflow.target_unlimited": "不限时长（按内容）",
+  "web.workflow.source_music": "完整原曲主音轨",
+  "web.workflow.source_music_hint": "保留完整原曲，画面跟随原曲时长；跳过自动写歌、配音与音效。",
+  "web.workflow.source_music_listen": "试听完整原曲",
+  "web.workflow.source_music_clear": "改回生成音频",
+  "web.plan.reason.source_music": "已采用完整原曲",
+  "web.produce.reason.source_music": "已采用完整原曲"
 }

@@ -57,7 +57,7 @@ def resolve_brief(settings: Settings, kind_name: str = "", answers: Mapping[str,
 
 
 def estimate(settings: Settings, ledger: Any, brief: Mapping[str, Any], pipeline: str = "", *,
-             models: Mapping[str, str] | None = None) -> dict[str, Any]:
+             models: Mapping[str, str] | None = None, source_music: bool = False) -> dict[str, Any]:
     """Tasks and machine time the brief needs under the plan. ``known`` says whether the time per task is measured."""
     from storyagent.pipelines import settings_for
     from storyagent.workflow.media import fallback_seconds
@@ -83,6 +83,8 @@ def estimate(settings: Settings, ledger: Any, brief: Mapping[str, Any], pipeline
     ]
     tasks: list[dict[str, Any]] = []
     for kind, count in wanted:
+        if source_music and kind.startswith("audio."):
+            continue
         if count <= 0 or kind not in eff.default_models:
             continue
         ref = eff.default_model(kind).ref

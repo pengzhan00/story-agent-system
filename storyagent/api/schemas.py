@@ -147,6 +147,10 @@ class ProjectSettingsPatch(BaseModel):
         default=None, description="allow models that run in the cloud (prompts and reference files leave this machine)")
     target_sec: float | None = Field(
         default=None, description="wanted episode length in seconds (advert to feature film); null = the profile's")
+    source_music: str | None = Field(
+        default=None, description="asset:<id> of this project's complete original soundtrack; preserve it, "
+                                  "skip generated music/speech and keep visuals at least as long; "
+                                  "null = normal production")
     video_share: float | None = Field(
         default=None, ge=0, le=1, description="share of an episode's shots that get a video clip (0-1); null = default")
     video_budget_hours: float | None = Field(

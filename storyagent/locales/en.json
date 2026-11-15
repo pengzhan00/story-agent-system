@@ -2753,5 +2753,11 @@
   "web.control.assemble_locked": "Assemble to the original audio duration",
   "web.control.freeze_tail": "Allow up to 1 s of a frozen tail on the last non-lipsync shot",
   "web.control.assembly_parts": "Assembly part durations (seconds)",
-  "web.workflow.target_unlimited": "No length limit (follow content)"
+  "web.workflow.target_unlimited": "No length limit (follow content)",
+  "web.workflow.source_music": "Complete original soundtrack",
+  "web.workflow.source_music_hint": "Preserve the full original song. Pictures follow its duration; automatic music, dubbing and effects are skipped.",
+  "web.workflow.source_music_listen": "Listen to original soundtrack",
+  "web.workflow.source_music_clear": "Switch back to generated audio",
+  "web.plan.reason.source_music": "complete original soundtrack selected",
+  "web.produce.reason.source_music": "complete original soundtrack selected"
 }

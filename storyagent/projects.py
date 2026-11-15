@@ -18,7 +18,8 @@ from storyagent.pipelines import check_choices, follow_project_models
 _PATCHABLE = ("name", "description", "genre", "content_language", "delivery_profile", "aspect_ratio", "kind",
               "pipeline", "rating")
 _SETTINGS_KEYS = ("compliance", "models", "allow_restricted_licenses", "target_sec", "allow_remote", "default_voice",
-                  "video_share", "video_budget_hours", "edit", "pipeline_models", "video_with_sound", "agents")
+                  "video_share", "video_budget_hours", "edit", "pipeline_models", "video_with_sound", "agents",
+                  "source_music")
 
 
 class ProjectNotFound(LookupError):
@@ -296,6 +297,21 @@ class ProjectStore:
             voice = current.get("default_voice")
             if voice is not None and not (isinstance(voice, str) and voice.startswith(("library:voice/", "asset:"))):
                 raise ConfigError("default_voice must be a library:voice/<name> or asset:<id> reference")
+            source_music = current.get("source_music")
+            if source_music is not None:
+                from storyagent.media.ledger import Ledger, LedgerError
+
+                if not isinstance(source_music, str) or not source_music.startswith("asset:"):
+                    raise ConfigError("source_music must be an asset:<id> reference")
+                try:
+                    asset = Ledger(self.db, self.settings).get_asset(source_music[6:])
+                except LedgerError as exc:
+                    raise ConfigError("source_music audio asset was not found") from exc
+                if asset.project_id != project_id or asset.trashed_at \
+                        or not asset.duration_sec or asset.duration_sec <= 0 \
+                        or not (asset.kind.startswith("audio.") or asset.kind == "upload.audio") \
+                        or not (self.settings.home / asset.path).is_file():
+                    raise ConfigError("source_music must be an available audio asset of this project")
             for ref in current.get("models", {}):
                 self.settings.model(ref)  # unknown model ref -> ConfigError
             conn.execute(

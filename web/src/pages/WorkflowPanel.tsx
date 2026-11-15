@@ -27,6 +27,7 @@ export function WorkflowSpec({ id }: { id: number }) {
   const [draft, setDraft] = useState<string | null>(null);
   const voices = (useLibraryItems().data ?? []).filter((i) => i.role === "voice");
   const voice = project.data?.settings?.["default_voice"];
+  const sourceMusic = project.data?.settings?.["source_music"];
   const share = project.data?.settings?.["video_share"];
   const budget = project.data?.settings?.["video_budget_hours"];
   const editRaw = project.data?.settings?.["edit"];
@@ -41,6 +42,12 @@ export function WorkflowSpec({ id }: { id: number }) {
   const save = (value: number | null) => settings.mutate({ target_sec: value }, { onSuccess: () => setDraft(null) });
   return (
     <section className="card stack">
+      {typeof sourceMusic === "string" ? <div className="hint stack">
+        <strong>{t("web.workflow.source_music")}</strong>
+        <span>{t("web.workflow.source_music_hint")}</span>
+        <audio controls preload="metadata" src={`/api/assets/${encodeURIComponent(sourceMusic.slice(6))}/file`} aria-label={t("web.workflow.source_music_listen")} />
+        <button className="link" onClick={() => settings.mutate({ source_music: null })}>{t("web.workflow.source_music_clear")}</button>
+      </div> : null}
       <div className="form-grid">
         <label className="field">
           <span>{t("web.workflow.profile")}</span>
@@ -115,7 +122,8 @@ export function WorkflowSpec({ id }: { id: number }) {
       <label className="check">
         <input
           type="checkbox"
-          checked={project.data?.settings?.["video_with_sound"] === true}
+          checked={!sourceMusic && project.data?.settings?.["video_with_sound"] === true}
+          disabled={!!sourceMusic}
           onChange={(e) => settings.mutate({ video_with_sound: e.target.checked })}
         />
         <span>{t("web.workflow.video_with_sound")}</span>

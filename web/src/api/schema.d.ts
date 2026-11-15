@@ -5890,6 +5890,11 @@ export interface components {
                 };
             } | null;
             /**
+             * Source Music
+             * @description asset:<id> of this project's complete original soundtrack; preserve it, skip generated music/speech and keep visuals at least as long; null = normal production
+             */
+            source_music?: string | null;
+            /**
              * Target Sec
              * @description wanted episode length in seconds (advert to feature film); null = the profile's
              */

@@ -154,6 +154,14 @@ def swell_expr(swell: dict[str, Any]) -> str:
 def audio_cmd(ffmpeg: str, tl: dict[str, Any], dest: Path) -> list[str]:
     a, total = tl["audio"], float(tl["total_sec"])
     rate = a["rate"]
+    if a.get("preserve_source_music"):
+        source = next(m for m in tl["music"] if m.get("primary"))
+        if total + 0.000001 < float(source["duration"]):
+            raise ValueError("visual timeline is shorter than the original soundtrack")
+        # Full original at normal speed/gain, with silence only after it for optional ending cards.
+        return [ffmpeg, "-y", "-loglevel", "error", "-nostdin", "-i", source["path"], "-map", "0:a:0",
+                "-af", f"aresample={rate},aformat=channel_layouts=stereo,apad,atrim=0:{total}",
+                "-c:a", a["codec"], "-b:a", a["bitrate"], str(dest)]
     cmd = [ffmpeg, "-y", "-loglevel", "error", "-nostdin", "-f", "lavfi", "-t", f"{total}",
            "-i", f"anullsrc=r={rate}:cl=stereo"]
     chains: list[str] = []

@@ -31,7 +31,9 @@ from .media import (
     keyframe_edit_model,
     scene_modes,
     up_to_date,
+    uses_original_music,
     video_picks,
+    video_sound_of,
 )
 
 
@@ -109,7 +111,7 @@ def produce_plan(
                 if first is not None:
                     end_keyframe = _end_frame(store, specs, ledger, project_id, int(spec.subject_id), first)
             state = "new" if asset is None else "done" if up_to_date(
-                ledger, spec, settings, video_with_sound=bool((project_settings or {}).get("video_with_sound")),
+                ledger, spec, settings, video_with_sound=video_sound_of(project_settings),
                 end_keyframe=end_keyframe,
             ) and not force else "stale"
             reason, model_ref = "", spec.model_ref
@@ -130,6 +132,8 @@ def produce_plan(
             detail = ""
             if found:
                 state, reason, detail = "blocked", "blocked_term", found
+            if uses_original_music(project_settings, spec):
+                state, reason = "skip", "source_music"
             if spec.subject_type == "shot.video" and state == "new" and spec.subject_id not in picks:
                 state, reason = "skip", "still"
             guess = fallback_seconds(settings, model_ref, kind) if model_ref else FALLBACK_SECONDS.get(kind, 60.0)

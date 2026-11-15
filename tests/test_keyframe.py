@@ -73,3 +73,25 @@ def test_people_are_named_by_their_own_description_not_by_the_order_they_are_lis
     assert both.startswith("the man is a handsome") and "the woman is a young Chinese woman" in both
     twice = _character_identities({"characters": ["Lin", "Mei"]}, chars)
     assert "the first woman is" in twice and "the second woman is" in twice
+
+
+def test_visual_agent_receives_mode_duration_and_identity_labels(tmp_path) -> None:
+    from storyagent.workflow.seed import _shot_prompts
+    from storyagent.workflow.stages import Ctx
+
+    from .story_kit import make_engine, new_project
+
+    engine, client, settings = make_engine(tmp_path)
+    pid = new_project(engine)
+    engine.run(pid, None, {"visual_prompts": False})
+    shot = engine.store.list_shots(pid)[0]
+    shot["render_payload"].pop("detail", None)
+    shot["render_payload"].update(mode="t2v", seconds=8)
+    ctx = Ctx(settings, engine.db, engine.store, engine.state, engine.agents, engine.projects,
+              engine.projects.get(pid), {}, spec_store=engine.spec_store)
+    chars = {c["name"]: c for c in engine.store.list_characters(pid)}
+    _shot_prompts(ctx, shot, chars, {}, "", True)
+    assert client.calls[-1] == "visual"
+    prompt = client.prompts[-1]
+    assert '"mode": "t2v"' in prompt and '"duration_sec": 8' in prompt
+    assert '"label":' in prompt

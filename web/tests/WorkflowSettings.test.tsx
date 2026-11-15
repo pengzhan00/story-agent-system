@@ -52,3 +52,11 @@ it("allows arbitrary seconds and saving an empty target", async () => {
   fireEvent.click(screen.getByRole("button", { name: en["web.save"]! }));
   await waitFor(() => expect(writes[1]).toEqual({ target_sec: null }));
 });
+it("shows the complete source song and lets the user explicitly return to generated audio", async () => {
+  settings = { source_music: "asset:original", video_with_sound: true };
+  mount();
+  const player = await screen.findByLabelText(en["web.workflow.source_music_listen"]!);
+  expect(player).toHaveAttribute("src", "/api/assets/original/file");
+  fireEvent.click(screen.getByRole("button", { name: en["web.workflow.source_music_clear"]! }));
+  await waitFor(() => expect(writes).toEqual([{ source_music: null }]));
+});

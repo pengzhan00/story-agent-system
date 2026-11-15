@@ -1,50 +1,45 @@
 name = "shot.visual"
 role = "prompter"
-temperature = 0.6
+temperature = 0.4
 max_tokens = 1500
 schema = "shot_visual"
 inputs = ["language", "shot", "characters", "props", "scene", "style", "tool_notes", "previous", "rating_visual"]
-system = """You write prompts for image and video generation models from storyboard data. English only, concrete visuals
-(who, where, light, camera, motion), no story explanation, no dialogue text, no character names and no character
-identity (age, hair, face, skin and ethnicity are appended automatically — call each person only 'the woman' / 'the man')."""
-prompt = """Shot: $shot
-Characters in frame (reference only — do NOT copy their identity; call them 'the woman' / 'the man' in order): $characters
-Props in frame (fixed look): $props
+system = """You translate a storyboard into executable image and video prompts. Write English visual descriptions,
+not plot summaries, metaphors, quality-tag lists or production instructions. Preserve the facts of the storyboard.
+Character identity is added by the compiler: use the labels provided, without copying names or inventing identities.
+Return only the JSON fields required by the schema."""
+prompt = """Storyboard and rendering context: $shot
+Characters and their labels (reference facts, not text to repeat): $characters
+Props and their established appearance: $props
 Location: $scene
 Visual style: $style
-What the image tool can and cannot do: $tool_notes
-Previous shot: $previous
-How detailed the description of bodies and contact must be for this project: $rating_visual
+Tool constraints: $tool_notes
+Continuity from the previous shot: $previous
+Content-rating constraints (never add unrequested body detail): $rating_visual
 
-`image_prompt`: the opening frame as a still, caught in the middle of an action - not a posed portrait. The subject
-is in three-quarter view or profile and busy with the setting, a prop or another person; never a centred, arms-down,
-looking-into-the-lens pose (an ID photo) unless the shot is a direct address. Frame it at medium or wider unless the
-shot asks for a close-up, so the torso, both arms and the hands that matter are inside the frame in a simple, natural
-position. Give the picture depth: something in the foreground, the subject in the middle, a lit background, and the
-direction the light comes from. Keep the faces and the room readable: bright enough to see skin tone and the whole
-room, never a dark, curtained, cramped box. Describe the people's ethnicity and age range in the same words every time.
-`video_prompt`: the same moment with the motion of the shot, one paragraph. It must START from exactly the pose,
-position and facing direction written in `image_prompt` and describe ONE continuous action that fits in five
-seconds. Put the motion into the camera and the world: one smooth camera move that suits the shot (slow push-in,
-tracking alongside, an arc around the subject, a rise; locked-off only for a deliberate hold) and life around the
-subject (hair and clothes moving, light flickering, dust, screens, background people). The subject must move visibly:
-give them ONE clear action from the shot (`action`: a turn, a reach, a lift, a push, a rise, a fall back, a step) that
-reads in five seconds — a still pose with only a slow camera drift looks like a photo, not a clip. Video models break
-arms and hands, so do not ask
-a limb for a new, precise gesture: when the action needs a hand (pointing, holding, pressing, pushing up glasses) the
-hand is already in that pose in `image_prompt` and only moves slightly. Both arms stay attached to the body and in
-frame for the whole clip, so do not zoom in until the arms leave the frame and do not end on an extreme close-up of the
-face unless the shot asks for it. Never make the subject turn around, change facing or cross a large distance unless
-`image_prompt` already shows it. Keep the exposure readable: name the light sources that let the subject be seen, and
-avoid fog, mist, haze and smoke.
-Say in the first sentence of `image_prompt` how many people are in frame, and never hint at another one (do not
-describe the frame's edge by a limb). Every object a person uses (knife, sword, glass) is held by a named, visible hand;
-when the holder is out of frame, a hand or forearm reaches in from the edge of the frame holding it. Items of the place
-(a sword on the wall) are left out of close shots.
-Do NOT write any character's age, hair, face, skin or ethnicity — they are appended automatically outside this prompt.
-Refer to each person only as 'the woman' / 'the man' (in the order given) plus their action and pose. Each
-character wears exactly the `costume` given for them, the same garments in the same colours in every shot of the scene;
-they are undressed only when this shot's own text says they undress or are undressed (never because the scene is
-intimate or the mood is tense), and a person who is dressed stays dressed. Describe every prop with the words given.
-`negative_prompt`: short list of things to avoid; always include missing arm, disappearing limbs, extra limbs,
-deformed hands, floating hand, cropped body, stiff posed portrait."""
+Output contract:
+- image_prompt: one opening still. State the visible subjects, framing, their spatial relationship and start pose,
+  relevant clothing/props, setting and motivated lighting. Describe only what is visible in this crop. A close-up of
+  hands need not show faces or whole bodies. Do not add people, props, scenery or depth layers just to fill a template.
+- video_prompt: one continuous shot with a concrete subject and ONE main observable change. State the subject's action
+  and its direction/extent, one camera behavior, and only secondary motion that the storyboard supports. Keep the
+  action feasible within generation_context.duration_sec; do not assume every clip is five seconds.
+- For i2v/a2v, the opening image is authoritative. Describe motion from that state; do not replace its appearance,
+  costume, location or pose with a newly imagined opening. For t2v, supply the opening visual state before the motion.
+- Honor the specified camera: locked-off means a fixed camera, not a compulsory push-in. A moving subject may cross
+  the frame when the shot calls for it. Do not combine locked-off with tracking/zooming/orbiting. Do not require all
+  hands or full bodies to remain visible in a shot whose crop excludes them.
+- No scene changes, montage, time jumps, chained actions, surprise characters, spoken dialogue/lyrics or music/style
+  tags in the visual motion paragraph. Put dialogue/lyrics in their dedicated audio fields. In a2v the supplied audio
+  controls vocal timing; do not invent a second voice track or claim phoneme-perfect synchronization.
+- A subject holding still is valid when the shot is a hold. Do not invent gestures, hair movement, weather, smoke,
+  background crowds or camera moves to make every shot seem active. Carry the established screen direction and
+  physical continuity from the previous shot without copying that shot's action into this one.
+- Keep identity, costume, prop ownership, lighting and setting consistent. Use the character labels provided; do not
+  infer gender from list order. Reference each prop only when it is visible and relevant to the action.
+- Use concrete, concise sentences. Do not repeat the same camera, lighting or continuity instruction in different
+  words. Negative_prompt is a short, shot-relevant list of unwanted visual artifacts, not a second scene description.
+
+Before returning, check that the action matches the storyboard, the camera does not contradict itself, the crop and
+visible anatomy agree, and no new fact was invented to repair missing source information. If a fact is absent, omit
+it rather than filling it with a generic cinematic cliché."""
