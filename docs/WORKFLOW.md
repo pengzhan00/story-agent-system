@@ -7,7 +7,7 @@ analyze → cast → (outline) → script → scenes → music → shotplan → 
 └────────────── story (default run) ───────────────────┘  └─ media ─┘ └ episode ┘
 ```
 
-A plain resume runs the seven story stages only; `produce` and `compose` are started on purpose (Web buttons "生成素材" / "合成成片" / "一键做完整部", or `--stage produce`).
+A plain resume runs the seven story stages only; `produce` and `compose` are started on purpose (Web buttons "生成素材" / "合成成片", or `--stage produce`), or by a **full run** ("一键做完整部", `workflow run --full`, `params.full`): see "One run to the film" below. A resume (plain or full) also redoes the stages that a stage it runs makes stale: a project whose locations are stale gets its shot plan and specs redone in the same run, not from the old ones.
 
 | Stage | What it does | Agents (LLM roles) |
 |---|---|---|
@@ -24,6 +24,26 @@ A plain resume runs the seven story stages only; `produce` and `compose` are sta
 | `compose` | builds the timeline (speech first, see below), renders `episode.mp4` + `episode.srt` with ffmpeg, then runs QC | `compose.assemble` adapter |
 
 Agents are **data**: `storyagent/agents/specs/*.toml` (+ `schemas/*.json`). Copy one into `$STORY_AGENT_HOME/config/agents/` to change a prompt or model role without touching code. Each agent runs on an LLM *role* routed by `llm.toml` to a backend (ollama / llamacpp / openai_compat); output is requested as schema-constrained JSON, repaired if needed, validated and re-asked up to `max_attempts` times.
+
+## Story coherence
+
+A film is only as coherent as its outline, and nothing read the outline before. Dramas made without these checks had a villain who was designed and never on screen, a parcel whose sender was never told, a woman who was "just there" at the beach and a line said one shot before it was true. The `script` stage now does four things (`workflow/coherence.py`, `workflow/stages.py`):
+
+1. **The outline states what is true.** `screenwriter.outline` fills `facts` (5-12 plain sentences: what happened before, who did what and why, every secret with its answer, what each person wants, how it ends) before any scene, and `threads` after the scenes (each thing planted, the scene that plants it and the later scene that pays it off). Both are kept in the project's workflow data under `story:<episode>`.
+2. **The outline is read before a shot is written.** Plain code (`outline_problems`) finds a person of the cast who is in no scene (a single piece; an episode of a series need not use everyone), a person in a scene who is not in the cast, a scene without a beat, and a thread with no pay-off scene or one paid off before it is planted. The `reviewer.outline` agent reads it for cause, things planted and dropped, why people are where they are and what they know, time and place, contradictions of the facts, and the end. Serious (`high`) problems send the outline back to the writer with the notes and the outline they are about (`feedback`, `current`), at most `[workflow] outline_review_rounds` times (default 2). Of all the versions the one with the fewest serious problems is kept (then the best score), so a rewrite that made things worse is thrown away. An adaptation of a source text is read and reported, never rewritten.
+3. **Every scene is written knowing the story.** `screenwriter.shots` is given the story so far scene by scene (`story_so_far`: place, time, who, what happened; all scenes, the oldest shortened first), the last lines spoken before the scene (`last_lines`) and the `facts`, with the rule that nothing in the scene contradicts them, nobody knows what they were not shown or told, and nothing is explained twice. Before, the writer of scene 7 knew one sentence about scene 6.
+4. **The script is read once more.** After the shots are written and before the shot cards, `reviewer.logic` reads the script in order like a viewer: lines against the facts or earlier scenes, a secret said too early, the same thing told twice, a beat the shots never show, a line a shot too early. Scenes with a serious problem are written again with the reader's notes and the shots they have (at most `script_review_max_scenes` per round, `script_review_rounds` rounds, default 4 and 1), then read again.
+
+A later episode is told how each earlier one ended (its last scene) and the facts fixed so far, not only the synopses. What the checks found and did is the `story_check` of the script stage summary (and `story_check:<episode>` in the workflow data): per part the score, how often the text went back, the scenes written again and what is still open; the Web "工作流" page shows it under "剧情自检". Run parameters: `story_check=false` skips both checks, `story_check=true` reads an existing script again (a plain resume with nothing to write reads nothing), `outline_review_rounds` / `script_review_rounds` override the configuration. A revision a person asked for (`feedback`) is not second-guessed by the reader. The checks cost language-model time only (a few requests per episode); they are judged by a model, so they lower the odds of a hole, they do not prove there is none: read "剧情自检" before spending hours on pictures.
+
+## One run to the film
+
+`params.full` on a resume (`POST .../workflow/runs {"params": {"full": true}}`, CLI `storyagent workflow run --project N --full`, Web "一键做完整部") runs every stage that is not done from where the project stands to the film: the story stages, `produce`, `compose`; with `episodes` / `season`, each episode in turn from its story to its film. It needs the worker.
+
+* **Looked at before it starts** (`workflow/preflight.py`, `GET /api/projects/{id}/preflight`): the language model of every role its story stages use (backend answers, model installed), every media adapter the project's models run on (service running, tool and weights there), the content gates, and the voices. A `block` finding refuses the run (409 `not_ready`, the findings in `detail`; `params.skip_preflight` overrides), a `warn` is shown. The worker looks again right before the first media job (`workflow.not_ready`): a picture service that is not running costs one message, not one failed job per shot after the story was written.
+* **Voices**: people without a voice get a library voice by gender, one each (`voices.auto_assign`, consent-flagged voices only), and it is put on their lines; the produce summary lists `voices_given` / `voices_missing`. Also on its own with `params.auto_voices`.
+* **A few failed assets do not stop the film.** In a full run (`keep_going`, on with `full`) a `produce` that ends with failed jobs is marked failed and keeps its summary (which assets, why), and `compose` still cuts the episode from what exists and reports the rest as warnings; the next full run makes only what failed and cuts again. When nothing at all could be made (and nothing was there to reuse) no film is cut from nothing: the run fails at `produce`. A story stage that fails still stops the run (the next episode is written from this one); an episode whose film could not be cut does not stop the episodes after it, and the run ends failed.
+* Without `full` nothing changed: a failed job fails the run at `produce`. The summary of a failed stage is now kept in both cases.
 
 ## Rules that matter
 
@@ -62,7 +82,7 @@ The writing agents (`screenwriter.*`, `reviewer.script`, `workshop.story|script`
 
 ## i18n key list for the UI
 
-`workflow.stage.<stage>`, `workflow.status.<pending|queued|running|completed|failed|stale|cancelled>`, `workflow.progress.{stage_of,items,elapsed,eta,eta_unknown,working,queued}`, run `error_code` → `llm.error.<code>` / `workflow.error.<code>` (+ `.remediation`), API errors `api.error.{shot_locked,nothing_to_do}`. `GET /api/meta` returns `workflow_stages` and `workflow_statuses` with labels.
+`workflow.stage.<stage>`, `workflow.status.<pending|queued|running|completed|failed|stale|cancelled>`, `workflow.progress.{stage_of,items,elapsed,eta,eta_unknown,working,queued,outline_check,outline_fix,script_check,script_fix}`, `workflow.error.not_ready` (+ `.remediation`), `api.error.not_ready`, `preflight.<llm_down|llm_model_missing|llm_role|service_down|not_installed|no_adapter|no_model|degraded|gate|voices_auto|no_voice>` (variables `subject`, `detail`), `web.preflight.*`, `web.storycheck.*`, `web.produce.{result,failures,voices_given,voices_missing}`, `web.produce.reason.{still,not_voiced}`, `agent.reviewer.{outline,logic}.*`, run `error_code` → `llm.error.<code>` / `workflow.error.<code>` (+ `.remediation`), API errors `api.error.{shot_locked,nothing_to_do}`. `GET /api/meta` returns `workflow_stages` and `workflow_statuses` with labels.
 
 
 ## Produce and compose

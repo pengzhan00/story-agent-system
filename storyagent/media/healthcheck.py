@@ -175,6 +175,13 @@ def _check_tools(settings: Settings, run: Runner) -> list[Entry]:
     return out
 
 
+def tool_entries(settings: Settings, run: Runner | None = None) -> list[Entry]:
+    """The ``tool.<name>`` entries alone (commands and weights of the tools that run as subprocesses): what the
+    look ahead of a full run asks, without probing every service."""
+    return _check_tools(settings, run or (
+        lambda argv: subprocess.run(argv, capture_output=True, text=True, timeout=20, check=False).stdout))
+
+
 def run_checks(
     settings: Settings,
     *,

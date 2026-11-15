@@ -218,6 +218,8 @@ class WorkflowEngine:
                     uncut.append(exc)
                 done = exc.params.get("summary")
                 out[key] = dict(done) if isinstance(done, dict) else {}   # some jobs failed, the rest is made
+                if exc.code == "produce_failed" and not (out[key].get("made") or out[key].get("reused")):
+                    raise                         # nothing was made at all: there is no film to cut from nothing
         if uncut:
             raise uncut[0]                        # an episode did not get its film: the run says so
         return out

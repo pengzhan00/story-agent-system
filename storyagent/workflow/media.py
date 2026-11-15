@@ -599,7 +599,8 @@ def produce(ctx: Ctx) -> dict[str, Any]:
     if ctx.adapters is not None and todo and not ctx.params.get("skip_preflight"):
         # a service that is not running is found before the first job, not as one failed job per shot
         stopped = preflight.blocking(
-            preflight.check_media(ctx.settings, ctx.adapters, todo, ctx.project.settings, compose=False))
+            preflight.check_media(ctx.settings, ctx.adapters, todo, ctx.project.settings, compose=False,
+                                  tools=preflight.tool_states(ctx.settings)))
         if stopped:
             raise StageError("not_ready", "; ".join(f"{f.subject}: {f.code} {f.detail}".strip() for f in stopped),
                              services=", ".join(sorted({f.subject for f in stopped})),

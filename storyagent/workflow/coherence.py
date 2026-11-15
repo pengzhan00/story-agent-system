@@ -62,7 +62,9 @@ def outline_problems(outline: Mapping[str, Any], cast: Sequence[str], *, must_us
                      closed_cast: bool = True) -> list[dict[str, str]]:
     """What plain code can tell is wrong with an outline. ``cast`` are the names the writer was given.
 
-    * a person of the cast who is in no scene (``must_use_all``: the first episode; a later one need not use everyone)
+    * a person of the cast who is in no scene (``must_use_all``: a single piece; an episode of a series need not use
+      everyone). A person named in a scene's beat counts as being in it, and an outline whose scenes list nobody at
+      all (an imported script, a writer that left the field out) is not judged on this: there is nothing to go by
     * a person in a scene who is not in the cast (``closed_cast``: the writer was told to bring in nobody else)
     * a scene without a beat
     * a thread whose pay-off names no scene, a scene that does not exist, or one that is not after its set-up
@@ -71,10 +73,14 @@ def outline_problems(outline: Mapping[str, Any], cast: Sequence[str], *, must_us
     order = {_key(a, s): n for n, (a, s) in enumerate(scenes)}
     out: list[dict[str, str]] = []
     seen: set[str] = set()
+    listed = False                     # whether any scene says who is in it
     for act, sc in scenes:
         where = _key(act, sc)
         people = [str(n).strip() for n in sc.get("characters") or [] if str(n).strip()]
         seen.update(people)
+        told = f"{sc.get('beat') or ''} {sc.get('narration') or ''}"
+        seen.update(name for name in cast if name and name in told)
+        listed = listed or bool(people)
         if not str(sc.get("beat") or "").strip():
             out.append(_issue("empty_beat", where, "the scene has no beat: nothing is said to happen in it",
                               "say who wants what, what gets in the way and what has changed at the end"))
@@ -82,7 +88,7 @@ def outline_problems(outline: Mapping[str, Any], cast: Sequence[str], *, must_us
             if closed_cast and name not in cast:
                 out.append(_issue("unknown_character", where, f"{name} is in this scene but is not one of the cast",
                                   "use one of the listed characters, or leave the person out", "medium"))
-    if must_use_all:
+    if must_use_all and listed:
         for name in cast:
             if name not in seen:
                 out.append(_issue(

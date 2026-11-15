@@ -77,7 +77,7 @@ def look_ahead(ctx: ApiContext, project_id: int, params: dict[str, Any]) -> tupl
         project_settings=project.settings, stages=stages, specs=specs,
         characters=ctx.story.list_characters(project_id), default_voice=default_voice_of(cfg, project.settings),
         library_voices=sum(1 for v in ctx.library.list(role="voice") if v.meta.get("consent")),
-        gates=plan_gates(ctx.settings, ctx.db, project_id, rating))
+        gates=plan_gates(ctx.settings, ctx.db, project_id, rating), tools=preflight.tool_states(cfg))
     return stages, found
 
 

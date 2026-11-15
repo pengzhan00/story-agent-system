@@ -30,6 +30,11 @@ def test_a_designed_person_who_is_never_on_screen_is_a_serious_problem() -> None
     found = coherence.outline_problems(_outline([["Lin Wan"], ["Lin Wan"]]), NAMES)
     assert [(i["code"], i["severity"]) for i in found] == [("unused_character", "high")]
     assert "Zhao Heng" in found[0]["problem"]
+    # named in a beat is being in the scene; an outline that lists nobody anywhere is not judged on this
+    spoken_of = _outline([["Lin Wan"], ["Lin Wan"]])
+    spoken_of["acts"][0]["scenes"][1]["beat"] = "Zhao Heng pushes the file across the desk."
+    assert coherence.outline_problems(spoken_of, NAMES) == []
+    assert coherence.outline_problems(_outline([[], []]), NAMES) == []
     # an episode of a series need not use everyone
     assert coherence.outline_problems(_outline([["Lin Wan"]]), NAMES, must_use_all=False) == []
 

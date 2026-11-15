@@ -96,6 +96,20 @@ def test_a_plain_resume_stops_at_the_story_and_a_full_one_goes_to_the_film(tmp_p
     assert two[:2] == [(1, "produce"), (1, "compose")] and two[2] == (2, "script") and two[-1] == (2, "compose")
 
 
+def test_a_resume_also_redoes_what_the_stale_stage_makes_stale(tmp_path: Path) -> None:
+    engine, _, _ = make_engine(tmp_path)
+    pid = new_project(engine)
+    engine.run(pid, None, {"visual_prompts": False})
+    # the script was written again and only the shot plan and the specs were redone by hand: the locations and the
+    # music are stale. One resume redoes them and what is built on them, not just the two stale stages
+    engine.run(pid, ["script", "shotplan", "specs"], {"visual_prompts": False, "force": True})
+    states = {s["stage"]: s["status"] for s in engine.state.stages(pid)}
+    assert states["scenes"] == states["music"] == "stale" and states["specs"] == "completed"
+    assert [s for _, s in engine.state.plan(pid, None, {})] == ["scenes", "music", "shotplan", "specs"]
+    assert [s for _, s in engine.state.plan(pid, None, {"full": True})] == [
+        "scenes", "music", "shotplan", "specs", "produce", "compose"]
+
+
 def test_one_run_makes_the_film_from_the_idea(tmp_path: Path) -> None:
     engine, worker, _ = _rig(tmp_path)
     run = _full(engine, worker)
@@ -134,6 +148,15 @@ def test_a_few_failed_assets_do_not_stop_the_film_and_only_they_are_made_again(t
     stages = {s["stage"]: s for s in engine.state.stages(1)}
     assert stages["produce"]["status"] == "completed" and stages["produce"]["summary"]["made"] == 8
     assert "no_video" not in {w["code"] for w in stages["compose"]["summary"]["warnings"]}
+
+
+def test_when_nothing_at_all_could_be_made_no_film_is_cut_from_nothing(tmp_path: Path) -> None:
+    engine, worker, fake = _rig(tmp_path)
+    fake.fail_kinds = {k.value for k in MediaKind}
+    run = _full(engine, worker)
+    assert run["status"] == "failed" and run["error_code"] == "workflow.produce_failed"
+    stages = {s["stage"]: s for s in engine.state.stages(1)}
+    assert stages["produce"]["summary"]["made"] == 0 and stages["compose"]["status"] == "pending"
 
 
 def test_without_the_full_flag_a_failed_asset_still_fails_the_run(tmp_path: Path) -> None:
@@ -178,6 +201,13 @@ def test_the_look_ahead_names_what_is_missing(tmp_path: Path) -> None:
     # nothing left to make and nothing to cut: nothing is asked of anyone
     assert preflight.look_ahead(cfg, cfg, engine.router, reg, stages=["produce"], specs=[], **{
         **args, "default_voice": "library:voice/x"}) == []
+    # a tool that runs as a subprocess has no service to ask: its missing weights are read from the tool check
+    fake.down = False
+    tools = {"fake": (HealthState.MISSING_MODEL, "FLUX weights"), "other": (HealthState.MISSING_TOOL, "x")}
+    found = preflight.check_media(cfg, reg, None, {}, compose=False, tools=tools)
+    assert [(f.code, f.level, f.subject) for f in found] == [("not_installed", "block", "fake")]
+    assert found[0].detail.endswith(": FLUX weights")
+    assert set(preflight.tool_states(cfg)) >= {"mflux", "cosyvoice", "ffmpeg"}
     gate = [{"reason": "adult_not_confirmed", "name": "Lin Wan", "detail": ""}]
     found = preflight.look_ahead(cfg, cfg, engine.router, reg, stages=["produce"], specs=[], gates=gate,
                                  **{**args, "default_voice": "library:voice/x"})

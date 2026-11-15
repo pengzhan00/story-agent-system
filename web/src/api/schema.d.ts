@@ -1992,6 +1992,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{project_id}/preflight": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Preflight
+         * @description Before a run that goes all the way to the film: the stages it would do and what is missing for them (a
+         *     language model that is not installed, a media service that is not running, people without a voice). Read only.
+         */
+        get: operations["get_preflight_api_projects__project_id__preflight_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{project_id}/produce/plan": {
         parameters: {
             query?: never;
@@ -2615,7 +2636,10 @@ export interface paths {
         put?: never;
         /**
          * Start Run
-         * @description Queue a run; the worker executes it. Without ``stages`` the run resumes where the project stopped.
+         * @description Queue a run; the worker executes it. Without ``stages`` the run resumes where the project stopped; with
+         *     ``params.full`` such a run goes on to the media and the film (``produce``, ``compose``), and is refused
+         *     (409 ``not_ready``, the findings in ``detail``) while something it needs is missing, unless
+         *     ``params.skip_preflight``.
          */
         post: operations["start_run_api_projects__project_id__workflow_runs_post"];
         delete?: never;
@@ -5571,6 +5595,41 @@ export interface components {
             trailer_sec: number;
             /** Width */
             width: number;
+        };
+        /** PreflightFinding */
+        PreflightFinding: {
+            /**
+             * Code
+             * @description llm_down | llm_model_missing | llm_role | service_down | not_installed | no_adapter | no_model | degraded | gate | voices_auto | no_voice (i18n preflight.<code>)
+             */
+            code: string;
+            /** Detail */
+            detail: string;
+            /**
+             * Level
+             * @description block = a full run is not started; warn = shown, the run goes on
+             */
+            level: string;
+            /**
+             * Subject
+             * @description the service, model, role, kind or people it is about
+             */
+            subject: string;
+        };
+        /** PreflightOut */
+        PreflightOut: {
+            /** Findings */
+            findings: components["schemas"]["PreflightFinding"][];
+            /**
+             * Ready
+             * @description no blocking finding
+             */
+            ready: boolean;
+            /**
+             * Stages
+             * @description what a full run would do now, in order
+             */
+            stages: string[];
         };
         /** PresetBody */
         PresetBody: {
@@ -12400,6 +12459,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PipelineView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_preflight_api_projects__project_id__preflight_get: {
+        parameters: {
+            query?: {
+                episode?: number;
+                episodes?: string;
+            };
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreflightOut"];
                 };
             };
             /** @description Validation Error */

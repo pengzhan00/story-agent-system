@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useLibraryItems } from "../api/library";
 import { useCancelRun, useMeta, useProject, useProjectSettings, useReviewScript, useStartRun, useUpdateProject, useWorkflow } from "../api/hooks";
 import { ErrorNote } from "../components/ErrorNote";
+import { FullRun, ProduceResult, StoryCheck } from "../components/FullRun";
 import { ProgressBar } from "../components/ProgressBar";
 import { ScriptRevise } from "../components/ScriptRevise";
 import { ProducePlan } from "../components/ProducePlan";
@@ -247,6 +248,7 @@ export function WorkflowPanel({ id }: { id: number }) {
         <p className="muted small">{t("web.workflow.episodes_hint")}</p>
         {dirty ? <p className="hint">{t("web.workflow.save_first")}</p> : null}
         <ErrorNote error={start.error ?? cancel.error ?? update.error ?? wf.error} />
+        {active ? null : <FullRun id={id} episode={episode} episodes={batch} disabled={!text.trim() || dirty} />}
       </section>
 
       <ProjectPlan id={id} />
@@ -303,6 +305,7 @@ export function WorkflowPanel({ id }: { id: number }) {
               </ul>
             </div>
           ) : null}
+          <ProduceResult summary={stage("produce")?.summary} />
           {stage("produce")?.summary && Number(stage("produce")?.summary["skipped"] ?? 0) > 0 ? (
             <p className="muted small">
               {t("web.produce.skipped", { n: Number(stage("produce")?.summary["skipped"]) })}
@@ -314,6 +317,8 @@ export function WorkflowPanel({ id }: { id: number }) {
       ) : null}
 
       {compose?.status === "completed" && compose.summary ? <EpisodePlayer projectId={id} summary={compose.summary} /> : null}
+
+      <StoryCheck summary={stage("script")?.summary} />
 
       <section className="card stack">
         <h2>{t("web.workflow.stages")}</h2>

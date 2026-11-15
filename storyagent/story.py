@@ -373,7 +373,12 @@ class StoryStore:
         return rows[-1] if rows else None
 
     def list_scripts(self, project_id: int) -> list[dict[str, Any]]:
-        return self._list("scripts", project_id)
+        """One script per episode, the newest row (what ``get_script`` reads). An older row of the same episode (a
+        hand edit, an old import) is history: it must not feed the locations, the music or "what happened before"."""
+        newest: dict[int, dict[str, Any]] = {}
+        for row in self._list("scripts", project_id):          # ordered by episode, then id
+            newest[int(row["episode_no"])] = row
+        return list(newest.values())
 
     # -- workflow snapshots: one-click undo for stages that rewrite story tables -------------------
     _SNAPSHOT_SEASON_FIELDS = ("title", "summary", "planned_episodes", "status")

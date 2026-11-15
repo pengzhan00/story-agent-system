@@ -11,7 +11,7 @@ installs anything.
 """
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from typing import Any
 
@@ -120,9 +120,19 @@ def models_needed(cfg: Settings, specs: Sequence[SpecRecord] | None, project_set
     return providers, missing
 
 
+def tool_states(cfg: Settings) -> dict[str, tuple[HealthState, str]]:
+    """provider -> (state, what is missing) for the tools that run as subprocesses (the healthcheck's ``tool.<name>``
+    entries): their adapters have no service to ask, so their command and weights are looked at on disk."""
+    from storyagent.media.healthcheck import tool_entries
+
+    return {e.name.removeprefix("tool."): (e.state, ", ".join(e.missing) or e.detail) for e in tool_entries(cfg)}
+
+
 def check_media(cfg: Settings, registry: AdapterRegistry, specs: Sequence[SpecRecord] | None,
-                project_settings: dict[str, Any], *, compose: bool = True) -> list[Finding]:
-    """Every adapter the project's models run on says it is ready (its service answers, its tool and weights exist)."""
+                project_settings: dict[str, Any], *, compose: bool = True,
+                tools: Mapping[str, tuple[HealthState, str]] | None = None) -> list[Finding]:
+    """Every adapter the project's models run on says it is ready (its service answers), and for a tool that runs as
+    a subprocess its command and weights exist (``tools`` from ``tool_states``; ``None`` = not looked at)."""
     providers, out = models_needed(cfg, specs, project_settings, compose=compose)
     for provider in sorted(providers):
         models = ", ".join(sorted(providers[provider]))
@@ -142,6 +152,12 @@ def check_media(cfg: Settings, registry: AdapterRegistry, specs: Sequence[SpecRe
                                f"{models}: {', '.join(health.missing) or health.detail}"))
         elif health.state is HealthState.DEGRADED:
             out.append(Finding("degraded", WARN, provider, ", ".join(health.missing) or health.detail))
+        else:
+            state, missing = (tools or {}).get(provider, (HealthState.OK, ""))
+            if state in (HealthState.MISSING_MODEL, HealthState.MISSING_TOOL):
+                out.append(Finding("not_installed", BLOCK, provider, f"{models}: {missing}"))
+            elif state is HealthState.DEGRADED:
+                out.append(Finding("degraded", WARN, provider, missing))
     return out
 
 
@@ -169,7 +185,7 @@ def look_ahead(
     settings: Settings, cfg: Settings, router: LLMRouter, registry: AdapterRegistry, *, project_id: int,
     project_settings: dict[str, Any], stages: Sequence[str], specs: Sequence[SpecRecord] | None,
     characters: Sequence[dict[str, Any]], default_voice: str, library_voices: int,
-    gates: Sequence[dict[str, str]] = (),
+    gates: Sequence[dict[str, str]] = (), tools: Mapping[str, tuple[HealthState, str]] | None = None,
 ) -> list[Finding]:
     """Everything a run of ``stages`` needs, checked once: the language models of its story stages, the media
     adapters of its ``produce``/``compose`` (``specs`` = what is left to make; ``None`` = not known yet), the voices,
@@ -182,8 +198,8 @@ def look_ahead(
     if "produce" in stages:
         out += [Finding("gate", BLOCK, g.get("reason", ""), " ".join(x for x in (g.get("name"), g.get("detail")) if x))
                 for g in gates]
-        out += check_media(cfg, registry, specs, project_settings, compose="compose" in stages)
+        out += check_media(cfg, registry, specs, project_settings, compose="compose" in stages, tools=tools)
         out += check_voices(characters, default_voice, library_voices)
     elif "compose" in stages:
-        out += check_media(cfg, registry, [], project_settings, compose=True)
+        out += check_media(cfg, registry, [], project_settings, compose=True, tools=tools)
     return out

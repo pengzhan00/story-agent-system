@@ -400,3 +400,32 @@ def test_the_queue_lists_the_story_runs_of_every_project(client: TestClient, fse
     binned = client.delete(f"/api/projects/{second}")                     # a project in the bin leaves the list
     assert binned.status_code == 200, binned.text
     assert [r["project_name"] for r in client.get("/api/workflow/runs").json()] == ["Rain"]
+
+
+def test_a_full_run_is_looked_at_before_it_starts_and_refused_while_something_is_missing(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from storyagent.workflow import preflight
+
+    down = preflight.Finding("service_down", "block", "comfy", "krea-2")
+    note = preflight.Finding("voices_auto", "warn", "Lin Wan", "3")
+    found = [down, note]
+    monkeypatch.setattr(preflight, "look_ahead", lambda *a, **kw: list(found))
+    pid = new_project(client)
+    look = client.get(f"/api/projects/{pid}/preflight").json()
+    assert look["ready"] is False and look["stages"][0] == "analyze" and look["stages"][-2:] == ["produce", "compose"]
+    assert look["findings"] == [down.to_dict(), note.to_dict()]
+    refused = client.post(f"/api/projects/{pid}/workflow/runs", json={"params": {"full": True}})
+    assert refused.status_code == 409 and refused.json()["error"]["code"] == "not_ready"
+    assert refused.json()["error"]["detail"] == [down.to_dict()]            # only what blocks
+    assert client.get(f"/api/projects/{pid}/workflow").json()["active_run"] is None
+    # a plain run (the story only) is not held up by a picture service
+    plain = started(client, pid)
+    assert plain["stages"][-1] == "specs"
+    client.post(f"/api/workflow/runs/{plain['id']}/cancel")
+    # with only notes left the full run starts, and it covers the media and the film
+    found.remove(down)
+    assert client.get(f"/api/projects/{pid}/preflight").json()["ready"] is True
+    run = started(client, pid, params={"full": True, "visual_prompts": False})
+    assert run["stages"][-2:] == ["produce", "compose"] and run["params"]["full"] is True
+    assert client.get(f"/api/projects/{pid}/preflight?episodes=0").status_code == 422

@@ -190,11 +190,14 @@ class WorkflowState:
         planned = self.db.conn.execute(
             "SELECT planned_episodes FROM seasons WHERE project_id=? AND number=?", (project_id, season)).fetchone()
         outlined = planned is not None and int(planned["planned_episodes"]) > 1      # a planned season: outline first
-        wanted = DEFAULT_STAGES + (("produce", "compose") if full else ())
-        out = [s for s in STAGES if (s in wanted or (s == "outline" and outlined)) and s not in done]
-        if full and "produce" in out and "compose" not in out:
-            out.append("compose")             # new media: the film is cut again (it would go stale anyway)
-        return out
+        wanted = set(DEFAULT_STAGES) | ({"produce", "compose"} if full else set())
+        if outlined:
+            wanted.add("outline")
+        todo = {s for s in wanted if s not in done}
+        # a stage that runs makes the stages built on it stale: they belong to the same run, not to a second click
+        # (a project whose locations were stale but whose shots were not got its media from the old shot plan)
+        todo |= {later for s in todo for later in DOWNSTREAM[s] if later in wanted}
+        return [s for s in STAGES if s in todo]
 
     # -- data ---------------------------------------------------------------------------------
     def get_data(self, project_id: int, key: str, default: Any = None) -> Any:
