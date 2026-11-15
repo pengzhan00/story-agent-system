@@ -96,3 +96,5 @@ Release readiness: 可部署到本机生产；不作为“已验证的一键出�
 
 ## 整改后验证
 后端全量 pytest 1074 通过（2 个 live 用例按默认不选）、ruff、mypy（191 文件）、`i18n check`、网页 typecheck / lint / test（119）/ build 全部通过；OpenAPI 与网页类型已重新生成。
+
+变基到当日最新主线（3c63344，含同期的 5 个提交）之后又跑了一遍：后端全量 pytest 1085 全部通过、ruff、mypy（192 文件）、`i18n check`、网页 typecheck / lint / test（123）/ build 通过；重新生成的 OpenAPI 与网页类型与库内一致。
