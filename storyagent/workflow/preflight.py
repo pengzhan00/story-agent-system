@@ -22,6 +22,7 @@ from storyagent.llm import LLMError, LLMRouter
 from storyagent.media.contracts import HealthState
 from storyagent.media.registry import AdapterRegistry
 from storyagent.media.specs import SpecRecord
+from storyagent.media.tts import automatic_voice
 
 from .state import STAGES
 
@@ -162,9 +163,10 @@ def check_media(cfg: Settings, registry: AdapterRegistry, specs: Sequence[SpecRe
 
 
 def check_voices(characters: Sequence[dict[str, Any]], default_voice: str, library_voices: int,
-                 speakers: Iterable[str] | None = None) -> list[Finding]:
+                 speakers: Iterable[str] | None = None, *, automatic: bool = False) -> list[Finding]:
     """People who speak but have no voice: with library voices to give them (a full run does) it is only told; with
-    none and no default voice their lines will be subtitles without sound."""
+    none and no default voice they all speak with the speech model's one automatic voice (``automatic``), or, when
+    the model has none, their lines will be subtitles without sound."""
     names = set(speakers) if speakers is not None else None
     silent = [str(c["name"]) for c in characters if not str(c.get("voice_ref_audio") or "").strip()
               and (names is None or c["name"] in names)]
@@ -172,7 +174,15 @@ def check_voices(characters: Sequence[dict[str, Any]], default_voice: str, libra
         return []
     if library_voices:
         return [Finding("voices_auto", WARN, ", ".join(silent), str(library_voices))]
-    return [Finding("no_voice", WARN, ", ".join(silent))]
+    return [Finding("voice_shared" if automatic else "no_voice", WARN, ", ".join(silent))]
+
+
+def speaks_unaided(cfg: Settings) -> bool:
+    """Whether the project's speech model reads a line without a reference voice (``media.tts.automatic_voice``)."""
+    try:
+        return automatic_voice(cfg, "", {})
+    except ConfigError:
+        return False
 
 
 def run_stages(plan: Sequence[tuple[int, str]]) -> list[str]:
@@ -199,7 +209,7 @@ def look_ahead(
         out += [Finding("gate", BLOCK, g.get("reason", ""), " ".join(x for x in (g.get("name"), g.get("detail")) if x))
                 for g in gates]
         out += check_media(cfg, registry, specs, project_settings, compose="compose" in stages, tools=tools)
-        out += check_voices(characters, default_voice, library_voices)
+        out += check_voices(characters, default_voice, library_voices, automatic=speaks_unaided(cfg))
     elif "compose" in stages:
         out += check_media(cfg, registry, [], project_settings, compose=True, tools=tools)
     return out

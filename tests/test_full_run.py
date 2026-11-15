@@ -198,6 +198,10 @@ def test_the_look_ahead_names_what_is_missing(tmp_path: Path) -> None:
     assert [(f.code, f.level, f.subject) for f in found] == [
         ("service_down", "block", "fake"), ("no_voice", "warn", "Lin Wan")]
     assert "f-img" in found[0].detail and "f-vid" in found[0].detail
+    # a speech model that reads without a reference voice: the lines are spoken, all in its one voice
+    people = args["characters"]
+    assert [f.code for f in preflight.check_voices(people, "", 0, automatic=True)] == ["voice_shared"]
+    assert [f.code for f in preflight.check_voices(people, "", 3, automatic=True)] == ["voices_auto"]
     # nothing left to make and nothing to cut: nothing is asked of anyone
     assert preflight.look_ahead(cfg, cfg, engine.router, reg, stages=["produce"], specs=[], **{
         **args, "default_voice": "library:voice/x"}) == []
