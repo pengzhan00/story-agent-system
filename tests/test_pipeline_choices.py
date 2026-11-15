@@ -123,3 +123,36 @@ def test_a_wrong_choice_is_refused_and_changing_the_plan_drops_the_choices(clien
 def test_the_plans_say_which_rating_they_start_with(client: TestClient) -> None:
     plans = {p["name"]: p for p in client.get("/api/meta").json()["pipelines"]}
     assert plans["vertical_drama"]["rating"] == ""
+
+
+def test_model_reselection_updates_estimate_and_jobs_but_keeps_explicit_choices(client: TestClient) -> None:
+    from storyagent.domain import MediaKind
+
+    pid = client.post("/api/projects", json={"name": "Choices", "kind": "drama_single",
+                                            "pipeline": "vertical_drama", "brief": {"episode_sec": 240}}).json()["id"]
+    specs = client.app.state.ctx.specs
+    old = "flux2-klein-base-4b"
+    agent = specs.create(pid, "character.portrait", "1", MediaKind.IMAGE_GENERATE, model_ref=old,
+                         prompt="portrait", author="agent")
+    manual = specs.create(pid, "character.portrait", "2", MediaKind.IMAGE_GENERATE, model_ref=old, author="user")
+    locked = specs.create(pid, "character.portrait", "3", MediaKind.IMAGE_GENERATE, model_ref=old, author="agent")
+    specs.lock(*locked.key)
+    submitted, _ = specs.ledger.enqueue(specs.build_job(agent))
+    r = client.put(f"/api/projects/{pid}/pipeline", json={"models": {"image.generate": "other-img",
+                                                                              "audio.music": "yue2-3b"}})
+    assert r.status_code == 200, r.text
+    current = specs.current(*agent.key)
+    assert current.version == 2 and current.model_ref == "" and current.prompt == agent.prompt
+    assert specs.get(agent.id).model_ref == old
+    assert specs.current(*manual.key).id == manual.id and specs.current(*locked.key).id == locked.id
+    assert specs.ledger.get_job(submitted.id).model_ref == old
+    assert specs.build_job(current).model_ref == "other-img"
+    estimate = client.get(f"/api/projects/{pid}/estimate").json()
+    assert estimate["brief"]["episode_sec"] == 240
+    assert {t["model_ref"] for t in estimate["tasks"] if t["kind"] == "image.generate"} == {"other-img"}
+    assert {t["model_ref"] for t in estimate["tasks"] if t["kind"] == "audio.music"} == {"yue2-3b"}
+    assert not any(t["kind"] == "image.edit" for t in estimate["tasks"])
+    client.put(f"/api/projects/{pid}/pipeline", json={"models": {"image.generate": "other-img"}})
+    assert specs.current(*agent.key).id == current.id
+    client.delete(f"/api/projects/{pid}/pipeline")
+    assert specs.build_job(specs.current(*agent.key)).model_ref == old

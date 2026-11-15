@@ -6,6 +6,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../src/i18n";
 import { PipelinePanel } from "../src/components/PipelinePanel";
+import { useProjectEstimate } from "../src/api/hooks";
 
 const en = JSON.parse(readFileSync(join(__dirname, "..", "..", "storyagent", "locales", "en.json"), "utf-8")) as Record<string, string>;
 const cand = (ref: string, paired = true, rating = "general") => ({ ref, family: "f", rating, paired, remote: false, commercial_ok: true, license_tag: "" });
@@ -33,6 +34,7 @@ beforeEach(() => {
       if (init?.method === "DELETE") state = view(false);
       json = state;
     }
+    else if (url.endsWith("/estimate")) json = { tasks: [{ model_ref: state.rows[0]!.chosen }] };
     return { ok: true, status: init?.method === "DELETE" ? 204 : 200, statusText: "", json: async () => json, text: async () => JSON.stringify(json) };
   });
 });
@@ -45,21 +47,30 @@ describe("PipelinePanel", () => {
         <I18nProvider>
           <MemoryRouter>
             <PipelinePanel projectId={3} />
+            <EstimateProbe />
           </MemoryRouter>
         </I18nProvider>
       </QueryClientProvider>,
     );
     const select = (await screen.findByLabelText(en["media.kind.image.generate"]!)) as HTMLSelectElement;
     expect(select.value).toBe("flux");
+    await waitFor(() => expect(screen.getByTestId("estimate").textContent).toBe("flux"));
     expect((screen.getByRole("button", { name: en["web.pipeline.reset_all"]! }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getAllByRole("link", { name: en["web.wiki.about"]! })[0]?.getAttribute("href")).toBe("/wiki?q=flux");
     expect(screen.getAllByRole("link", { name: en["web.wiki.about_graph"]! })[0]?.getAttribute("href")).toBe("/wiki?view=graph&model=flux");
     fireEvent.change(select, { target: { value: "alt" } });
+    await waitFor(() => expect(screen.getByTestId("estimate").textContent).toBe("alt"));
     await waitFor(() => expect(calls.some((c) => c.url === "PUT /api/projects/3/pipeline")).toBe(true));
     expect(JSON.parse(calls.find((c) => c.url.startsWith("PUT"))?.body ?? "{}")).toEqual({ models: { "image.generate": "alt" } });
     expect(await screen.findByText(en["web.pipeline.note.auto_paired"]!.replace("{kind}", en["media.kind.image.edit"]!).replace("{model}", "alt-edit"))).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: en["web.pipeline.reset_all"]! }));
     await waitFor(() => expect(calls.some((c) => c.url === "DELETE /api/projects/3/pipeline")).toBe(true));
     await waitFor(() => expect((screen.getByLabelText(en["media.kind.image.generate"]!) as HTMLSelectElement).value).toBe("flux"));
+    await waitFor(() => expect(screen.getByTestId("estimate").textContent).toBe("flux"));
   });
 });
+
+function EstimateProbe() {
+  const estimate = useProjectEstimate(3);
+  return <output data-testid="estimate">{estimate.data?.tasks[0]?.model_ref}</output>;
+}

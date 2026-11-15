@@ -23,8 +23,8 @@ export function EstimateView({ estimate, busy }: { estimate: Estimate | undefine
             </tr>
           </thead>
           <tbody>
-            {estimate.tasks.map((x) => (
-              <tr key={x.kind}>
+            {estimate.tasks.map((x, index) => (
+              <tr key={`${x.kind}-${index}`}>
                 <td>{t(`media.kind.${x.kind}`)}</td>
                 <td className="muted small">{x.model_ref}</td>
                 <td>{x.count}</td>

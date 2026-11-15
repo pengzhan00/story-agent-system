@@ -17,7 +17,7 @@ import { useT } from "../i18n";
 const TARGET_PRESETS = [30, 90, 120, 180];
 
 /** How long the episode should be and in which delivery format: one number steers the story size and the quality check. */
-function Spec({ id }: { id: number }) {
+export function WorkflowSpec({ id }: { id: number }) {
   const t = useT();
   const project = useProject(id);
   const meta = useMeta();
@@ -36,6 +36,7 @@ function Spec({ id }: { id: number }) {
   const [budgetDraft, setBudgetDraft] = useState<string | null>(null);
   const profiles = meta.data?.delivery_profiles ?? [];
   const current = profiles.find((p) => p.name === project.data?.delivery_profile);
+  const openLength = !!current && !current.max_episode_sec && !current.target_sec;
   const shown = draft ?? (typeof saved === "number" ? String(saved) : "");
   const save = (value: number | null) => settings.mutate({ target_sec: value }, { onSuccess: () => setDraft(null) });
   return (
@@ -58,11 +59,12 @@ function Spec({ id }: { id: number }) {
               type="number"
               min={1}
               value={shown}
-              placeholder={current?.target_sec ? String(current.target_sec) : ""}
+              placeholder={current?.target_sec ? String(current.target_sec) : openLength ? t("web.workflow.target_unlimited") : ""}
               onChange={(e) => setDraft(e.target.value)}
             />
             <span className="muted small">{t("web.workflow.target_unit")}</span>
           </span>
+          <span className="muted small">{t("web.workflow.target_hint")}</span>
         </label>
         <label className="field">
           <span>{t("web.workflow.voice")}</span>
@@ -141,7 +143,6 @@ function Spec({ id }: { id: number }) {
         ))}
       </div>
       <p className="muted small">{t("web.edit.hint")}</p>
-      <p className="muted small">{t("web.workflow.target_hint")}</p>
       <div className="row">
         {TARGET_PRESETS.map((n) => (
           <button key={n} type="button" className="chip chip-button" onClick={() => setDraft(String(n))}>
@@ -149,10 +150,10 @@ function Spec({ id }: { id: number }) {
           </button>
         ))}
         <span className="spacer" />
-        <button type="button" disabled={settings.isPending || saved === undefined} onClick={() => save(null)}>
-          {t("web.workflow.target_clear")}
+        <button type="button" disabled={settings.isPending || (saved === undefined && draft === null)} onClick={() => save(null)}>
+          {t(openLength ? "web.workflow.target_unlimited" : "web.workflow.target_clear")}
         </button>
-        <button type="button" className="primary" disabled={settings.isPending || draft === null || Number(draft) <= 0} onClick={() => save(Number(draft))}>
+        <button type="button" className="primary" disabled={settings.isPending || draft === null || (draft.trim() !== "" && Number(draft) <= 0)} onClick={() => save(draft?.trim() ? Number(draft) : null)}>
           {t("web.save")}
         </button>
       </div>
@@ -242,7 +243,7 @@ export function WorkflowPanel({ id }: { id: number }) {
 
       <ProjectPlan id={id} />
 
-      <Spec id={id} />
+      <WorkflowSpec id={id} />
 
       <SeasonCard id={id} busy={active !== null} />
 

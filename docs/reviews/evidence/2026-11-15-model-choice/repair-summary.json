@@ -1,0 +1,10 @@
+{
+  "project_id": 7,
+  "choices": {
+    "image.generate": "z-image-turbo-comfy",
+    "audio.music": "yue2-3b"
+  },
+  "backup": "/Users/pengzhan/myworkspace/projects/story-agent-system/data/storyagent.db.bak-before-model-choice-follow-20261115-101107",
+  "changed": 46,
+  "generated_jobs": 0
+}

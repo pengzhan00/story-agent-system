@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useEstimate, useMeta, useProject, useProjectBrief, useUpdateProject } from "../api/hooks";
+import { useMeta, useProject, useProjectBrief, useProjectEstimate, useUpdateProject } from "../api/hooks";
 import type { BriefAnswers } from "../api/types";
 import { useT } from "../i18n";
 import { ErrorNote } from "./ErrorNote";
@@ -22,10 +22,7 @@ export function ProjectPlan({ id }: { id: number }) {
   const planInfo = plans.find((p) => p.name === project?.pipeline);
   const brief = (project?.brief ?? {}) as Record<string, unknown>;
   const hasBrief = typeof brief["episodes_total"] === "number";
-  const estimate = useEstimate(
-    { kind: project?.kind ?? "", pipeline: project?.pipeline ?? "", brief: { seasons: Number(brief["seasons"]) || undefined, episodes_per_season: Number(brief["episodes_per_season"]) || undefined, episode_sec: Number(brief["episode_sec"]) || undefined } },
-    !!project && !!kind && hasBrief,
-  );
+  const estimate = useProjectEstimate(id, !!project && !!kind && hasBrief);
   if (!project || !meta) return null;
   const val = (key: string) => draft[key] ?? field(brief, key);
   function save(key: keyof BriefAnswers) {

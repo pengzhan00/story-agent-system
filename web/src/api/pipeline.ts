@@ -12,7 +12,7 @@ export const usePipeline = (projectId: number) =>
 /** Hand-picked models (kind -> model; empty = the plan's recommendation) and the way back to the defaults. */
 export function usePipelineChoices(projectId: number) {
   const qc = useQueryClient();
-  const done = () => Promise.all([qc.invalidateQueries({ queryKey: ["pipeline", projectId] }), qc.invalidateQueries({ queryKey: ["project", projectId] }), qc.invalidateQueries({ queryKey: ["produce-plan"] })]);
+  const done = () => Promise.all([qc.invalidateQueries({ queryKey: ["pipeline", projectId] }), qc.invalidateQueries({ queryKey: ["project", projectId] }), qc.invalidateQueries({ queryKey: ["produce-plan"] }), qc.invalidateQueries({ queryKey: ["project-estimate", projectId] }), qc.invalidateQueries({ queryKey: ["flow", projectId] })]);
   return {
     set: useMutation({ mutationFn: (models: Record<string, string>) => put<PipelineView>(`/api/projects/${projectId}/pipeline`, { models }), onSuccess: done }),
     reset: useMutation({ mutationFn: () => del(`/api/projects/${projectId}/pipeline`), onSuccess: done }),

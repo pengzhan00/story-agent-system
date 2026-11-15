@@ -40,6 +40,9 @@ export const useEstimate = (body: { kind: string; pipeline: string; brief: Brief
     retry: false,
   });
 
+export const useProjectEstimate = (id: number, enabled = true) =>
+  useQuery({ queryKey: ["project-estimate", id], queryFn: () => api<Estimate>(`/api/projects/${id}/estimate`), enabled });
+
 /** Change the plan made up front: more seasons/episodes or another episode length. */
 export function useProjectBrief(id: number) {
   const qc = useQueryClient();
@@ -49,6 +52,7 @@ export function useProjectBrief(id: number) {
       qc.setQueryData(["project", id], p);
       void qc.invalidateQueries({ queryKey: ["series", id] });
       void qc.invalidateQueries({ queryKey: ["seasons", id] });
+      void qc.invalidateQueries({ queryKey: ["project-estimate", id] });
     },
   });
 }
@@ -68,7 +72,11 @@ export function useProjectSettings(id: number) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: { target_sec?: number | null; default_voice?: string | null; video_share?: number | null; video_budget_hours?: number | null; video_with_sound?: boolean | null; agents?: Record<string, Record<string, unknown>> | null; edit?: Record<string, unknown> | null }) => patch<Project>(`/api/projects/${id}/settings`, body),
-    onSuccess: (p) => qc.setQueryData(["project", id], p),
+    onSuccess: (p) => {
+      qc.setQueryData(["project", id], p);
+      void qc.invalidateQueries({ queryKey: ["project-estimate", id] });
+      void qc.invalidateQueries({ queryKey: ["produce-plan"] });
+    },
   });
 }
 
@@ -77,7 +85,12 @@ export function useUpdateProject(id: number) {
   return useMutation({
     mutationFn: (body: Partial<Pick<Project, "name" | "description" | "genre" | "delivery_profile" | "kind" | "pipeline">>) =>
       patch<Project>(`/api/projects/${id}`, body),
-    onSuccess: (p) => qc.setQueryData(["project", id], p),
+    onSuccess: (p) => {
+      qc.setQueryData(["project", id], p);
+      void qc.invalidateQueries({ queryKey: ["project-estimate", id] });
+      void qc.invalidateQueries({ queryKey: ["pipeline", id] });
+      void qc.invalidateQueries({ queryKey: ["produce-plan"] });
+    },
   });
 }
 

@@ -16695,6 +16695,49 @@
         ]
       }
     },
+    "/api/projects/{project_id}/estimate": {
+      "get": {
+        "description": "Estimate with the project's saved model choices, rather than the creation wizard's recommendations.",
+        "operationId": "estimate_existing_project_api_projects__project_id__estimate_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstimateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Estimate Existing Project",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
     "/api/projects/{project_id}/grammar": {
       "get": {
         "description": "Every shot checked against `grammar.toml`; `episode` limits the check to one episode.",

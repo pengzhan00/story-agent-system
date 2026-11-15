@@ -94,6 +94,26 @@ def project_settings_for(settings: Settings, db: Any, project_id: int | None) ->
     return settings_for(settings, row["pipeline"], choices)
 
 
+def follow_project_models(settings: Settings, db: Any, project_id: int, kinds: Collection[str]) -> int:
+    """Release obsolete agent-created model pins; manual/locked specs and existing job snapshots stay intact."""
+    from storyagent.media.specs import SpecStore
+
+    cfg = project_settings_for(settings, db, project_id)
+    affected = set(kinds) | {f for f, leader in FOLLOWERS.items() if leader in kinds}
+    protected_route = str(cfg.workflow.get("sfw_image_model") or "")
+    specs = SpecStore(db, cfg)
+    changed = 0
+    for spec in specs.list_current(project_id):
+        if spec.kind.value not in affected or not spec.model_ref or spec.author != "agent" \
+                or specs.is_locked(*spec.key):
+            continue
+        if spec.kind.value == "image.generate" and spec.model_ref == protected_route:
+            continue                         # the configured safe-scene route is an intentional exception
+        specs.edit(*spec.key, model_ref="", author="agent", note="follow project model selection")
+        changed += 1
+    return changed
+
+
 def describe(settings: Settings, pipeline: str, choices: Mapping[str, Any] | None, project_rating: str
              ) -> dict[str, Any]:
     """What the pipeline panel shows: per kind the plan's recommendation, what is in use, the models to choose from

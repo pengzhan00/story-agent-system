@@ -81,6 +81,19 @@ def estimate_project(body: EstimateRequest, request: Request) -> EstimateOut:
     return EstimateOut(brief=brief, **estimate(ctx.settings, ctx.ledger, brief, plan))
 
 
+@router.get("/{project_id}/estimate", response_model=EstimateOut)
+def estimate_existing_project(project_id: int, request: Request) -> EstimateOut:
+    """Estimate with the project's saved model choices, rather than the creation wizard's recommendations."""
+    ctx = ctx_of(request)
+    project = ctx.projects.get(project_id)
+    answers = dict(project.brief)
+    if project.settings.get("target_sec"):
+        answers["episode_sec"] = project.settings["target_sec"]
+    brief = resolve_brief(ctx.settings, project.kind, answers)
+    return EstimateOut(brief=brief, **estimate(ctx.settings, ctx.ledger, brief, project.pipeline,
+                                             models=project.settings.get("pipeline_models")))
+
+
 TEXT_KINDS = ("text.story", "text.script", "text.asr", "upload.text")
 MAX_SOURCE_CHARS = 24000          # what the script stage reads of a source text
 

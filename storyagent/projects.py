@@ -13,7 +13,7 @@ from storyagent.config import ConfigError, Settings
 from storyagent.content import ContentError
 from storyagent.db import Database
 from storyagent.domain import slugify
-from storyagent.pipelines import check_choices
+from storyagent.pipelines import check_choices, follow_project_models
 
 _PATCHABLE = ("name", "description", "genre", "content_language", "delivery_profile", "aspect_ratio", "kind",
               "pipeline", "rating")
@@ -258,6 +258,8 @@ class ProjectStore:
                     if kept.pop("pipeline_models", None) is not None:
                         conn.execute("UPDATE projects SET settings=? WHERE id=?",
                                      (json.dumps(kept, ensure_ascii=False), project_id))
+                    follow_project_models(self.settings, self.db, project_id,
+                                          self.settings.pipeline(str(changes["pipeline"])).models)
         return self.get(project_id)
 
     def set_settings(self, project_id: int, patch: Mapping[str, Any]) -> Project:
@@ -266,7 +268,8 @@ class ProjectStore:
         if unknown:
             raise ConfigError(f"unknown project setting groups {sorted(unknown)}; allowed: {list(_SETTINGS_KEYS)}")
         with self.db.transaction() as conn:
-            current = dict(self.get(project_id).settings)
+            before = self.get(project_id)
+            current = dict(before.settings)
             for key, value in patch.items():
                 if value is None:
                     current.pop(key, None)
@@ -299,4 +302,7 @@ class ProjectStore:
                 "UPDATE projects SET settings=?, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?",
                 (json.dumps(current, ensure_ascii=False), project_id),
             )
+            if "pipeline_models" in patch:
+                kinds = set(before.settings.get("pipeline_models") or {}) | set(current.get("pipeline_models") or {})
+                follow_project_models(self.settings, self.db, project_id, kinds)
         return self.get(project_id)

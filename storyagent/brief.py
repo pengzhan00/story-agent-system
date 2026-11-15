@@ -56,11 +56,13 @@ def resolve_brief(settings: Settings, kind_name: str = "", answers: Mapping[str,
             "episodes_total": seasons * episodes, "total_sec": seasons * episodes * sec}
 
 
-def estimate(settings: Settings, ledger: Any, brief: Mapping[str, Any], pipeline: str = "") -> dict[str, Any]:
+def estimate(settings: Settings, ledger: Any, brief: Mapping[str, Any], pipeline: str = "", *,
+             models: Mapping[str, str] | None = None) -> dict[str, Any]:
     """Tasks and machine time the brief needs under the plan. ``known`` says whether the time per task is measured."""
+    from storyagent.pipelines import settings_for
     from storyagent.workflow.media import fallback_seconds
 
-    eff = settings.for_pipeline(pipeline or settings.kind(str(brief.get("kind", ""))).pipeline)
+    eff = settings_for(settings, pipeline or settings.kind(str(brief.get("kind", ""))).pipeline, models)
     cfg = eff.delivery.get("estimate", {})
     tier = str(eff.workflow.get("tier", "preview"))
     episodes = int(brief["episodes_total"])
