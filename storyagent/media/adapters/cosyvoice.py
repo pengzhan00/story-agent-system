@@ -6,6 +6,7 @@ Inputs:
                                slot = id)
     voice_ref                  {"audio": <3-20 s wav>, "text": <transcript>, "consent": true}
                                (a missing transcript is produced with whisper unless auto_transcribe=false)
+                               Optional: absent reference uses a synthetic macOS system-voice sample automatically.
     instruct                   style instruction for mode=instruct (e.g. "speak softly, with a sad tone")
     prompt                     the line's emotion ("furious", "hesitant"): with mode=zero_shot it is spoken in that tone
                                (the job runs as ``instruct`` with ``emotion_prompt``); ``emotion=false`` turns it off
@@ -17,9 +18,14 @@ so the timeline is built from what was actually spoken, not from a character-cou
 """
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import re
+import shutil
 import subprocess
+import tomllib
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -30,8 +36,10 @@ from ..asr import find_whisper, transcribe, whisper_model
 from ..contracts import AdapterError, ArtifactSpec, Capabilities, JobContext, JobRecord, ValidationIssue
 from ..probe import find_tool, probe
 from ._subprocess import Command, SubprocessAdapter
+from .say import SayAdapter
 
 SCHEMA: dict[str, dict[str, Any]] = {
+    "auto_reference": {"type": "bool"},
     "mode": {"type": "str", "choices": ["zero_shot", "cross_lingual", "instruct"]},
     "emotion": {"type": "bool"},
     "emotion_prompt": {"type": "str"},
@@ -45,6 +53,7 @@ SCHEMA: dict[str, dict[str, Any]] = {
 }
 _ID = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 DEFAULT_RUNNER = Path(__file__).resolve().parents[1] / "runners" / "cosyvoice_zero_shot.py"
+AUTO_VOICE = tomllib.loads((Path(__file__).resolve().parents[2] / "voices.toml").read_text("utf-8"))["automatic"]
 
 
 def mode_of(job: JobRecord) -> tuple[str, str]:
@@ -104,6 +113,53 @@ class CosyVoiceAdapter(SubprocessAdapter):
         p = Path(str(raw)).expanduser()
         return p if p.is_absolute() else ctx.settings.home / p
 
+    @staticmethod
+    def _automatic(job: JobRecord) -> bool:
+        # An explicit but invalid reference must fail rather than be silently replaced.
+        return not (job.inputs.get("voice_ref") or {}).get("audio") and bool(job.params.get("auto_reference", True))
+
+    @staticmethod
+    def _say(ctx: JobContext) -> str | None:
+        return str(ctx.settings.tools.get("say", {}).get("binary") or SayAdapter._binary() or "") or None
+
+    def _make_reference(self, ctx: JobContext) -> tuple[Path, str, str]:
+        binary = self._say(ctx)
+        if not binary:
+            raise AdapterError(ErrorCode.MISSING_TOOL, "automatic voice needs macOS say", tool="say")
+        config = ctx.settings.tools.get("cosyvoice", {})
+        voice = str(config.get("automatic_voice") or AUTO_VOICE["voice"])
+        text = str(config.get("automatic_voice_text") or AUTO_VOICE["text"])
+        key = hashlib.sha256(json.dumps([binary, voice, text, 180, "LEI16@22050"]).encode()).hexdigest()
+        cached = ctx.settings.home / "cache" / "tts-references" / f"{key}.wav"
+        info = probe(ctx.settings, cached) if cached.is_file() else None
+        if info and info.duration_sec is not None and 3 <= info.duration_sec <= 20:
+            return cached, text, voice
+        ctx.work_dir.mkdir(parents=True, exist_ok=True)
+        ref = ctx.work_dir / "automatic-reference.wav"
+        try:
+            result = subprocess.run(
+                [binary, "-v", voice, "-r", "180", "-o", str(ref), "--data-format=LEI16@22050", "--", text],
+                capture_output=True, text=True, timeout=30, check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise AdapterError(ErrorCode.TOOL_FAILED, "could not prepare automatic voice reference",
+                               exit_code=-1) from exc
+        if result.returncode or not ref.is_file() or ref.stat().st_size == 0:
+            raise AdapterError(ErrorCode.TOOL_FAILED, "could not prepare automatic voice reference",
+                               exit_code=result.returncode, detail=result.stderr[-200:])
+        info = probe(ctx.settings, ref)
+        if info is None or info.duration_sec is None or not 3 <= info.duration_sec <= 20:
+            raise AdapterError(ErrorCode.INVALID_INPUT, "automatic voice reference must be 3-20 s long",
+                               detail="automatic_voice_text")
+        cached.parent.mkdir(parents=True, exist_ok=True)
+        temp = cached.with_name(f"{key}-{uuid.uuid4().hex}.tmp")
+        try:
+            shutil.copyfile(ref, temp)
+            os.replace(temp, cached)
+        finally:
+            temp.unlink(missing_ok=True)
+        return cached, text, voice
+
     # -- validation ---------------------------------------------------------------------------
     def validate(self, job: JobRecord, ctx: JobContext) -> list[ValidationIssue]:
         python, workdir, model_dir = self._paths(ctx, job)
@@ -125,6 +181,13 @@ class CosyVoiceAdapter(SubprocessAdapter):
         if not all(_ID.match(i) for i in ids) or len(set(ids)) != len(ids):
             bad("line ids must be unique and file-safe (letters, digits, _ . -)")
         mode, instruct = mode_of(job)
+        if mode == "instruct" and not instruct:
+            bad("mode instruct needs an instruct text")
+        if self._automatic(job):
+            if not self._say(ctx):
+                issues.append(ValidationIssue(ErrorCode.MISSING_TOOL, "automatic voice needs macOS say",
+                                              {"tool": "say"}))
+            return issues
         ref = self._ref_audio(job, ctx)
         if ref is None or not ref.is_file():
             bad(f"reference voice audio not found: {ref}")
@@ -133,8 +196,6 @@ class CosyVoiceAdapter(SubprocessAdapter):
         lo, hi = float(job.params.get("ref_min_sec", 3)), float(job.params.get("ref_max_sec", 20))
         if info and info.duration_sec is not None and not lo <= info.duration_sec <= hi:
             bad(f"reference voice must be {lo:g}-{hi:g} s long (it is {info.duration_sec:.1f} s)")
-        if mode == "instruct" and not instruct:
-            bad("mode instruct needs an instruct text")
         has_text = bool((job.inputs.get("voice_ref") or {}).get("text"))
         if mode == "zero_shot" and not has_text:
             model = whisper_model(ctx.settings)
@@ -148,8 +209,12 @@ class CosyVoiceAdapter(SubprocessAdapter):
         python, workdir, model_dir = self._paths(ctx, job)
         assert python and workdir and model_dir
         ref = self._ref_audio(job, ctx)
-        assert ref is not None
         ref_text = str((job.inputs.get("voice_ref") or {}).get("text") or "").strip()
+        automatic = self._automatic(job)
+        voice = ""
+        if automatic:
+            ref, ref_text, voice = self._make_reference(ctx)
+        assert ref is not None
         mode, instruct = mode_of(job)
         if mode == "zero_shot" and not ref_text:
             try:
@@ -163,6 +228,8 @@ class CosyVoiceAdapter(SubprocessAdapter):
             "ref_wav": str(ref), "ref_text": ref_text, "instruct": instruct,
             "speed": float(job.params.get("speed", 1.0)), "seed": job.seed, "out_dir": str(ctx.work_dir / "out"),
             "items": lines_of(job),
+            "voice_source": "synthetic_system_reference" if automatic else "explicit_reference",
+            "system_voice": voice,
         }
         (ctx.work_dir / "config.json").write_text(json.dumps(cfg, ensure_ascii=False), "utf-8")
         return super().submit(job, ctx)
@@ -193,6 +260,7 @@ class CosyVoiceAdapter(SubprocessAdapter):
             out.append(ArtifactSpec(final, slot=slot, metadata={
                 "text": line["text"], "mode": cfg["mode"], "speed": cfg["speed"],
                 "ref_text": cfg["ref_text"], "ref_audio": cfg["ref_wav"],
+                "voice_source": cfg["voice_source"], "system_voice": cfg["system_voice"],
             }))
         return out
 

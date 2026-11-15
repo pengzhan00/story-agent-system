@@ -92,6 +92,8 @@ binary = "~/myworkspace/h3-image-mlx/.venv/bin/h3-image-mlx"
 model_dir = "~/myworkspace/h3-image-mlx/models"
 
 [tools.cosyvoice]
+# Optional: automatic_voice / automatic_voice_text override the synthetic macOS reference used when no
+# voice_ref was supplied. Defaults are in voices.toml. No per-character voice registration is required.
 root = "~/cosyvoice"
 python = "~/cosyvoice/venv/bin/python"
 workdir = "~/cosyvoice/CosyVoice"
@@ -245,8 +247,8 @@ video_min_per_episode = 2
 video_budget_hours = 0
 # The produce stage turns every spec into media. Quality tier for the first pass (draft | preview | final).
 tier = "draft"
-# Library voice used for a character without a voice of their own, e.g. "library:voice/narrator". Empty = such
-# lines are skipped and the episode shows them as subtitles only (the report says which).
+# Optional shared library voice for characters without their own. Empty uses the TTS model's automatic voice
+# (CosyVoice prepares a synthetic system reference; say needs no reference). Other providers may require one.
 default_voice = ""
 # Seconds between checks of the job ledger while the stage waits for the worker.
 poll_seconds = 1.0

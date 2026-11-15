@@ -242,6 +242,13 @@ export function ToolsPage() {
   const t = useT();
   const meta = useMeta();
   const models = useToolModels();
+  // Meta is the complete registry; the tools endpoint also carries imported workflow ownership.
+  // Merging keeps native models visible on servers that still return connector-only tools.
+  const catalog = [...new Map([
+    ...(meta.data?.models ?? []).filter(m => m.provider !== "control-tools").map(m => [m.ref,
+      { ...m, workflow: "", mine: false }] as const),
+    ...(models.data ?? []).map(m => [m.ref, m] as const),
+  ]).values()].sort((a, b) => a.ref.localeCompare(b.ref));
   const preview = usePreviewComfy();
   const save = useSaveComfy();
   const [workflow, setWorkflow] = useState<Record<string, unknown> | null>(null);
@@ -383,8 +390,10 @@ export function ToolsPage() {
 
       <section className="stack">
         <h2>{t("web.tools.models")}</h2>
-        {models.data && models.data.length === 0 ? <p className="empty">{t("web.tools.none")}</p> : null}
-        {models.data && models.data.length > 0 ? (
+        <p className="muted small">{t("web.tools.models_hint")}</p>
+        {meta.isSuccess && models.isSuccess && catalog.length === 0 ? <p className="empty">{t("web.tools.none")}</p> : null}
+        <ErrorNote error={meta.error ?? models.error} />
+        {catalog.length > 0 ? (
           <div className="table-wrap">
             <table>
               <thead>
@@ -397,13 +406,13 @@ export function ToolsPage() {
                 </tr>
               </thead>
               <tbody>
-                {models.data.map((m) => (
+                {catalog.map((m) => (
                   <tr key={m.ref}>
                     <td className="strong">{m.ref}</td>
                     <td>{t(`media.kind.${m.kind}`)}</td>
                     <td>{m.family}</td>
                     <td className="mono">{m.provider}</td>
-                    <td className="muted">{m.workflow ? `${m.workflow} - ${m.mine ? t("web.tools.mine") : t("web.tools.packaged")}` : ""}</td>
+                    <td className="muted">{m.workflow ? `${m.workflow} - ${m.mine ? t("web.tools.mine") : t("web.tools.packaged")}` : ["comfy", "cli", "http"].includes(m.provider) ? t("web.tools.connector") : t("web.tools.native")}</td>
                   </tr>
                 ))}
               </tbody>

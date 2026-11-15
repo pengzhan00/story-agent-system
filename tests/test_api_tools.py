@@ -58,7 +58,9 @@ def test_refusals_carry_a_localised_reason(client: TestClient) -> None:
 def test_the_list_marks_templates_that_are_the_operators_own(client: TestClient, fsettings: Settings) -> None:
     rows = client.get("/api/tools").json()
     assert rows and all(not r["mine"] for r in rows)
-    assert {r["provider"] for r in rows} <= {"comfy", "cli", "http"} and "comfy" in {r["provider"] for r in rows}
+    assert {r["ref"] for r in rows} == {ref for ref, m in fsettings.models.items() if m.provider != "control-tools"}
+    assert {"comfy", "acestep", "phosphene", "h3", "h3image"} <= {r["provider"] for r in rows}
+    assert "yue2-3b" in {r["ref"] for r in rows}
 
 
 def test_a_model_added_to_models_toml_by_hand_is_loaded_by_the_reload_call(

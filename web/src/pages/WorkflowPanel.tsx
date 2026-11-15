@@ -77,6 +77,7 @@ function Spec({ id }: { id: number }) {
               </option>
             ))}
           </select>
+          <span className="muted small">{t("web.workflow.voice_hint")}</span>
         </label>
       </div>
       <div className="form-grid">
@@ -140,7 +141,6 @@ function Spec({ id }: { id: number }) {
         ))}
       </div>
       <p className="muted small">{t("web.edit.hint")}</p>
-      <p className="muted small">{t("web.workflow.voice_hint")}</p>
       <p className="muted small">{t("web.workflow.target_hint")}</p>
       <div className="row">
         {TARGET_PRESETS.map((n) => (

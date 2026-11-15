@@ -9,3 +9,8 @@ cjk = ["男", "他", "夫", "哥", "弟", "父", "爷", "先生"]
 
 [noise]
 cjk = ["其他", "他们", "他人", "其它"]
+
+# A synthetic system-voice reference for ordinary CosyVoice TTS, not a real person's recording.
+[automatic]
+voice = "Tingting"
+text = "你好，很高兴为你朗读。今天阳光明媚，我们一起开始新的故事。希望这段声音，能为你的创作带来灵感。"

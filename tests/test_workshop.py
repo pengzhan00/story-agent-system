@@ -59,6 +59,7 @@ def test_inputs_follow_the_kind_description() -> None:
     values = {"text": " hi ", "voice": "asset:x", "voice_text": "ref", "consent": True}
     tts = build_inputs(kind_spec("audio.tts"), values)
     assert tts == {"text": "hi", "voice_ref": {"audio": "asset:x", "text": "ref", "consent": True}}
+    assert build_inputs(kind_spec("audio.tts"), {"text": "automatic speech"}) == {"text": "automatic speech"}
     lip = build_inputs(kind_spec("video.lipsync"), {"image": "a.png", "audio": "b.wav"})
     assert lip == {"refs": ["a.png", "b.wav"]}
     with pytest.raises(WorkshopError) as e:
@@ -81,6 +82,8 @@ def test_every_module_kind_has_a_default_model_and_an_output() -> None:
 # ---- API ----------------------------------------------------------------------------------------
 def test_modules_describe_models_params_and_inputs(api: TestClient) -> None:
     mods = {m["id"]: m for m in api.get("/api/workshop").json()}
+    tts = next(k for k in mods["voice"]["kinds"] if k["kind"] == "audio.tts")
+    assert not next(f for f in tts["inputs"] if f["name"] == "voice")["required"]
     assert set(mods) == {"story", "script", "image", "lora", "song", "voice", "separate", "video", "episode",
                         "transcript", "post", "sound"}
     gen = next(k for k in mods["image"]["kinds"] if k["kind"] == "image.generate")

@@ -37,7 +37,11 @@ beforeEach(() => {
     let json: unknown = {};
     let status = 200;
     if (url.includes("/api/i18n")) json = en;
-    else if (url.includes("/api/meta")) json = { kinds: [{ value: "image.generate", label: "Image" }, { value: "text.story", label: "Story" }] };
+    else if (url.includes("/api/meta")) json = { kinds: [{ value: "image.generate", label: "Image" }, { value: "text.story", label: "Story" }], models:
+      [["acestep-1.5-turbo", "acestep", "audio.music"], ["yue2-3b", "phosphene", "audio.music"],
+        ["minimax-h3", "h3", "video.generate"], ["h3-image", "h3image", "image.generate"]].map(([ref, provider, kind]) =>
+        ({ ref, provider, kind, family: "" })),
+    };
     else if (url.endsWith("/api/tools")) json = [{ ref: "klein", kind: "image.edit", provider: "comfy", family: "flux2", workflow: "flux2_klein_edit", mine: false }];
     else if (url.endsWith("/api/tools/templates")) json = TEMPLATES;
     else if (url.endsWith("/api/tools/cli/parse")) json = PARSED;
@@ -72,6 +76,15 @@ const pick = (text: string, name = "My SD.json") => {
 };
 
 describe("tools page", () => {
+  it("shows native music, video and image models alongside imported connectors", async () => {
+    mount();
+    for (const ref of ["acestep-1.5-turbo", "yue2-3b", "minimax-h3", "h3-image"]) {
+      expect(await screen.findByText(ref)).toBeTruthy();
+    }
+    expect(screen.getAllByText(en["web.tools.native"]!)).toHaveLength(4);
+    expect(screen.getByText(en["web.tools.models_hint"]!)).toBeTruthy();
+    expect(calls.every(c => c.method === "GET")).toBe(true);
+  });
   it("previews what was found, then saves the workflow as a model", async () => {
     mount();
     expect(await screen.findByText("klein")).toBeTruthy();                                   // the models that run through ComfyUI

@@ -1,0 +1,57 @@
+{
+  "baseline": "main@c0f7250",
+  "scope": "automatic default TTS and complete tools catalog",
+  "backend_runs": [
+    {
+      "files": [
+        "test_adapter_subprocess.py",
+        "test_workflow_media.py",
+        "test_api_tools.py",
+        "test_adapter_say.py",
+        "test_voices.py"
+      ],
+      "passed": 61
+    },
+    {
+      "files": [
+        "test_adapter_subprocess.py",
+        "test_workshop.py",
+        "test_control_center.py"
+      ],
+      "passed": 59,
+      "note": "overlaps previous run; do not add counts"
+    },
+    {
+      "selection": "workshop input and API schema assertions after adding assertions",
+      "passed": 2
+    }
+  ],
+  "frontend": {
+    "full_suite_passed": 112,
+    "catalog_after_meta_merge_passed": 6,
+    "typecheck": "passed",
+    "lint": "passed",
+    "build": "passed",
+    "warnings": [
+      "existing large JS bundle",
+      "existing React Router/act test warnings"
+    ]
+  },
+  "ruff": "passed",
+  "mypy_source_files": 190,
+  "i18n_locales": 2,
+  "system_reference": {
+    "voice": "Tingting",
+    "duration_seconds": 10.603764,
+    "real_system_synthesizer": true,
+    "neural_tts_model_executed": false
+  },
+  "browser": {
+    "plugin": "unavailable in current tools",
+    "fallback": "bundled Playwright and installed Chrome",
+    "isolated_url": "http://127.0.0.1:18777",
+    "isolated_api_stopped": true,
+    "production_api_mutated_by_browser": false
+  },
+  "release_readiness": "partial; no final full backend suite or neural voice quality acceptance"
+}

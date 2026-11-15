@@ -55,13 +55,13 @@ def _preview(request: Request, result: ImportResult) -> ToolImportPreview:
 
 @router.get("", response_model=list[ToolModel])
 def list_tools(request: Request) -> list[ToolModel]:
-    """Models that run through a connector (ComfyUI workflow, command line, HTTP service), and whether a ComfyUI
-    template is the operator's own."""
+    """All configured creative models, including native adapters and imported connectors.
+    Listing is configuration evidence, not proof of runtime availability or output quality."""
     settings = ctx_of(request).settings
     mine = workflows_dir(settings)
     out = []
     for ref, m in sorted(settings.models.items()):
-        if m.provider not in ("comfy", "cli", "http"):
+        if m.provider == "control-tools":
             continue
         name = str(m.extra.get("workflow", ""))
         out.append(ToolModel(ref=ref, kind=m.kind, provider=m.provider, family=m.family, workflow=name,

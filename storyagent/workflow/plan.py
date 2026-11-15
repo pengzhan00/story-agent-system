@@ -18,6 +18,7 @@ from storyagent.config import ConfigError, Settings
 from storyagent.domain import MediaKind, QualityTier
 from storyagent.media.ledger import Ledger
 from storyagent.media.specs import SpecRecord, SpecStore
+from storyagent.media.tts import automatic_voice
 from storyagent.story import StoryStore
 
 from .media import (
@@ -121,7 +122,8 @@ def produce_plan(
                 settings.model(model_ref)
             except ConfigError:
                 state, reason = "blocked", "no_model"
-            if spec.subject_type == "dialogue.line" and not spec.params.get("voice_ref") and not default_voice:
+            if spec.subject_type == "dialogue.line" and not spec.params.get("voice_ref") and not default_voice \
+                    and reason != "no_model" and not automatic_voice(settings, model_ref, spec.params):
                 state, reason = "blocked", "no_voice"
             found = settings.content.blocked_in(f"{spec.prompt}\n{spec.negative_prompt}\n{spec.text_payload}") \
                 if gated and state in ("new", "stale") else None

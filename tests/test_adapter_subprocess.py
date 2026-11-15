@@ -121,6 +121,59 @@ def test_single_line(tmp_path: Path) -> None:
     assert Path(cfg["ref_wav"]) == ref and cfg["root"].endswith("cv")
 
 
+def test_no_reference_prepares_synthetic_voice_without_asr_or_character_setup(tmp_path: Path, monkeypatch) -> None:
+    from storyagent.media.adapters.say import SayAdapter
+
+    rig, _ = build(tmp_path, whisper=False)
+    source = tmp_path / "system.wav"
+    source.write_bytes(wav_bytes(4))
+    binary = tmp_path / "say-stub"
+    binary.write_text(
+        f"#!{sys.executable}\nimport sys\nfrom pathlib import Path\n"
+        "assert sys.argv[-2] == '--'\n"
+        f"Path(sys.argv[sys.argv.index('-o')+1]).write_bytes(Path({str(source)!r}).read_bytes())\n"
+    )
+    binary.chmod(0o755)
+    monkeypatch.setattr(SayAdapter, "_binary", staticmethod(lambda: str(binary)))
+    try:
+        rec, assets = rig.run(job(MediaKind.AUDIO_TTS, "cosy-test", {"text": "hello automatically"}))
+        assert rec.status is JobStatus.COMPLETED, rec.error_message
+        [cfg] = calls(tmp_path)
+        assert cfg["voice_source"] == "synthetic_system_reference"
+        assert cfg["ref_text"] and cfg["system_voice"] == "Tingting"
+        assert Path(cfg["ref_wav"]).read_bytes() == source.read_bytes()
+        assert assets[0].metadata["voice_source"] == "synthetic_system_reference"
+        assert rig.db.conn.execute("SELECT count(*) FROM characters").fetchone()[0] == 0
+        assert "ref_transcribed" not in [e["event"] for e in rig.ledger.events(rec.id)]
+        source.unlink()  # a second line must reuse the cached system reference, not synthesize it again
+        rec, _ = rig.run(job(MediaKind.AUDIO_TTS, "cosy-test", {"text": "another line",
+                            "voice_ref": {"audio": "", "consent": False}}))
+        assert rec.status is JobStatus.COMPLETED, rec.error_message
+        assert calls(tmp_path)[1]["ref_wav"] == cfg["ref_wav"]
+    finally:
+        rig.worker.shutdown()
+
+
+def test_automatic_voice_does_not_override_explicit_reference_or_opt_out(tmp_path: Path, monkeypatch) -> None:
+    from storyagent.media.adapters.say import SayAdapter
+
+    rig, ref = build(tmp_path)
+    monkeypatch.setattr(SayAdapter, "_binary", staticmethod(lambda: None))
+    try:
+        rec, _ = rig.run(tts(ref))
+        assert rec.status is JobStatus.COMPLETED
+        assert calls(tmp_path)[0]["voice_source"] == "explicit_reference"
+        rec, _ = rig.run(job(MediaKind.AUDIO_TTS, "cosy-test", {"text": "no reference"},
+                             params={"auto_reference": False}))
+        assert rec.status is JobStatus.FAILED_VALIDATION
+        assert len(calls(tmp_path)) == 1
+        rec, _ = rig.run(job(MediaKind.AUDIO_TTS, "cosy-test", {"text": "no system synthesizer"}))
+        assert rec.error_code == ErrorCode.MISSING_TOOL.value
+        assert len(calls(tmp_path)) == 1
+    finally:
+        rig.worker.shutdown()
+
+
 def test_a_line_with_an_emotion_is_spoken_in_that_tone(tmp_path: Path) -> None:
     rig, ref = build(tmp_path)
     rec, _ = rig.run(tts(ref, seed=1, inputs={"prompt": "furious"}))

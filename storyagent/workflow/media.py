@@ -33,6 +33,7 @@ from storyagent.media.compliance import visible_marks
 from storyagent.media.contracts import AssetRecord, JobRecord, MediaJob
 from storyagent.media.ledger import Ledger, LedgerError
 from storyagent.media.specs import SpecRecord, SpecStore, shot_id_of
+from storyagent.media.tts import automatic_voice
 from storyagent.story import StoryStore
 
 from .stages import Ctx, StageError, WorkflowCancelled
@@ -284,10 +285,11 @@ def _plan_phase(
             continue
         extra: dict[str, Any] = {}
         if spec.subject_type == "dialogue.line" and not spec.params.get("voice_ref"):
-            if not default_voice:
+            if not default_voice and not automatic_voice(ctx.settings, spec.model_ref, spec.params):
                 skipped.append({"subject": spec.subject_type, "id": spec.subject_id, "reason": "no_voice"})
                 continue
-            extra["voice_ref"] = default_voice
+            if default_voice:
+                extra["voice_ref"] = default_voice
         if spec.subject_type == "shot.video":
             shot = ctx.store.get_shot(int(spec.subject_id))
             mode = shot_mode(shot["render_payload"], spec.params)

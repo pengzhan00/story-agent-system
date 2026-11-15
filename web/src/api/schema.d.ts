@@ -2861,8 +2861,8 @@ export interface paths {
         };
         /**
          * List Tools
-         * @description Models that run through a connector (ComfyUI workflow, command line, HTTP service), and whether a ComfyUI
-         *     template is the operator's own.
+         * @description All configured creative models, including native adapters and imported connectors.
+         *     Listing is configuration evidence, not proof of runtime availability or output quality.
          */
         get: operations["list_tools_api_tools_get"];
         put?: never;

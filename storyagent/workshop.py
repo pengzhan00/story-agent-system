@@ -122,7 +122,7 @@ MODULES: tuple[Module, ...] = (
     Module("voice", (
         KindSpec(MediaKind.AUDIO_TTS, (
             Field("text", "text", "longtext", required=True),
-            Field("voice", "voice_ref.audio", "media", "audio", required=True),
+            Field("voice", "voice_ref.audio", "media", "audio"),
             Field("voice_text", "voice_ref.text", "text"),
             Field("consent", "voice_ref.consent", "bool"),
             Field("instruct", "instruct", "text"),

@@ -416,6 +416,36 @@ def test_each_location_chooses_how_its_keyframes_are_made(tmp_path: Path) -> Non
     assert kinds_by_place()[first] == {"image.generate"}
 
 
+@pytest.mark.parametrize("provider", ["cosyvoice", "say"])
+def test_automatic_tts_voice_is_not_blocked_in_plan_or_dispatch(tmp_path: Path, provider: str) -> None:
+    from dataclasses import replace
+
+    from storyagent.domain import QualityTier
+    from storyagent.workflow.media import _plan_phase
+    from storyagent.workflow.plan import produce_plan
+    from storyagent.workflow.stages import Ctx
+
+    engine, worker, _ = story(tmp_path, [FakeAdapter()])
+    engine.settings.models["f-tts"] = replace(engine.settings.models["f-tts"], provider=provider)
+    ledger = engine.spec_store.ledger
+    plan = produce_plan(engine.settings, engine.store, engine.spec_store, ledger, 1, QualityTier.DRAFT)
+    lines = [p for p in plan if p.subject_type == "dialogue.line"]
+    assert lines and all(p.state == "new" for p in lines)
+    ctx = Ctx(engine.settings, engine.db, engine.store, engine.state, engine.agents_for(engine.projects.get(1)),
+              engine.projects, engine.projects.get(1), {}, spec_store=engine.spec_store)
+    skipped: list[dict[str, Any]] = []
+    jobs = _plan_phase(ctx, ledger, engine.spec_store.list_current(1), ("dialogue.line",), skipped,
+                       QualityTier.DRAFT, {"reused": 0})
+    assert len(jobs) == len(lines) and not skipped
+    assert all(not job.inputs.get("voice_ref") for _, job in jobs)
+    assert all(not c["voice_ref_audio"] for c in engine.store.list_characters(1))
+    if provider == "cosyvoice":
+        engine.settings.models["f-tts"] = replace(engine.settings.models["f-tts"], params={"auto_reference": False})
+        plan = produce_plan(engine.settings, engine.store, engine.spec_store, ledger, 1, QualityTier.DRAFT)
+        assert all(p.reason == "no_voice" for p in plan if p.subject_type == "dialogue.line")
+    worker.shutdown()
+
+
 def test_a_project_voice_unblocks_the_dialogue_in_the_plan(tmp_path: Path) -> None:
     from storyagent.domain import QualityTier
     from storyagent.workflow.plan import produce_plan

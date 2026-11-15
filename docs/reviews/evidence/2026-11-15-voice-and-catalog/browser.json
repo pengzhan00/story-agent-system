@@ -1,0 +1,17 @@
+{
+  "origin": "http://127.0.0.1:18777",
+  "tools": [
+    "h3-image",
+    "h3-image-edit",
+    "ltx-2.5-av",
+    "ltx-2.5-video",
+    "ltx-2.5-lipsync",
+    "acestep-1.5-turbo",
+    "yue2-3b",
+    "acestep-1.5-xl-sft",
+    "minimax-h3"
+  ],
+  "automatic_voice_selected": true,
+  "page_errors": [],
+  "requests_mutated": false
+}
