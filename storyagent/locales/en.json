@@ -107,6 +107,7 @@
   "spec.subject.character.voice": "Character voice",
   "spec.subject.dialogue.line": "Dialogue line",
   "spec.subject.scene.keyframe": "Scene keyframe",
+  "spec.subject.project.keyframe": "Project keyframe",
   "spec.subject.shot.keyframe": "Shot keyframe",
   "spec.subject.shot.video": "Shot video",
   "spec.subject.music.bgm": "Background music",

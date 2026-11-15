@@ -107,6 +107,7 @@
   "spec.subject.character.voice": "人物声线",
   "spec.subject.dialogue.line": "对白台词",
   "spec.subject.scene.keyframe": "场景关键帧",
+  "spec.subject.project.keyframe": "项目关键帧",
   "spec.subject.shot.keyframe": "镜头首帧",
   "spec.subject.shot.video": "镜头视频",
   "spec.subject.music.bgm": "背景配乐",
