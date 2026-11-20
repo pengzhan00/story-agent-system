@@ -174,3 +174,25 @@ def test_h3_progress_and_capabilities() -> None:
     caps = a.capabilities()
     assert caps.heavy and MediaKind.VIDEO_AV in caps.kinds
 
+
+
+def test_h3_imported_duration_is_identical_in_preflight_draft_and_worker_command(tmp_path: Path) -> None:
+    from dataclasses import replace
+
+    rig = build_h3(tmp_path)
+    model = replace(rig.settings.model("h3-test"), params={"frames": 56})
+    # Keep the rig's settings object shared by its ledger and worker, as the production fixture does.
+    rig.settings.models[model.ref] = model
+    request = job(MediaKind.VIDEO_AV, "h3-test", {"prompt": "A fixed camera on the sea"},
+                  params={"seconds": 6, "frames": 145})
+    drafted = rig.ledger.draft(request)
+    assert drafted.params == {"seconds": 6}
+    rec, _ = rig.run(request)
+    assert rec.status is JobStatus.COMPLETED, (rec.error_code, rec.error_message)
+    assert rec.params == drafted.params
+    argv = h3_calls(tmp_path)[0]["argv"]
+    assert flag(argv, "--seconds") == "6" and "--frames" not in argv
+    failed, _ = rig.run(job(MediaKind.VIDEO_AV, "h3-test", {"prompt": "Another fixed shot"}, seed=42,
+                            params={"seconds": 6, "frames": 56}))
+    assert failed.status is JobStatus.FAILED_VALIDATION
+    assert "give frames or seconds" in (failed.error_message or "")

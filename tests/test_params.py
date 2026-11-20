@@ -82,3 +82,26 @@ def test_explicit_sizes_of_a_project_or_a_job_still_win_over_the_frame(fsettings
     proj = {"models": {"fake-video": {"width": 300, "height": 200}}}
     r = resolve_params(fsettings, "fake-video", "draft", project_settings=proj, frame=(720, 1280))
     assert (r["width"], r["height"]) == (300, 200)
+
+
+def test_h3_duration_choice_obeys_parameter_layer_priority(fsettings: Settings) -> None:
+    from dataclasses import replace
+
+    model = replace(fsettings.model("fake-video"), provider="h3", params={"frames": 56},
+                    tiers={"draft": {"seconds": 3.0}})
+    settings = replace(fsettings, models={**fsettings.models, model.ref: model})
+    assert resolve_params(settings, model.ref, "draft") == {"seconds": 3.0}
+    project = {"models": {model.ref: {"frames": 124}}}
+    assert resolve_params(settings, model.ref, "draft", project_settings=project) == {"frames": 124}
+    assert resolve_params(settings, model.ref, "draft", project_settings=project,
+                          job_params={"seconds": 6}) == {"seconds": 6}
+    assert resolve_params(settings, model.ref, "final", adapter_defaults={"seconds": 2}) == {"frames": 56}
+    assert resolve_params(settings, model.ref, "final", job_params={"frames": 145, "seconds": 6}) == {"seconds": 6}
+    # Never silently choose between genuinely contradictory or malformed values in the same layer.
+    assert resolve_params(settings, model.ref, "final", job_params={"frames": 56, "seconds": 6}) == {
+        "frames": 56, "seconds": 6}
+    assert resolve_params(settings, model.ref, "final", job_params={"frames": "145", "seconds": 6}) == {
+        "frames": "145", "seconds": 6}
+    other = replace(model, provider="comfy")
+    settings = replace(settings, models={**settings.models, other.ref: other})
+    assert resolve_params(settings, other.ref, "final", job_params={"seconds": 6}) == {"frames": 56, "seconds": 6}

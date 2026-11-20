@@ -53,6 +53,28 @@ def size_multiple(kind: str) -> int:
     return 32 if kind.startswith("video.") else 16
 
 
+def _merge_model_layer(base: Mapping[str, Any], layer: Mapping[str, Any], provider: str) -> dict[str, Any]:
+    """H3 duration is one choice across layers, not two independent knobs.
+
+    Imported LTX clips commonly store seconds plus 24-fps frames including the opening frame. Preserve that
+    duration when the two agree within one frame. Contradictory values in one layer remain for H3 to reject.
+    Other providers retain their own semantics (a Comfy workflow may genuinely use both keys).
+    """
+    out = deep_merge(dict(base), layer)
+    if provider != "h3":
+        return out
+    chosen = {"frames", "seconds"}.intersection(layer)
+    if len(chosen) == 1:
+        out.pop("seconds" if "frames" in chosen else "frames", None)
+    elif len(chosen) == 2:
+        frames, seconds = layer["frames"], layer["seconds"]
+        if isinstance(frames, int | float) and not isinstance(frames, bool) \
+                and isinstance(seconds, int | float) and not isinstance(seconds, bool) \
+                and abs(frames - seconds * 24) <= 1.000001:
+            out.pop("frames", None)
+    return out
+
+
 def resolve_params(
     settings: Settings,
     model_ref: str,
@@ -67,13 +89,13 @@ def resolve_params(
     tier_key = QualityTier(tier).value
     base: dict[str, Any] = {}
     for layer in (adapter_defaults or {}, spec.params, spec.tiers.get(tier_key, {})):
-        base = deep_merge(base, layer)
+        base = _merge_model_layer(base, layer, spec.provider)
     if frame:                                   # the shape comes from the project; explicit sizes below still win
         # a runtime with its own grid (Draw Things works in multiples of 64) says so in the model entry
         base = orient_size(base, frame, int(spec.extra.get("size_multiple") or size_multiple(spec.kind)))
     out = base
     for layer in (((project_settings or {}).get("models") or {}).get(model_ref, {}), job_params or {}):
-        out = deep_merge(out, layer)
+        out = _merge_model_layer(out, layer, spec.provider)
     return out
 
 
