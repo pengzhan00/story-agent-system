@@ -48,6 +48,7 @@ from ..contracts import (
     JobContext,
     JobRecord,
     Progress,
+    ReferenceRule,
     ValidationIssue,
 )
 from ._http import ServiceClient
@@ -161,6 +162,22 @@ class ComfyAdapter(AdapterBase):
     def template(self, job: JobRecord) -> dict[str, Any]:
         return load_template(self._workflows.get(job.model_ref) or "", self.user_dir)
 
+    def model_reference_rule(self, model_ref: str, kind: MediaKind) -> ReferenceRule | None:
+        """Derive image input capacity from the imported graph bindings, without contacting ComfyUI."""
+        if kind.value not in {"image.generate", "image.edit"}:
+            return None
+        try:
+            tpl = load_template(self._workflows.get(model_ref) or "", self.user_dir)
+        except AdapterError:
+            return None  # missing/invalid templates are reported by validate, not advertised as working
+        if tpl.get("references"):
+            return ReferenceRule()
+        bindings = tpl.get("bindings", {})
+        count = 0
+        while ("ref_image" if count == 0 else f"ref_image_{count + 1}") in bindings:
+            count += 1
+        return ReferenceRule(most=count)
+
     def health(self) -> HealthReport:
         try:
             self.client.json("GET", "/system_stats", timeout=5)
@@ -214,6 +231,15 @@ class ComfyAdapter(AdapterBase):
                 )
             )
         for prefix, files in (("ref_image", images), ("ref_audio", audios), ("ref_video", videos)):
+            if files and not (prefix == "ref_image" and tpl.get("references")):
+                # Uploading a file is not conditioning: every supplied reference needs a bound graph input.
+                consumed = sum(1 for i in range(len(files))
+                               if (prefix if i == 0 else f"{prefix}_{i + 1}") in bindings)
+                if consumed < len(files):
+                    issues.append(ValidationIssue(
+                        ErrorCode.UNUSED_REFERENCES,
+                        f"workflow binds {consumed} of {len(files)} supplied {prefix} references",
+                        {"supported": consumed, "count": len(files)}))
             for key in bindings:
                 if (
                     key.startswith(prefix + "_")

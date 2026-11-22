@@ -200,3 +200,24 @@ def test_a_run_stops_before_the_first_job_when_a_model_cannot_take_the_reference
     assert run["status"] == "failed" and run["error_code"] == "workflow.not_ready"
     assert "too_many_refs" in run["error_message"]
     assert engine.spec_store.ledger.list_jobs(project_id=1, limit=10) == []      # not one job was queued
+
+
+def test_comfy_template_capacity_reaches_readiness_without_model_max_refs(tmp_path: Path) -> None:
+    from storyagent.media.adapters._http import ServiceClient
+    from storyagent.media.adapters.comfy import ComfyAdapter
+
+    models = '''
+[models."plain"]
+kind = "image.generate"
+provider = "comfy"
+[models."reference"]
+kind = "image.generate"
+provider = "comfy"
+'''
+    cfg = make_settings(tmp_path, models=models)
+    reg = AdapterRegistry()
+    reg.register(ComfyAdapter(ServiceClient(cfg.service("comfy")),
+                             {"plain": "stable_audio_3", "reference": "flux2_klein_edit"}))
+    assert refs.rule_of(cfg, reg, "plain", "image.generate") == ReferenceRule(most=0)
+    assert refs.rule_of(cfg, reg, "reference", "image.generate") == ReferenceRule()
+    assert [m.ref for m in refs.roomy_models(cfg, reg, "image.generate", 2)] == ["reference"]

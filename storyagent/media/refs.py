@@ -5,9 +5,10 @@ Who says it, most specific first:
 1. the model entry in models.toml: ``max_refs`` (more than this is refused) and ``used_refs`` (only this many are
    read). This is where a ComfyUI workflow or a ``cli`` / ``http`` connector says it, because only the person who
    wired it knows;
-2. the adapter (``Adapter.reference_rule(kind)``): Draw Things takes one, H3-Image sixteen, mflux reads the first
+2. model-specific adapter metadata: ComfyUI derives capacity from its template bindings/reference chain;
+3. the adapter (``Adapter.reference_rule(kind)``): Draw Things takes one, H3-Image sixteen, mflux reads the first
    when it generates and all of them when it edits;
-3. nobody: the rule is unknown. An unknown model is never reported as too small and never offered as one that takes
+4. nobody: the rule is unknown. An unknown model is never reported as too small and never offered as one that takes
    several.
 
 Who reads it: the look ahead of a run (``workflow/preflight.py``: a job that can only be refused is found before
@@ -44,9 +45,15 @@ def rule_of(settings: Settings, registry: AdapterRegistry, model_ref: str, kind:
     if most is not None or used is not None:
         return ReferenceRule(most=most, used=used)
     adapter = registry.get(model.provider)
+    model_ask = getattr(adapter, "model_reference_rule", None)
     ask = getattr(adapter, "reference_rule", None)
     try:
-        found = ask(MediaKind(kind)) if callable(ask) else None
+        media_kind = MediaKind(kind)
+        if callable(model_ask):
+            found = model_ask(model_ref, media_kind)
+            if isinstance(found, ReferenceRule):
+                return found
+        found = ask(media_kind) if callable(ask) else None
     except ValueError:
         return None
     return found if isinstance(found, ReferenceRule) else None

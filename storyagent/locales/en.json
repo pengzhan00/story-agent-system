@@ -2838,5 +2838,7 @@
   "web.plan.reason.source_music": "complete original soundtrack selected",
   "web.produce.reason.source_music": "complete original soundtrack selected",
   "error.prompt_language": "Untranslated scene instructions for an English-prompt model: {detail}",
-  "error.prompt_language.remediation": "Translate the scene instructions into English. Literal lettering can remain in quotes after an English cue such as: a sign that reads \"悦来客栈\"."
+  "error.prompt_language.remediation": "Translate the scene instructions into English. Literal lettering can remain in quotes after an English cue such as: a sign that reads \"悦来客栈\".",
+  "error.unused_references": "The workflow connects {supported} of {count} supplied references.",
+  "error.unused_references.remediation": "Use a workflow wired for every reference, or remove unused references. Uploading files alone does not preserve character identity or clothing."
 }

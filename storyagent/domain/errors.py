@@ -23,6 +23,7 @@ class ErrorCode(StrEnum):
     INVALID_PARAMS = "invalid_params"
     INVALID_INPUT = "invalid_input"
     PROMPT_LANGUAGE = "prompt_language"
+    UNUSED_REFERENCES = "unused_references"
     CONSENT_REQUIRED = "consent_required"
     LICENSE_ACK_REQUIRED = "license_ack_required"
     REMOTE_NOT_ALLOWED = "remote_not_allowed"      # the model runs in the cloud: data would leave this machine
@@ -52,6 +53,7 @@ _STATUS: dict[ErrorCode, JobStatus] = {
     ErrorCode.INVALID_PARAMS: JobStatus.FAILED_VALIDATION,
     ErrorCode.INVALID_INPUT: JobStatus.FAILED_VALIDATION,
     ErrorCode.PROMPT_LANGUAGE: JobStatus.FAILED_VALIDATION,
+    ErrorCode.UNUSED_REFERENCES: JobStatus.FAILED_VALIDATION,
     ErrorCode.CONSENT_REQUIRED: JobStatus.FAILED_VALIDATION,
     ErrorCode.LICENSE_ACK_REQUIRED: JobStatus.FAILED_VALIDATION,
     ErrorCode.REMOTE_NOT_ALLOWED: JobStatus.FAILED_VALIDATION,

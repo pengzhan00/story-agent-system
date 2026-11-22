@@ -2838,5 +2838,7 @@
   "web.plan.reason.source_music": "已采用完整原曲",
   "web.produce.reason.source_music": "已采用完整原曲",
   "error.prompt_language": "模型要求英文场景描述，以下文字尚未翻译：{detail}",
-  "error.prompt_language.remediation": "请将场景描述翻译为英文。画面内的招牌文字可保留，用英文说明用途并加引号，例如：a sign that reads \"悦来客栈\"。"
+  "error.prompt_language.remediation": "请将场景描述翻译为英文。画面内的招牌文字可保留，用英文说明用途并加引号，例如：a sign that reads \"悦来客栈\"。",
+  "error.unused_references": "工作流只接入了 {count} 个参考素材中的 {supported} 个。",
+  "error.unused_references.remediation": "请使用已连接全部参考素材的工作流，或移除未接入的素材。仅上传文件不能保持人物长相或服装一致。"
 }

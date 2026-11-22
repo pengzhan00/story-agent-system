@@ -224,3 +224,42 @@ def test_declared_outputs_reject_unsafe_ports(tmp_path, outputs):
     (tmp_path / "bad.json").write_text(json.dumps({"outputs": outputs}))
     with pytest.raises(AdapterError):
         load_template("bad", tmp_path)
+
+
+def test_unused_references_fail_before_upload_or_generation(tmp_path: Path, server: FakeServer) -> None:
+    r, _ = rig(tmp_path, server)
+    image = tmp_path / "person.png"
+    image.write_bytes(png_bytes())
+    # This text-to-audio template has no reference bindings, like a pure text-to-image workflow.
+    rec, _ = r.run(job(MediaKind.AUDIO_SFX, "sa-test", {"prompt": "a quiet beach", "refs": [str(image)]}))
+    assert rec.status is JobStatus.FAILED_VALIDATION
+    assert rec.error_code == "unused_references"
+    assert rec.error_params == {"supported": "0", "count": "1"}
+    assert not any(q.path in ("/upload/image", "/prompt") for q in server.requests)
+
+
+def test_workflow_reference_capacity_is_known_before_jobs_exist(tmp_path: Path, server: FakeServer) -> None:
+    from storyagent.media.contracts import ReferenceRule
+
+    _, adapter = rig(tmp_path, server)
+    adapter._workflows.update(plain="stable_audio_3", edit="flux2_klein_edit")
+    assert adapter.model_reference_rule("plain", MediaKind.IMAGE_GENERATE) == ReferenceRule(most=0)
+    assert adapter.model_reference_rule("edit", MediaKind.IMAGE_EDIT) == ReferenceRule()
+    assert adapter.model_reference_rule("missing", MediaKind.IMAGE_GENERATE) is None
+
+
+def test_flux3_example_feeds_every_reference_into_sampler_conditioning(tmp_path: Path, server: FakeServer) -> None:
+    import json
+    from dataclasses import replace
+
+    r, adapter = rig(tmp_path, server)
+    rec = r.ledger.draft(job(MediaKind.AUDIO_SFX, "sa-test", {"prompt": "A man wearing a blue shirt on the beach"}))
+    rec = replace(rec, inputs={"prompt": "A man wearing a blue shirt on the beach"})
+    template = json.loads((Path(__file__).parents[1] / "docs/examples/flux3-reference/workflow.json").read_text())
+    graph = adapter._graph(rec, template, ["approved-face.png", "approved-costume.png"])
+    assert graph["7"]["inputs"]["positive"] == ["ref1_ref", 0]
+    assert graph["ref1_ref"]["inputs"]["conditioning"] == ["ref0_ref", 0]
+    assert graph["ref0_ref"]["inputs"]["conditioning"] == ["11", 0]
+    assert graph["ref0_load"]["inputs"]["image"] == "approved-face.png"
+    assert graph["ref1_load"]["inputs"]["image"] == "approved-costume.png"
+    assert graph["ref1_vae"]["inputs"]["vae"] == ["3", 0]
