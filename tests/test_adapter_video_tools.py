@@ -171,6 +171,10 @@ def test_h3_progress_and_capabilities() -> None:
     assert a.progress(None, "")[1] == "loading model"                      # type: ignore[arg-type]
     frac, msg = a.progress(None, "denoising step 2/4\n")                  # type: ignore[arg-type]
     assert msg == "step 2/4" and abs(frac - 0.5) < 0.01
+    # the real log: loading stages first (still "loading"), then "denoise enqueue" with padding before the count
+    loading = "load transformer core       50/50  \rdenoise enqueue              0/40  Failed to import MPS module\r"
+    assert a.progress(None, "load transformer core       12/50  ")[1] == "loading model"   # type: ignore[arg-type]
+    assert a.progress(None, loading + "denoise enqueue             10/40  ")[1] == "step 10/40"   # type: ignore[arg-type]
     caps = a.capabilities()
     assert caps.heavy and MediaKind.VIDEO_AV in caps.kinds
 

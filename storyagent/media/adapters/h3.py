@@ -47,7 +47,8 @@ SCHEMA: dict[str, dict[str, Any]] = {
     "int8_row_fc2": {"type": "bool"},
     "ref_image_size": {"type": "str", "choices": ["match", "max"]},
 }
-_STEP = re.compile(r"(?:step|pass|denois\w*)\D{0,12}(\d+)\s*/\s*(\d+)", re.IGNORECASE)
+# h3 prints "denoise enqueue    12/40" (a word and padding sit between the name and the count), so allow a long gap
+_STEP = re.compile(r"(?:step|pass|denois\w*)\D{0,40}(\d+)\s*/\s*(\d+)", re.IGNORECASE)
 FPS = 24
 
 
