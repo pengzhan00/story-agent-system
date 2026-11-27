@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Story Agent</title>
+  <link rel="stylesheet" href="/__launcher/style.css">
+  <script src="/__launcher/app.js" defer></script>
+</head>
+<body>
+  <main>
+    <div class="top"><span class="brand">Story Agent</span><select id="locale" aria-label=""><option value="zh-CN" data-i18n="gateway.locale.zh-CN"></option><option value="en" data-i18n="gateway.locale.en"></option></select></div>
+    <span class="badge" id="badge"></span>
+    <h1 data-i18n="gateway.title"></h1>
+    <p data-i18n="gateway.description"></p>
+    <div role="status" aria-live="polite" id="state"></div>
+    <div role="alert" id="error"></div>
+    <button id="start" disabled data-i18n="gateway.start"></button>
+    <button id="stop" hidden data-i18n="gateway.stop"></button>
+    <button id="install-login" hidden data-i18n="gateway.install_login"></button>
+    <div id="login-state" role="status"></div>
+    <a id="return" href="/" hidden data-i18n="gateway.return"></a>
+    <p class="hint" data-i18n="gateway.scope"></p>
+    <p class="hint" data-i18n="gateway.log_hint"></p>
+  </main>
+</body>
+</html>

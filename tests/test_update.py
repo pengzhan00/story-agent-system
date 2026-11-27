@@ -689,7 +689,8 @@ def test_start_sh_restarts_both_on_75_and_stops_on_ctrl_c(tmp_path: Path) -> Non
     py.chmod(0o755)
     calls = repo / "calls.log"
     env = {**os.environ, "FAKE_ROOT": str(repo), "STORY_AGENT_RESTART_GRACE": "5"}
-    proc = subprocess.Popen(["bash", str(repo / "scripts" / "start.sh"), "--port", "9"], cwd=tmp_path, env=env,
+    proc = subprocess.Popen(["bash", str(repo / "scripts" / "start.sh"), "--backend-only", "--port", "9"],
+                            cwd=tmp_path, env=env,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     try:
         deadline = time.time() + 40
@@ -738,3 +739,35 @@ def test_deploy_sh_checks_for_a_clean_tree_and_runs_the_update_command(tmp_path:
     (repo / "calls.log").unlink()
     refused = subprocess.run(["bash", str(repo / "scripts" / "deploy.sh")], env=env, capture_output=True, text=True)
     assert refused.returncode == 1 and "clean checkout" in refused.stderr and not (repo / "calls.log").exists()
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="bash missing")
+def test_gateway_exit_marker_stops_the_supervisor_after_its_drain(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    (repo / "scripts").mkdir(parents=True)
+    (repo / ".venv/bin").mkdir(parents=True)
+    shutil.copy(ROOT / "scripts/start.sh", repo / "scripts/start.sh")
+    py = repo / ".venv/bin/python"
+    py.write_text(FAKE_PYTHON)
+    py.chmod(0o755)
+    marker = tmp_path / "stop"
+    marker.touch()
+    env = {**os.environ, "FAKE_ROOT": str(repo), "STORY_AGENT_RESTART_GRACE": "1",
+           "STORY_AGENT_GATEWAY_STOP": str(marker)}
+    result = subprocess.run(["bash", str(repo / "scripts/start.sh"), "--backend-only"],
+                            env=env, capture_output=True, timeout=15)
+    assert result.returncode == 0, result.stderr
+    calls = (repo / "calls.log").read_text()
+    assert "worker 1" in calls and "worker 2" not in calls
+    assert b"backend stopped after draining work" in result.stderr
+
+
+def test_cancelling_a_gateway_exit_removes_its_stop_marker(settings: Settings, machine: FakeMachine,
+                                                         monkeypatch, tmp_path: Path) -> None:
+    u = updater(settings, machine, supervised=True)
+    u.request_restart()
+    marker = tmp_path / "gateway-stop"
+    marker.touch()
+    monkeypatch.setenv("STORY_AGENT_GATEWAY_STOP", str(marker))
+    u.cancel_restart()
+    assert not marker.exists() and read_request(settings) is None

@@ -12,7 +12,7 @@
 ```bash
 uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python -e '.[dev]'   # 第一次
 (cd web && pnpm install && pnpm build)                                                  # 第一次:Web 界面
-scripts/start.sh                       # worker + 网页服务;浏览器打开 http://localhost:<端口>(启动时打印)
+scripts/start.sh                       # 常驻启动入口 + worker + 网页服务;浏览器打开启动时打印的地址
 .venv/bin/python -m storyagent media healthcheck   # 看看本机哪些模型/服务可用
 ```
 
@@ -25,6 +25,8 @@ scripts/start.sh                       # worker + 网页服务;浏览器打开 h
 .venv/bin/python -m storyagent workflow run --project 1 --stage compose
 .venv/bin/python -m storyagent export episode --project 1 --out out/    # 成片 + 字幕 + 分轨 + 溯源
 ```
+
+后端停止时，网页会保留启动按钮；系统页可进入“后端启动与退出”。一次设置登录启动后，入口可随登录保留。详见 [启动与退出说明](docs/STARTUP_ENTRANCE.md)。
 
 ## 它由什么组成
 
@@ -56,6 +58,6 @@ cd web && pnpm typecheck && pnpm lint && pnpm test && pnpm build  # 前端
 ## 约定
 
 * **离线**:不联网抓取、不下载模型(缺什么由 `media healthcheck` 指出,下载由你决定)。
-* **不动别人的进程**:只探测外部服务,绝不 `pkill`;`scripts/start.sh` 只管自己启动的两个进程。
+* **不动别人的进程**:只探测外部服务,绝不 `pkill`;`scripts/start.sh` 及本机启动入口只管理自己启动的进程。
 * **AIGC 合规默认开启、可关闭**(全局 / 环境变量 `STORY_AGENT_COMPLIANCE` / 每个项目):显式标识、元数据、声音克隆授权、受限许可确认;溯源记录永远写入台账。
 * v1 旧实现保留在 git tag `v1-final`。

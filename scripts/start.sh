@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Start the web server and the worker of this checkout and keep them up; Ctrl-C stops exactly these two (never anything else).
-#   scripts/start.sh [--port N] [--host H]
+# Keep a local web entrance alive, with a supervised API and worker. Ctrl-C stops only the processes we own.
+#   scripts/start.sh [--port N] [--host H] [--no-auto-start]
+#   scripts/start.sh --backend-only [--port N] [--host H]  # internal/direct API mode
 # Needs .venv (see README). Data lives in $STORY_AGENT_HOME (default: ./data).
 #
 # Hot restart: when the worker or the server ends with exit code 75 (RESTART_EXIT_CODE in storyagent/restart.py - the
@@ -15,6 +16,13 @@ RESTART_EXIT=75                                  # storyagent.restart.RESTART_EX
 RESTART_GRACE="${STORY_AGENT_RESTART_GRACE:-60}" # seconds the second process gets to leave by itself after the first did
 PY=".venv/bin/python"
 [ -x "$PY" ] || { echo "missing .venv: uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python -e '.[dev]'" >&2; exit 1; }
+# Keep the public entrance alive when the API/worker supervisor exits. Internal restarts retain --backend-only.
+if [ "${1:-}" = "--backend-only" ]; then
+  shift
+else
+  exec "$PY" -m storyagent.gateway "$@"
+fi
+BACKEND_ARGS=(--backend-only "$@")
 [ -f web/dist/index.html ] || echo "note: web/dist is not built (cd web && pnpm install && pnpm build); the API still works" >&2
 
 "$PY" -m storyagent db migrate >/dev/null
@@ -47,9 +55,13 @@ if [ "$WRC" = "$RESTART_EXIT" ] || [ "$SRC" = "$RESTART_EXIT" ]; then
   done
   kill "$WORKER" "$SERVER" 2>/dev/null || true       # our own children, only if they did not leave in time
   wait 2>/dev/null || true
+  if [ -n "${STORY_AGENT_GATEWAY_STOP:-}" ] && [ -f "$STORY_AGENT_GATEWAY_STOP" ]; then
+    echo "backend stopped after draining work; startup entrance stays available" >&2
+    exit 0
+  fi
   echo "restarting worker and server" >&2
   trap - EXIT INT TERM
-  exec "$SELF" "$@"
+  exec "$SELF" "${BACKEND_ARGS[@]}"
 fi
 echo "one of the two stopped (worker $WRC, server $SRC) - stopping the other" >&2
 [ "$WRC" != 0 ] && exit "$WRC"

@@ -606,6 +606,8 @@ class Updater:
         if phase_of(request, answer) == "restarting":
             raise UpdateError("update_restarting", 409)           # the worker has already stopped
         clear_request(self.settings)
+        if stop_file := os.environ.get("STORY_AGENT_GATEWAY_STOP"):
+            Path(stop_file).unlink(missing_ok=True)
         self.audit("update.restart_cancel", by, {"request": request.id})
 
     def forget_restart(self) -> None:
